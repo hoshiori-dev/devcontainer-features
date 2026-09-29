@@ -31,12 +31,13 @@ gates), and `.agents/knowledge/agent-authority.md` (what you may do alone).
    `Phase:` line reads `specification` while Changes and Validation keep their reserved line. Then stop. The maintainer
    discusses on the PR and directs changes in conversation; push each through the publish gate. When the maintainer
    closes the package deliberation in conversation, read the PR's comments
-   (`gh api repos/hoshiori-dev/devcontainer-features/issues/<n>/comments`) and its review threads with their resolution
-   state (the GraphQL `reviewThreads` connection, field `isResolved`); list every unresolved thread, every adjustment
-   requested in the discussion that the change does not carry, and every pair of conclusions that contradict each other;
-   ask the maintainer to confirm them; and start the tasks and the implementation only when nothing is open or the open
-   items are confirmed. Record the closing on the `Approval:` line. The same reconciliation runs again at the
-   implementation deliberation, before the archive.
+   (`gh api repos/hoshiori-dev/devcontainer-features/issues/<pr>/comments`, where `<pr>` is the pull request number, not
+   the issue's: a PR's conversation lives under the issues API with its own number) and its review threads with their
+   resolution state (the GraphQL `reviewThreads` connection, field `isResolved`); list every unresolved thread, every
+   adjustment requested in the discussion that the change does not carry, and every pair of conclusions that contradict
+   each other; ask the maintainer to confirm them; and start the tasks and the implementation only when nothing is open
+   or the open items are confirmed. Record the closing on the `Approval:` line. The same reconciliation runs again at
+   the implementation deliberation, before the archive.
 4. Keep the PR description current; comment major discoveries and decisions. The repository is public: credentials,
    tokens, internal hosts, and personal data never go into an issue, PR, commit, or log.
 5. Abandon by un-assigning, closing the draft with a status comment, and leaving the issue open.
