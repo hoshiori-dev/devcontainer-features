@@ -29,8 +29,11 @@ const SIGNALS = { SIGHUP: 129, SIGINT: 130, SIGTERM: 143 } as const;
 
 /** The command run() is waiting on, so a signal handler can stop it before removing what it uses. */
 let current: Deno.ChildProcess | undefined;
+/** Set by a signal handler: run() starts nothing more while cleanup removes what commands would use. */
+let stopping = false;
 
 async function run(command: string, args: string[]): Promise<boolean> {
+    if (stopping) return false;
     console.log(`\n$ ${command} ${args.join(" ")}`);
     current = new Deno.Command(command, { args, stdout: "inherit", stderr: "inherit" }).spawn();
     try {
@@ -117,11 +120,13 @@ if (import.meta.main) {
 
     const failures: string[] = [];
     const out = await Deno.makeTempDir({ prefix: "feature-test-" });
-    // Named up front, so a signal that arrives while `docker run` is still starting it can remove it too.
+    // Named up front, so cleanup can remove it by name, after waiting for a `docker run` still creating it.
     const container = `feature-test-registry-${crypto.randomUUID().slice(0, 8)}`;
+    let starting: Promise<string> | undefined;
     let cleaned: Promise<void> | undefined;
     const cleanup = () =>
         cleaned ??= (async () => {
+            await starting?.catch(() => "");
             await new Deno.Command("docker", { args: ["rm", "-f", container], stdout: "null", stderr: "null" })
                 .output();
             if (args.keep) {
@@ -131,6 +136,7 @@ if (import.meta.main) {
     const handlers = Object.entries(SIGNALS).map(([signal, code]) => {
         const handler = () => {
             console.error(`\n${signal}: stopping, then removing the local registry and the staging directory`);
+            stopping = true;
             try {
                 current?.kill("SIGTERM");
             } catch {
@@ -142,7 +148,17 @@ if (import.meta.main) {
         return [signal as Deno.Signal, handler] as const;
     });
     try {
-        await capture("docker", ["run", "-d", "--rm", "--name", container, "-p", "127.0.0.1::5000", REGISTRY_IMAGE]);
+        starting = capture("docker", [
+            "run",
+            "-d",
+            "--rm",
+            "--name",
+            container,
+            "-p",
+            "127.0.0.1::5000",
+            REGISTRY_IMAGE,
+        ]);
+        await starting;
         const host = await registryHost(container);
         const staged = await stage(".", out, host, roots(mode, args.feature));
         console.log(`\nStaged for ${host}: ${staged.join(", ") || "no feature"}`);
