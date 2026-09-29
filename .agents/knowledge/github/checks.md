@@ -5,9 +5,10 @@ and before touching the release path.
 
 ## Required checks
 
-`ci-gate` (workflow CI), and `pr-title`, `pr-checklist`, `spec-archived` (workflow PR). They block merging once the
-`main` ruleset in `platform-settings.md` is applied. Required checks match by job name: a renamed job is renamed in the
-ruleset in the same PR, and a new name is added to the ruleset only after it has reported once.
+`ci-gate` (workflow CI), `pr-title`, `pr-checklist`, `spec-archived` (workflow PR), and `secret-scan` (workflow Secret
+Scanning). They block merging once the `main` ruleset in `platform-settings.md` is applied. Required checks match by job
+name: a renamed job is renamed in the ruleset in the same PR, and a new name is added to the ruleset only after it has
+reported once.
 
 ## Job ↔ command map
 

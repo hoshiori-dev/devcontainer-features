@@ -49,8 +49,8 @@ not passed and ask.
 - No specification approval exists in this conversation for the change you are about to implement.
 - The work needs a feature, option, dependency (`dependsOn`, `installsAfter`), or file the approved change does not
   cover.
-- A required check (`ci-gate`, `pr-title`, `pr-checklist`, `spec-archived`) is unavailable or flaky, or making it pass
-  would mean weakening it.
+- A required check (`ci-gate`, `pr-title`, `pr-checklist`, `spec-archived`, `secret-scan`) is unavailable or flaky, or
+  making it pass would mean weakening it.
 - The change touches security-sensitive surface: download sources, checksum or signature verification, `privileged`,
   `capAdd`, `securityOpt`, `mounts`, `entrypoint`, workflow `permissions:`, or secrets.
 - The change needs a major version bump, or renames or re-defaults an option, and the approved specification does not
