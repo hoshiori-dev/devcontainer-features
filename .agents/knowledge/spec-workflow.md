@@ -35,7 +35,8 @@ Regenerate with `openspec init --tools claude`, never `openspec update`. `.claud
 `.agents/skills`, where OpenSpec's generic "agents" tool keeps its skills too, so `update` treats both tools as
 configured, rewrites the shared skills to the agents tool's command names (`/openspec-apply-change` instead of
 `/opsx:apply`), and adds `.agents/skills/.openspec-target`. `init` with only the claude tool reproduces the committed
-files (verified with OpenSpec 1.13.2 on 2026-09-29).
+files (verified with OpenSpec 1.13.2 on 2026-09-29), and `just spec-check` fails when they drift from its output
+(`scripts/check_openspec.ts`).
 
 ## Source of truth
 

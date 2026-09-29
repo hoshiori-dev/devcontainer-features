@@ -27,9 +27,10 @@ scripts-check:
 validate base="origin/main":
     ./scripts/validate.ts --base "$1"
 
-# Validate every OpenSpec spec and change in strict mode
+# Validate every OpenSpec spec and change in strict mode, and that OpenSpec's generated files are current
 spec-check:
     OPENSPEC_NO_UPDATE_CHECK=1 openspec validate --all --strict --no-interactive
+    ./scripts/check_openspec.ts
 
 # List unarchived OpenSpec changes; --ready shows the verdict CI gives a ready PR
 spec-status *args:
