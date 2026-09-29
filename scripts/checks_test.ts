@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.19";
 import { parse } from "jsr:@std/semver@1.0.8";
-import { titleProblems } from "./check_title.ts";
+import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
@@ -19,6 +19,13 @@ Deno.test("titleProblems rejects malformed titles with a reason", () => {
     assert(titleProblems("feat(node): Add pnpm")[0].includes("lowercase"));
     assert(titleProblems("feat(node): add pnpm.")[0].includes("period"));
     assert(titleProblems(`feat: ${"x".repeat(80)}`)[0].includes("within 72"));
+});
+
+Deno.test("titleProblems ignores only Dependabot's directory suffix when measuring length", () => {
+    const title = "ci: bump denoland/setup-deno from 2.0.5 to 2.0.6 in /.github/actions/setup-tools";
+    assertEquals(titleProblems(title, DEPENDABOT), []);
+    assert(titleProblems(title)[0].includes("within 72"));
+    assert(titleProblems(`ci: bump ${"x".repeat(80)}`, DEPENDABOT)[0].includes("within 72"));
 });
 
 const TEMPLATE =
