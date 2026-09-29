@@ -1,6 +1,7 @@
 # Runs scripts/test_feature.ts — the same command `just test` runs locally — for one feature and
-# image, one feature's scenarios, or the global scenarios. The script stages a copy of the
-# repository in which in-repo dependencies resolve to this checkout, not to GHCR.
+# image, one feature's scenarios, or the global scenarios. The script publishes a staged copy of
+# the repository to a throwaway local registry, so in-repo dependencies resolve to this checkout,
+# not to GHCR.
 name: Test a feature
 description: Run the devcontainer feature tests for one CI matrix entry.
 inputs:

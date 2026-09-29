@@ -47,7 +47,8 @@ CI pins Deno, just, the devcontainer CLI, OpenSpec, and pre-commit in `.github/a
 place CI versions live. The dev container installs its own copies (OpenSpec at `@latest` via `.devcontainer/setup.sh`).
 Before bumping a pin, run `just check` locally with that version. `denoland/setup-deno` is pinned by commit SHA with its
 version in a comment; `actions/*` by major tag; Dependabot proposes updates for both. Deno scripts pin their `jsr:` /
-`npm:` imports inline, and CI's OpenSpec install uses the same permission flags as `setup.sh`.
+`npm:` imports inline, and CI's OpenSpec install uses the same permission flags as `setup.sh`. The local registry image
+the feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts/test_feature.ts`.
 
 ## Release path
 

@@ -5,8 +5,11 @@ import { join } from "jsr:@std/path@1.1.6";
 import { parse as parseJsonc } from "jsr:@std/jsonc@1.0.3";
 import Ajv from "npm:ajv@8.20.0";
 
+/** GitHub repository, which is also the OCI namespace path the features are published under. */
+export const REPO = "hoshiori-dev/devcontainer-features";
+
 /** OCI namespace every feature of this repository is published under. */
-export const NAMESPACE = "ghcr.io/hoshiori-dev/devcontainer-features";
+export const NAMESPACE = `ghcr.io/${REPO}`;
 
 /** A publishable feature version: MAJOR.MINOR.PATCH without a pre-release or build suffix. */
 export const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -290,19 +293,6 @@ export function unreadableFiles(model: RepoModel): Problem[] {
 export function testEdges(feature: FeatureInfo): string[] {
     return unique([...feature.dependsOn, ...feature.installsAfter, ...feature.scenarioRefs])
         .filter((id) => id !== feature.id);
-}
-
-/** Transitive in-repo dependsOn closure of `id`, excluding `id` itself, in discovery order. */
-export function dependsOnClosure(model: RepoModel, id: string): string[] {
-    const seen = new Set<string>();
-    const queue = [...(model.features.get(id)?.dependsOn ?? [])];
-    while (queue.length > 0) {
-        const next = queue.shift()!;
-        if (next === id || seen.has(next)) continue;
-        seen.add(next);
-        queue.push(...(model.features.get(next)?.dependsOn ?? []));
-    }
-    return [...seen];
 }
 
 /**

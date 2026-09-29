@@ -118,6 +118,6 @@ before editing anything:
 - Every path, command, and job name in `AGENTS.md` and `.agents/knowledge/` still exists and runs.
 - Every knowledge file is reached from `AGENTS.md`, and no two files state the same rule.
 - Pinned versions — `setup-tools` inputs, `jsr:` / `npm:` imports in `scripts/`, the feature schema URL in
-  `scripts/validate.ts` — are not far behind upstream.
+  `scripts/validate.ts`, `REGISTRY_IMAGE` in `scripts/test_feature.ts` — are not far behind upstream.
 - The canary set in `test/canary.json` is still small, fast, and representative.
 - "Deliberately not used" triggers in this file: has any fired?

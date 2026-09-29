@@ -3,7 +3,6 @@ import { join } from "jsr:@std/path@1.1.6";
 import {
     buildPlan,
     classifyPath,
-    dependsOnClosure,
     type FeatureInfo,
     findInstallCycle,
     inRepoId,
@@ -177,12 +176,6 @@ Deno.test("buildPlan refuses more jobs than one matrix may hold", () => {
     const images = Array.from({ length: 130 }, (_, i) => ({ image: `img:${i}` }));
     const m = model([feature("a", { compat: { images } }), feature("b", { compat: { images } })]);
     assertThrows(() => buildPlan(selectAffected(["src/a/x", "src/b/x"], m), m), Error, "256-job matrix limit");
-});
-
-Deno.test("dependsOnClosure follows dependencies transitively", () => {
-    const m = model([feature("a"), feature("b", { dependsOn: ["a"] }), feature("c", { dependsOn: ["b"] })]);
-    assertEquals(dependsOnClosure(m, "c"), ["b", "a"]);
-    assertEquals(dependsOnClosure(m, "a"), []);
 });
 
 Deno.test("findInstallCycle reports a loop through dependsOn, installsAfter, or both", () => {
