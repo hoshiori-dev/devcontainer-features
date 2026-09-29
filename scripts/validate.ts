@@ -2,7 +2,8 @@
 // Checks every feature's layout and metadata before any container is built:
 // - devcontainer-feature.json matches the official schema, `id` equals the folder name, `name` is
 //   set, `version` is MAJOR.MINOR.PATCH without a pre-release or build suffix;
-// - install.sh, test/<id>/test.sh and (unless exempted) duplicate.sh exist and are executable;
+// - install.sh, test/<id>/test.sh, (unless exempted) duplicate.sh, and a <name>.sh per scenario —
+//   the global scenarios' too — exist and are executable;
 // - test/<id>/compatibility.json is valid, and every scenario image — the global scenarios' too —
 //   appears in the compatibility list of each feature it installs, for the scenario runners' arch;
 // - every scenarios.json, test/_global/scenarios.json, and test/canary.json is readable;
@@ -73,16 +74,24 @@ export function scenarioImages(compat: Compat): Set<string> {
     );
 }
 
-/** Every global scenario image must be supported, on the scenario runners' arch, by each feature it installs. */
-export function globalImageProblems(model: RepoModel): Problem[] {
+/**
+ * Every in-repo feature a scenario installs must list the scenario's image for the scenario runners' arch. `owner`,
+ * the feature whose test folder holds the scenarios, is skipped: its own list gets a more specific message.
+ */
+export function scenarioImageProblems(
+    model: RepoModel,
+    scenarios: Scenario[],
+    file: string,
+    owner?: string,
+): Problem[] {
     const problems: Problem[] = [];
-    for (const scenario of model.globalScenarios) {
+    for (const scenario of scenarios) {
         if (scenario.usesBuild || !scenario.image) continue;
         for (const id of new Set(scenario.featureKeys.map(scenarioKeyId))) {
-            const compat = id === undefined ? undefined : model.features.get(id)?.compat;
+            const compat = id === undefined || id === owner ? undefined : model.features.get(id)?.compat;
             if (!compat || scenarioImages(compat).has(scenario.image)) continue;
             problems.push({
-                file: "test/_global/scenarios.json",
+                file,
                 message: `scenario "${scenario.name}" installs ${id} on ${scenario.image}, which ` +
                     `test/${id}/compatibility.json does not list for ${SCENARIO_ARCH}, the architecture scenario jobs ` +
                     "run on. Use an image every installed feature lists for it.",
@@ -277,6 +286,7 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
             );
         }
         problems.push(...scenarioRefProblems(model, feature.scenarios, `test/${id}/scenarios.json`));
+        problems.push(...scenarioImageProblems(model, feature.scenarios, `test/${id}/scenarios.json`, id));
 
         if (!(await exists(`openspec/specs/${id}/spec.md`)) && !inChanges.has(id)) {
             problems.push({
@@ -290,7 +300,14 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
 
     problems.push(...unreadableFiles(model));
     problems.push(...scenarioRefProblems(model, model.globalScenarios, "test/_global/scenarios.json"));
-    problems.push(...globalImageProblems(model));
+    problems.push(...scenarioImageProblems(model, model.globalScenarios, "test/_global/scenarios.json"));
+    for (const scenario of model.globalScenarios) {
+        await requireExecutable(
+            problems,
+            `test/_global/${scenario.name}.sh`,
+            `Global scenario "${scenario.name}" needs a test script.`,
+        );
+    }
     const cycle = findInstallCycle(model);
     if (cycle) {
         problems.push({

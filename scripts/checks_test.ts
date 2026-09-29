@@ -4,7 +4,7 @@ import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
-import { compatBumpProblems, globalImageProblems, inRepoRefProblem, scenarioImages } from "./validate.ts";
+import { compatBumpProblems, inRepoRefProblem, scenarioImageProblems, scenarioImages } from "./validate.ts";
 import { type Compat, type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
 
 Deno.test("titleProblems accepts the convention", () => {
@@ -112,9 +112,12 @@ Deno.test("scenario images must be listed for the scenario runners' architecture
         { name: "arm", image: "arm-only", usesBuild: false, featureKeys: ["a", "b"] },
         { name: "built", usesBuild: true, featureKeys: ["a"] },
     ];
-    const problems = globalImageProblems(m).map((p) => p.message);
+    const problems = scenarioImageProblems(m, m.globalScenarios, "test/_global/scenarios.json").map((p) => p.message);
     assertEquals(problems.length, 2);
     assert(problems.every((p) => p.startsWith('scenario "arm" installs ')));
+    // A feature's own scenarios skip the owner, whose list gets its own message.
+    const own = scenarioImageProblems(m, m.globalScenarios, "test/a/scenarios.json", "a").map((p) => p.message);
+    assertEquals(own, [problems[1]]);
 });
 
 Deno.test("compatBumpProblems wants MAJOR to drop an image and MINOR to add one", () => {
