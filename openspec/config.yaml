@@ -20,8 +20,9 @@ rules:
     - Link the GitHub issue the change implements.
   specs:
     - One capability per feature; the capability path is the feature id.
-    - A new capability's Purpose ends with an "Upstream sources:" list of the official install docs, release index, and signing keys the feature relies on.
-    - When an upstream source shapes behavior (download location, checksum or signature verification), state it as a Requirement.
+    - 'A new capability''s Purpose opens with one or two sentences on what the feature installs, then ends with an "Upstream sources:" list of reference links, one `- <label>: <url>` entry each — the upstream home or README, its documentation root, and its installation guide. Link stable entry pages, not deep anchors.'
+    - When an upstream source shapes behavior (download location, checksum or signature verification, signing keys), state it and its URL as a Requirement and leave it out of the "Upstream sources:" list; each URL lives in one place.
+    - A delta spec holds only `## Purpose` (new capabilities only) and ADDED, MODIFIED, REMOVED, or RENAMED Requirements sections; archive silently drops any other section. The Purpose of an existing spec changes only by hand (.agents/knowledge/spec-workflow.md, Scope of specifications).
     - Refer to test/<id>/compatibility.json for supported images; never list images in a spec.
     - Name options in scenarios, but leave their types and defaults to devcontainer-feature.json.
     - Include a requirement stating what installing the feature a second time, with the same or different options, does.
