@@ -64,6 +64,9 @@ the feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts
   publish (`platform-settings.md`).
 - A failed release is fixed forward through a PR; a maintainer may rerun it by dispatch on `main` — the job skips any
   other branch, which would publish unmerged versions. Tags are never deleted or moved.
+- Release runs one at a time, and GitHub keeps only the newest pending run: of several merges in quick succession, the
+  intermediate ones may never run. Their versions are superseded by the newest one, which is published and tagged; the
+  skipped versions are never published.
 
 ## Rules
 
