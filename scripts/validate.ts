@@ -25,6 +25,7 @@ import Ajv from "npm:ajv@8.20.0";
 import FEATURE_SCHEMA from "https://raw.githubusercontent.com/devcontainers/spec/1b2baddb5f1071ca0e8bcb7eb56dbc9d3e4a674f/schemas/devContainerFeature.schema.json" with {
     type: "json",
 };
+import { activeChanges } from "./check_spec_archived.ts";
 import {
     archesOf,
     type Compat,
@@ -104,11 +105,8 @@ export function scenarioImageProblems(
 
 async function activeChangeSpecs(): Promise<Set<string>> {
     const ids = new Set<string>();
-    const changes = "openspec/changes";
-    if (!(await exists(changes))) return ids;
-    for await (const change of Deno.readDir(changes)) {
-        if (!change.isDirectory || change.name === "archive") continue;
-        const specs = join(changes, change.name, "specs");
+    for (const change of await activeChanges()) {
+        const specs = join("openspec/changes", change, "specs");
         if (!(await exists(specs))) continue;
         for await (const spec of Deno.readDir(specs)) if (spec.isDirectory) ids.add(spec.name);
     }
