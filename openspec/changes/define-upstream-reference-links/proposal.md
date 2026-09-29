@@ -40,3 +40,12 @@ None. This change edits the harness only (`skip_specs: true`).
 
 - Feature ids touched: none, so no version bump. No feature exists yet, so no spec needs migrating.
 - Affects how every future feature spec records upstream links, and which PRs need an OpenSpec change.
+
+## Acceptance
+
+- `openspec instructions specs --json` for a change shows rules that put reference links (home or README, documentation,
+  installation guide) in the Purpose's "Upstream sources:" list as `- <label>: <url>`, put behavior-shaping sources
+  (signing keys included) only in Requirements, and limit a delta spec to the sections archive keeps.
+- `spec-workflow.md` permits a PR that only edits the "Upstream sources:" list without an OpenSpec change or version
+  bump, and its Source of truth row names one place per kind of link; `references.md` agrees.
+- A uv-shaped spec written to these rules passes `openspec validate --strict`, and `just check` passes.

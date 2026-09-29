@@ -12,9 +12,10 @@ warning; any other section in a delta (e.g. `## References`) is dropped without 
 
 **Goals:**
 
-- One place per kind of upstream link, stated where the agent writing a spec reads it (`rules.specs`) and in the
-  specification contract (`spec-workflow.md`).
-- A documented path for every edit of a spec's "Upstream sources:" list, including adding and removing entries.
+- The rules injected into the specs step (`openspec instructions specs --json`) and `spec-workflow.md` name the same
+  place for each kind of upstream link — reference links in the Purpose list, behavior-shaping sources in Requirements.
+- Adding, updating, and removing an entry of a spec's "Upstream sources:" list each has a documented path in
+  `spec-workflow.md` that needs no OpenSpec change.
 
 **Non-Goals:**
 
