@@ -1,16 +1,21 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert@1.0.19";
+import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1.0.19";
+import { join } from "jsr:@std/path@1.1.6";
 import {
     buildPlan,
     classifyPath,
     dependsOnClosure,
     type FeatureInfo,
-    findDependsOnCycle,
+    findInstallCycle,
     inRepoId,
     inRepoRefs,
+    loadRepo,
     localPathRefs,
+    majorOf,
     NAMESPACE,
     type RepoModel,
+    scenarioKeyId,
     selectAffected,
+    unreadableFiles,
 } from "./repo.ts";
 
 function feature(id: string, extra: Partial<FeatureInfo> = {}): FeatureInfo {
@@ -30,8 +35,10 @@ function model(features: FeatureInfo[], extra: Partial<RepoModel> = {}): RepoMod
     return {
         features: new Map(features.map((f) => [f.id, f])),
         globalRefs: [],
+        globalScenarios: [],
         hasGlobal: false,
         canary: [],
+        errors: [],
         ...extra,
     };
 }
@@ -48,6 +55,18 @@ Deno.test("inRepoRefs reads dependsOn objects and installsAfter arrays", () => {
     assertEquals(inRepoRefs({ [`${NAMESPACE}/a:1`]: {}, "ghcr.io/other/x:1": {} }), ["a"]);
     assertEquals(inRepoRefs([`${NAMESPACE}/b`, "ghcr.io/devcontainers/features/common-utils"]), ["b"]);
     assertEquals(inRepoRefs(undefined), []);
+});
+
+Deno.test("scenarioKeyId treats every bare key as src/<key> and resolves full in-repo refs", () => {
+    assertEquals(scenarioKeyId("node"), "node");
+    assertEquals(scenarioKeyId(`${NAMESPACE}/node:1`), "node");
+    assertEquals(scenarioKeyId("ghcr.io/devcontainers/features/git:1"), undefined);
+});
+
+Deno.test("majorOf reads only release versions", () => {
+    assertEquals(majorOf(feature("a", { json: { version: "2.3.4" } })), 2);
+    assertEquals(majorOf(feature("a", { json: { version: "2.3.4-rc.1" } })), undefined);
+    assertEquals(majorOf(undefined), undefined);
 });
 
 Deno.test("localPathRefs flags relative and absolute paths, not OCI refs", () => {
@@ -105,9 +124,19 @@ Deno.test("infrastructure changes select the canary set and nothing else", () =>
     assertEquals(selectAffected(["README.md", "openspec/specs/a/spec.md"], m).reasons.size, 0);
 });
 
-Deno.test("deleted features and unknown test folders are ignored", () => {
+Deno.test("deleted features and unknown test folders select nothing by themselves", () => {
     const m = model([feature("a")]);
     assertEquals(selectAffected(["src/gone/install.sh", "test/gone/test.sh"], m).reasons.size, 0);
+});
+
+Deno.test("a deleted feature still selects the features that reference it", () => {
+    const m = model([feature("b", { scenarioRefs: ["gone"] }), feature("c", { dependsOn: ["b"] })], {
+        hasGlobal: true,
+        globalRefs: ["gone"],
+    });
+    const selection = selectAffected(["src/gone/install.sh"], m);
+    assertEquals(Object.fromEntries(selection.reasons), { b: "references removed gone", c: "depends on b" });
+    assertEquals(selection.runGlobal, true);
 });
 
 Deno.test("buildPlan expands images and architectures and lists scenario jobs", () => {
@@ -156,8 +185,34 @@ Deno.test("dependsOnClosure follows dependencies transitively", () => {
     assertEquals(dependsOnClosure(m, "a"), []);
 });
 
-Deno.test("findDependsOnCycle reports a loop", () => {
+Deno.test("findInstallCycle reports a loop through dependsOn, installsAfter, or both", () => {
     const m = model([feature("a", { dependsOn: ["b"] }), feature("b", { dependsOn: ["a"] })]);
-    assertEquals(findDependsOnCycle(m), ["a", "b", "a"]);
-    assertEquals(findDependsOnCycle(model([feature("a"), feature("b", { dependsOn: ["a"] })])), undefined);
+    assertEquals(findInstallCycle(m), ["a", "b", "a"]);
+    assertEquals(findInstallCycle(model([feature("a"), feature("b", { dependsOn: ["a"] })])), undefined);
+    const mixed = model([feature("a", { installsAfter: ["b"] }), feature("b", { dependsOn: ["a"] })]);
+    assertEquals(findInstallCycle(mixed), ["a", "b", "a"]);
+});
+
+Deno.test("loadRepo records unreadable test files instead of throwing", async () => {
+    const root = await Deno.makeTempDir({ prefix: "repo-test-" });
+    try {
+        const write = async (path: string, text: string) => {
+            await Deno.mkdir(join(root, path, ".."), { recursive: true });
+            await Deno.writeTextFile(join(root, path), text);
+        };
+        await write("src/a/devcontainer-feature.json", '{"id": "a", "version": "1.0.0"}');
+        await write("test/a/scenarios.json", "[1, 2]");
+        await write("test/_global/scenarios.json", "{not json");
+        await write("test/canary.json", '{"features": "a"}');
+        const m = await loadRepo(root);
+        assert(m.features.get("a")?.scenariosError);
+        assertEquals(unreadableFiles(m).map((p) => p.file), [
+            "test/a/scenarios.json",
+            "test/_global/scenarios.json",
+            "test/canary.json",
+        ]);
+        assertEquals(m.canary, []);
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
 });

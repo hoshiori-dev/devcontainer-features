@@ -1,11 +1,13 @@
-#!/usr/bin/env -S deno run --allow-read=src,test --allow-run=git
+#!/usr/bin/env -S deno run --allow-read=src --allow-run=git
 // Creates the git tag `<id>/v<version>` at HEAD for every feature whose current version has no
 // tag on origin yet, then pushes those tags. Run by the release workflow after
-// `devcontainer features publish` succeeded; never run it by hand.
+// `devcontainer features publish` succeeded; never run it by hand. It reads only src/, so nothing
+// under test/ can stop a published version from being tagged.
 //
 //   scripts/tag_releases.ts [--dry-run]
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
-import { loadRepo } from "./lib/repo.ts";
+import { join } from "jsr:@std/path@1.1.6";
+import { exists, readJsonc } from "./lib/repo.ts";
 
 async function git(args: string[]): Promise<string> {
     const output = await new Deno.Command("git", { args, stderr: "inherit" }).output();
@@ -24,11 +26,19 @@ if (import.meta.main) {
             .map((line) => line.split("\t")[1]?.replace(/^refs\/tags\//, "").replace(/\^\{\}$/, ""))
             .filter(Boolean),
     );
-    const model = await loadRepo(".");
+    const ids: string[] = [];
+    if (await exists("src")) {
+        for await (const entry of Deno.readDir("src")) if (entry.isDirectory) ids.push(entry.name);
+    }
     const missing: string[] = [];
-    for (const [id, feature] of model.features) {
-        const version = feature.json?.version;
-        if (typeof version !== "string") continue;
+    for (const id of ids.sort()) {
+        const version = await readJsonc(join("src", id, "devcontainer-feature.json"))
+            .then((json) => (json as { version?: unknown } | null)?.version)
+            .catch(() => undefined);
+        if (typeof version !== "string") {
+            console.error(`warning: src/${id}/devcontainer-feature.json has no readable version; not tagged.`);
+            continue;
+        }
         const tag = releaseTag(id, version);
         if (!remote.has(tag)) missing.push(tag);
     }

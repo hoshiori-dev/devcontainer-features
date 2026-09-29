@@ -1,8 +1,11 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.19";
+import { parse } from "jsr:@std/semver@1.0.8";
 import { titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
+import { compatBumpProblems, inRepoRefProblem } from "./validate.ts";
+import { type Compat, type FeatureInfo, NAMESPACE, type RepoModel } from "./lib/repo.ts";
 
 Deno.test("titleProblems accepts the convention", () => {
     assertEquals(titleProblems("feat(node): add pnpm option"), []);
@@ -49,4 +52,44 @@ Deno.test("scaffold produces the required files for a valid id", () => {
 
 Deno.test("releaseTag uses <id>/v<version>", () => {
     assertEquals(releaseTag("node", "1.2.3"), "node/v1.2.3");
+});
+
+function repoWith(versions: Record<string, string>): RepoModel {
+    const features = new Map<string, FeatureInfo>(
+        Object.entries(versions).map(([id, version]) => [id, {
+            id,
+            json: { id, version },
+            dependsOn: [],
+            installsAfter: [],
+            scenarioRefs: [],
+            scenarios: [],
+        }]),
+    );
+    return { features, globalRefs: [], globalScenarios: [], hasGlobal: false, canary: [], errors: [] };
+}
+
+Deno.test("inRepoRefProblem accepts only the dependency's current major, untagged for installsAfter", () => {
+    const m = repoWith({ a: "2.1.0" });
+    assertEquals(inRepoRefProblem(m, `${NAMESPACE}/a:2`, "dependsOn"), undefined);
+    assertEquals(inRepoRefProblem(m, `${NAMESPACE}/a`, "installsAfter"), undefined);
+    assertEquals(inRepoRefProblem(m, "ghcr.io/other/x:1", "dependsOn"), undefined);
+    for (const ref of [`${NAMESPACE}/a:1`, `${NAMESPACE}/a:2.1`, `${NAMESPACE}/a@sha256:abc`, `${NAMESPACE}/a`]) {
+        assert(inRepoRefProblem(m, ref, "dependsOn")?.includes(`use ${NAMESPACE}/a:2`), ref);
+    }
+    assert(inRepoRefProblem(m, `${NAMESPACE}/a:2`, "installsAfter")?.includes("without a tag"));
+    assert(inRepoRefProblem(m, `${NAMESPACE}/gone:1`, "dependsOn")?.includes("src/gone does not exist"));
+});
+
+Deno.test("compatBumpProblems wants MAJOR to drop an image and MINOR to add one", () => {
+    const one: Compat = { images: [{ image: "debian:12" }] };
+    const two: Compat = { images: [{ image: "debian:12" }, { image: "ubuntu:24.04" }] };
+    const arm: Compat = { images: [{ image: "debian:12", arch: ["amd64", "arm64"] }] };
+    const check = (base: Compat, head: Compat, from: string, to: string) =>
+        compatBumpProblems("a", base, head, parse(from), parse(to));
+    assert(check(two, one, "1.2.0", "1.3.0")[0].message.includes("MAJOR"));
+    assertEquals(check(two, one, "1.2.0", "2.0.0"), []);
+    assert(check(one, two, "1.2.0", "1.2.1")[0].message.includes("MINOR"));
+    assert(check(one, arm, "1.2.0", "1.2.1")[0].message.includes("debian:12 (arm64)"));
+    assertEquals(check(one, two, "1.2.0", "1.3.0"), []);
+    assertEquals(check(one, { images: [{ image: "debian:12", remoteUser: "x" }] }, "1.2.0", "1.2.0"), []);
 });

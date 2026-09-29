@@ -8,6 +8,9 @@ import Ajv from "npm:ajv@8.20.0";
 /** OCI namespace every feature of this repository is published under. */
 export const NAMESPACE = "ghcr.io/hoshiori-dev/devcontainer-features";
 
+/** A publishable feature version: MAJOR.MINOR.PATCH without a pre-release or build suffix. */
+export const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
 /** GitHub-hosted runner label for each architecture a compatibility entry may name. */
 export const RUNNERS = { amd64: "ubuntu-24.04", arm64: "ubuntu-24.04-arm" } as const;
 export type Arch = keyof typeof RUNNERS;
@@ -59,14 +62,24 @@ export interface FeatureInfo {
     scenarios: Scenario[];
     compat?: Compat;
     compatError?: string;
+    scenariosError?: string;
+}
+
+/** A problem tied to one repository file, with a message that says how to fix it. */
+export interface Problem {
+    file: string;
+    message: string;
 }
 
 export interface RepoModel {
     features: Map<string, FeatureInfo>;
     /** In-repo feature ids installed by test/_global scenarios. */
     globalRefs: string[];
+    globalScenarios: Scenario[];
     hasGlobal: boolean;
     canary: string[];
+    /** Files outside src/<id> and test/<id> that could not be read (global scenarios, canary list). */
+    errors: Problem[];
 }
 
 /** Returns the feature id when `ref` points into this repository's OCI namespace. */
@@ -77,17 +90,24 @@ export function inRepoId(ref: string): string | undefined {
     return match?.[1];
 }
 
-/** Resolves a scenario feature key: a bare key is a local feature id, a full ref may be in-repo. */
-export function scenarioKeyId(key: string, known: Set<string>): string | undefined {
-    if (!key.includes("/")) return known.has(key) ? key : undefined;
-    return inRepoId(key);
+/** Resolves a scenario feature key: a bare key names src/<key> (existing or not), a full ref may be in-repo. */
+export function scenarioKeyId(key: string): string | undefined {
+    return key.includes("/") ? inRepoId(key) : key;
+}
+
+/** Major version of a feature's metadata, or undefined when its version is not a release version. */
+export function majorOf(feature: FeatureInfo | undefined): number | undefined {
+    const version = feature?.json?.version;
+    const match = typeof version === "string" ? RELEASE_VERSION.exec(version) : null;
+    return match ? Number(match[1]) : undefined;
 }
 
 function unique<T>(items: Iterable<T>): T[] {
     return [...new Set(items)];
 }
 
-function refsOf(value: unknown): string[] {
+/** Reference strings of a dependsOn object, an installsAfter array, or a scenario's features object. */
+export function refsOf(value: unknown): string[] {
     if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
     if (value && typeof value === "object") return Object.keys(value);
     return [];
@@ -127,8 +147,12 @@ export function archesOf(entry: CompatEntry): Arch[] {
 // Loaders
 // ---------------------------------------------------------------------------------------------
 
+export function parseJsoncText(text: string): unknown {
+    return parseJsonc(text);
+}
+
 export async function readJsonc(path: string): Promise<unknown> {
-    return parseJsonc(await Deno.readTextFile(path));
+    return parseJsoncText(await Deno.readTextFile(path));
 }
 
 export async function exists(path: string): Promise<boolean> {
@@ -188,36 +212,74 @@ export async function loadFeature(root: string, id: string): Promise<FeatureInfo
         }
     }
     const scenariosPath = join(root, "test", id, "scenarios.json");
-    if (await exists(scenariosPath)) info.scenarios = parseScenarios(await readJsonc(scenariosPath));
+    if (await exists(scenariosPath)) {
+        try {
+            info.scenarios = parseScenarios(await readJsonc(scenariosPath));
+        } catch (error) {
+            info.scenariosError = error instanceof Error ? error.message : String(error);
+        }
+    }
     return info;
 }
 
-/** Loads every feature under src/ plus the global scenarios and the canary list. */
+function scenarioRefs(scenarios: Scenario[]): string[] {
+    return unique(
+        scenarios.flatMap((s) => s.featureKeys).map(scenarioKeyId).filter((ref): ref is string => ref !== undefined),
+    );
+}
+
+function errorText(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Loads every feature under src/ plus the global scenarios and the canary list. Unreadable files never throw:
+ * they surface as FeatureInfo errors or in `errors`, so every caller can name the file to fix.
+ */
 export async function loadRepo(root: string): Promise<RepoModel> {
     const features = new Map<string, FeatureInfo>();
     for (const id of await listDirs(join(root, "src"))) features.set(id, await loadFeature(root, id));
-    const known = new Set(features.keys());
     for (const feature of features.values()) {
-        feature.scenarioRefs = unique(
-            feature.scenarios.flatMap((s) => s.featureKeys)
-                .map((key) => scenarioKeyId(key, known))
-                .filter((ref): ref is string => ref !== undefined && ref !== feature.id),
-        );
+        feature.scenarioRefs = scenarioRefs(feature.scenarios).filter((ref) => ref !== feature.id);
     }
+    const errors: Problem[] = [];
     const globalPath = join(root, "test", "_global", "scenarios.json");
     const hasGlobal = await exists(globalPath);
-    const globalRefs = hasGlobal
-        ? unique(
-            parseScenarios(await readJsonc(globalPath)).flatMap((s) => s.featureKeys)
-                .map((key) => scenarioKeyId(key, known))
-                .filter((ref): ref is string => ref !== undefined),
-        )
-        : [];
+    let globalScenarios: Scenario[] = [];
+    if (hasGlobal) {
+        try {
+            globalScenarios = parseScenarios(await readJsonc(globalPath));
+        } catch (error) {
+            errors.push({ file: "test/_global/scenarios.json", message: `unreadable: ${errorText(error)}.` });
+        }
+    }
     const canaryPath = join(root, "test", "canary.json");
-    const canary = (await exists(canaryPath))
-        ? ((await readJsonc(canaryPath)) as { features?: string[] }).features ?? []
-        : [];
-    return { features, globalRefs, hasGlobal, canary };
+    let canary: string[] = [];
+    if (await exists(canaryPath)) {
+        try {
+            const value = await readJsonc(canaryPath) as { features?: unknown } | null;
+            const list = value?.features ?? [];
+            if (!Array.isArray(list) || !list.every((id) => typeof id === "string")) {
+                throw new Error('it must be {"features": ["<id>", ...]}');
+            }
+            canary = list;
+        } catch (error) {
+            errors.push({ file: "test/canary.json", message: `unreadable: ${errorText(error)}.` });
+        }
+    }
+    return { features, globalRefs: scenarioRefs(globalScenarios), globalScenarios, hasGlobal, canary, errors };
+}
+
+/** Every test file the model could not read: scenario files, the global scenarios, the canary list. */
+export function unreadableFiles(model: RepoModel): Problem[] {
+    return [
+        ...[...model.features.values()].flatMap((f) =>
+            f.scenariosError
+                ? [{ file: `test/${f.id}/scenarios.json`, message: `unreadable: ${f.scenariosError}.` }]
+                : []
+        ),
+        ...model.errors,
+    ];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -243,8 +305,11 @@ export function dependsOnClosure(model: RepoModel, id: string): string[] {
     return [...seen];
 }
 
-/** Finds one dependsOn cycle, returned as the ids along it, or undefined when there is none. */
-export function findDependsOnCycle(model: RepoModel): string[] | undefined {
+/**
+ * Finds one cycle through dependsOn and installsAfter, returned as the ids along it, or undefined when there is
+ * none. The CLI orders both kinds of edge together, so a loop mixing them cannot be installed either.
+ */
+export function findInstallCycle(model: RepoModel): string[] | undefined {
     const state = new Map<string, "visiting" | "done">();
     const stack: string[] = [];
     const visit = (id: string): string[] | undefined => {
@@ -252,7 +317,8 @@ export function findDependsOnCycle(model: RepoModel): string[] | undefined {
         if (state.get(id) === "visiting") return [...stack.slice(stack.indexOf(id)), id];
         state.set(id, "visiting");
         stack.push(id);
-        for (const dep of model.features.get(id)?.dependsOn ?? []) {
+        const feature = model.features.get(id);
+        for (const dep of unique([...(feature?.dependsOn ?? []), ...(feature?.installsAfter ?? [])])) {
             if (!model.features.has(dep)) continue;
             const cycle = visit(dep);
             if (cycle) return cycle;
@@ -291,28 +357,32 @@ export interface Selection {
     runGlobal: boolean;
 }
 
-/** Selects the features a set of changed paths affects, following dependents transitively. */
+/**
+ * Selects the features a set of changed paths affects, following dependents transitively. A changed id that is no
+ * longer in src/ (a deleted or renamed feature) selects nothing itself but still selects what references it.
+ */
 export function selectAffected(changed: string[], model: RepoModel): Selection {
     const reasons = new Map<string, string>();
+    const seeds = new Set<string>();
     let globalChanged = false;
     let infraChanged = false;
     for (const path of changed) {
         const kind = classifyPath(path);
-        if (kind.kind === "feature" && model.features.has(kind.id) && !reasons.has(kind.id)) {
-            reasons.set(kind.id, "changed");
-        } else if (kind.kind === "global") globalChanged = true;
+        if (kind.kind === "feature") seeds.add(kind.id);
+        else if (kind.kind === "global") globalChanged = true;
         else if (kind.kind === "infra") infraChanged = true;
     }
+    for (const id of seeds) if (model.features.has(id)) reasons.set(id, "changed");
     const dependents = new Map<string, string[]>();
     for (const feature of model.features.values()) {
         for (const dep of testEdges(feature)) dependents.set(dep, [...(dependents.get(dep) ?? []), feature.id]);
     }
-    const queue = [...reasons.keys()];
+    const queue = [...seeds];
     while (queue.length > 0) {
         const id = queue.shift()!;
         for (const dependent of dependents.get(id) ?? []) {
             if (reasons.has(dependent)) continue;
-            reasons.set(dependent, `depends on ${id}`);
+            reasons.set(dependent, model.features.has(id) ? `depends on ${id}` : `references removed ${id}`);
             queue.push(dependent);
         }
     }
@@ -320,7 +390,8 @@ export function selectAffected(changed: string[], model: RepoModel): Selection {
     if (infraChanged) {
         for (const id of model.canary) if (model.features.has(id) && !reasons.has(id)) reasons.set(id, "canary");
     }
-    const runGlobal = model.hasGlobal && (globalChanged || model.globalRefs.some((id) => reasons.has(id)));
+    const runGlobal = model.hasGlobal &&
+        (globalChanged || model.globalRefs.some((id) => reasons.has(id) || seeds.has(id)));
     return { reasons, runGlobal };
 }
 

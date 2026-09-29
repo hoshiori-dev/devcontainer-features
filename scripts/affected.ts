@@ -9,7 +9,7 @@
 // --github prints `key=value` lines for $GITHUB_OUTPUT (tests, scenarios, global); the
 // human-readable summary always goes to stderr.
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
-import { buildPlan, loadRepo, selectAffected, type Selection } from "./lib/repo.ts";
+import { buildPlan, loadRepo, selectAffected, type Selection, unreadableFiles } from "./lib/repo.ts";
 
 async function changedPaths(base: string, head: string): Promise<string[]> {
     const output = await new Deno.Command("git", {
@@ -32,6 +32,13 @@ if (import.meta.main) {
         default: { base: "origin/main", head: "HEAD" },
     });
     const model = await loadRepo(".");
+    const unreadable = unreadableFiles(model);
+    if (unreadable.length > 0) {
+        // An unreadable scenario or canary file hides dependency edges, so any plan would be incomplete.
+        for (const problem of unreadable) console.error(`error: ${problem.file}: ${problem.message}`);
+        console.error("Fix the file(s) above; `just validate` lists every problem.");
+        Deno.exit(1);
+    }
     let selection: Selection;
     if (args.all) {
         selection = {

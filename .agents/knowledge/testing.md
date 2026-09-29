@@ -22,8 +22,8 @@ per assertion and `reportResults` last.
 `compatibility.json` is the single source of the images a feature supports; its spec refers to it and never lists
 images. Each entry is `{"image": "…"}` with optional `"arch": ["amd64", "arm64"]` (default amd64; arm64 runs on an arm64
 runner) and `"remoteUser"`. Every scenario `image` must be in the list (`build` scenarios are exempt). Adding an image
-is a MINOR bump, dropping one MAJOR (`feature-authoring.md`). `duplicate.sh` is required unless the list sets
-`idempotencyExemption`, which a maintainer approves.
+or architecture is a MINOR bump, dropping one MAJOR (`feature-authoring.md`); `just validate` checks the bump against
+the base. `duplicate.sh` is required unless the list sets `idempotencyExemption`, which a maintainer approves.
 
 ## Running tests locally
 

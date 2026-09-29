@@ -1,28 +1,46 @@
 #!/usr/bin/env -S deno run --allow-read --allow-run=git --allow-net=raw.githubusercontent.com --allow-env=GITHUB_ACTIONS
 // Checks every feature's layout and metadata before any container is built:
 // - devcontainer-feature.json matches the official schema, `id` equals the folder name, `name` is
-//   set, `version` is SemVer;
+//   set, `version` is MAJOR.MINOR.PATCH without a pre-release or build suffix;
 // - install.sh, test/<id>/test.sh and (unless exempted) duplicate.sh exist and are executable;
 // - test/<id>/compatibility.json is valid, and every scenario image appears in it;
-// - in-repo dependsOn / installsAfter / scenario references resolve, and dependsOn has no cycle;
+// - every scenarios.json, test/_global/scenarios.json, and test/canary.json is readable;
+// - in-repo dependsOn / installsAfter / scenario references resolve to a feature in src/, use the
+//   exact form `<namespace>/<id>:<its current major>` (installsAfter: no tag), and dependsOn plus
+//   installsAfter form no cycle;
 // - every feature has an OpenSpec spec (main or in an active change);
-// - with --base, every feature whose src/<id>/ changed has a higher version than on the base.
+// - with --base, every feature whose src/<id>/ changed has a higher version than on the base, and a
+//   change to the images in test/<id>/compatibility.json carries the bump it requires.
 //
 //   scripts/validate.ts [--base origin/main]
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { join } from "jsr:@std/path@1.1.6";
-import { compare, parse, tryParse } from "jsr:@std/semver@1.0.8";
+import { compare, format, parse, type SemVer, tryParse } from "jsr:@std/semver@1.0.8";
 import Ajv from "npm:ajv@8.20.0";
-import { exists, findDependsOnCycle, loadRepo, localPathRefs, NAMESPACE, type RepoModel } from "./lib/repo.ts";
+import {
+    archesOf,
+    type Compat,
+    exists,
+    findInstallCycle,
+    inRepoId,
+    loadRepo,
+    localPathRefs,
+    majorOf,
+    NAMESPACE,
+    parseJsoncText,
+    type Problem,
+    refsOf,
+    RELEASE_VERSION,
+    type RepoModel,
+    type Scenario,
+    unreadableFiles,
+} from "./lib/repo.ts";
 
 /** Official feature metadata schema, pinned to the last commit that changed it. */
 export const FEATURE_SCHEMA_URL =
     "https://raw.githubusercontent.com/devcontainers/spec/1b2baddb5f1071ca0e8bcb7eb56dbc9d3e4a674f/schemas/devContainerFeature.schema.json";
 
-export interface Problem {
-    file: string;
-    message: string;
-}
+export type { Problem };
 
 async function isExecutable(path: string): Promise<boolean> {
     try {
@@ -61,6 +79,47 @@ async function activeChangeSpecs(): Promise<Set<string>> {
     return ids;
 }
 
+/**
+ * Why an in-repo ref is unusable, or undefined when it is fine or outside this namespace. `where` names the field
+ * for the message. Tests install every in-repo feature from this checkout, so only the dependency's current major
+ * is ever tested: dependsOn and scenario refs must float on exactly that tag, and installsAfter carries none.
+ */
+export function inRepoRefProblem(model: RepoModel, ref: string, where: string): string | undefined {
+    const id = inRepoId(ref);
+    if (!id) return undefined;
+    const target = model.features.get(id);
+    if (!target) {
+        return `${where} references ${ref}, but src/${id} does not exist. Fix the reference or add the feature first.`;
+    }
+    if (where === "installsAfter") {
+        const expected = `${NAMESPACE}/${id}`;
+        return ref === expected ? undefined : `installsAfter references ${ref}; use ${expected} without a tag or ` +
+            "digest — it only orders features that are installed anyway.";
+    }
+    const major = majorOf(target);
+    if (major === undefined) return undefined; // the target's own version problem is reported on it
+    const expected = `${NAMESPACE}/${id}:${major}`;
+    return ref === expected ? undefined : `${where} references ${ref}; use ${expected}. ${id} is at ` +
+        `${target.json?.version}, and tests install it from this checkout, so another major, a narrower tag, or a ` +
+        "digest would ship a combination no test ran. A MAJOR bump of a dependency updates its dependents' refs.";
+}
+
+function scenarioRefProblems(model: RepoModel, scenarios: Scenario[], file: string): Problem[] {
+    const problems: Problem[] = [];
+    for (const scenario of scenarios) {
+        for (const key of scenario.featureKeys) {
+            const message = key.includes("/")
+                ? inRepoRefProblem(model, key, `scenario "${scenario.name}"`)
+                : model.features.has(key)
+                ? undefined
+                : `scenario "${scenario.name}" installs ${key}, but src/${key} does not exist. Fix the key or add ` +
+                    "the feature first.";
+            if (message) problems.push({ file, message });
+        }
+    }
+    return problems;
+}
+
 export async function checkFeatures(model: RepoModel, schema: Record<string, unknown>): Promise<Problem[]> {
     const problems: Problem[] = [];
     // deno-lint-ignore no-explicit-any
@@ -96,8 +155,13 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
             if (typeof feature.json.name !== "string" || feature.json.name.trim() === "") {
                 problems.push({ file: jsonPath, message: `"name" must be a non-empty string (the spec requires it).` });
             }
-            if (typeof feature.json.version !== "string" || !tryParse(feature.json.version)) {
-                problems.push({ file: jsonPath, message: `"version" must be a SemVer string such as "1.0.0".` });
+            if (typeof feature.json.version !== "string" || !RELEASE_VERSION.test(feature.json.version)) {
+                problems.push({
+                    file: jsonPath,
+                    message: `"version" must be MAJOR.MINOR.PATCH such as "1.0.0", without a pre-release or build ` +
+                        "suffix: publishing moves the floating :<major> and :<major>.<minor> tags to any higher " +
+                        "version, a pre-release included, and '+' is not a valid OCI tag.",
+                });
             }
             for (const field of ["dependsOn", "installsAfter"] as const) {
                 for (const ref of localPathRefs(feature.json[field])) {
@@ -111,14 +175,13 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
                     });
                 }
             }
-            for (const dep of [...feature.dependsOn, ...feature.installsAfter]) {
-                if (!model.features.has(dep)) {
-                    problems.push({
-                        file: jsonPath,
-                        message: `references ${dep} in this repository's namespace, but src/${dep} does not exist. ` +
-                            "Fix the reference or add the feature first.",
-                    });
-                }
+            for (const ref of refsOf(feature.json.dependsOn)) {
+                const problem = inRepoRefProblem(model, ref, "dependsOn");
+                if (problem) problems.push({ file: jsonPath, message: problem });
+            }
+            for (const ref of refsOf(feature.json.installsAfter)) {
+                const problem = inRepoRefProblem(model, ref, "installsAfter");
+                if (problem) problems.push({ file: jsonPath, message: problem });
             }
         }
 
@@ -139,7 +202,7 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
         } else {
             const seen = new Set<string>();
             for (const entry of feature.compat.images) {
-                for (const arch of entry.arch ?? ["amd64"]) {
+                for (const arch of archesOf(entry)) {
                     const key = `${entry.image} ${arch}`;
                     if (seen.has(key)) {
                         problems.push({
@@ -177,6 +240,7 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
                 `Scenario "${scenario.name}" needs a test script.`,
             );
         }
+        problems.push(...scenarioRefProblems(model, feature.scenarios, `test/${id}/scenarios.json`));
 
         if (!(await exists(`openspec/specs/${id}/spec.md`)) && !inChanges.has(id)) {
             problems.push({
@@ -188,11 +252,14 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
         }
     }
 
-    const cycle = findDependsOnCycle(model);
+    problems.push(...unreadableFiles(model));
+    problems.push(...scenarioRefProblems(model, model.globalScenarios, "test/_global/scenarios.json"));
+    const cycle = findInstallCycle(model);
     if (cycle) {
         problems.push({
             file: "src",
-            message: `dependsOn cycle: ${cycle.join(" -> ")}. Features cannot depend on each other in a loop.`,
+            message: `dependsOn/installsAfter cycle: ${cycle.join(" -> ")}. The CLI cannot order features that ` +
+                "wait for each other in a loop; drop one of the edges.",
         });
     }
     for (const id of model.canary) {
@@ -216,6 +283,53 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
     return problems;
 }
 
+function supportedPairs(compat: Compat | undefined): Set<string> {
+    const images = Array.isArray(compat?.images) ? compat.images : [];
+    return new Set(images.flatMap((entry) => archesOf(entry).map((arch) => `${entry.image} (${arch})`)));
+}
+
+/** The bump a change to the supported images requires: MAJOR to drop an image or arch, at least MINOR to add one. */
+export function compatBumpProblems(
+    id: string,
+    baseCompat: Compat | undefined,
+    headCompat: Compat,
+    baseVersion: SemVer,
+    headVersion: SemVer,
+): Problem[] {
+    const before = supportedPairs(baseCompat);
+    const after = supportedPairs(headCompat);
+    const dropped = [...before].filter((pair) => !after.has(pair));
+    const added = [...after].filter((pair) => !before.has(pair));
+    const file = `test/${id}/compatibility.json`;
+    const versions = `src/${id} goes from ${format(baseVersion)} to ${format(headVersion)}`;
+    if (dropped.length > 0 && headVersion.major <= baseVersion.major) {
+        return [{
+            file,
+            message: `drops ${dropped.join(", ")}, which is a MAJOR bump, but ${versions}. Raise the major ` +
+                "version and mark the PR title with `!` (.agents/knowledge/feature-authoring.md).",
+        }];
+    }
+    if (added.length > 0 && headVersion.major === baseVersion.major && headVersion.minor <= baseVersion.minor) {
+        return [{
+            file,
+            message: `adds ${added.join(", ")}, which is at least a MINOR bump, but ${versions}. Raise the minor ` +
+                "version (.agents/knowledge/feature-authoring.md).",
+        }];
+    }
+    return [];
+}
+
+async function readBaseJsonc(base: string, path: string): Promise<{ found: boolean; value?: unknown }> {
+    const old = await git(["show", `${base}:${path}`]);
+    if (!old.ok) return { found: false };
+    try {
+        return { found: true, value: parseJsoncText(old.out) };
+    } catch {
+        console.error(`warning: ${path} on ${base} is not valid JSONC; its bump check is skipped.`);
+        return { found: true };
+    }
+}
+
 export async function checkVersionBumps(model: RepoModel, base: string): Promise<Problem[]> {
     if (!(await git(["rev-parse", "--verify", "--quiet", `${base}^{commit}`])).ok) {
         return [{
@@ -224,23 +338,50 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
                 `base ref ${base} is not available. Fetch it (\`git fetch origin main\`) or check out with fetch-depth: 0.`,
         }];
     }
-    const diff = await git(["diff", "--name-only", "--no-renames", `${base}...HEAD`, "--", "src"]);
-    const changed = new Set(diff.out.split("\n").filter(Boolean).map((path) => path.split("/")[1]));
+    const diff = await git([
+        "diff",
+        "--name-only",
+        "--no-renames",
+        `${base}...HEAD`,
+        "--",
+        "src",
+        "test/*/compatibility.json",
+    ]);
+    const srcChanged = new Set<string>();
+    const compatChanged = new Set<string>();
+    for (const path of diff.out.split("\n").filter(Boolean)) {
+        const [top, id] = path.split("/");
+        (top === "src" ? srcChanged : compatChanged).add(id);
+    }
     const problems: Problem[] = [];
-    for (const id of changed) {
+    for (const id of new Set([...srcChanged, ...compatChanged])) {
         const feature = model.features.get(id);
         const head = feature?.json?.version;
-        if (typeof head !== "string" || !tryParse(head)) continue;
-        const old = await git(["show", `${base}:src/${id}/devcontainer-feature.json`]);
-        if (!old.ok) continue; // new feature
-        let baseVersion: string | undefined;
-        try {
-            baseVersion = JSON.parse(old.out).version;
-        } catch {
+        if (typeof head !== "string" || !RELEASE_VERSION.test(head)) continue; // reported by checkFeatures
+        const old = await readBaseJsonc(base, `src/${id}/devcontainer-feature.json`);
+        if (!old.found) continue; // new feature
+        const baseVersion = (old.value as { version?: unknown } | null | undefined)?.version;
+        if (typeof baseVersion !== "string" || !tryParse(baseVersion)) {
+            if (old.value !== undefined) {
+                console.error(`warning: src/${id} has no SemVer version on ${base}; its bump check is skipped.`);
+            }
             continue;
         }
-        if (typeof baseVersion !== "string" || !tryParse(baseVersion)) continue;
-        if (compare(parse(head), parse(baseVersion)) <= 0) {
+        if (compatChanged.has(id) && feature?.compat) {
+            const oldCompat = await readBaseJsonc(base, `test/${id}/compatibility.json`);
+            if (!oldCompat.found || oldCompat.value !== undefined) {
+                const compatProblems = compatBumpProblems(
+                    id,
+                    oldCompat.value as Compat | undefined,
+                    feature.compat,
+                    parse(baseVersion),
+                    parse(head),
+                );
+                problems.push(...compatProblems);
+                if (compatProblems.length > 0) continue;
+            }
+        }
+        if (srcChanged.has(id) && compare(parse(head), parse(baseVersion)) <= 0) {
             problems.push({
                 file: `src/${id}/devcontainer-feature.json`,
                 message:
