@@ -21,17 +21,18 @@ gates), and `.agents/knowledge/agent-authority.md` (what you may do alone).
 1. Read the issue; confirm it is open and its outcome is concrete. If another identity is assigned, stop and ask. An
    issue with no OpenSpec change yet is taken by committing the change to the draft PR first (step 3) and stopping there
    until a maintainer closes the package deliberation in conversation; the proposal's Acceptance, with the scenarios it
-   points to, is then the acceptance criteria. A harness or tooling issue gets a change with `skip_specs: true`; a typo
-   or dependency bump needs none.
+   points to, is then the acceptance criteria. A harness or tooling issue gets a change with `skip_specs: true`; a typo,
+   a dependency bump, or an edit of only a spec's "Upstream sources" list needs none.
 2. Assign yourself (`gh issue edit <n> --add-assignee @me`), re-read, and confirm you are the sole assignee.
 3. `gh issue develop -c <n>` to create and check out the linked branch; once the approval package is committed, push it
    and open a draft PR (`gh pr create --draft`) with `Closes #<n>` and a body built from
    `.github/pull_request_template.md`. The draft PR is the claim and the work log. The draft opens once the approval
-   package is complete — the proposal, the delta specs, and `design.md` when warranted, created through OpenSpec's
-   propose flow and passing `just spec-check`; no `tasks.md` (the flow stops before it; delete one it wrote anyway) —
-   and the body's `Phase:` line reads `specification` while Changes and Validation keep their reserved line. Then stop.
-   The maintainer discusses on the PR and directs changes in conversation; push each through the publish gate. When the
-   maintainer closes the package deliberation in conversation, read the PR's comments
+   package is complete — the proposal, the delta specs, `design.md` when warranted, and any Purpose correction the
+   change carries (`spec-workflow.md`, Scope of specifications), created through OpenSpec's propose flow and passing
+   `just spec-check`; no `tasks.md` (the flow stops before it; delete one it wrote anyway) — and the body's `Phase:`
+   line reads `specification` while Changes and Validation keep their reserved line. Then stop. The maintainer discusses
+   on the PR and directs changes in conversation; push each through the publish gate. When the maintainer closes the
+   package deliberation in conversation, read the PR's comments
    (`gh api repos/hoshiori-dev/devcontainer-features/issues/<pr>/comments`, where `<pr>` is the pull request number, not
    the issue's: a PR's conversation lives under the issues API with its own number) and its review threads with their
    resolution state (the GraphQL `reviewThreads` connection, field `isResolved`); list every unresolved thread, every

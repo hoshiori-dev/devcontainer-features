@@ -2,8 +2,8 @@
 
 Read this when you need a fact about a specification or tool this repository depends on and it is not already in the
 repository. It lists index pages only — fetch the index, then the page you need; do not trust remembered syntax. Prefer
-an `llms.txt` where one exists. Facts that concern a single feature (its upstream downloads, release pages, signing
-keys) belong in that feature's spec, not here. Links verified 2026-09-29.
+an `llms.txt` where one exists. Facts that concern a single feature (its upstream home, documentation, downloads,
+signing keys) belong in that feature's spec, not here. Links verified 2026-09-29.
 
 ## Dev Containers (no llms.txt)
 
