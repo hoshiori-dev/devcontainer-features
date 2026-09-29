@@ -19,6 +19,9 @@ export const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 export const RUNNERS = { amd64: "ubuntu-24.04", arm64: "ubuntu-24.04-arm" } as const;
 export type Arch = keyof typeof RUNNERS;
 
+/** Architecture of the runners the scenario and global scenario jobs use (.github/workflows/ci.yml). */
+export const SCENARIO_ARCH: Arch = "amd64";
+
 /** Repository paths whose change can break feature testing itself; they select the canary set. */
 export const INFRA_PATHS = [
     ".github/workflows/ci.yml",

@@ -3,7 +3,8 @@
 // - devcontainer-feature.json matches the official schema, `id` equals the folder name, `name` is
 //   set, `version` is MAJOR.MINOR.PATCH without a pre-release or build suffix;
 // - install.sh, test/<id>/test.sh and (unless exempted) duplicate.sh exist and are executable;
-// - test/<id>/compatibility.json is valid, and every scenario image appears in it;
+// - test/<id>/compatibility.json is valid, and every scenario image — the global scenarios' too —
+//   appears in the compatibility list of each feature it installs, for the scenario runners' arch;
 // - every scenarios.json, test/_global/scenarios.json, and test/canary.json is readable;
 // - in-repo dependsOn / installsAfter / scenario references resolve to a feature in src/, use the
 //   exact form `<namespace>/<id>:<its current major>` (installsAfter: no tag), and dependsOn plus
@@ -35,6 +36,8 @@ import {
     type RepoModel,
     runGit,
     type Scenario,
+    SCENARIO_ARCH,
+    scenarioKeyId,
     unreadableFiles,
 } from "./lib/repo.ts";
 
@@ -61,6 +64,32 @@ async function requireExecutable(problems: Problem[], path: string, why: string)
             message: `${path} is not executable. Run \`chmod +x ${path}\` and commit the mode.`,
         });
     }
+}
+
+/** Images a compatibility list supports on the architecture scenario jobs run on. */
+export function scenarioImages(compat: Compat): Set<string> {
+    return new Set(
+        compat.images.filter((entry) => archesOf(entry).includes(SCENARIO_ARCH)).map((entry) => entry.image),
+    );
+}
+
+/** Every global scenario image must be supported, on the scenario runners' arch, by each feature it installs. */
+export function globalImageProblems(model: RepoModel): Problem[] {
+    const problems: Problem[] = [];
+    for (const scenario of model.globalScenarios) {
+        if (scenario.usesBuild || !scenario.image) continue;
+        for (const id of new Set(scenario.featureKeys.map(scenarioKeyId))) {
+            const compat = id === undefined ? undefined : model.features.get(id)?.compat;
+            if (!compat || scenarioImages(compat).has(scenario.image)) continue;
+            problems.push({
+                file: "test/_global/scenarios.json",
+                message: `scenario "${scenario.name}" installs ${id} on ${scenario.image}, which ` +
+                    `test/${id}/compatibility.json does not list for ${SCENARIO_ARCH}, the architecture scenario jobs ` +
+                    "run on. Use an image every installed feature lists for it.",
+            });
+        }
+    }
+    return problems;
 }
 
 async function activeChangeSpecs(): Promise<Set<string>> {
@@ -218,13 +247,23 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
                 );
             }
             const images = new Set(feature.compat.images.map((entry) => entry.image));
+            const runnable = scenarioImages(feature.compat);
             for (const scenario of feature.scenarios) {
-                if (!scenario.usesBuild && scenario.image && !images.has(scenario.image)) {
+                if (scenario.usesBuild || !scenario.image) continue;
+                if (!images.has(scenario.image)) {
                     problems.push({
                         file: `test/${id}/scenarios.json`,
                         message:
                             `scenario "${scenario.name}" uses ${scenario.image}, which is not in test/${id}/compatibility.json. ` +
                             "Add the image to the compatibility list or use a listed one.",
+                    });
+                } else if (!runnable.has(scenario.image)) {
+                    problems.push({
+                        file: `test/${id}/scenarios.json`,
+                        message:
+                            `scenario "${scenario.name}" uses ${scenario.image}, which test/${id}/compatibility.json ` +
+                            `does not list for ${SCENARIO_ARCH}, the architecture scenario jobs run on. Use an image ` +
+                            `listed for ${SCENARIO_ARCH}.`,
                     });
                 }
             }
@@ -251,6 +290,7 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
 
     problems.push(...unreadableFiles(model));
     problems.push(...scenarioRefProblems(model, model.globalScenarios, "test/_global/scenarios.json"));
+    problems.push(...globalImageProblems(model));
     const cycle = findInstallCycle(model);
     if (cycle) {
         problems.push({

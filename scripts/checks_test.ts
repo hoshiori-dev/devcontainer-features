@@ -4,7 +4,7 @@ import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
-import { compatBumpProblems, inRepoRefProblem } from "./validate.ts";
+import { compatBumpProblems, globalImageProblems, inRepoRefProblem, scenarioImages } from "./validate.ts";
 import { type Compat, type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
 
 Deno.test("titleProblems accepts the convention", () => {
@@ -90,6 +90,22 @@ Deno.test("inRepoRefProblem accepts only the dependency's current major, untagge
     }
     assert(inRepoRefProblem(m, `${NAMESPACE}/a:2`, "installsAfter")?.includes("without a tag"));
     assert(inRepoRefProblem(m, `${NAMESPACE}/gone:1`, "dependsOn")?.includes("src/gone does not exist"));
+});
+
+Deno.test("scenario images must be listed for the scenario runners' architecture", () => {
+    const compat: Compat = { images: [{ image: "debian:12" }, { image: "arm-only", arch: ["arm64"] }] };
+    assertEquals([...scenarioImages(compat)], ["debian:12"]);
+    const m = repoWith({ a: "1.0.0", b: "1.0.0" });
+    m.features.get("a")!.compat = compat;
+    m.features.get("b")!.compat = { images: [{ image: "debian:12" }] };
+    m.globalScenarios = [
+        { name: "ok", image: "debian:12", usesBuild: false, featureKeys: ["a", `${NAMESPACE}/b:1`] },
+        { name: "arm", image: "arm-only", usesBuild: false, featureKeys: ["a", "b"] },
+        { name: "built", usesBuild: true, featureKeys: ["a"] },
+    ];
+    const problems = globalImageProblems(m).map((p) => p.message);
+    assertEquals(problems.length, 2);
+    assert(problems.every((p) => p.startsWith('scenario "arm" installs ')));
 });
 
 Deno.test("compatBumpProblems wants MAJOR to drop an image and MINOR to add one", () => {
