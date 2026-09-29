@@ -1,0 +1,11 @@
+### Devcontainer ###
+devcontainer-lock.json
+
+### Skills Lock ###
+skills-lock.json
+
+### Project Files ###
+.agents/skills/meta-*/
+.agents/skills/scaffold-*/
+.claude/skills/meta-*
+.claude/skills/scaffold-*

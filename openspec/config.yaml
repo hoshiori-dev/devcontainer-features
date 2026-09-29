@@ -1,0 +1,41 @@
+schema: spec-driven
+
+# Injected by OpenSpec into every artifact's instructions. It points to the knowledge base rather
+# than restating it; the specification contract is .agents/knowledge/spec-workflow.md.
+context: |
+  This repository develops Dev Container Features, one per folder under src/<id>/, each published
+  independently to ghcr.io/hoshiori-dev/devcontainer-features/<id> with its own SemVer version.
+  There is one OpenSpec capability per feature and its path equals the feature id (flat layout).
+  Changes to the harness, scripts, CI, or documents set `skip_specs: true` and carry no delta spec.
+  Before writing an artifact, read .agents/knowledge/feature-authoring.md (conventions, idempotency,
+  versions) and .agents/knowledge/testing.md (compatibility lists, test types). Write every artifact
+  in English.
+
+rules:
+  proposal:
+    - Name every feature id the change touches and the version bump each needs, per .agents/knowledge/feature-authoring.md.
+    - Link the GitHub issue the change implements.
+  specs:
+    - One capability per feature; the capability path is the feature id.
+    - A new capability's Purpose ends with an "Upstream sources:" list of the official install docs, release index, and signing keys the feature relies on.
+    - When an upstream source shapes behavior (download location, checksum or signature verification), state it as a Requirement.
+    - Refer to test/<id>/compatibility.json for supported images; never list images in a spec.
+    - Name options in scenarios, but leave their types and defaults to devcontainer-feature.json.
+    - Include a requirement stating what installing the feature a second time, with the same or different options, does.
+  design:
+    - Write one for every new feature and for any change to options, dependencies, or security-sensitive metadata.
+    - Record the chosen upstream source and verification method, the rejected alternatives, and research needed only for this change.
+    - State bounds, not steps. Never include secrets, credentials, or private data.
+  tasks:
+    - Cover install.sh, test.sh, duplicate.sh, scenarios, compatibility.json, NOTES.md, the version bump, and regenerating the README with `just docs`.
+    - End with running `just check`, `just test <id>`, and `just test-scenarios <id>` and recording the results in the PR's Validation section.
+    - Never add a task to archive or sync; that happens only on a maintainer's command.
+
+operations:
+  apply:
+    guidance:
+      - Implement only after a maintainer approved the specification in the current conversation; otherwise stop and ask.
+      - When every task is done, do not suggest or run archive or sync; follow the Finish steps of the github-project-workflow skill.
+  archive:
+    guidance:
+      - Archive or sync only when a maintainer explicitly commanded it in the current conversation; otherwise stop and ask.

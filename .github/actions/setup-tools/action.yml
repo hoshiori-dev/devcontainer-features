@@ -1,0 +1,42 @@
+# Installs the pinned toolchain CI jobs share: Deno and just always; the devcontainer CLI,
+# OpenSpec, and pre-commit when a job asks for them. Versions are pinned here and only here for
+# CI; the dev container installs its own (see .agents/knowledge/github/checks.md).
+name: Set up repository tools
+description: Install Deno, just, and on request the devcontainer CLI, OpenSpec, and pre-commit.
+inputs:
+  devcontainer-cli:
+    description: Install the devcontainer CLI.
+    default: "false"
+  openspec:
+    description: Install the OpenSpec CLI.
+    default: "false"
+  pre-commit:
+    description: Install pre-commit.
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      with:
+        deno-version: v2.9.7
+    - name: Install just
+      shell: bash
+      run: |
+        pipx install rust-just==1.58.0
+        echo "$HOME/.deno/bin" >> "$GITHUB_PATH"
+    - name: Install the devcontainer CLI
+      if: inputs.devcontainer-cli == 'true'
+      shell: bash
+      run: npm install --global @devcontainers/cli@0.89.0
+    - name: Install OpenSpec
+      if: inputs.openspec == 'true'
+      shell: bash
+      # Same permissions as .devcontainer/setup.sh grants the local install.
+      run: >-
+        deno install --global --force
+        --allow-read --allow-write --allow-env --allow-sys=cpus,homedir,uid --allow-net=edge.openspec.dev
+        npm:@fission-ai/openspec@1.13.2
+    - name: Install pre-commit
+      if: inputs.pre-commit == 'true'
+      shell: bash
+      run: pipx install pre-commit==4.6.2

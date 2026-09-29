@@ -1,0 +1,35 @@
+# Publishes every feature whose version is not on GHCR yet (the CLI skips published versions),
+# then tags each new version as <id>/v<version>. Features were tested in their pull request;
+# merging a version bump is the release decision. Maintainers may rerun it by dispatch.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # push release tags
+      packages: write # publish to ghcr.io
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-tools
+        with:
+          devcontainer-cli: "true"
+      - name: Publish features
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features
+      - name: Tag new versions
+        run: ./scripts/tag_releases.ts

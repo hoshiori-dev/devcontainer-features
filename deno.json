@@ -1,0 +1,17 @@
+{
+  "lock": false,
+  "fmt": {
+    "exclude": [
+      ".agents/skills/openspec-*/**",
+      ".claude/commands/opsx/",
+      "src/*/README.md"
+    ]
+  },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "no-import-prefix"
+      ]
+    }
+  }
+}

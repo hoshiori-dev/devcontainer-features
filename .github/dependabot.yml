@@ -1,0 +1,11 @@
+# Version updates for the actions the workflows use. Deno scripts pin their jsr:/npm: imports
+# inline and are reviewed in the periodic harness review (.agents/knowledge/github-workflow.md).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories: ["/", "/.github/actions/*"]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    labels: []

@@ -1,0 +1,55 @@
+name: Feature request
+description: Propose a new feature for the collection, or a new capability for an existing one.
+type: Feature
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - New feature
+        - Change to an existing feature
+    validations:
+      required: true
+  - type: input
+    id: feature
+    attributes:
+      label: Feature
+      description: The existing feature id, or the id you propose (lowercase words joined by hyphens).
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What becomes possible, and for whom, when this exists.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and references
+      description: Why now, the upstream project and its official install docs or release pages, alternatives considered.
+    validations:
+      required: false
+  - type: input
+    id: spec
+    attributes:
+      label: Specification
+      description: Path of the OpenSpec change or spec this request extends, if one exists.
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance sketch
+      description: How we would observe that this is done. Rough is fine and non-authoritative — acceptance is written into the specification.
+    validations:
+      required: false
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this request deliberately does not cover.
+    validations:
+      required: false
