@@ -4,7 +4,6 @@
 // repository.
 import { join } from "jsr:@std/path@1.1.6";
 import { parse as parseJsonc } from "jsr:@std/jsonc@1.0.3";
-import Ajv from "npm:ajv@8.20.0";
 
 /** GitHub repository, which is also the OCI namespace path the features are published under. */
 export const REPO = "hoshiori-dev/devcontainer-features";
@@ -193,21 +192,27 @@ async function listDirs(path: string): Promise<string[]> {
     return names.sort();
 }
 
-let compatValidator: ((value: unknown) => string | undefined) | undefined;
+/** One compiled validator per repository root, since each root has its own schema file. */
+const compatValidators = new Map<string, (value: unknown) => string | undefined>();
 
-/** Validates a parsed compatibility.json against test/compatibility.schema.json. */
+/** Validates a parsed compatibility.json against `<root>/test/compatibility.schema.json`. */
 export async function compatSchemaErrors(root: string, value: unknown): Promise<string | undefined> {
-    if (!compatValidator) {
+    let validator = compatValidators.get(root);
+    if (!validator) {
         const schema = await readJsonc(join(root, "test", "compatibility.schema.json")) as Record<string, unknown>;
+        // Loaded on first use, so scripts that never validate — tag_releases in the Release job, with its write
+        // token — never evaluate the npm package or its unpinned transitive dependencies.
+        const { default: Ajv } = await import("npm:ajv@8.20.0");
         // deno-lint-ignore no-explicit-any
         const ajv = new (Ajv as any)({ allErrors: true, strict: false });
         const validate = ajv.compile(schema);
-        compatValidator = (candidate) =>
+        validator = (candidate) =>
             validate(candidate)
                 ? undefined
                 : ajv.errorsText(validate.errors, { dataVar: "compatibility.json", separator: "; " });
+        compatValidators.set(root, validator);
     }
-    return compatValidator(value);
+    return validator(value);
 }
 
 export async function loadFeature(root: string, id: string): Promise<FeatureInfo> {
