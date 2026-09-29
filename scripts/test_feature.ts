@@ -11,8 +11,11 @@
 // install-twice test, once per image. Without --image it uses every image in
 // test/<id>/compatibility.json that lists this machine's architecture.
 // --preserve keeps test containers; --keep keeps the staging directory and prints its path.
+// The registry container and the staging directory are removed on success, failure, and on
+// SIGINT, SIGTERM, or SIGHUP, which also stop the running devcontainer command; a test container
+// that command had started may remain (`docker ps -a`), as after interrupting the CLI directly.
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
-import { type Arch, archesOf, loadFeature, REPO } from "./lib/repo.ts";
+import { type Arch, archesOf, loadFeature, REPO, type RepoModel, scenarioKeyId } from "./lib/repo.ts";
 import { stage } from "./lib/stage.ts";
 
 const HOST_ARCH: Arch = Deno.build.arch === "aarch64" ? "arm64" : "amd64";
@@ -20,10 +23,20 @@ const HOST_ARCH: Arch = Deno.build.arch === "aarch64" ? "arm64" : "amd64";
 /** Registry the staged features are published to: registry 3.1.2, multi-arch index digest. */
 export const REGISTRY_IMAGE = "registry:3@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8";
 
+/** Exit code a shell reports for each signal the script cleans up after (128 + signal number). */
+const SIGNALS = { SIGHUP: 129, SIGINT: 130, SIGTERM: 143 } as const;
+
+/** The command run() is waiting on, so a signal handler can stop it before removing what it uses. */
+let current: Deno.ChildProcess | undefined;
+
 async function run(command: string, args: string[]): Promise<boolean> {
     console.log(`\n$ ${command} ${args.join(" ")}`);
-    const status = await new Deno.Command(command, { args, stdout: "inherit", stderr: "inherit" }).spawn().status;
-    return status.success;
+    current = new Deno.Command(command, { args, stdout: "inherit", stderr: "inherit" }).spawn();
+    try {
+        return (await current.status).success;
+    } finally {
+        current = undefined;
+    }
 }
 
 async function capture(command: string, args: string[]): Promise<string> {
@@ -32,27 +45,31 @@ async function capture(command: string, args: string[]): Promise<string> {
     return new TextDecoder().decode(output.stdout).trim();
 }
 
-/** Starts the registry on a free loopback port; returns its container id and `localhost:<port>`. */
-async function startRegistry(): Promise<{ container: string; host: string }> {
-    const container = await capture("docker", ["run", "-d", "--rm", "-p", "127.0.0.1::5000", REGISTRY_IMAGE]);
-    try {
-        const port = (await capture("docker", ["port", container, "5000/tcp"])).split("\n")[0].split(":").pop();
-        const host = `localhost:${port}`;
-        for (let attempt = 0; attempt < 50; attempt++) {
-            try {
-                const response = await fetch(`http://${host}/v2/`);
-                await response.body?.cancel();
-                if (response.ok) return { container, host };
-            } catch {
-                // not listening yet
-            }
-            await new Promise((resolve) => setTimeout(resolve, 200));
+/** Waits until the registry container answers on its loopback port; returns `localhost:<port>`. */
+async function registryHost(container: string): Promise<string> {
+    const port = (await capture("docker", ["port", container, "5000/tcp"])).split("\n")[0].split(":").pop();
+    const host = `localhost:${port}`;
+    for (let attempt = 0; attempt < 50; attempt++) {
+        try {
+            const response = await fetch(`http://${host}/v2/`);
+            await response.body?.cancel();
+            if (response.ok) return host;
+        } catch {
+            // not listening yet
         }
-        throw new Error(`the local registry did not answer on ${host} within 10 s`);
-    } catch (error) {
-        await capture("docker", ["rm", "-f", container]).catch(() => {});
-        throw error;
+        await new Promise((resolve) => setTimeout(resolve, 200));
     }
+    throw new Error(`the local registry did not answer on ${host} within 10 s`);
+}
+
+/** The features a mode tests; stage() adds their install closure. */
+function roots(mode: string, feature: string | undefined): (model: RepoModel) => string[] {
+    return (model) => {
+        if (mode === "global") return model.globalRefs;
+        const scenarios = mode === "scenarios" ? model.features.get(feature!)?.scenarios ?? [] : [];
+        const refs = scenarios.flatMap((s) => s.featureKeys).map(scenarioKeyId);
+        return [feature!, ...refs.filter((id): id is string => id !== undefined)];
+    };
 }
 
 if (import.meta.main) {
@@ -98,20 +115,47 @@ if (import.meta.main) {
 
     const failures: string[] = [];
     const out = await Deno.makeTempDir({ prefix: "feature-test-" });
-    let registry: { container: string; host: string } | undefined;
+    // Named up front, so a signal that arrives while `docker run` is still starting it can remove it too.
+    const container = `feature-test-registry-${crypto.randomUUID().slice(0, 8)}`;
+    let cleaned: Promise<void> | undefined;
+    const cleanup = () =>
+        cleaned ??= (async () => {
+            await new Deno.Command("docker", { args: ["rm", "-f", container], stdout: "null", stderr: "null" })
+                .output();
+            if (args.keep) {
+                console.log(`\nStaging directory kept: ${out} (its registry refs point at a removed registry)`);
+            } else await Deno.remove(out, { recursive: true }).catch(() => {});
+        })();
+    const handlers = Object.entries(SIGNALS).map(([signal, code]) => {
+        const handler = () => {
+            console.error(`\n${signal}: stopping, then removing the local registry and the staging directory`);
+            try {
+                current?.kill("SIGTERM");
+            } catch {
+                // already exited
+            }
+            cleanup().finally(() => Deno.exit(code));
+        };
+        Deno.addSignalListener(signal as Deno.Signal, handler);
+        return [signal as Deno.Signal, handler] as const;
+    });
     try {
-        registry = await startRegistry();
-        await stage(".", out, registry.host);
-        const published = await run("devcontainer", [
-            "features",
-            "publish",
-            `${out}/src`,
-            "--registry",
-            registry.host,
-            "--namespace",
-            REPO,
-        ]);
-        if (!published) throw new Error(`publishing the staged features to ${registry.host} failed`);
+        await capture("docker", ["run", "-d", "--rm", "--name", container, "-p", "127.0.0.1::5000", REGISTRY_IMAGE]);
+        const host = await registryHost(container);
+        const staged = await stage(".", out, host, roots(mode, args.feature));
+        console.log(`\nStaged for ${host}: ${staged.join(", ") || "no feature"}`);
+        if (staged.length > 0) {
+            const published = await run("devcontainer", [
+                "features",
+                "publish",
+                `${out}/src`,
+                "--registry",
+                host,
+                "--namespace",
+                REPO,
+            ]);
+            if (!published) throw new Error(`publishing the staged features to ${host} failed`);
+        }
 
         const common = [
             "features",
@@ -149,9 +193,8 @@ if (import.meta.main) {
     } catch (error) {
         failures.push(`setup (${error instanceof Error ? error.message : error})`);
     } finally {
-        if (registry) await capture("docker", ["rm", "-f", registry.container]).catch(() => {});
-        if (args.keep) console.log(`\nStaging directory kept: ${out} (its registry refs point at a removed registry)`);
-        else await Deno.remove(out, { recursive: true });
+        await cleanup();
+        for (const [signal, handler] of handlers) Deno.removeSignalListener(signal, handler);
     }
     if (failures.length > 0) {
         console.error(`\nFAILED: ${failures.join(", ")}`);

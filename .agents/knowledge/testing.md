@@ -58,7 +58,10 @@ set (`scripts/affected.ts`, `scripts/lib/repo.ts`):
 `scripts/test_feature.ts` therefore starts a throwaway OCI registry (`registry` image pinned in the script) on a free
 `localhost` port, stages a copy of `src/` and `test/` in which every in-repo reference — `dependsOn`, `installsAfter`,
 scenario and global scenario keys — names that registry instead of GHCR (`scripts/lib/stage.ts`), publishes the staged
-features there, runs the tests, and removes both. A bare scenario key (`node`) becomes `<registry>/<repo>/node:<major>`.
+features there, runs the tests, and removes both — also when interrupted, though a test container the CLI had started
+may remain (`docker ps -a`). A bare scenario key (`node`) becomes `<registry>/<repo>/node:<major>`. Only what the test
+needs is staged and published: the feature under test (or the global scenarios' features), the features its scenarios
+install, and their `dependsOn` / `installsAfter` closure — a broken unrelated feature cannot fail the job.
 
 References stay OCI refs, so the CLI treats them as it does for users: a dependency a scenario also installs is
 installed once, `installsAfter` orders against it, and `:<major>` resolves only when it is the dependency's current

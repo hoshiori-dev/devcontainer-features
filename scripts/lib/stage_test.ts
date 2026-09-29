@@ -94,6 +94,33 @@ Deno.test("stage points every in-repo reference at the registry and leaves the s
     }
 });
 
+Deno.test("stage copies only the roots and their install closure into src/", async () => {
+    const root = await Deno.makeTempDir({ prefix: "stage-test-root-" });
+    const out = join(await Deno.makeTempDir({ prefix: "stage-test-out-" }), "staged");
+    try {
+        await writeJson(join(root, "src/a/devcontainer-feature.json"), { id: "a", version: "1.0.0" });
+        await writeJson(join(root, "src/b/devcontainer-feature.json"), {
+            id: "b",
+            version: "1.0.0",
+            dependsOn: { [`${NAMESPACE}/a:1`]: {} },
+        });
+        await writeJson(join(root, "src/c/devcontainer-feature.json"), {
+            id: "c",
+            version: "1.0.0",
+            installsAfter: [`${NAMESPACE}/b`],
+        });
+        await writeJson(join(root, "src/unrelated/devcontainer-feature.json"), { id: "unrelated", version: "1.0.0" });
+
+        assertEquals(await stage(root, out, HOST, () => ["c"]), ["a", "b", "c"]);
+        const staged: string[] = [];
+        for await (const entry of Deno.readDir(join(out, "src"))) staged.push(entry.name);
+        assertEquals(staged.sort(), ["a", "b", "c"]);
+    } finally {
+        await Deno.remove(root, { recursive: true });
+        await Deno.remove(out.slice(0, out.lastIndexOf("/")), { recursive: true });
+    }
+});
+
 Deno.test("stage refuses a repository with an unreadable scenario file", async () => {
     const root = await Deno.makeTempDir({ prefix: "stage-test-root-" });
     const out = join(await Deno.makeTempDir({ prefix: "stage-test-out-" }), "staged");

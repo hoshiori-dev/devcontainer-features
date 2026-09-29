@@ -7,6 +7,7 @@ import {
     findInstallCycle,
     inRepoId,
     inRepoRefs,
+    installClosure,
     loadRepo,
     localPathRefs,
     majorOf,
@@ -189,6 +190,17 @@ Deno.test("buildPlan refuses more jobs than one matrix may hold", () => {
     const images = Array.from({ length: 130 }, (_, i) => ({ image: `img:${i}` }));
     const m = model([feature("a", { compat: { images } }), feature("b", { compat: { images } })]);
     assertThrows(() => buildPlan(selectAffected(["src/a/x", "src/b/x"], m), m), Error, "256-job matrix limit");
+});
+
+Deno.test("installClosure follows dependsOn and installsAfter and drops unknown ids", () => {
+    const m = model([
+        feature("a"),
+        feature("b", { dependsOn: ["a"] }),
+        feature("c", { installsAfter: ["b"], dependsOn: ["gone"] }),
+        feature("d"),
+    ]);
+    assertEquals(installClosure(m, ["c"]), ["a", "b", "c"]);
+    assertEquals(installClosure(m, ["d", "gone"]), ["d"]);
 });
 
 Deno.test("findInstallCycle reports a loop through dependsOn, installsAfter, or both", () => {

@@ -314,6 +314,23 @@ export function testEdges(feature: FeatureInfo): string[] {
 }
 
 /**
+ * `ids` plus every in-repo feature they reach through dependsOn and installsAfter, transitively: what a test of
+ * `ids` must be able to resolve. The CLI fetches the metadata of every installsAfter entry, so those count too.
+ */
+export function installClosure(model: RepoModel, ids: Iterable<string>): string[] {
+    const seen = new Set<string>();
+    const queue = [...ids];
+    while (queue.length > 0) {
+        const id = queue.shift()!;
+        if (seen.has(id) || !model.features.has(id)) continue;
+        seen.add(id);
+        const feature = model.features.get(id)!;
+        queue.push(...feature.dependsOn, ...feature.installsAfter);
+    }
+    return [...seen].sort();
+}
+
+/**
  * Finds one cycle through dependsOn and installsAfter, returned as the ids along it, or undefined when there is
  * none. The CLI orders both kinds of edge together, so a loop mixing them cannot be installed either.
  */
