@@ -131,9 +131,14 @@ Deno.test("global scenarios run when _global changes or a feature they install i
     assertEquals(selectAffected(["src/b/install.sh"], m).runGlobal, false);
 });
 
-Deno.test("infrastructure changes select the canary set and nothing else", () => {
-    const m = model([feature("a"), feature("b"), feature("c", { dependsOn: ["b"] })], { canary: ["b"] });
-    assertEquals(Object.fromEntries(selectAffected(["scripts/lib/stage.ts"], m).reasons), { b: "canary" });
+Deno.test("infrastructure changes select the canary set and the global scenarios", () => {
+    const m = model([feature("a"), feature("b"), feature("c", { dependsOn: ["b"] })], {
+        canary: ["b"],
+        hasGlobal: true,
+    });
+    const selection = selectAffected(["deno.json"], m);
+    assertEquals(Object.fromEntries(selection.reasons), { b: "canary" });
+    assertEquals(selection.runGlobal, true);
     assertEquals(selectAffected(["README.md", "openspec/specs/a/spec.md"], m).reasons.size, 0);
 });
 
@@ -143,13 +148,29 @@ Deno.test("deleted features and unknown test folders select nothing by themselve
 });
 
 Deno.test("a deleted feature still selects the features that reference it", () => {
-    const m = model([feature("b", { scenarioRefs: ["gone"] }), feature("c", { dependsOn: ["b"] })], {
-        hasGlobal: true,
-        globalRefs: ["gone"],
-    });
+    const m = model([
+        feature("b", { scenarioRefs: ["gone"] }),
+        feature("c", { dependsOn: ["b"] }),
+        feature("d", { dependsOn: ["gone"] }),
+        feature("e", { installsAfter: ["d"] }),
+    ], { hasGlobal: true, globalRefs: ["gone"] });
     const selection = selectAffected(["src/gone/install.sh"], m);
-    assertEquals(Object.fromEntries(selection.reasons), { b: "references removed gone", c: "depends on b" });
+    assertEquals(Object.fromEntries(selection.reasons), {
+        d: "references removed gone",
+        e: "depends on d",
+        b: "references removed gone",
+    });
     assertEquals(selection.runGlobal, true);
+});
+
+Deno.test("a feature reached only through its scenarios does not pull in its own dependents", () => {
+    const m = model([feature("a"), feature("b", { scenarioRefs: ["a"] }), feature("c", { dependsOn: ["b"] })], {
+        hasGlobal: true,
+        globalRefs: ["c"],
+    });
+    const selection = selectAffected(["src/a/install.sh"], m);
+    assertEquals(Object.fromEntries(selection.reasons), { a: "changed", b: "tests with a" });
+    assertEquals(selection.runGlobal, false);
 });
 
 Deno.test("buildPlan expands images and architectures and lists scenario jobs", () => {

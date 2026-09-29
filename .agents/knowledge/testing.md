@@ -43,13 +43,14 @@ Container tests run only on pull requests, only for affected features, in parall
 set (`scripts/affected.ts`, `scripts/lib/repo.ts`):
 
 1. A change under `src/<id>/` or `test/<id>/` affects `<id>`.
-2. Every feature that depends on a feature whose `src/` changed — through `dependsOn`, `installsAfter`, or a scenario
-   that installs it — is affected too, transitively. A change only under `test/<id>/` changes nothing users install, so
-   it stops at `<id>`.
+2. A `src/` change also affects every feature that installs the changed one through `dependsOn` or `installsAfter`,
+   transitively — their installed result changes too — and every feature whose scenarios install one of those. A feature
+   reached only through its scenarios does not pass the change on: its own artifact is unchanged. A change only under
+   `test/<id>/` changes nothing users install, so it stops at `<id>`.
 3. A change to `test/_global/`, or a `src/` change that reaches a feature the global scenarios install, runs the global
    scenarios.
 4. A change to the test infrastructure (the paths in `INFRA_PATHS` in `scripts/lib/repo.ts`) adds the canary features,
-   without their dependents.
+   without their dependents, and runs the global scenarios, so both test paths go through the changed pipeline.
 5. Each affected feature gets one job per compatibility image and architecture, plus one scenario job when it has
    `scenarios.json`. More than 256 jobs in one matrix fails `plan`: split the PR.
 

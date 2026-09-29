@@ -24,6 +24,7 @@ export const SCENARIO_ARCH: Arch = "amd64";
 /** Repository paths whose change can break feature testing itself; they select the canary set. */
 export const INFRA_PATHS = [
     ".github/workflows/ci.yml",
+    "deno.json",
     ".github/actions/",
     "scripts/lib/",
     "scripts/affected.ts",
@@ -314,12 +315,6 @@ export function unreadableFiles(model: RepoModel): Problem[] {
 // Graph and selection (pure)
 // ---------------------------------------------------------------------------------------------
 
-/** Every in-repo feature `feature` needs to install or test: dependsOn, installsAfter, scenarios. */
-export function testEdges(feature: FeatureInfo): string[] {
-    return unique([...feature.dependsOn, ...feature.installsAfter, ...feature.scenarioRefs])
-        .filter((id) => id !== feature.id);
-}
-
 /**
  * `ids` plus every in-repo feature they reach through dependsOn and installsAfter, transitively: what a test of
  * `ids` must be able to resolve. The CLI fetches the metadata of every installsAfter entry, so those count too.
@@ -391,13 +386,16 @@ export interface Selection {
 }
 
 /**
- * Selects the features a set of changed paths affects. A change under src/<id> changes what users install, so it
- * also selects every dependent, transitively; a change under test/<id> selects only <id>. A changed id no longer in
- * src/ (a deleted or renamed feature) selects nothing itself but still selects what references it.
+ * Selects the features a set of changed paths affects. A change under src/<id> changes what users install, so it also
+ * selects every feature that installs <id> through dependsOn or installsAfter — transitively, since their installed
+ * result changes too — and every feature whose scenarios install one of those, without following that feature's own
+ * dependents: its artifact did not change. A change under test/<id> selects only <id>. A changed id no longer in src/
+ * (a deleted or renamed feature) selects nothing itself but still selects what references it. A test infrastructure
+ * change adds the canaries and runs the global scenarios, so both test paths run through the changed pipeline.
  */
 export function selectAffected(changed: string[], model: RepoModel): Selection {
     const reasons = new Map<string, string>();
-    /** Ids whose installed result may differ: changed src/ trees and, below, everything depending on them. */
+    /** Ids whose installed result may differ: changed src/ trees and everything installing them. */
     const shipped = new Set<string>();
     let globalChanged = false;
     let infraChanged = false;
@@ -409,27 +407,36 @@ export function selectAffected(changed: string[], model: RepoModel): Selection {
         } else if (kind.kind === "global") globalChanged = true;
         else if (kind.kind === "infra") infraChanged = true;
     }
-    const dependents = new Map<string, string[]>();
+    const installers = new Map<string, string[]>();
+    const testers = new Map<string, string[]>();
     for (const feature of model.features.values()) {
-        for (const dep of testEdges(feature)) dependents.set(dep, [...(dependents.get(dep) ?? []), feature.id]);
+        for (const dep of new Set([...feature.dependsOn, ...feature.installsAfter])) {
+            if (dep !== feature.id) installers.set(dep, [...(installers.get(dep) ?? []), feature.id]);
+        }
+        for (const dep of feature.scenarioRefs) testers.set(dep, [...(testers.get(dep) ?? []), feature.id]);
     }
+    const why = (id: string, verb: string) => model.features.has(id) ? `${verb} ${id}` : `references removed ${id}`;
     const queue = [...shipped];
     while (queue.length > 0) {
         const id = queue.shift()!;
-        for (const dependent of dependents.get(id) ?? []) {
+        for (const dependent of installers.get(id) ?? []) {
             if (shipped.has(dependent)) continue;
             shipped.add(dependent);
-            if (!reasons.has(dependent)) {
-                reasons.set(dependent, model.features.has(id) ? `depends on ${id}` : `references removed ${id}`);
-            }
+            if (!reasons.has(dependent)) reasons.set(dependent, why(id, "depends on"));
             queue.push(dependent);
+        }
+    }
+    for (const id of [...shipped].sort()) {
+        for (const tester of testers.get(id) ?? []) {
+            if (!reasons.has(tester)) reasons.set(tester, why(id, "tests with"));
         }
     }
     // Canaries exercise the pipeline itself; their dependents are not pulled in, keeping the set bounded.
     if (infraChanged) {
         for (const id of model.canary) if (model.features.has(id) && !reasons.has(id)) reasons.set(id, "canary");
     }
-    const runGlobal = model.hasGlobal && (globalChanged || model.globalRefs.some((id) => shipped.has(id)));
+    const runGlobal = model.hasGlobal &&
+        (globalChanged || infraChanged || model.globalRefs.some((id) => shipped.has(id)));
     return { reasons, runGlobal };
 }
 
