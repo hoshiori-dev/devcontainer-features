@@ -52,9 +52,9 @@ A file under "Points to it" may summarize in one line and must link; it never re
 2. **Approved** — a maintainer closes the package deliberation in the conversation (see Approval gates).
 3. **Implemented** — tasks are written after approval, every task is done and every scenario verified in the PR's
    Validation section; the PR is marked ready for the second deliberation.
-4. **Archived** — only after a maintainer commands it in the conversation: the implementer runs OpenSpec's archive flow
-   on the branch, which merges the deltas into `openspec/specs/` and moves the change to the archive. That commit is the
-   freeze the final approval names.
+4. **Archived** — only after a maintainer commands it in the conversation: the implementer runs OpenSpec's archive skill
+   (`openspec-archive-change`, `/opsx:archive` in Claude Code) on the branch, which merges the deltas into
+   `openspec/specs/` and moves the change to the archive. That commit is the freeze the final approval names.
 
 ## Approval gates
 
@@ -104,9 +104,10 @@ archived change stays frozen: a defect found in it goes to the PR's Validation s
 the archive.
 
 Executor: whoever holds the branch — the implementer, or a maintainer who pulled a fork's branch — and only after the
-maintainer's command. OpenSpec's sync flow also rewrites main specs, so it is part of the archive and waits for the same
-command. Every task ticked, then the archive, then `just spec-check`, then a commit. No workflow archives: no token can
-push to a fork, and a job that could would be the only automation needing write access to repository contents.
+maintainer's command. OpenSpec's sync skill (`openspec-sync-specs`, `/opsx:sync`) also rewrites main specs, so it is
+part of the archive and waits for the same command. Every task ticked, then the archive, then `just spec-check`, then a
+commit. No workflow archives: no token can push to a fork, and a job that could would be the only automation needing
+write access to repository contents.
 
 The `spec-archived` check fails a ready PR that still holds an unarchived change (a warning while it is a draft), so the
 PR stays red until the archive. A commit after the archive commit means the approved version no longer exists: say so

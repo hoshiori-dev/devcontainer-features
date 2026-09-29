@@ -86,8 +86,9 @@ survive deletion, and public content is indexed within minutes. Every remote or 
    evidence, not acceptance. Under it you may mark the PR ready (`gh pr ready`) and request review once the package gate
    closed in this conversation, then hand the maintainer the report it defines. Marking ready opens the implementation
    deliberation, so `spec-archived` is red until the archive commit lands: that red is the merge block, not a defect.
-   Archive only when the maintainer commands it in the conversation: OpenSpec's archive flow, `just spec-check`, commit,
-   push. A commit after the archive commit spends the closing; say so and ask again. Auto-merge is not used; never edit
-   the policy, protections, or required checks to unblock yourself — propose the change to a maintainer instead.
+   Archive only when the maintainer commands it in the conversation: the `openspec-archive-change` skill
+   (`/opsx:archive`), `just spec-check`, commit, push. A commit after the archive commit spends the closing; say so and
+   ask again. Auto-merge is not used; never edit the policy, protections, or required checks to unblock yourself —
+   propose the change to a maintainer instead.
 3. A maintainer merges; the closing keyword closes the linked issue — verify it closed. Merging a version bump publishes
    it: the Release workflow publishes to GHCR and tags `<id>/v<version>` (`checks.md`).
