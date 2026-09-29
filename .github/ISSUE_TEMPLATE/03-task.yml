@@ -40,10 +40,10 @@ body:
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance criteria
-      description: Executable, observable criteria — commands to run, states to verify — or the scenarios of the linked change record. Never both.
+      label: Acceptance sketch
+      description: How we would observe that this is done. Rough is fine and non-authoritative — acceptance lives in the linked change record (its scenarios, or tasks.md for a change without specs).
     validations:
-      required: true
+      required: false
   - type: textarea
     id: out-of-scope
     attributes:
