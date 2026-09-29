@@ -119,7 +119,8 @@ if (import.meta.main) {
     }
 
     const failures: string[] = [];
-    const out = await Deno.makeTempDir({ prefix: "feature-test-" });
+    // In /tmp, the one directory the shebang lets the script write, whatever TMPDIR says.
+    const out = await Deno.makeTempDir({ dir: "/tmp", prefix: "feature-test-" });
     // Named up front, so cleanup can remove it by name, after waiting for a `docker run` still creating it.
     const container = `feature-test-registry-${crypto.randomUUID().slice(0, 8)}`;
     let starting: Promise<string> | undefined;

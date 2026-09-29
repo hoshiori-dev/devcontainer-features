@@ -19,7 +19,8 @@ if (import.meta.main) {
         console.error("No src/ folder yet: no README to generate.");
         Deno.exit(0);
     }
-    const temp = await Deno.makeTempDir({ prefix: "feature-docs-" });
+    // In /tmp, the one directory the shebang lets the script write, whatever TMPDIR says.
+    const temp = await Deno.makeTempDir({ dir: "/tmp", prefix: "feature-docs-" });
     // Deno.exit() inside try would skip the finally below and leak the temporary directory.
     let failed = false;
     try {

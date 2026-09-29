@@ -215,7 +215,7 @@ Deno.test("buildPlan refuses more jobs than one matrix may hold", () => {
 
 Deno.test("loadRepo rejects a canary list that is not an object with a features array", async () => {
     for (const text of ['["a"]', "null", '{"features": [1]}']) {
-        const root = await Deno.makeTempDir({ prefix: "repo-test-" });
+        const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "repo-test-" });
         try {
             await Deno.mkdir(join(root, "test"), { recursive: true });
             await Deno.writeTextFile(join(root, "test/canary.json"), text);
@@ -246,7 +246,7 @@ Deno.test("findInstallCycle reports a loop through dependsOn, installsAfter, or 
 });
 
 Deno.test("loadRepo records unreadable test files instead of throwing", async () => {
-    const root = await Deno.makeTempDir({ prefix: "repo-test-" });
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "repo-test-" });
     try {
         const write = async (path: string, text: string) => {
             await Deno.mkdir(join(root, path, ".."), { recursive: true });

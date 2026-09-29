@@ -56,8 +56,8 @@ async function writeJson(path: string, value: unknown) {
 }
 
 Deno.test("stage points every in-repo reference at the registry and leaves the source alone", async () => {
-    const root = await Deno.makeTempDir({ prefix: "stage-test-root-" });
-    const out = join(await Deno.makeTempDir({ prefix: "stage-test-out-" }), "staged");
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-root-" });
+    const out = join(await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-out-" }), "staged");
     try {
         await writeJson(join(root, "src/a/devcontainer-feature.json"), { id: "a", version: "1.0.0" });
         await writeJson(join(root, "src/b/devcontainer-feature.json"), {
@@ -95,8 +95,8 @@ Deno.test("stage points every in-repo reference at the registry and leaves the s
 });
 
 Deno.test("stage copies only the roots and their install closure into src/", async () => {
-    const root = await Deno.makeTempDir({ prefix: "stage-test-root-" });
-    const out = join(await Deno.makeTempDir({ prefix: "stage-test-out-" }), "staged");
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-root-" });
+    const out = join(await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-out-" }), "staged");
     try {
         await writeJson(join(root, "src/a/devcontainer-feature.json"), { id: "a", version: "1.0.0" });
         await writeJson(join(root, "src/b/devcontainer-feature.json"), {
@@ -122,8 +122,8 @@ Deno.test("stage copies only the roots and their install closure into src/", asy
 });
 
 Deno.test("stage refuses a repository with an unreadable scenario file", async () => {
-    const root = await Deno.makeTempDir({ prefix: "stage-test-root-" });
-    const out = join(await Deno.makeTempDir({ prefix: "stage-test-out-" }), "staged");
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-root-" });
+    const out = join(await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-out-" }), "staged");
     try {
         await writeJson(join(root, "src/a/devcontainer-feature.json"), { id: "a", version: "1.0.0" });
         await writeJson(join(root, "test/a/scenarios.json"), [1, 2]);
