@@ -278,8 +278,10 @@ export async function loadRepo(root: string): Promise<RepoModel> {
     let canary: string[] = [];
     if (await exists(canaryPath)) {
         try {
-            const value = await readJsonc(canaryPath) as { features?: unknown } | null;
-            const list = value?.features ?? [];
+            const value = await readJsonc(canaryPath);
+            const list = value !== null && typeof value === "object" && !Array.isArray(value)
+                ? (value as { features?: unknown }).features ?? []
+                : undefined;
             if (!Array.isArray(list) || !list.every((id) => typeof id === "string")) {
                 throw new Error('it must be {"features": ["<id>", ...]}');
             }

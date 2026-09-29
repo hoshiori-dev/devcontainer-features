@@ -192,6 +192,19 @@ Deno.test("buildPlan refuses more jobs than one matrix may hold", () => {
     assertThrows(() => buildPlan(selectAffected(["src/a/x", "src/b/x"], m), m), Error, "256-job matrix limit");
 });
 
+Deno.test("loadRepo rejects a canary list that is not an object with a features array", async () => {
+    for (const text of ['["a"]', "null", '{"features": [1]}']) {
+        const root = await Deno.makeTempDir({ prefix: "repo-test-" });
+        try {
+            await Deno.mkdir(join(root, "test"), { recursive: true });
+            await Deno.writeTextFile(join(root, "test/canary.json"), text);
+            assertEquals(unreadableFiles(await loadRepo(root)).map((p) => p.file), ["test/canary.json"], text);
+        } finally {
+            await Deno.remove(root, { recursive: true });
+        }
+    }
+});
+
 Deno.test("installClosure follows dependsOn and installsAfter and drops unknown ids", () => {
     const m = model([
         feature("a"),
