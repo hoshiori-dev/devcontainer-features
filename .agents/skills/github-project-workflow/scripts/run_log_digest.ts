@@ -1,6 +1,7 @@
 #!/usr/bin/env -S deno run --allow-run=gh
-// Digests the failed jobs of a GitHub Actions run into one small JSON object — failed jobs, failed
-// steps, and the last N log lines of each — so full logs never enter agent context.
+// Digests the failed jobs of a GitHub Actions run into one small JSON object — failed, timed-out,
+// and cancelled jobs, their unsuccessful steps, and the last N log lines of each — so full logs
+// never enter agent context. A run that failed without any such job gets a `note` instead.
 //
 //   run_log_digest.ts --run-id <id> [--repo hoshiori-dev/devcontainer-features] [--tail 50]
 //
@@ -19,6 +20,9 @@ interface Job {
     conclusion?: string;
     steps?: Step[];
 }
+
+/** Job and step conclusions that mean "did not succeed" (skipped and neutral are not failures). */
+export const UNSUCCESSFUL = new Set(["failure", "timed_out", "cancelled", "startup_failure"]);
 
 async function gh(args: string[]): Promise<{ ok: boolean; out: string; err: string }> {
     const output = await new Deno.Command("gh", { args }).output();
@@ -53,23 +57,27 @@ if (import.meta.main) {
     }
     const run = JSON.parse(view.out) as { databaseId?: number; status?: string; conclusion?: string; jobs?: Job[] };
     const jobs = run.jobs ?? [];
-    let failed = jobs.filter((job) => job.conclusion === "failure");
-    if (failed.length === 0 && run.conclusion === "failure") {
-        // The run failed but no job reports failure (cancelled or startup failure): inspect completed jobs.
-        failed = jobs.filter((job) => job.status === "completed");
-    }
+    const failed = jobs.filter((job) => UNSUCCESSFUL.has(job.conclusion ?? ""));
     const failedJobs = [];
     for (const job of failed) {
-        const log = await gh(["run", "view", "-R", args.repo, "--job", String(job.databaseId), "--log-failed"]);
+        const view = ["run", "view", "-R", args.repo, "--job", String(job.databaseId)];
+        // --log-failed prints only steps that concluded "failure"; a timed-out or cancelled job may have none.
+        let log = await gh([...view, "--log-failed"]);
+        if (!log.ok || log.out.trim() === "") log = await gh([...view, "--log"]);
         failedJobs.push({
             name: job.name ?? "",
             job_id: job.databaseId,
-            failed_steps: (job.steps ?? []).filter((step) => step.conclusion === "failure").map((step) =>
+            conclusion: job.conclusion,
+            failed_steps: (job.steps ?? []).filter((step) => UNSUCCESSFUL.has(step.conclusion ?? "")).map((step) =>
                 step.name ?? ""
             ),
-            log_tail: log.ok ? log.out.split("\n").slice(-tail) : [],
+            log_tail: log.ok ? log.out.trimEnd().split("\n").slice(-tail) : [],
         });
     }
+    const note = failedJobs.length === 0 && UNSUCCESSFUL.has(run.conclusion ?? "")
+        ? `The run concluded ${run.conclusion} but no job did (a workflow or startup error): read its ` +
+            `annotations with \`gh run view ${runId} -R ${args.repo}\`.`
+        : undefined;
     console.log(
         JSON.stringify(
             {
@@ -77,6 +85,7 @@ if (import.meta.main) {
                 status: run.status,
                 conclusion: run.conclusion,
                 failed_jobs: failedJobs,
+                ...(note ? { note } : {}),
             },
             null,
             2,
