@@ -32,7 +32,8 @@ _Reserved: filled in when the pull request is marked ready._
 ## Checklist
 
 - [ ] `just check` passes locally
-- [ ] Acceptance criteria of the linked issue, or the scenarios of the linked change record, are met
+- [ ] The scenarios of the linked change record (its `tasks.md` for a change without specs) are met, or this PR has no
+      OpenSpec change
 - [ ] The package deliberation was closed in conversation before the task list, and the implementation deliberation
       before the archive, or this PR has no OpenSpec change
 - [ ] Every task of the change record is done and verified, or the specification is updated — the change is archived
