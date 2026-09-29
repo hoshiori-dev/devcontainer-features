@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-run=git --allow-net=raw.githubusercontent.com --allow-env=GITHUB_ACTIONS
+#!/usr/bin/env -S deno run --allow-read --allow-run=git --allow-env=GITHUB_ACTIONS
 // Checks every feature's layout and metadata before any container is built:
 // - devcontainer-feature.json matches the official schema, `id` equals the folder name, `name` is
 //   set, `version` is MAJOR.MINOR.PATCH without a pre-release or build suffix;
@@ -20,6 +20,11 @@ import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { join } from "jsr:@std/path@1.1.6";
 import { compare, format, parse, type SemVer, tryParse } from "jsr:@std/semver@1.0.8";
 import Ajv from "npm:ajv@8.20.0";
+// Official feature metadata schema, pinned to the last commit that changed it; imported as a module
+// so Deno caches it like any other pinned dependency.
+import FEATURE_SCHEMA from "https://raw.githubusercontent.com/devcontainers/spec/1b2baddb5f1071ca0e8bcb7eb56dbc9d3e4a674f/schemas/devContainerFeature.schema.json" with {
+    type: "json",
+};
 import {
     archesOf,
     type Compat,
@@ -41,10 +46,6 @@ import {
     scenarioKeyId,
     unreadableFiles,
 } from "./lib/repo.ts";
-
-/** Official feature metadata schema, pinned to the last commit that changed it. */
-export const FEATURE_SCHEMA_URL =
-    "https://raw.githubusercontent.com/devcontainers/spec/1b2baddb5f1071ca0e8bcb7eb56dbc9d3e4a674f/schemas/devContainerFeature.schema.json";
 
 export type { Problem };
 
@@ -456,21 +457,7 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
 if (import.meta.main) {
     const args = parseArgs(Deno.args, { string: ["base"] });
     const model = await loadRepo(".");
-    let schema: Record<string, unknown> = {}; // nothing to validate against it without features
-    if (model.features.size > 0) {
-        try {
-            const response = await fetch(FEATURE_SCHEMA_URL);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            schema = await response.json();
-        } catch (error) {
-            console.error(
-                `error: could not fetch the feature schema from ${FEATURE_SCHEMA_URL} ` +
-                    `(${error instanceof Error ? error.message : error}). Check the network and rerun.`,
-            );
-            Deno.exit(1);
-        }
-    }
-    const problems = await checkFeatures(model, schema);
+    const problems = await checkFeatures(model, FEATURE_SCHEMA);
     if (args.base) problems.push(...(await checkVersionBumps(model, args.base)));
     const annotate = Deno.env.get("GITHUB_ACTIONS") === "true";
     for (const problem of problems) {
