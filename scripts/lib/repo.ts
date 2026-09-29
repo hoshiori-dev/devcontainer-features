@@ -1,6 +1,7 @@
 // Shared model of the feature collection: features, their in-repo dependencies, compatibility
-// lists, and test scenarios. The loaders read the working tree; everything else is pure so the
-// selection logic can be unit-tested without a repository.
+// lists, and test scenarios. The loaders read the working tree and git() runs git for the scripts
+// that need history; everything else is pure so the selection logic can be unit-tested without a
+// repository.
 import { join } from "jsr:@std/path@1.1.6";
 import { parse as parseJsonc } from "jsr:@std/jsonc@1.0.3";
 import Ajv from "npm:ajv@8.20.0";
@@ -152,6 +153,20 @@ export function archesOf(entry: CompatEntry): Arch[] {
 
 export function parseJsoncText(text: string): unknown {
     return parseJsonc(text);
+}
+
+/** Runs git; `ok` is false when it exits non-zero, and `err` carries its message. */
+export async function runGit(args: string[]): Promise<{ ok: boolean; out: string; err: string }> {
+    const output = await new Deno.Command("git", { args, stdout: "piped", stderr: "piped" }).output();
+    const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
+    return { ok: output.success, out: decode(output.stdout), err: decode(output.stderr).trim() };
+}
+
+/** Runs git and returns its output; throws with git's own message when it fails. */
+export async function git(args: string[]): Promise<string> {
+    const result = await runGit(args);
+    if (!result.ok) throw new Error(`git ${args.join(" ")} failed: ${result.err || "no message"}`);
+    return result.out;
 }
 
 export async function readJsonc(path: string): Promise<unknown> {

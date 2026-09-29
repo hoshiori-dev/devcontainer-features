@@ -9,8 +9,9 @@
 //   exact form `<namespace>/<id>:<its current major>` (installsAfter: no tag), and dependsOn plus
 //   installsAfter form no cycle;
 // - every feature has an OpenSpec spec (main or in an active change);
-// - with --base, every feature whose src/<id>/ changed has a higher version than on the base, and a
-//   change to the images in test/<id>/compatibility.json carries the bump it requires.
+// - with --base, every feature whose src/<id>/ changed since the merge base — committed or not —
+//   has a higher version than on the base, and a change to the images in
+//   test/<id>/compatibility.json carries the bump it requires.
 //
 //   scripts/validate.ts [--base origin/main]
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
@@ -32,6 +33,7 @@ import {
     refsOf,
     RELEASE_VERSION,
     type RepoModel,
+    runGit,
     type Scenario,
     unreadableFiles,
 } from "./lib/repo.ts";
@@ -59,11 +61,6 @@ async function requireExecutable(problems: Problem[], path: string, why: string)
             message: `${path} is not executable. Run \`chmod +x ${path}\` and commit the mode.`,
         });
     }
-}
-
-async function git(args: string[]): Promise<{ ok: boolean; out: string }> {
-    const output = await new Deno.Command("git", { args, stderr: "null" }).output();
-    return { ok: output.success, out: new TextDecoder().decode(output.stdout) };
 }
 
 async function activeChangeSpecs(): Promise<Set<string>> {
@@ -320,7 +317,7 @@ export function compatBumpProblems(
 }
 
 async function readBaseJsonc(base: string, path: string): Promise<{ found: boolean; value?: unknown }> {
-    const old = await git(["show", `${base}:${path}`]);
+    const old = await runGit(["show", `${base}:${path}`]);
     if (!old.ok) return { found: false };
     try {
         return { found: true, value: parseJsoncText(old.out) };
@@ -331,25 +328,31 @@ async function readBaseJsonc(base: string, path: string): Promise<{ found: boole
 }
 
 export async function checkVersionBumps(model: RepoModel, base: string): Promise<Problem[]> {
-    if (!(await git(["rev-parse", "--verify", "--quiet", `${base}^{commit}`])).ok) {
+    if (!(await runGit(["rev-parse", "--verify", "--quiet", `${base}^{commit}`])).ok) {
         return [{
             file: ".",
             message:
                 `base ref ${base} is not available. Fetch it (\`git fetch origin main\`) or check out with fetch-depth: 0.`,
         }];
     }
-    const diff = await git([
-        "diff",
-        "--name-only",
-        "--no-renames",
-        `${base}...HEAD`,
-        "--",
-        "src",
-        "test/*/compatibility.json",
-    ]);
+    // Compare the working tree, not only HEAD, so `just check` before a commit sees what CI will see after it.
+    const paths = ["src", "test/*/compatibility.json"];
+    const listings = [
+        await runGit(["diff", "--name-only", "--no-renames", "--merge-base", base, "--", ...paths]),
+        await runGit(["ls-files", "--others", "--exclude-standard", "--", ...paths]),
+    ];
+    const failed = listings.find((listing) => !listing.ok);
+    if (failed) {
+        return [{
+            file: ".",
+            message: `git could not list the changes since ${base} (${failed.err}), so version bumps cannot be ` +
+                `checked. Fetch the full history (\`git fetch --unshallow origin\`, or fetch-depth: 0 in CI) so ${base} ` +
+                "and HEAD share a merge base.",
+        }];
+    }
     const srcChanged = new Set<string>();
     const compatChanged = new Set<string>();
-    for (const path of diff.out.split("\n").filter(Boolean)) {
+    for (const path of listings.flatMap((listing) => listing.out.split("\n")).filter(Boolean)) {
         const [top, id] = path.split("/");
         (top === "src" ? srcChanged : compatChanged).add(id);
     }
@@ -396,12 +399,21 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
 if (import.meta.main) {
     const args = parseArgs(Deno.args, { string: ["base"] });
     const model = await loadRepo(".");
-    const response = await fetch(FEATURE_SCHEMA_URL);
-    if (!response.ok) {
-        console.error(`error: could not fetch the feature schema (${response.status} from ${FEATURE_SCHEMA_URL}).`);
-        Deno.exit(1);
+    let schema: Record<string, unknown> = {}; // nothing to validate against it without features
+    if (model.features.size > 0) {
+        try {
+            const response = await fetch(FEATURE_SCHEMA_URL);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            schema = await response.json();
+        } catch (error) {
+            console.error(
+                `error: could not fetch the feature schema from ${FEATURE_SCHEMA_URL} ` +
+                    `(${error instanceof Error ? error.message : error}). Check the network and rerun.`,
+            );
+            Deno.exit(1);
+        }
     }
-    const problems = await checkFeatures(model, await response.json());
+    const problems = await checkFeatures(model, schema);
     if (args.base) problems.push(...(await checkVersionBumps(model, args.base)));
     const annotate = Deno.env.get("GITHUB_ACTIONS") === "true";
     for (const problem of problems) {

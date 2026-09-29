@@ -7,13 +7,7 @@
 //   scripts/tag_releases.ts [--dry-run]
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { join } from "jsr:@std/path@1.1.6";
-import { exists, readJsonc } from "./lib/repo.ts";
-
-async function git(args: string[]): Promise<string> {
-    const output = await new Deno.Command("git", { args, stderr: "inherit" }).output();
-    if (!output.success) throw new Error(`git ${args.join(" ")} failed`);
-    return new TextDecoder().decode(output.stdout);
-}
+import { exists, git, readJsonc } from "./lib/repo.ts";
 
 export function releaseTag(id: string, version: string): string {
     return `${id}/v${version}`;

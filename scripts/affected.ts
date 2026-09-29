@@ -9,20 +9,17 @@
 // --github prints `key=value` lines for $GITHUB_OUTPUT (tests, scenarios, global); the
 // human-readable summary always goes to stderr.
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
-import { buildPlan, loadRepo, selectAffected, type Selection, unreadableFiles } from "./lib/repo.ts";
+import { buildPlan, loadRepo, runGit, selectAffected, type Selection, unreadableFiles } from "./lib/repo.ts";
 
 async function changedPaths(base: string, head: string): Promise<string[]> {
-    const output = await new Deno.Command("git", {
-        args: ["diff", "--name-only", "--no-renames", `${base}...${head}`],
-        stderr: "inherit",
-    }).output();
-    if (!output.success) {
+    const diff = await runGit(["diff", "--name-only", "--no-renames", `${base}...${head}`]);
+    if (!diff.ok) {
         throw new Error(
-            `git diff ${base}...${head} failed. The base ref must exist locally: run \`git fetch origin main\`, ` +
-                "or check out with fetch-depth: 0 in CI.",
+            `git diff ${base}...${head} failed (${diff.err}). ${base} and ${head} must exist locally and share a ` +
+                "merge base: run `git fetch --unshallow origin`, or check out with fetch-depth: 0 in CI.",
         );
     }
-    return new TextDecoder().decode(output.stdout).split("\n").filter((line) => line !== "");
+    return diff.out.split("\n").filter((line) => line !== "");
 }
 
 if (import.meta.main) {
@@ -39,16 +36,13 @@ if (import.meta.main) {
         console.error("Fix the file(s) above; `just validate` lists every problem.");
         Deno.exit(1);
     }
-    let selection: Selection;
-    if (args.all) {
-        selection = {
-            reasons: new Map([...model.features.keys()].map((id) => [id, "all requested"])),
-            runGlobal: model.hasGlobal,
-        };
-    } else {
-        selection = selectAffected(await changedPaths(args.base, args.head), model);
-    }
     try {
+        const selection: Selection = args.all
+            ? {
+                reasons: new Map([...model.features.keys()].map((id) => [id, "all requested"])),
+                runGlobal: model.hasGlobal,
+            }
+            : selectAffected(await changedPaths(args.base, args.head), model);
         const plan = buildPlan(selection, model);
         const lines = Object.entries(plan.reasons).map(([id, reason]) => `  ${id}: ${reason}`);
         console.error(
