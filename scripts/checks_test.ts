@@ -41,6 +41,15 @@ Deno.test("bodyProblems reports missing sections and an unticked or deleted secu
     assert(bodyProblems(TEMPLATE, TEMPLATE.replace(/- \[ \].*\n/, "")).some((p) => p.includes("missing; restore")));
 });
 
+Deno.test("bodyProblems wants whole heading lines and the template's own security item", () => {
+    const ticked = TEMPLATE.replace("- [ ]", "- [x]");
+    const inline = ticked.replace("## Validation\n", "See ## Validation below.\n");
+    assert(bodyProblems(TEMPLATE, inline)[0].includes("## Validation"));
+    assert(bodyProblems(TEMPLATE, ticked.replace("## Validation", "### Validation"))[0].includes("## Validation"));
+    assert(bodyProblems(TEMPLATE, `${TEMPLATE}- [x] secrets n/a\n`).some((p) => p.includes("unticked")));
+    assert(bodyProblems("## What and why\n", "## What and why\n")[0].includes("no checklist item"));
+});
+
 Deno.test("scaffold produces the required files for a valid id", () => {
     assert(ID_PATTERN.test("node-lts"));
     assert(!ID_PATTERN.test("Node"));
