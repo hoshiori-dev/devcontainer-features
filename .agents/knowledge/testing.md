@@ -53,8 +53,9 @@ set (`scripts/affected.ts`, `scripts/lib/repo.ts`):
 `devcontainer features test` would install an in-repo dependency from GHCR — the old, published version.
 `scripts/test_feature.ts` therefore tests a staged copy: each feature carries its `dependsOn` closure in
 `src/<id>/_deps/<dep>/`, its references are rewritten to `./<id>/_deps/<dep>`, and full in-repo refs in scenarios become
-local keys. A dependent is always tested against the dependency in the same checkout. `installsAfter` references are not
-rewritten: they only order features that are already installed.
+local keys. A dependent is always tested against the dependency in the same checkout. The rewrite exists only in that
+temporary copy — the source always keeps full GHCR refs. `installsAfter` references are not rewritten: they only order
+features that are already installed.
 
 ## Choosing canaries
 

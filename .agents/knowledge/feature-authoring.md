@@ -56,9 +56,11 @@ duplicate test proves it (`.agents/knowledge/testing.md`).
 
 ## Dependencies between features
 
-- Reference a feature of this repository by its published ref,
-  `ghcr.io/hoshiori-dev/devcontainer-features/<id>:<major>`, in `dependsOn`, and by the ref without a tag in
-  `installsAfter`. Tests resolve these to the local copy automatically.
+- Both `dependsOn` and `installsAfter` always use the full GHCR ref, including for features of this repository:
+  `ghcr.io/hoshiori-dev/devcontainer-features/<id>:<major>` in `dependsOn`, the same ref without the tag in
+  `installsAfter`. Never a local path (`./<id>`, `../<id>`): it resolves against the consumer's `.devcontainer/` folder,
+  so it breaks in tests and after publishing. `just validate` rejects it. Tests resolve full refs to this checkout on
+  their own (`testing.md`).
 - Use `installsAfter` when only ordering matters; `dependsOn` installs the dependency for the user.
 - External features use their full ref with a major tag.
 - A PATCH or MINOR change to a dependency needs no change in its dependents: they reference the floating major tag. Only

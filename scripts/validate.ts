@@ -13,7 +13,7 @@ import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { join } from "jsr:@std/path@1.1.6";
 import { compare, parse, tryParse } from "jsr:@std/semver@1.0.8";
 import Ajv from "npm:ajv@8.20.0";
-import { exists, findDependsOnCycle, loadRepo, type RepoModel } from "./lib/repo.ts";
+import { exists, findDependsOnCycle, loadRepo, localPathRefs, NAMESPACE, type RepoModel } from "./lib/repo.ts";
 
 /** Official feature metadata schema, pinned to the last commit that changed it. */
 export const FEATURE_SCHEMA_URL =
@@ -98,6 +98,18 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
             }
             if (typeof feature.json.version !== "string" || !tryParse(feature.json.version)) {
                 problems.push({ file: jsonPath, message: `"version" must be a SemVer string such as "1.0.0".` });
+            }
+            for (const field of ["dependsOn", "installsAfter"] as const) {
+                for (const ref of localPathRefs(feature.json[field])) {
+                    problems.push({
+                        file: jsonPath,
+                        message: `${field} references the local path ${JSON.stringify(ref)}. A local path resolves ` +
+                            "against the consumer's .devcontainer/ folder, so it breaks both in tests and after " +
+                            `publishing. Use the full ref ${NAMESPACE}/<id>` +
+                            (field === "dependsOn" ? ":<major>" : " (no tag)") +
+                            "; tests resolve it to this checkout automatically.",
+                    });
+                }
             }
             for (const dep of [...feature.dependsOn, ...feature.installsAfter]) {
                 if (!model.features.has(dep)) {

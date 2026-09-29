@@ -98,6 +98,11 @@ export function inRepoRefs(value: unknown): string[] {
     return unique(refsOf(value).map(inRepoId).filter((id): id is string => id !== undefined));
 }
 
+/** References in a dependsOn object or installsAfter array that are local paths instead of OCI refs. */
+export function localPathRefs(value: unknown): string[] {
+    return refsOf(value).filter((ref) => /^(\.{1,2}(\/|$)|\/)/.test(ref));
+}
+
 export function parseScenarios(value: unknown): Scenario[] {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         throw new Error("scenarios.json must be an object mapping scenario names to dev container configs");

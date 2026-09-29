@@ -7,6 +7,7 @@ import {
     findDependsOnCycle,
     inRepoId,
     inRepoRefs,
+    localPathRefs,
     NAMESPACE,
     type RepoModel,
     selectAffected,
@@ -47,6 +48,14 @@ Deno.test("inRepoRefs reads dependsOn objects and installsAfter arrays", () => {
     assertEquals(inRepoRefs({ [`${NAMESPACE}/a:1`]: {}, "ghcr.io/other/x:1": {} }), ["a"]);
     assertEquals(inRepoRefs([`${NAMESPACE}/b`, "ghcr.io/devcontainers/features/common-utils"]), ["b"]);
     assertEquals(inRepoRefs(undefined), []);
+});
+
+Deno.test("localPathRefs flags relative and absolute paths, not OCI refs", () => {
+    assertEquals(localPathRefs({ "./node": {}, "../x": {}, [`${NAMESPACE}/a:1`]: {} }), ["./node", "../x"]);
+    assertEquals(localPathRefs(["/abs/feature", `${NAMESPACE}/b`, "ghcr.io/devcontainers/features/git"]), [
+        "/abs/feature",
+    ]);
+    assertEquals(localPathRefs(undefined), []);
 });
 
 Deno.test("classifyPath maps feature, global, infra, and other paths", () => {
