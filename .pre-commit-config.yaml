@@ -23,7 +23,8 @@ repos:
     hooks:
       - id: deno-fmt
         name: deno fmt
-        entry: deno fmt
+        # --permit-no-files: a commit whose files deno.json excludes (generated READMEs, OpenSpec output) passes.
+        entry: deno fmt --permit-no-files
         language: unsupported
         files: '\.(?:[cm]?[jt]sx?|jsonc?|ya?ml|md|markdown|css|scss|less|html|xml|svg)$'
       - id: shellcheck
