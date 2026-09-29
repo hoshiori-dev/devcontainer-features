@@ -24,12 +24,12 @@ repos:
       - id: deno-fmt
         name: deno fmt
         entry: deno fmt
-        language: system
+        language: unsupported
         files: '\.(?:[cm]?[jt]sx?|jsonc?|ya?ml|md|markdown|css|scss|less|html|xml|svg)$'
       - id: shellcheck
         name: shellcheck
         entry: shellcheck
-        language: system
+        language: unsupported
         types: [shell]
 
   - repo: https://github.com/gitleaks/gitleaks
