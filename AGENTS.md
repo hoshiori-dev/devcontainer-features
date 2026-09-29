@@ -55,7 +55,8 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 - The dev container (`.devcontainer/`) provides Deno, just, uv, pre-commit, shellcheck, the devcontainer CLI, OpenSpec,
   gh, and docker-in-docker, so every CI container test runs locally.
 - The repository is public: credentials, tokens, internal hosts, and personal data never enter a file, commit, issue, or
-  PR. pre-commit runs gitleaks.
+  PR. The pre-commit hooks run gitleaks on each commit; CI's Secret Scanning workflow runs TruffleHog on every pushed
+  commit.
 
 ## Validation
 
