@@ -18,13 +18,13 @@ observed with OpenSpec 1.13.2:
 
 ## What Changes
 
-- `openspec/config.yaml` `rules.specs`: the Purpose's "Upstream sources:" list holds reference links only, one
-  `- <label>: <url>` entry each; behavior-shaping sources, signing keys included, are Requirements and stay out of the
-  list; a delta spec holds only the sections archive keeps.
-- `.agents/knowledge/spec-workflow.md`: the Artifact map and Source of truth rows name one place per kind of link; Scope
-  of specifications gains a second hand-edit exception — a PR that only edits the "Upstream sources:" list carries no
-  change and bumps no version — and names the link kinds and entry format.
-- `.agents/knowledge/references.md`: its pointer to feature specs names documentation among the per-feature facts.
+- Every kind of upstream link has one place in a feature's spec: reference links (upstream home or README, documentation
+  root, installation guide) in the Purpose's "Upstream sources:" list as `- <label>: <url>`; behavior-shaping sources
+  (download location, checksum or signature verification, signing keys) only in Requirements.
+- Adding, updating, or removing an entry of the "Upstream sources:" list has a documented path: a PR that edits only the
+  list carries no OpenSpec change and bumps no version; a change that leaves the list stale corrects it by hand in its
+  own PR.
+- Delta specs hold only the sections archive keeps, so no link written in a change is silently lost.
 
 ## Capabilities
 
@@ -38,14 +38,24 @@ None. This change edits the harness only (`skip_specs: true`).
 
 ## Impact
 
+- Files: `openspec/config.yaml` (`rules.specs`), `.agents/knowledge/spec-workflow.md` (Artifact map, Source of truth,
+  Scope of specifications), `.agents/knowledge/references.md`.
 - Feature ids touched: none, so no version bump. No feature exists yet, so no spec needs migrating.
 - Affects how every future feature spec records upstream links, and which PRs need an OpenSpec change.
 
 ## Acceptance
 
-- `openspec instructions specs --json` for a change shows rules that put reference links (home or README, documentation,
-  installation guide) in the Purpose's "Upstream sources:" list as `- <label>: <url>`, put behavior-shaping sources
-  (signing keys included) only in Requirements, and limit a delta spec to the sections archive keeps.
-- `spec-workflow.md` permits a PR that only edits the "Upstream sources:" list without an OpenSpec change or version
-  bump, and its Source of truth row names one place per kind of link; `references.md` agrees.
-- A uv-shaped spec written to these rules passes `openspec validate --strict`, and `just check` passes.
+**Becomes true:**
+
+- `openspec instructions specs --json` for a change shows rules that put reference links in the Purpose's "Upstream
+  sources:" list as `- <label>: <url>`, put behavior-shaping sources (signing keys included) only in Requirements, and
+  limit a delta spec to the sections archive keeps.
+- `spec-workflow.md` names one place per kind of link and permits a PR that only edits the "Upstream sources:" list
+  without an OpenSpec change or version bump; `references.md` agrees with it.
+- A uv-shaped spec written to these rules passes `openspec validate --strict`.
+
+**Stays true:**
+
+- A behavior-shaping upstream source still reaches the spec only through a change and the package gate.
+- Project-wide references stay in `.agents/knowledge/references.md`.
+- No approval gate or check changes; `just check` passes.

@@ -12,16 +12,14 @@ warning; any other section in a delta (e.g. `## References`) is dropped without 
 
 **Goals:**
 
-- The rules injected into the specs step (`openspec instructions specs --json`) and `spec-workflow.md` name the same
-  place for each kind of upstream link — reference links in the Purpose list, behavior-shaping sources in Requirements.
-- Adding, updating, and removing an entry of a spec's "Upstream sources:" list each has a documented path in
-  `spec-workflow.md` that needs no OpenSpec change.
+- The rule text lives in `rules.specs` in brief and in `spec-workflow.md` in full, the rule pointing to the file —
+  checked by reading both against each other.
+- Only formats OpenSpec keeps are used: Purpose text and Requirements, no extra spec sections — checked by
+  `openspec validate --strict` and an archive run on a sample spec.
 
 **Non-Goals:**
 
 - A custom OpenSpec schema or templates.
-- Changing the approval gates or any check.
-- Project-wide references; they stay in `.agents/knowledge/references.md`.
 
 ## Decisions
 
