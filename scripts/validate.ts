@@ -383,8 +383,16 @@ async function readBaseJsonc(base: string, path: string): Promise<{ found: boole
     }
 }
 
+export async function baseExists(base: string): Promise<boolean> {
+    return (await runGit(["rev-parse", "--verify", "--quiet", `${base}^{commit}`])).ok;
+}
+
+/**
+ * What changed is measured from the merge base, so commits main gained after the branch point never count as the
+ * branch's changes; the version must still exceed the base tip's, since that is what is already published.
+ */
 export async function checkVersionBumps(model: RepoModel, base: string): Promise<Problem[]> {
-    if (!(await runGit(["rev-parse", "--verify", "--quiet", `${base}^{commit}`])).ok) {
+    if (!(await baseExists(base))) {
         return [{
             file: ".",
             message:
@@ -393,10 +401,14 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
     }
     // Compare the working tree, not only HEAD, so `just check` before a commit sees what CI will see after it.
     const paths = ["src", "test/*/compatibility.json"];
-    const listings = [
-        await runGit(["diff", "--name-only", "--no-renames", "--merge-base", base, "--", ...paths]),
-        await runGit(["ls-files", "--others", "--exclude-standard", "--", ...paths]),
-    ];
+    const mergeBase = await runGit(["merge-base", base, "HEAD"]);
+    const fork = mergeBase.out.trim();
+    const listings = mergeBase.ok
+        ? [
+            await runGit(["diff", "--name-only", "--no-renames", fork, "--", ...paths]),
+            await runGit(["ls-files", "--others", "--exclude-standard", "--", ...paths]),
+        ]
+        : [mergeBase];
     const failed = listings.find((listing) => !listing.ok);
     if (failed) {
         return [{
@@ -427,7 +439,7 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
             continue;
         }
         if (compatChanged.has(id) && feature?.compat) {
-            const oldCompat = await readBaseJsonc(base, `test/${id}/compatibility.json`);
+            const oldCompat = await readBaseJsonc(fork, `test/${id}/compatibility.json`);
             if (!oldCompat.found || oldCompat.value !== undefined) {
                 const compatProblems = compatBumpProblems(
                     id,
