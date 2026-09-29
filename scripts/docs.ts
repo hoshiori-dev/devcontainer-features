@@ -9,9 +9,9 @@
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { join } from "jsr:@std/path@1.1.6";
 import { copy } from "jsr:@std/fs@1.0.24/copy";
-import { exists, NAMESPACE } from "./lib/repo.ts";
+import { exists, REPO } from "./lib/repo.ts";
 
-const [OWNER, REPO] = NAMESPACE.split("/").slice(1);
+const [OWNER, NAME] = REPO.split("/");
 
 if (import.meta.main) {
     const args = parseArgs(Deno.args, { boolean: ["check"] });
@@ -37,11 +37,11 @@ if (import.meta.main) {
                 "--project-folder",
                 "src",
                 "--namespace",
-                `${OWNER}/${REPO}`,
+                REPO,
                 "--github-owner",
                 OWNER,
                 "--github-repo",
-                REPO,
+                NAME,
                 "--log-level",
                 "info",
             ],

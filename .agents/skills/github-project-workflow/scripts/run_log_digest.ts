@@ -3,11 +3,14 @@
 // and cancelled jobs, their unsuccessful steps, and the last N log lines of each — so full logs
 // never enter agent context. A run that failed without any such job gets a `note` instead.
 //
-//   run_log_digest.ts --run-id <id> [--repo hoshiori-dev/devcontainer-features] [--tail 50]
+//   run_log_digest.ts --run-id <id> [--repo OWNER/REPO] [--tail 50]
+//
+// --repo defaults to REPO in scripts/lib/repo.ts, this repository.
 //
 // Exit codes: 0 digest produced (an empty failed_jobs list on a green run), 1 gh failed or the run
 // was not found, 2 bad arguments.
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
+import { REPO } from "../../../../scripts/lib/repo.ts";
 
 interface Step {
     name?: string;
@@ -33,7 +36,7 @@ async function gh(args: string[]): Promise<{ ok: boolean; out: string; err: stri
 if (import.meta.main) {
     const args = parseArgs(Deno.args, {
         string: ["repo", "run-id", "tail"],
-        default: { repo: "hoshiori-dev/devcontainer-features", tail: "50" },
+        default: { repo: REPO, tail: "50" },
     });
     const runId = Number(args["run-id"]);
     const tail = Number(args.tail);
