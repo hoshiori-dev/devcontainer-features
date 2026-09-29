@@ -42,9 +42,11 @@ Container tests run only on pull requests, only for affected features, in parall
 set (`scripts/affected.ts`, `scripts/lib/repo.ts`):
 
 1. A change under `src/<id>/` or `test/<id>/` affects `<id>`.
-2. Every feature that depends on an affected feature — through `dependsOn`, `installsAfter`, or a scenario that installs
-   it — is affected too, transitively.
-3. A change to `test/_global/`, or an affected feature that the global scenarios install, runs the global scenarios.
+2. Every feature that depends on a feature whose `src/` changed — through `dependsOn`, `installsAfter`, or a scenario
+   that installs it — is affected too, transitively. A change only under `test/<id>/` changes nothing users install, so
+   it stops at `<id>`.
+3. A change to `test/_global/`, or a `src/` change that reaches a feature the global scenarios install, runs the global
+   scenarios.
 4. A change to the test infrastructure (the paths in `INFRA_PATHS` in `scripts/lib/repo.ts`) adds the canary features,
    without their dependents.
 5. Each affected feature gets one job per compatibility image and architecture, plus one scenario job when it has

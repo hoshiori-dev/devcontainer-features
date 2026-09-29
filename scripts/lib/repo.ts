@@ -343,17 +343,18 @@ export function findInstallCycle(model: RepoModel): string[] | undefined {
 }
 
 export type PathKind =
-    | { kind: "feature"; id: string }
+    /** `part` is "src" for what ships in the feature's artifact, "test" for its tests. */
+    | { kind: "feature"; id: string; part: "src" | "test" }
     | { kind: "global" }
     | { kind: "infra" }
     | { kind: "other" };
 
 export function classifyPath(path: string): PathKind {
     const parts = path.split("/");
-    if (parts[0] === "src" && parts.length > 2) return { kind: "feature", id: parts[1] };
+    if (parts[0] === "src" && parts.length > 2) return { kind: "feature", id: parts[1], part: "src" };
     if (parts[0] === "test" && parts.length > 2) {
         if (parts[1] === "_global") return { kind: "global" };
-        if (!parts[1].startsWith("_")) return { kind: "feature", id: parts[1] };
+        if (!parts[1].startsWith("_")) return { kind: "feature", id: parts[1], part: "test" };
     }
     if (INFRA_PATHS.some((p) => (p.endsWith("/") ? path.startsWith(p) : path === p))) return { kind: "infra" };
     return { kind: "other" };
@@ -366,31 +367,37 @@ export interface Selection {
 }
 
 /**
- * Selects the features a set of changed paths affects, following dependents transitively. A changed id that is no
- * longer in src/ (a deleted or renamed feature) selects nothing itself but still selects what references it.
+ * Selects the features a set of changed paths affects. A change under src/<id> changes what users install, so it
+ * also selects every dependent, transitively; a change under test/<id> selects only <id>. A changed id no longer in
+ * src/ (a deleted or renamed feature) selects nothing itself but still selects what references it.
  */
 export function selectAffected(changed: string[], model: RepoModel): Selection {
     const reasons = new Map<string, string>();
-    const seeds = new Set<string>();
+    /** Ids whose installed result may differ: changed src/ trees and, below, everything depending on them. */
+    const shipped = new Set<string>();
     let globalChanged = false;
     let infraChanged = false;
     for (const path of changed) {
         const kind = classifyPath(path);
-        if (kind.kind === "feature") seeds.add(kind.id);
-        else if (kind.kind === "global") globalChanged = true;
+        if (kind.kind === "feature") {
+            if (model.features.has(kind.id)) reasons.set(kind.id, "changed");
+            if (kind.part === "src") shipped.add(kind.id);
+        } else if (kind.kind === "global") globalChanged = true;
         else if (kind.kind === "infra") infraChanged = true;
     }
-    for (const id of seeds) if (model.features.has(id)) reasons.set(id, "changed");
     const dependents = new Map<string, string[]>();
     for (const feature of model.features.values()) {
         for (const dep of testEdges(feature)) dependents.set(dep, [...(dependents.get(dep) ?? []), feature.id]);
     }
-    const queue = [...seeds];
+    const queue = [...shipped];
     while (queue.length > 0) {
         const id = queue.shift()!;
         for (const dependent of dependents.get(id) ?? []) {
-            if (reasons.has(dependent)) continue;
-            reasons.set(dependent, model.features.has(id) ? `depends on ${id}` : `references removed ${id}`);
+            if (shipped.has(dependent)) continue;
+            shipped.add(dependent);
+            if (!reasons.has(dependent)) {
+                reasons.set(dependent, model.features.has(id) ? `depends on ${id}` : `references removed ${id}`);
+            }
             queue.push(dependent);
         }
     }
@@ -398,8 +405,7 @@ export function selectAffected(changed: string[], model: RepoModel): Selection {
     if (infraChanged) {
         for (const id of model.canary) if (model.features.has(id) && !reasons.has(id)) reasons.set(id, "canary");
     }
-    const runGlobal = model.hasGlobal &&
-        (globalChanged || model.globalRefs.some((id) => reasons.has(id) || seeds.has(id)));
+    const runGlobal = model.hasGlobal && (globalChanged || model.globalRefs.some((id) => shipped.has(id)));
     return { reasons, runGlobal };
 }
 

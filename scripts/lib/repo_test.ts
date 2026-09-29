@@ -77,8 +77,8 @@ Deno.test("localPathRefs flags relative and absolute paths, not OCI refs", () =>
 });
 
 Deno.test("classifyPath maps feature, global, infra, and other paths", () => {
-    assertEquals(classifyPath("src/node/install.sh"), { kind: "feature", id: "node" });
-    assertEquals(classifyPath("test/node/test.sh"), { kind: "feature", id: "node" });
+    assertEquals(classifyPath("src/node/install.sh"), { kind: "feature", id: "node", part: "src" });
+    assertEquals(classifyPath("test/node/test.sh"), { kind: "feature", id: "node", part: "test" });
     assertEquals(classifyPath("test/_global/scenarios.json"), { kind: "global" });
     assertEquals(classifyPath("scripts/lib/stage.ts"), { kind: "infra" });
     assertEquals(classifyPath(".github/actions/feature-test/action.yml"), { kind: "infra" });
@@ -107,7 +107,20 @@ Deno.test("dependents are selected transitively through dependsOn and installsAf
 
 Deno.test("a feature whose scenarios install a changed feature is selected", () => {
     const m = model([feature("a"), feature("b", { scenarioRefs: ["a"] })]);
-    assertEquals([...selectAffected(["test/a/test.sh"], m).reasons.keys()], ["a", "b"]);
+    assertEquals([...selectAffected(["src/a/install.sh"], m).reasons.keys()], ["a", "b"]);
+});
+
+Deno.test("a change to a feature's tests selects only that feature", () => {
+    const m = model([feature("a"), feature("b", { dependsOn: ["a"] })], { hasGlobal: true, globalRefs: ["a"] });
+    const selection = selectAffected(["test/a/test.sh", "test/a/compatibility.json"], m);
+    assertEquals(Object.fromEntries(selection.reasons), { a: "changed" });
+    assertEquals(selection.runGlobal, false);
+});
+
+Deno.test("a test-only change does not stop a src change from reaching dependents", () => {
+    const m = model([feature("a"), feature("b", { dependsOn: ["a"] }), feature("c", { dependsOn: ["b"] })]);
+    const selection = selectAffected(["test/b/test.sh", "src/a/install.sh"], m);
+    assertEquals(Object.fromEntries(selection.reasons), { a: "changed", b: "changed", c: "depends on b" });
 });
 
 Deno.test("global scenarios run when _global changes or a feature they install is affected", () => {
