@@ -49,8 +49,18 @@ jobs:
           devcontainer-cli: "true"
       - name: Validate features and version bumps
         env:
+          EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: just validate "$BASE"
+        # A push that creates the branch has no previous commit (all zeros), and one after a force push
+        # may no longer exist: then there is no base to compare versions with, and only the layout and
+        # metadata checks run. A pull request always has its base.
+        run: |
+          if [[ "$EVENT" == push ]] && ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "::notice::No previous commit $BASE to compare versions with; skipping the version bump check."
+            ./scripts/validate.ts
+          else
+            just validate "$BASE"
+          fi
       - run: just docs-check
 
   spec:
