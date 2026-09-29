@@ -10,12 +10,13 @@ set positional-arguments
 default:
     @just --list
 
-# Everything CI checks without containers: hooks, scripts, metadata and versions, specs, READMEs
+# Everything CI checks without containers: formatting, shell scripts, Deno scripts, metadata and versions, specs, READMEs
 check: lint scripts-check validate spec-check docs-check
 
-# Run every pre-commit hook on all files
+# Check formatting (deno fmt) and shell scripts (shellcheck); the pre-commit hooks run on each commit
 lint:
-    pre-commit run --all-files --show-diff-on-failure
+    deno fmt --check
+    git ls-files -z '*.sh' | xargs -0 --no-run-if-empty shellcheck
 
 # Type-check, lint, and unit-test the Deno scripts
 scripts-check:

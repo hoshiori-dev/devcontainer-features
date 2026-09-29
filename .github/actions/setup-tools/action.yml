@@ -1,17 +1,14 @@
-# Installs the pinned toolchain CI jobs share: Deno and just always; the devcontainer CLI,
-# OpenSpec, and pre-commit when a job asks for them. Versions are pinned here and only here for
-# CI; the dev container installs its own (see .agents/knowledge/github/checks.md).
+# Installs the pinned toolchain CI jobs share: Deno and just always; the devcontainer CLI and
+# OpenSpec when a job asks for them. Versions are pinned here and only here for CI; the dev
+# container installs its own (see .agents/knowledge/github/checks.md).
 name: Set up repository tools
-description: Install Deno, just, and on request the devcontainer CLI, OpenSpec, and pre-commit.
+description: Install Deno, just, and on request the devcontainer CLI and OpenSpec.
 inputs:
   devcontainer-cli:
     description: Install the devcontainer CLI.
     default: "false"
   openspec:
     description: Install the OpenSpec CLI.
-    default: "false"
-  pre-commit:
-    description: Install pre-commit.
     default: "false"
 runs:
   using: composite
@@ -36,7 +33,3 @@ runs:
         deno install --global --force
         --allow-read --allow-write --allow-env --allow-sys=cpus,homedir,uid --allow-net=edge.openspec.dev
         npm:@fission-ai/openspec@1.13.2
-    - name: Install pre-commit
-      if: inputs.pre-commit == 'true'
-      shell: bash
-      run: pipx install pre-commit==4.6.2

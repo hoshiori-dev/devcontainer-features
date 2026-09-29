@@ -23,12 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-tools
-        with:
-          pre-commit: "true"
-      - uses: actions/cache@v6
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      # shellcheck comes with the runner image.
       - run: just lint
 
   scripts:

@@ -15,7 +15,7 @@ Every CI job runs a command that also runs locally.
 
 | Job (workflow)                           | Command                                                                                                                                                                                                                                                                   | Runs on                                                      |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `lint` (CI)                              | `just lint` — pre-commit on all files                                                                                                                                                                                                                                     | PR, push to `main`                                           |
+| `lint` (CI)                              | `just lint` — `deno fmt --check` and shellcheck on the tracked `*.sh` files. The pre-commit hooks (these two, file hygiene, gitleaks) run on each commit, not in CI                                                                                                       | PR, push to `main`                                           |
 | `scripts` (CI)                           | `just scripts-check` — deno check, lint, test                                                                                                                                                                                                                             | PR, push to `main`                                           |
 | `validate` (CI)                          | `just validate <base>` then `just docs-check`                                                                                                                                                                                                                             | PR, push to `main`                                           |
 | `spec` (CI)                              | `just spec-check` — OpenSpec strict validation; OpenSpec's generated files are current                                                                                                                                                                                    | PR, push to `main`                                           |
@@ -50,14 +50,15 @@ Every CI job runs a command that also runs locally.
 
 ## Toolchain pins
 
-CI pins Deno, just, the devcontainer CLI, OpenSpec, and pre-commit in `.github/actions/setup-tools/action.yml`, the only
-place CI versions live. The dev container installs its own copies (OpenSpec at `@latest` via `.devcontainer/setup.sh`).
-Before bumping a pin, run `just check` locally with that version. `denoland/setup-deno` is pinned by commit SHA with its
-version in a comment; `actions/*` by major tag; Dependabot proposes updates for both. Deno scripts pin their `jsr:` /
-`npm:` imports inline, and CI's OpenSpec install uses the same permission flags as `setup.sh`. The local registry image
-the feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts/test_feature.ts`. The TruffleHog action
-in `secret.yml` is pinned by commit SHA, and the image it runs by digest in its `version` input: Dependabot bumps only
-the action, so update the image with it.
+CI pins Deno, just, the devcontainer CLI, and OpenSpec in `.github/actions/setup-tools/action.yml`, the only place CI
+versions live; shellcheck is the runner image's (0.9.0 on ubuntu-24.04, as in the dev container's apt package). The dev
+container installs its own copies (OpenSpec at `@latest` via `.devcontainer/setup.sh`). Before bumping a pin, run
+`just check` locally with that version. `denoland/setup-deno` is pinned by commit SHA with its version in a comment;
+`actions/*` by major tag; Dependabot proposes updates for both. Deno scripts pin their `jsr:` / `npm:` imports inline,
+and CI's OpenSpec install uses the same permission flags as `setup.sh`. The local registry image the feature tests
+publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts/test_feature.ts`. The TruffleHog action in `secret.yml`
+is pinned by commit SHA, and the image it runs by digest in its `version` input: Dependabot bumps only the action, so
+update the image with it.
 
 ## Release path
 
