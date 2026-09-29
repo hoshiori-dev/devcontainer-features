@@ -61,8 +61,8 @@ the feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts
   (the CLI skips published ones), then creates `<id>/v<version>` tags at the merge commit.
 - A new GHCR package starts with the organization's default visibility; a maintainer makes it public after its first
   publish (`platform-settings.md`).
-- A failed release is fixed forward through a PR; a maintainer may rerun it by dispatch. Tags are never deleted or
-  moved.
+- A failed release is fixed forward through a PR; a maintainer may rerun it by dispatch on `main` — the job skips any
+  other branch, which would publish unmerged versions. Tags are never deleted or moved.
 
 ## Rules
 
