@@ -15,7 +15,10 @@
 //   has a higher version than on the base, and a change to the images in
 //   test/<id>/compatibility.json carries the bump it requires.
 //
-//   scripts/validate.ts [--base origin/main]
+//   scripts/validate.ts [--base origin/main [--allow-missing-base]]
+//
+// --allow-missing-base skips the version bump check with a notice when the base commit does not
+// exist (a branch-creating push reports all zeros; a force push can name a vanished commit).
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { join } from "jsr:@std/path@1.1.6";
 import { compare, format, parse, type SemVer, tryParse } from "jsr:@std/semver@1.0.8";
@@ -465,11 +468,17 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
 }
 
 if (import.meta.main) {
-    const args = parseArgs(Deno.args, { string: ["base"] });
+    const args = parseArgs(Deno.args, { string: ["base"], boolean: ["allow-missing-base"] });
     const model = await loadRepo(".");
     const problems = await checkFeatures(model, FEATURE_SCHEMA);
-    if (args.base) problems.push(...(await checkVersionBumps(model, args.base)));
     const annotate = Deno.env.get("GITHUB_ACTIONS") === "true";
+    if (args.base && args["allow-missing-base"] && !(await baseExists(args.base))) {
+        const note = `base ${args.base} does not exist, so there is nothing to compare versions with; ` +
+            "skipping the version bump check.";
+        console.error(annotate ? `::notice::${note}` : `note: ${note}`);
+    } else if (args.base) {
+        problems.push(...(await checkVersionBumps(model, args.base)));
+    }
     for (const problem of problems) {
         console.error(
             annotate ? `::error file=${problem.file}::${problem.message}` : `${problem.file}: ${problem.message}`,

@@ -27,7 +27,7 @@ Every CI job runs a command that also runs locally.
 | `pr-title` (PR)                          | `just check-title "<title>"`; for Dependabot the length ignores its `in /<directory>` suffix (`PR_AUTHOR`)                              | PR opened, edited, synchronized, ready, draft                |
 | `pr-checklist` (PR)                      | `scripts/check_pr_body.ts --template <base commit's template> --body-file <file>`                                                       | same; skipped for Dependabot                                 |
 | `spec-archived` (PR)                     | `just spec-status` (add `--ready` for the verdict a ready PR gets)                                                                      | same                                                         |
-| `verify` (Release)                       | `scripts/validate.ts` on the commit about to be published, without the write token                                                      | before every `publish`                                       |
+| `verify` (Release)                       | `scripts/validate.ts --base <previous main>` on the commit about to be published, without the write token                               | before every `publish`                                       |
 | `publish` (Release)                      | `devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features`, then `scripts/tag_releases.ts` | push to `main` touching `src/**`; dispatch by maintainers    |
 
 ## Reading a run
