@@ -42,8 +42,9 @@ which is a maintainer decision recorded here first.
 | Branch in this repository   | Squash | One reviewed unit per change on `main`; the PR title becomes the commit title, so history reads as the list of changes. |
 | Fork or outside contributor | Squash | Same; the contributor's own commits do not need to follow the title convention.                                         |
 
-Enforcement: only squash merge is enabled (repository setting). The squash commit title is the PR title and must follow
-Conventional Commits: `<type>(<scope>)[!]: <subject>`.
+Enforcement: squash-only is a repository setting a maintainer has yet to apply (see the register below); until then it
+is a convention, and every merge uses squash. The squash commit title is the PR title and must follow Conventional
+Commits: `<type>(<scope>)[!]: <subject>`.
 
 - `<scope>` is the feature id for a change to one feature (`feat(node): add pnpm option`); for a harness change use the
   area (`ci`, `scripts`, `openspec`, `harness`); omit it for repository-wide changes.
