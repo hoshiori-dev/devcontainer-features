@@ -32,7 +32,21 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-tools
-      - run: ./scripts/check_pr_body.ts --template .github/pull_request_template.md
+      # The template comes from the base commit, so a PR cannot drop a required section by deleting it from
+      # both the template and its own description. Only a base without a template (the bootstrap) uses this
+      # branch's copy.
+      - env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          template=.github/pull_request_template.md
+          git fetch --no-tags --depth 1 origin "$BASE_SHA"
+          if git cat-file -e "$BASE_SHA:$template" 2>/dev/null; then
+            git show "$BASE_SHA:$template" > "$RUNNER_TEMP/pull_request_template.md"
+            template="$RUNNER_TEMP/pull_request_template.md"
+          else
+            echo "::notice::The base branch has no $template yet; checking against this branch's copy."
+          fi
+          ./scripts/check_pr_body.ts --template "$template"
 
   spec-archived:
     runs-on: ubuntu-24.04
