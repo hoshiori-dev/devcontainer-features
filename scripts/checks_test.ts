@@ -5,7 +5,7 @@ import { bodyProblems } from "./check_pr_body.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
 import { compatBumpProblems, inRepoRefProblem } from "./validate.ts";
-import { type Compat, type FeatureInfo, NAMESPACE, type RepoModel } from "./lib/repo.ts";
+import { type Compat, type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
 
 Deno.test("titleProblems accepts the convention", () => {
     assertEquals(titleProblems("feat(node): add pnpm option"), []);
@@ -59,6 +59,11 @@ Deno.test("scaffold produces the required files for a valid id", () => {
 
 Deno.test("releaseTag uses <id>/v<version>", () => {
     assertEquals(releaseTag("node", "1.2.3"), "node/v1.2.3");
+});
+
+Deno.test("release.yml and new_feature.ts publish under REPO", async () => {
+    assert((await Deno.readTextFile(".github/workflows/release.yml")).includes(`--namespace ${REPO}\n`));
+    assert(scaffold("demo", "Demo")["src/demo/devcontainer-feature.json"].includes(`github.com/${REPO}/tree/main`));
 });
 
 function repoWith(versions: Record<string, string>): RepoModel {

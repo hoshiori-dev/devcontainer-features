@@ -30,6 +30,7 @@ jobs:
       - name: Publish features
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The namespace is REPO in scripts/lib/repo.ts; scripts/checks_test.ts keeps the two equal.
         run: devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features
       - name: Tag new versions
         run: ./scripts/tag_releases.ts

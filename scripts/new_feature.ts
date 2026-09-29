@@ -5,7 +5,7 @@
 //
 //   scripts/new_feature.ts <id> [--name "Display name"]
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
-import { exists } from "./lib/repo.ts";
+import { exists, REPO } from "./lib/repo.ts";
 
 export const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -15,7 +15,7 @@ export function scaffold(id: string, name: string): Record<string, string> {
         version: "1.0.0",
         name,
         description: `TODO: one sentence on what ${id} installs.`,
-        documentationURL: `https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/${id}`,
+        documentationURL: `https://github.com/${REPO}/tree/main/src/${id}`,
         options: {
             version: { type: "string", proposals: ["latest"], default: "latest", description: "Version to install." },
         },

@@ -95,19 +95,19 @@ template link and path above.
 
 ## Synchronization
 
-| When this changes                                                          | Update in the same PR                                                                                               | Owner                                 |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| A CI or PR job is renamed or added                                         | `github/checks.md` job map; the `main` ruleset's required checks (maintainer, `github/platform-settings.md`)        | PR author; maintainer for the ruleset |
-| A `just` recipe CI calls                                                   | the job that calls it and the `github/checks.md` map                                                                | PR author                             |
-| PR template `##` headings or the security item                             | nothing else — `scripts/check_pr_body.ts` reads the template; keep the word "secrets" in the security item          | PR author                             |
-| PR template specification block or checklist items                         | `spec-workflow.md` if a gate or the archive rule changed, else revert the template                                  | PR author                             |
-| Issue form `type:` values                                                  | organization issue types row in `github/platform-settings.md`                                                       | Maintainer                            |
-| Issue form `spec` field or acceptance descriptions                         | `spec-workflow.md` "Specifications and issues"                                                                      | PR author                             |
-| `github-project-workflow` Take work / Create issues / Finish               | `spec-workflow.md` and `agent-authority.md` must still agree                                                        | PR author                             |
-| A tool pin in `.github/actions/setup-tools/action.yml`                     | run `just check` with that version; OpenSpec's permission flags stay identical to `.devcontainer/setup.sh`          | PR author                             |
-| A file the test pipeline uses is added or moved (workflow, action, script) | `INFRA_PATHS` in `scripts/lib/repo.ts`                                                                              | PR author                             |
-| The release tag format or namespace                                        | `git-workflow.md`, `scripts/tag_releases.ts`, `.github/workflows/release.yml`, `NAMESPACE` in `scripts/lib/repo.ts` | PR author                             |
-| The arch values a compatibility entry may name                             | `RUNNERS` in `scripts/lib/repo.ts` and the `arch` enum in `test/compatibility.schema.json`                          | PR author                             |
+| When this changes                                                          | Update in the same PR                                                                                          | Owner                                 |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| A CI or PR job is renamed or added                                         | `github/checks.md` job map; the `main` ruleset's required checks (maintainer, `github/platform-settings.md`)   | PR author; maintainer for the ruleset |
+| A `just` recipe CI calls                                                   | the job that calls it and the `github/checks.md` map                                                           | PR author                             |
+| PR template `##` headings or the security item                             | nothing else — `scripts/check_pr_body.ts` reads the template; keep the word "secrets" in the security item     | PR author                             |
+| PR template specification block or checklist items                         | `spec-workflow.md` if a gate or the archive rule changed, else revert the template                             | PR author                             |
+| Issue form `type:` values                                                  | organization issue types row in `github/platform-settings.md`                                                  | Maintainer                            |
+| Issue form `spec` field or acceptance descriptions                         | `spec-workflow.md` "Specifications and issues"                                                                 | PR author                             |
+| `github-project-workflow` Take work / Create issues / Finish               | `spec-workflow.md` and `agent-authority.md` must still agree                                                   | PR author                             |
+| A tool pin in `.github/actions/setup-tools/action.yml`                     | run `just check` with that version; OpenSpec's permission flags stay identical to `.devcontainer/setup.sh`     | PR author                             |
+| A file the test pipeline uses is added or moved (workflow, action, script) | `INFRA_PATHS` in `scripts/lib/repo.ts`                                                                         | PR author                             |
+| The release tag format or namespace                                        | `git-workflow.md`, `scripts/tag_releases.ts`, `.github/workflows/release.yml`, `REPO` in `scripts/lib/repo.ts` | PR author                             |
+| The arch values a compatibility entry may name                             | `RUNNERS` in `scripts/lib/repo.ts` and the `arch` enum in `test/compatibility.schema.json`                     | PR author                             |
 
 ## Harness review
 
