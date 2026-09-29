@@ -16,7 +16,7 @@
 // SIGINT, SIGTERM, or SIGHUP, which also stop the running devcontainer command; a test container
 // that command had started may remain (`docker ps -a`), as after interrupting the CLI directly.
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
-import { type Arch, archesOf, loadFeature, REPO, type RepoModel, scenarioKeyId } from "./lib/repo.ts";
+import { type Arch, archesOf, loadFeature, REPO, type RepoModel } from "./lib/repo.ts";
 import { stage } from "./lib/stage.ts";
 
 const HOST_ARCH: Arch = Deno.build.arch === "aarch64" ? "arm64" : "amd64";
@@ -67,9 +67,8 @@ async function registryHost(container: string): Promise<string> {
 function roots(mode: string, feature: string | undefined): (model: RepoModel) => string[] {
     return (model) => {
         if (mode === "global") return model.globalRefs;
-        const scenarios = mode === "scenarios" ? model.features.get(feature!)?.scenarios ?? [] : [];
-        const refs = scenarios.flatMap((s) => s.featureKeys).map(scenarioKeyId);
-        return [feature!, ...refs.filter((id): id is string => id !== undefined)];
+        if (mode === "scenarios") return [feature!, ...(model.features.get(feature!)?.scenarioRefs ?? [])];
+        return [feature!];
     };
 }
 
