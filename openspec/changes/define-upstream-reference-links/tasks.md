@@ -24,3 +24,14 @@
 - [x] 3.1 In a throwaway OpenSpec repository, write a uv-shaped spec to the new rules (reference links in Purpose,
       download and checksum source in a Requirement) and confirm `openspec validate --strict` passes
 - [x] 3.2 Run `just check` and record each Acceptance item of proposal.md with its result in the PR's Validation section
+
+## 4. Review fixes
+
+- [x] 4.1 Name a Purpose correction a change carries wherever the approval package is listed — Lifecycle in
+      `spec-workflow.md` and step 3 of the workflow skill — and let Artifact operations allow the two hand edits of a
+      main spec's Purpose; verify by reading them against Approval gates and Scope of specifications
+- [x] 4.2 List an edit of only a spec's "Upstream sources" list among the PRs that need no change in step 1 of the
+      workflow skill; verify against Scope of specifications
+- [x] 4.3 Make the reference-link kinds examples of links that do not shape behavior (changelog included) in
+      `rules.specs` and `spec-workflow.md`; verify with
+      `openspec instructions specs --change define-upstream-reference-links --json` that all specs rules are injected

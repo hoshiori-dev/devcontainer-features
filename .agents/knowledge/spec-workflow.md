@@ -15,9 +15,10 @@ remembered one. No separate skill wraps OpenSpec here: its own generated skills 
 
 Creating a change, validating, syncing, and archiving run through OpenSpec's commands or its generated skills; never
 create `openspec/` directories or change metadata by hand. Hand edits stop at the text of proposal, design, tasks, and
-delta specs. Validation: `just spec-check` runs OpenSpec's validator in strict mode over all specs and changes and is
-part of `just check`. Run it after every artifact edit, before publishing the draft PR, before marking the PR ready, and
-after archiving; a red check is a red check.
+delta specs, and at a main spec's Purpose under the two exceptions in Scope of specifications. Validation:
+`just spec-check` runs OpenSpec's validator in strict mode over all specs and changes and is part of `just check`. Run
+it after every artifact edit, before publishing the draft PR, before marking the PR ready, and after archiving; a red
+check is a red check.
 
 ## Artifact map
 
@@ -76,7 +77,8 @@ A file under "Points to it" may summarize in one line and must link; it never re
 
 1. **Proposed** — the change is created with OpenSpec's propose flow, which stops before `tasks.md` (`rules.tasks`; a
    `tasks.md` a flow wrote anyway is deleted before the commit), and committed on the issue's branch; the draft PR opens
-   with the complete approval package (proposal, delta specs, design when warranted) and the agent stops.
+   with the complete approval package (proposal, delta specs, design when warranted, and any Purpose correction the
+   change carries) and the agent stops.
 2. **Approved** — a maintainer closes the package deliberation in the conversation (see Approval gates).
 3. **Implemented** — the agent writes `tasks.md` from the approved package (`openspec instructions tasks`), every task
    is done and every Acceptance item (with the scenarios it points to) verified in the PR's Validation section; the PR
@@ -175,9 +177,10 @@ delta's Purpose for an existing capability:
   fix, and bumps no version.
 
 Feature-specific external information lives with the feature, never in the project knowledge base: sources that shape
-behavior become Requirements ("SHALL download from … and verify against …"), reference links (upstream home or README,
-documentation root, installation guide) go in the "Upstream sources" list of the spec's Purpose as `- <label>: <url>`
-entries, and research needed only for one change goes in that change's `design.md`.
+behavior become Requirements ("SHALL download from … and verify against …"), reference links that do not shape behavior
+(for example the upstream home or README, documentation root, installation guide, changelog) go in the "Upstream
+sources" list of the spec's Purpose as `- <label>: <url>` entries, and research needed only for one change goes in that
+change's `design.md`.
 
 ## Update this file when
 
