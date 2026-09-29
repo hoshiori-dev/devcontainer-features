@@ -38,6 +38,26 @@ configured, rewrites the shared skills to the agents tool's command names (`/ope
 files (verified with OpenSpec 1.13.2 on 2026-09-29), and `just spec-check` fails when they drift from its output
 (`scripts/check_openspec.ts`).
 
+## Artifact roles
+
+Each artifact of a change owns one role; nothing is restated in another. `openspec/config.yaml` rules point here.
+
+| Artifact    | Owns                                                                                                                                                                                                                  | Never holds                                           |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| proposal    | The end state: why, the goal, what changes, the capabilities whose contracts change (named), and `## Acceptance`                                                                                                      | The contract itself, the approach, steps              |
+| delta specs | The executable contract of feature behavior: requirements and scenarios                                                                                                                                               | Implementation choices, anything but feature behavior |
+| design      | How the end state is reached: the approaches discussed, decisions with rejected alternatives, the chosen approach's constraints and invariants (each with how it is checked), information needed only for this change | The goal or acceptance (see proposal), steps          |
+| tasks       | Implementation steps, each with its own verification; written only after the package gate closes                                                                                                                      | Acceptance; anything the package gate must see        |
+
+- The proposal's `## Acceptance` has two lists of checkable items: **Becomes true** (the end state) and **Stays true**
+  (what must not change). For feature behavior it points to the delta specs' scenarios instead of restating them; the
+  proposal is frozen at archive while specs live on.
+- Invariant test: an invariant that would still have to hold under any other approach belongs to the proposal's Stays
+  true; one that holds only because of the chosen approach belongs to the design.
+- Information test: information needed again the next time the feature changes goes to its spec (the "Upstream sources"
+  list or a Requirement), and for a change without specs to the knowledge base; information needed only for this change
+  goes to the design.
+
 ## Source of truth
 
 | Fact                                      | Rules                                                                                               | Points to it                                                             |
@@ -48,17 +68,19 @@ files (verified with OpenSpec 1.13.2 on 2026-09-29), and `just spec-check` fails
 | A feature's option names, types, defaults | `src/<id>/devcontainer-feature.json`                                                                | the spec names options in scenarios but never restates types or defaults |
 | Images a feature supports                 | `test/<id>/compatibility.json`                                                                      | the spec refers to it and never lists images                             |
 | Upstream sources a feature depends on     | the "Upstream sources" list in the spec's Purpose, or a Requirement when the source shapes behavior | `design.md` of the change that chose it                                  |
-| Acceptance of a change                    | the scenarios in the change's delta specs (for a change without specs: its `tasks.md`)              | PRs, issues                                                              |
+| Acceptance of a change                    | the proposal's `## Acceptance`, pointing to the delta specs' scenarios for feature behavior         | PRs, issues                                                              |
 
 A file under "Points to it" may summarize in one line and must link; it never restates the fact.
 
 ## Lifecycle
 
-1. **Proposed** — the change is created with OpenSpec's propose flow and committed on the issue's branch; the draft PR
-   opens with the complete approval package (proposal, delta specs, design when warranted) and the agent stops.
+1. **Proposed** — the change is created with OpenSpec's propose flow, which stops before `tasks.md` (`rules.tasks`; a
+   `tasks.md` a flow wrote anyway is deleted before the commit), and committed on the issue's branch; the draft PR opens
+   with the complete approval package (proposal, delta specs, design when warranted) and the agent stops.
 2. **Approved** — a maintainer closes the package deliberation in the conversation (see Approval gates).
-3. **Implemented** — tasks are written after approval, every task is done and every scenario verified in the PR's
-   Validation section; the PR is marked ready for the second deliberation.
+3. **Implemented** — the agent writes `tasks.md` from the approved package (`openspec instructions tasks`), every task
+   is done and every Acceptance item (with the scenarios it points to) verified in the PR's Validation section; the PR
+   is marked ready for the second deliberation.
 4. **Archived** — only after a maintainer commands it in the conversation: the implementer runs OpenSpec's archive skill
    (`openspec-archive-change`, `/opsx:archive` in Claude Code) on the branch, which merges the deltas into
    `openspec/specs/` and moves the change to the archive. That commit is the freeze the final approval names.
@@ -74,13 +96,14 @@ archive, and the maintainer's final approval applies to the archived version. Th
 so the `spec-archived` check is red for the whole second deliberation: that red is the merge block, not a defect. Never
 archive to turn it green.
 
-The package gate is exercised on the approval package: the delta specs plus `design.md` when one is warranted — always
-for a new feature, and otherwise when more than one reasonable approach exists or the change touches structure, options,
-dependencies (`dependsOn`, `installsAfter`), or files outside the change; a wording change inside one requirement needs
-none. The review covers goals and scope, behavior per option, idempotency, supported images, failure behavior, security
-(downloads, checksums, signing keys), and the design's bounds: approach, constraints, preferences, rejected
-alternatives. The design lists no steps; a design written as a procedure is rewritten before the draft opens. It is
-committed, so it carries no secret or private data. The gate never reviews `tasks.md`.
+The package gate is exercised on the approval package: the proposal, the delta specs, and `design.md` when one is
+warranted — always for a new feature, and otherwise when more than one reasonable approach exists or the change touches
+structure, options, dependencies (`dependsOn`, `installsAfter`), or files outside the change; a wording change inside
+one requirement needs none. The review covers goals and scope, behavior per option, idempotency, supported images,
+failure behavior, security (downloads, checksums, signing keys), and the design's bounds: approach, constraints,
+preferences, rejected alternatives. The design lists no steps; a design written as a procedure is rewritten before the
+draft opens. It is committed, so it carries no secret or private data. `tasks.md` does not exist yet at this gate; the
+gate approves the acceptance in the proposal, never a task list.
 
 Mode, both gates: conversational. A gate closes only when the maintainer says so in the current conversation — "spec
 approved" for the package gate, an explicit command to archive for the freeze gate. Nothing is recorded on GitHub. An
@@ -122,15 +145,15 @@ and ask for the gate again.
 
 ## Specifications and issues
 
-- A specification owns what is built, why, and its acceptance scenarios.
+- A change owns what is built, why, and its acceptance (Artifact roles).
 - An issue is opened when the requirement appears, carrying the raw requirement and no acceptance criteria; it links the
   change once the change exists. It owns who does it and its status. Acceptance criteria are never copied into it; an
   acceptance sketch is marked non-authoritative.
 - A PR description navigates to the change and carries no implementation until ready: a goal paragraph, a value section,
   the specification block (`Spec:` linking the change on the branch, `Phase:` specification or implementation, one link
-  per file of the approval package with `tasks.md` marked as after-approval, `Approval:` noting the conversational
+  per file of the approval package and `tasks.md` noted as following approval, `Approval:` noting the conversational
   closing), `Closes #N`, and Changes and Validation left on their reserved line until the PR is marked ready — then
-  Changes as permalinks to the commits and Validation naming each scenario with its result.
+  Changes as permalinks to the commits and Validation naming each Acceptance item and scenario with its result.
 - Discussion of a specification in an issue thread is deliberation; the record is the file at the approved commit.
 
 ## Scope of specifications
