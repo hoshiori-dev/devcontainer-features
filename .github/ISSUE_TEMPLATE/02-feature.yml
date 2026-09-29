@@ -43,7 +43,7 @@ body:
     id: acceptance
     attributes:
       label: Acceptance sketch
-      description: How we would observe that this is done. Rough is fine and non-authoritative — acceptance is written into the specification.
+      description: How we would observe that this is done. Rough is fine and non-authoritative — acceptance is written into the OpenSpec change (its proposal's Acceptance and delta specs).
     validations:
       required: false
   - type: textarea

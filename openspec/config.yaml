@@ -13,6 +13,9 @@ context: |
 
 rules:
   proposal:
+    - Describe the end state, not the approach; the roles of proposal, specs, design, and tasks are in the "Artifact roles" section of .agents/knowledge/spec-workflow.md.
+    - Name the capabilities whose contracts change; never restate a requirement or scenario.
+    - End with "## Acceptance" holding two lists of checkable items, "Becomes true" and "Stays true" (invariants that must hold under any approach); for feature behavior, point to the delta specs' scenarios.
     - Name every feature id the change touches and the version bump each needs, per .agents/knowledge/feature-authoring.md.
     - Link the GitHub issue the change implements.
   specs:
@@ -23,12 +26,15 @@ rules:
     - Name options in scenarios, but leave their types and defaults to devcontainer-feature.json.
     - Include a requirement stating what installing the feature a second time, with the same or different options, does.
   design:
+    - Describe how the proposal's end state is reached; never restate its goal or acceptance (see "Artifact roles" in .agents/knowledge/spec-workflow.md).
+    - Put in Goals / Non-Goals the constraints and invariants of the chosen approach, each with how it is checked; put information needed only for this change in Context.
     - Write one for every new feature and for any change to options, dependencies, or security-sensitive metadata.
     - Record the chosen upstream source and verification method, the rejected alternatives, and research needed only for this change.
     - State bounds, not steps. Never include secrets, credentials, or private data.
   tasks:
-    - Cover install.sh, test.sh, duplicate.sh, scenarios, compatibility.json, NOTES.md, the version bump, and regenerating the README with `just docs`.
-    - End with running `just check`, `just test <id>`, and `just test-scenarios <id>` and recording the results in the PR's Validation section.
+    - Write tasks.md only after a maintainer approved the approval package (proposal, delta specs, design when warranted) in the current conversation. Without that approval, do not create this file; stop and report that the approval package is ready for review.
+    - For a feature change, cover install.sh, test.sh, duplicate.sh, scenarios, compatibility.json, NOTES.md, the version bump, and regenerating the README with `just docs`.
+    - End with running `just check` (for a feature change also `just test <id>` and `just test-scenarios <id>`) and recording the results in the PR's Validation section.
     - Never add a task to archive or sync; that happens only on a maintainer's command.
 
 operations:

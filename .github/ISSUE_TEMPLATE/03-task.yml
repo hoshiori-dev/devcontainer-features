@@ -41,7 +41,7 @@ body:
     id: acceptance
     attributes:
       label: Acceptance sketch
-      description: How we would observe that this is done. Rough is fine and non-authoritative — acceptance lives in the linked change record (its scenarios, or tasks.md for a change without specs).
+      description: How we would observe that this is done. Rough is fine and non-authoritative — acceptance lives in the linked change's proposal (its Acceptance section, with the scenarios it points to).
     validations:
       required: false
   - type: textarea
