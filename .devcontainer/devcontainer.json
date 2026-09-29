@@ -16,7 +16,8 @@
   },
   "remoteUser": "vscode",
   "remoteEnv": {
-    "PATH": "/home/vscode/.deno/bin:/home/vscode/.devcontainers/bin:${containerEnv:PATH}"
+    "PATH": "/home/vscode/.deno/bin:/home/vscode/.devcontainers/bin:${containerEnv:PATH}",
+    "OPENSPEC_NO_UPDATE_CHECK": "1"
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "customizations": {
