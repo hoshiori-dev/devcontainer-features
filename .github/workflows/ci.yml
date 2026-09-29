@@ -84,6 +84,8 @@ jobs:
     needs: plan
     if: needs.plan.outputs.tests != '[]'
     runs-on: ${{ matrix.runner }}
+    # A hung image build would otherwise hold the runner and ci-gate for GitHub's 6-hour default.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -102,6 +104,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.scenarios != '[]'
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -117,6 +120,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.global == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/feature-test

@@ -40,6 +40,8 @@ Every CI job runs a command that also runs locally.
   `gh run view <id> --job <job-id> --log-failed`; never read a full log.
 - Reproduce a test job locally with the command in the map; `--preserve` keeps the test containers, `--keep` keeps the
   staging directory. Testing mechanics: `.agents/knowledge/testing.md`.
+- Test jobs stop after 60 minutes (`timeout-minutes` in `ci.yml`); a timed-out job usually means a hung image build or
+  download, not a slow test.
 
 ## Toolchain pins
 
