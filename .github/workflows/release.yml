@@ -1,0 +1,55 @@
+# Publishes every feature whose version is not on GHCR yet (the CLI skips published versions),
+# then tags each new version as <id>/v<version>. Features were tested in their pull request;
+# merging a version bump is the release decision. Maintainers may rerun it by dispatch — on main
+# only: a dispatch from another branch would publish unmerged versions that cannot be withdrawn.
+# `verify` validates the exact commit first — its metadata and that every changed feature carries a
+# version above the previous main — since two pull requests green on their own can still combine
+# into an invalid main (a stale dependency major, or two identical bumps that would publish nothing
+# new). It runs without the write token, which only `publish` receives.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-tools
+      # A dispatch has no previous commit to compare with, so it checks the metadata only.
+      - env:
+          BEFORE: ${{ github.event.before }}
+        run: ./scripts/validate.ts --base "${BEFORE:-0000000000000000000000000000000000000000}" --allow-missing-base
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # push release tags
+      packages: write # publish to ghcr.io
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-tools
+        with:
+          devcontainer-cli: "true"
+      - name: Publish features
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The namespace is REPO in scripts/lib/repo.ts; scripts/checks_test.ts keeps the two equal.
+        run: devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features
+      - name: Tag new versions
+        run: ./scripts/tag_releases.ts

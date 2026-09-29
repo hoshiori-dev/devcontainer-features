@@ -1,0 +1,64 @@
+# Pull-request metadata checks. They depend on the title, the description, and the draft state, so
+# they rerun on edits and on ready/draft transitions without rerunning CI. Each job is a required
+# check; job map: .agents/knowledge/github/checks.md.
+name: PR
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review, converted_to_draft]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Each job runs the base commit's copy of its script (.github/actions/base-checks), so a pull
+  # request cannot relax a check by editing the script or the template it reads. This workflow and
+  # its actions still come from the pull request; review is what guards edits to them.
+  pr-title:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-tools
+      - id: base
+        uses: ./.github/actions/base-checks
+        with:
+          files: scripts/check_title.ts
+      - working-directory: ${{ steps.base.outputs.root }}
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: ./scripts/check_title.ts "$TITLE"
+
+  pr-checklist:
+    # Dependabot writes its own description; its PRs change no behavior and carry no spec.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-tools
+      - id: base
+        uses: ./.github/actions/base-checks
+        with:
+          files: scripts/check_pr_body.ts .github/pull_request_template.md
+      - working-directory: ${{ steps.base.outputs.root }}
+        run: ./scripts/check_pr_body.ts --template .github/pull_request_template.md
+
+  spec-archived:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-tools
+      - id: base
+        uses: ./.github/actions/base-checks
+        with:
+          files: scripts/check_spec_archived.ts
+      # Runs in the workspace, so it reads this pull request's openspec/changes/.
+      - env:
+          DRAFT: ${{ github.event.pull_request.draft }}
+          ROOT: ${{ steps.base.outputs.root }}
+        run: |
+          if [[ "$DRAFT" == "true" ]]; then "$ROOT/scripts/check_spec_archived.ts"; else "$ROOT/scripts/check_spec_archived.ts" --ready; fi

@@ -1,0 +1,33 @@
+# Puts the pull request's base commit in a worktree so the PR checks run the base's copy of their
+# scripts and the template they read: a pull request cannot relax a check by editing either. Only
+# when the base commit lacks one of the files (the bootstrap) does the branch's own copy run. The
+# calling workflow and this action still come from the pull request.
+name: Use the base commit's checks
+description: Report the tree to run PR checks from — the base commit's, or this branch's when the base lacks the files.
+inputs:
+  files:
+    description: Space-separated paths the base commit must hold for its tree to be used.
+    required: true
+outputs:
+  root:
+    description: Directory to run the checks from; the workspace itself (".") in the fallback.
+    value: ${{ steps.pick.outputs.root }}
+runs:
+  using: composite
+  steps:
+    - id: pick
+      shell: bash
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        FILES: ${{ inputs.files }}
+      run: |
+        git fetch --no-tags --depth 1 origin "$BASE_SHA"
+        for file in $FILES; do
+          if ! git cat-file -e "$BASE_SHA:$file" 2>/dev/null; then
+            echo "::notice::The base commit has no $file yet; checking with this branch's copies."
+            echo "root=." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+        done
+        git worktree add --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+        echo "root=$RUNNER_TEMP/base" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,60 @@
+name: Task
+description: Planned work with an agreed outcome — usually harness, CI, or tooling.
+type: Task
+body:
+  - type: textarea
+    id: content
+    attributes:
+      label: Content
+      description: The planned change, precisely.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: The observable repository state when this task is complete.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and references
+      description: Everything the executor needs that lives outside this issue — the discussion, the file or upstream being imitated (link it), constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: direction
+    attributes:
+      label: Solution direction and breakdown
+      description: Architecture-level direction and decomposition. Not line-by-line prescriptions.
+    validations:
+      required: false
+  - type: input
+    id: spec
+    attributes:
+      label: Specification
+      description: Path of the OpenSpec change this task implements, if one exists.
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance sketch
+      description: How we would observe that this is done. Rough is fine and non-authoritative — acceptance lives in the linked change record (its scenarios, or tasks.md for a change without specs).
+    validations:
+      required: false
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Adjacent work this task must not absorb.
+    validations:
+      required: true
+  - type: textarea
+    id: cautions
+    attributes:
+      label: Cautions
+      description: Known hazards, fragile areas, rollback notes. Leave empty if none.
+    validations:
+      required: false
