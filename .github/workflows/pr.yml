@@ -15,12 +15,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Each job runs the base commit's copy of its script (.github/actions/base-checks), so a pull
+  # request cannot relax a check by editing the script or the template it reads. This workflow and
+  # its actions still come from the pull request; review is what guards edits to them.
   pr-title:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-tools
-      - env:
+      - id: base
+        uses: ./.github/actions/base-checks
+        with:
+          files: scripts/check_title.ts
+      - working-directory: ${{ steps.base.outputs.root }}
+        env:
           TITLE: ${{ github.event.pull_request.title }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: ./scripts/check_title.ts "$TITLE"
@@ -32,28 +40,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-tools
-      # The template comes from the base commit, so a PR cannot drop a required section by deleting it from
-      # both the template and its own description. Only a base without a template (the bootstrap) uses this
-      # branch's copy.
-      - env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          template=.github/pull_request_template.md
-          git fetch --no-tags --depth 1 origin "$BASE_SHA"
-          if git cat-file -e "$BASE_SHA:$template" 2>/dev/null; then
-            git show "$BASE_SHA:$template" > "$RUNNER_TEMP/pull_request_template.md"
-            template="$RUNNER_TEMP/pull_request_template.md"
-          else
-            echo "::notice::The base branch has no $template yet; checking against this branch's copy."
-          fi
-          ./scripts/check_pr_body.ts --template "$template"
+      - id: base
+        uses: ./.github/actions/base-checks
+        with:
+          files: scripts/check_pr_body.ts .github/pull_request_template.md
+      - working-directory: ${{ steps.base.outputs.root }}
+        run: ./scripts/check_pr_body.ts --template .github/pull_request_template.md
 
   spec-archived:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-tools
+      - id: base
+        uses: ./.github/actions/base-checks
+        with:
+          files: scripts/check_spec_archived.ts
+      # Runs in the workspace, so it reads this pull request's openspec/changes/.
       - env:
           DRAFT: ${{ github.event.pull_request.draft }}
+          ROOT: ${{ steps.base.outputs.root }}
         run: |
-          if [[ "$DRAFT" == "true" ]]; then ./scripts/check_spec_archived.ts; else ./scripts/check_spec_archived.ts --ready; fi
+          if [[ "$DRAFT" == "true" ]]; then "$ROOT/scripts/check_spec_archived.ts"; else "$ROOT/scripts/check_spec_archived.ts" --ready; fi
