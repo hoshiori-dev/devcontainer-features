@@ -61,4 +61,4 @@ new-feature id *args:
 
 # Check a pull request title against the commit convention
 check-title title:
-    ./scripts/check_title.ts "{{ title }}"
+    ./scripts/check_title.ts {{ quote(title) }}
