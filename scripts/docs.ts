@@ -20,6 +20,8 @@ if (import.meta.main) {
         Deno.exit(0);
     }
     const temp = await Deno.makeTempDir({ prefix: "feature-docs-" });
+    // Deno.exit() inside try would skip the finally below and leak the temporary directory.
+    let failed = false;
     try {
         const src = join(temp, "src");
         await copy("src", src);
@@ -49,33 +51,33 @@ if (import.meta.main) {
         }).output();
         if (!result.success) {
             console.error("error: devcontainer features generate-docs failed; see its output above.");
-            Deno.exit(1);
-        }
-        const stale: string[] = [];
-        for await (const entry of Deno.readDir(src)) {
-            if (!entry.isDirectory) continue;
-            const generated = join(src, entry.name, "README.md");
-            if (!(await exists(generated))) continue;
-            const target = join("src", entry.name, "README.md");
-            const want = await Deno.readTextFile(generated);
-            const have = (await exists(target)) ? await Deno.readTextFile(target) : undefined;
-            if (want === have) continue;
-            if (args.check) stale.push(target);
-            else {
-                await Deno.writeTextFile(target, want);
-                console.error(`wrote ${target}`);
+            failed = true;
+        } else {
+            const stale: string[] = [];
+            for await (const entry of Deno.readDir(src)) {
+                if (!entry.isDirectory) continue;
+                const generated = join(src, entry.name, "README.md");
+                if (!(await exists(generated))) continue;
+                const target = join("src", entry.name, "README.md");
+                const want = await Deno.readTextFile(generated);
+                const have = (await exists(target)) ? await Deno.readTextFile(target) : undefined;
+                if (want === have) continue;
+                if (args.check) stale.push(target);
+                else {
+                    await Deno.writeTextFile(target, want);
+                    console.error(`wrote ${target}`);
+                }
             }
-        }
-        if (stale.length > 0) {
-            console.error(
-                `error: generated README.md out of date: ${
-                    stale.join(", ")
-                }. Run \`just docs\` and commit the result; ` +
-                    "edit NOTES.md or devcontainer-feature.json, never README.md.",
-            );
-            Deno.exit(1);
+            if (stale.length > 0) {
+                console.error(
+                    `error: generated README.md out of date: ${stale.join(", ")}. Run \`just docs\` and commit the ` +
+                        "result; edit NOTES.md or devcontainer-feature.json, never README.md.",
+                );
+                failed = true;
+            }
         }
     } finally {
         await Deno.remove(temp, { recursive: true });
+        if (failed) Deno.exit(1);
     }
 }
