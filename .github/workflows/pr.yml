@@ -38,4 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-tools
-      - run: ./scripts/check_spec_archived.ts
+      - env:
+          DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          if [[ "$DRAFT" == "true" ]]; then ./scripts/check_spec_archived.ts; else ./scripts/check_spec_archived.ts --ready; fi

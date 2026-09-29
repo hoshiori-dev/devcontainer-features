@@ -1,10 +1,10 @@
-#!/usr/bin/env -S deno run --allow-read=openspec --allow-env=GITHUB_EVENT_PATH,GITHUB_ACTIONS
+#!/usr/bin/env -S deno run --allow-read=openspec --allow-env=GITHUB_ACTIONS
 // Blocks merging a pull request that still holds an unarchived OpenSpec change. A draft PR only
 // gets a warning; a ready PR fails until a maintainer commands the archive and it is committed
 // (.agents/knowledge/spec-workflow.md). Also usable locally to list active changes.
 //
-//   scripts/check_spec_archived.ts            state from the pull_request event payload
-//   scripts/check_spec_archived.ts --ready    treat the PR as ready (local use)
+//   scripts/check_spec_archived.ts            list active changes; warn only (local use, draft PRs)
+//   scripts/check_spec_archived.ts --ready    fail when any change is unarchived (ready PRs)
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 
 export async function activeChanges(root = "openspec/changes"): Promise<string[]> {
@@ -21,11 +21,7 @@ export async function activeChanges(root = "openspec/changes"): Promise<string[]
 
 if (import.meta.main) {
     const args = parseArgs(Deno.args, { boolean: ["ready"] });
-    let draft = !args.ready;
-    const eventPath = Deno.env.get("GITHUB_EVENT_PATH");
-    if (!args.ready && eventPath) {
-        draft = JSON.parse(await Deno.readTextFile(eventPath)).pull_request?.draft ?? false;
-    }
+    const draft = !args.ready;
     const changes = await activeChanges();
     const annotate = Deno.env.get("GITHUB_ACTIONS") === "true";
     if (changes.length === 0) {
