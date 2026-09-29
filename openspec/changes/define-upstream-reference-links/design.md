@@ -6,7 +6,9 @@ See proposal.md - Why. OpenSpec 1.13.2, checked in a throwaway repository: a mai
 Purpose and any extra section through `openspec validate --strict` and through archiving other changes; a new
 capability's delta Purpose is copied into the main spec; for an existing capability a delta Purpose is ignored with a
 warning; any other section in a delta (e.g. `## References`) is dropped without one. No CI check blocks a hand edit of
-`openspec/specs/`, and such an edit selects no feature tests.
+`openspec/specs/`, and such an edit selects no feature tests. The approval package in Approval gates of
+`spec-workflow.md` is the one #7 defined (proposal, delta specs, design when warranted); this change adds one item to
+it.
 
 ## Goals / Non-Goals
 
@@ -50,8 +52,6 @@ warning; any other section in a delta (e.g. `## References`) is dropped without 
 
 - [A hand-edited Purpose skips the package gate] → The exception covers only the "Upstream sources:" list; a link that
   shapes behavior is a Requirement and still needs a change.
-- [#7 also rewrites the package list in Approval gates] → Whichever PR merges second rebases on the first and keeps both
-  additions: the package is proposal, delta specs, design when warranted, and any hand correction of a Purpose.
 - [Upstream URLs rot] → Entries link stable entry pages; a fix is a link-only PR.
 - [OpenSpec changes how archive treats Purpose or extra sections] → `spec-workflow.md` already requires re-verifying on
   upgrade; the delta rule names the observed behavior.
