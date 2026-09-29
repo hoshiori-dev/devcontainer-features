@@ -2,6 +2,9 @@
 # then tags each new version as <id>/v<version>. Features were tested in their pull request;
 # merging a version bump is the release decision. Maintainers may rerun it by dispatch — on main
 # only: a dispatch from another branch would publish unmerged versions that cannot be withdrawn.
+# `verify` validates the exact commit first, since two pull requests green on their own can still
+# combine into an invalid main (for example a stale dependency major); it runs without the write
+# token, which only `publish` receives.
 name: Release
 
 on:
@@ -18,8 +21,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  verify:
     if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-tools
+      - run: ./scripts/validate.ts
+
+  publish:
+    needs: verify
     runs-on: ubuntu-24.04
     permissions:
       contents: write # push release tags
