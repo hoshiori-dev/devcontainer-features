@@ -29,7 +29,8 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
   so a script carries everything it needs — `no-import-prefix` is disabled on purpose. Run them via `just` or directly
   (`./scripts/<name>.ts`).
 - Never hand-edit generated files: `src/*/README.md` (`just docs`), `.agents/skills/openspec-*/` and
-  `.claude/commands/opsx/` (`openspec update`, which only regenerates them and never archives).
+  `.claude/commands/opsx/` (`openspec init --tools claude`, which only regenerates them and never archives; not
+  `openspec update` — see `spec-workflow.md`).
 - Do not change `.devcontainer/`, `.pre-commit-config.yaml`, or `.editorconfig` without asking a maintainer first, even
   when a plan lists the change.
 
