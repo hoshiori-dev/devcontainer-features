@@ -36,6 +36,10 @@ warning; any other section in a delta (e.g. `## References`) is dropped without 
   change per link edit — rejected, a proposal, tasks, and two gates for one line cost more than the record is worth. A
   change that alters capabilities or leaves the list stale still corrects the Purpose by hand in its own PR, named in
   its proposal.
+- **A Purpose correction travels with the approval package.** A main spec is the living contract, so the maintainer
+  approves the corrected text, not a promise of it: the hand edit is committed before the draft opens and listed in the
+  Approval gates section as part of the package. Alternative: the edit during implementation — rejected, it would change
+  a main spec after the package gate without the gate having seen it.
 - **Deltas hold only what archive keeps.** `rules.specs` says a delta spec holds `## Purpose` (new capabilities only)
   and the ADDED, MODIFIED, REMOVED, and RENAMED Requirements sections.
 - **No custom schema.** Templates cannot be overridden without forking the whole `spec-driven` schema, instructions
@@ -46,6 +50,8 @@ warning; any other section in a delta (e.g. `## References`) is dropped without 
 
 - [A hand-edited Purpose skips the package gate] → The exception covers only the "Upstream sources:" list; a link that
   shapes behavior is a Requirement and still needs a change.
+- [#7 also rewrites the package list in Approval gates] → Whichever PR merges second rebases on the first and keeps both
+  additions: the package is proposal, delta specs, design when warranted, and any hand correction of a Purpose.
 - [Upstream URLs rot] → Entries link stable entry pages; a fix is a link-only PR.
 - [OpenSpec changes how archive treats Purpose or extra sections] → `spec-workflow.md` already requires re-verifying on
   upgrade; the delta rule names the observed behavior.

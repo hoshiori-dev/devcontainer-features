@@ -24,6 +24,8 @@ observed with OpenSpec 1.13.2:
 - Adding, updating, or removing an entry of the "Upstream sources:" list has a documented path: a PR that edits only the
   list carries no OpenSpec change and bumps no version; a change that leaves the list stale corrects it by hand in its
   own PR.
+- A hand correction of a main spec's Purpose that a change carries is committed with the change's approval package, so
+  the package gate reviews the corrected text itself, not only the proposal's mention of it.
 - Delta specs hold only the sections archive keeps, so no link written in a change is silently lost.
 
 ## Capabilities
@@ -39,7 +41,7 @@ None. This change edits the harness only (`skip_specs: true`).
 ## Impact
 
 - Files: `openspec/config.yaml` (`rules.specs`), `.agents/knowledge/spec-workflow.md` (Artifact map, Source of truth,
-  Scope of specifications), `.agents/knowledge/references.md`.
+  Approval gates, Scope of specifications), `.agents/knowledge/references.md`.
 - Feature ids touched: none, so no version bump. No feature exists yet, so no spec needs migrating.
 - Affects how every future feature spec records upstream links, and which PRs need an OpenSpec change.
 
@@ -52,6 +54,8 @@ None. This change edits the harness only (`skip_specs: true`).
   limit a delta spec to the sections archive keeps.
 - `spec-workflow.md` names one place per kind of link and permits a PR that only edits the "Upstream sources:" list
   without an OpenSpec change or version bump; `references.md` agrees with it.
+- `spec-workflow.md` lists a hand correction of a main spec's Purpose among the files of the approval package, committed
+  before the draft PR opens.
 - A uv-shaped spec written to these rules passes `openspec validate --strict`.
 
 **Stays true:**
