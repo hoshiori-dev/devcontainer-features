@@ -55,7 +55,8 @@ Each artifact of a change owns one role; nothing is restated in another. `opensp
 - Invariant test: an invariant that would still have to hold under any other approach belongs to the proposal's Stays
   true; one that holds only because of the chosen approach belongs to the design.
 - Information test: information needed again the next time the feature changes goes to its spec (the "Upstream sources"
-  list or a Requirement); information needed only for this change goes to the design.
+  list or a Requirement), and for a change without specs to the knowledge base; information needed only for this change
+  goes to the design.
 
 ## Source of truth
 

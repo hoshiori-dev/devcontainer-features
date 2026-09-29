@@ -67,8 +67,8 @@ Escalating earlier is always allowed. Bypassing a closed gate never is.
 
 - Goal and how the change addresses it — point at the PR's specification block (the change, its phase, its approval
   state) instead of restating the goal.
-- Tests executed and results; CI state — point at the PR's Validation section, which names each scenario with its
-  result.
+- Tests executed and results; CI state — point at the PR's Validation section, which names each Acceptance item and
+  scenario with its result.
 - Scope actually touched, including anything beyond the original intent (other features, the harness).
 - Known risks and remaining limitations (images not covered, idempotency exemptions).
 - The decisions available to the maintainer: request fixes, reject, approve the specification, or — after review —

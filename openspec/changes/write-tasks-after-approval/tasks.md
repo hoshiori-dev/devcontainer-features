@@ -34,3 +34,16 @@
       for a small change and confirm it writes no `tasks.md`, ends the proposal with both Acceptance lists, and reports
       the package as ready
 - [x] 4.2 Run `just check` and record each Acceptance item of proposal.md with its result in the PR's Validation section
+
+## 5. Review fixes
+
+- [x] 5.1 Point the remaining acceptance definitions to the proposal's Acceptance: `github-workflow.md` (Acceptance row,
+      Other contracts) and the gate report in `agent-authority.md`; verify with `git grep -n "scenario"` over the
+      knowledge base that no line names scenarios as the whole acceptance
+- [x] 5.2 Give the information test a destination for a change without specs (the knowledge base); verify by reading
+      Artifact roles in `spec-workflow.md`
+- [x] 5.3 Limit the feature-only `rules.tasks` rules to feature changes; verify with
+      `openspec instructions tasks --change write-tasks-after-approval --json`
+- [x] 5.4 Open the draft in the workflow skill only once the approval package is committed, and split the PR template's
+      gate item so a ready PR can tick it truthfully (the archive half is the item `spec-archived` tracks); verify by
+      reading step 3 and the checklist against `github-workflow.md`

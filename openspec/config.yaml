@@ -33,8 +33,8 @@ rules:
     - State bounds, not steps. Never include secrets, credentials, or private data.
   tasks:
     - Write tasks.md only after a maintainer approved the approval package (proposal, delta specs, design when warranted) in the current conversation. Without that approval, do not create this file; stop and report that the approval package is ready for review.
-    - Cover install.sh, test.sh, duplicate.sh, scenarios, compatibility.json, NOTES.md, the version bump, and regenerating the README with `just docs`.
-    - End with running `just check`, `just test <id>`, and `just test-scenarios <id>` and recording the results in the PR's Validation section.
+    - For a feature change, cover install.sh, test.sh, duplicate.sh, scenarios, compatibility.json, NOTES.md, the version bump, and regenerating the README with `just docs`.
+    - End with running `just check` (for a feature change also `just test <id>` and `just test-scenarios <id>`) and recording the results in the PR's Validation section.
     - Never add a task to archive or sync; that happens only on a maintainer's command.
 
 operations:

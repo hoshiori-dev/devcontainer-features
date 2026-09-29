@@ -24,21 +24,21 @@ gates), and `.agents/knowledge/agent-authority.md` (what you may do alone).
    points to, is then the acceptance criteria. A harness or tooling issue gets a change with `skip_specs: true`; a typo
    or dependency bump needs none.
 2. Assign yourself (`gh issue edit <n> --add-assignee @me`), re-read, and confirm you are the sole assignee.
-3. `gh issue develop -c <n>` to create and check out the linked branch; push it and open a draft PR immediately
-   (`gh pr create --draft`) with `Closes #<n>` and a body built from `.github/pull_request_template.md`. The draft PR is
-   the claim and the work log. The draft opens once the approval package is complete — the proposal, the delta specs,
-   and `design.md` when warranted, created through OpenSpec's propose flow and passing `just spec-check`; no `tasks.md`
-   (the flow stops before it; delete one it wrote anyway) — and the body's `Phase:` line reads `specification` while
-   Changes and Validation keep their reserved line. Then stop. The maintainer discusses on the PR and directs changes in
-   conversation; push each through the publish gate. When the maintainer closes the package deliberation in
-   conversation, read the PR's comments (`gh api repos/hoshiori-dev/devcontainer-features/issues/<pr>/comments`, where
-   `<pr>` is the pull request number, not the issue's: a PR's conversation lives under the issues API with its own
-   number) and its review threads with their resolution state (the GraphQL `reviewThreads` connection, field
-   `isResolved`); list every unresolved thread, every adjustment requested in the discussion that the change does not
-   carry, and every pair of conclusions that contradict each other; ask the maintainer to confirm them; and only when
-   nothing is open or the open items are confirmed, write `tasks.md` from
-   `openspec instructions tasks --change <name> --json` and implement. Record the closing on the `Approval:` line. The
-   same reconciliation runs again at the implementation deliberation, before the archive.
+3. `gh issue develop -c <n>` to create and check out the linked branch; once the approval package is committed, push it
+   and open a draft PR (`gh pr create --draft`) with `Closes #<n>` and a body built from
+   `.github/pull_request_template.md`. The draft PR is the claim and the work log. The draft opens once the approval
+   package is complete — the proposal, the delta specs, and `design.md` when warranted, created through OpenSpec's
+   propose flow and passing `just spec-check`; no `tasks.md` (the flow stops before it; delete one it wrote anyway) —
+   and the body's `Phase:` line reads `specification` while Changes and Validation keep their reserved line. Then stop.
+   The maintainer discusses on the PR and directs changes in conversation; push each through the publish gate. When the
+   maintainer closes the package deliberation in conversation, read the PR's comments
+   (`gh api repos/hoshiori-dev/devcontainer-features/issues/<pr>/comments`, where `<pr>` is the pull request number, not
+   the issue's: a PR's conversation lives under the issues API with its own number) and its review threads with their
+   resolution state (the GraphQL `reviewThreads` connection, field `isResolved`); list every unresolved thread, every
+   adjustment requested in the discussion that the change does not carry, and every pair of conclusions that contradict
+   each other; ask the maintainer to confirm them; and only when nothing is open or the open items are confirmed, write
+   `tasks.md` from `openspec instructions tasks --change <name> --json` and implement. Record the closing on the
+   `Approval:` line. The same reconciliation runs again at the implementation deliberation, before the archive.
 4. Keep the PR description current; comment major discoveries and decisions. The repository is public: credentials,
    tokens, internal hosts, and personal data never go into an issue, PR, commit, or log.
 5. Abandon by un-assigning, closing the draft with a status comment, and leaving the issue open.

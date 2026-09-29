@@ -34,8 +34,7 @@ _Reserved: filled in when the pull request is marked ready._
 - [ ] `just check` passes locally
 - [ ] The Acceptance of the linked change's proposal, with the scenarios it points to, is met, or this PR has no
       OpenSpec change
-- [ ] The package deliberation was closed in conversation before the task list, and the implementation deliberation
-      before the archive, or this PR has no OpenSpec change
+- [ ] The package deliberation was closed in conversation before the task list, or this PR has no OpenSpec change
 - [ ] Every task of the change record is done and verified, or the specification is updated — the change is archived
       only on a maintainer's command, and `spec-archived` stays red until it is
 - [ ] Every changed feature's `version` is bumped and its README regenerated with `just docs`

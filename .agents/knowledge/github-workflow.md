@@ -22,7 +22,7 @@ publishing a higher fixed version — a published version cannot be withdrawn fr
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | Issue                              | One independently acceptable outcome: a new feature, a behavior change to one feature, a defect, or a harness task. Typed with the native issue type.                          | The record of why a change exists and who asked for it; PRs would have nothing to close. |
 | Pull request                       | Every change to `main`. A draft PR is work in progress — including a draft whose first content is an OpenSpec change awaiting approval — never a placeholder for planned work. | Review, CI feedback, and the single place where acceptance happens.                      |
-| Acceptance                         | The required check `ci-gate` passes, the PR's OpenSpec scenarios are verified (see `spec-workflow.md`), and a maintainer merges.                                               | Merge would equal an unchecked release to every consumer.                                |
+| Acceptance                         | The required check `ci-gate` passes, the Acceptance of the PR's OpenSpec change is verified (see `spec-workflow.md`), and a maintainer merges.                                 | Merge would equal an unchecked release to every consumer.                                |
 | Issue types (Task / Bug / Feature) | The kind of work, set by the issue form.                                                                                                                                       | Filtering defects from new work.                                                         |
 | Tag `<id>/v<version>`              | Marks the commit a published feature version was built from; created by the release workflow, never by hand (see `git-workflow.md`).                                           | Mapping a GHCR version back to the commit it was built from.                             |
 | GHCR package version               | The delivery: what consumers actually install.                                                                                                                                 | — (it is the product).                                                                   |
@@ -65,7 +65,7 @@ Governed by `.agents/knowledge/agent-authority.md`.
 
 - Branches, merge method, and tags: `.agents/knowledge/git-workflow.md`.
 - Specifications, their approval, and archiving: `.agents/knowledge/spec-workflow.md` — a PR's acceptance is the
-  scenarios of the OpenSpec change it implements.
+  proposal's Acceptance of the OpenSpec change it implements, with the scenarios it points to.
 
 ## Update this file when
 
@@ -80,7 +80,7 @@ Governed by `.agents/knowledge/agent-authority.md`.
 The OpenSpec contract lives in `.agents/knowledge/spec-workflow.md`. Because of it:
 
 - the PR template carries the specification block under `## Related work` (`Spec:`, `Phase:`, `Records:`, `Approval:`)
-  and checklist items for the two conversational gates and the archive;
+  and checklist items for the package gate and the archive command;
 - the Feature request and Task forms carry an optional `Specification` field, and their acceptance fields defer to the
   change's proposal Acceptance and the scenarios it points to;
 - the `github-project-workflow` skill's Take work, Create issues, and Finish steps apply the gates, the reconciliation,
