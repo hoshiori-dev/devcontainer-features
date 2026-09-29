@@ -82,7 +82,7 @@ The OpenSpec contract lives in `.agents/knowledge/spec-workflow.md`. Because of 
 - the PR template carries the specification block under `## Related work` (`Spec:`, `Phase:`, `Records:`, `Approval:`)
   and checklist items for the two conversational gates and the archive;
 - the Feature request and Task forms carry an optional `Specification` field, and their acceptance fields defer to the
-  change's scenarios;
+  change's proposal Acceptance and the scenarios it points to;
 - the `github-project-workflow` skill's Take work, Create issues, and Finish steps apply the gates, the reconciliation,
   and the archive-on-command rule;
 - the `spec-archived` check (workflow PR, `scripts/check_spec_archived.ts`) fails a ready PR that still holds an

@@ -20,24 +20,25 @@ gates), and `.agents/knowledge/agent-authority.md` (what you may do alone).
 
 1. Read the issue; confirm it is open and its outcome is concrete. If another identity is assigned, stop and ask. An
    issue with no OpenSpec change yet is taken by committing the change to the draft PR first (step 3) and stopping there
-   until a maintainer closes the package deliberation in conversation; the change's scenarios are then the acceptance
-   criteria. A harness or tooling issue gets a change with `skip_specs: true`; a typo or dependency bump needs none.
+   until a maintainer closes the package deliberation in conversation; the proposal's Acceptance, with the scenarios it
+   points to, is then the acceptance criteria. A harness or tooling issue gets a change with `skip_specs: true`; a typo
+   or dependency bump needs none.
 2. Assign yourself (`gh issue edit <n> --add-assignee @me`), re-read, and confirm you are the sole assignee.
 3. `gh issue develop -c <n>` to create and check out the linked branch; push it and open a draft PR immediately
    (`gh pr create --draft`) with `Closes #<n>` and a body built from `.github/pull_request_template.md`. The draft PR is
    the claim and the work log. The draft opens once the approval package is complete — the proposal, the delta specs,
-   and `design.md` when warranted, created through OpenSpec's propose flow and passing `just spec-check`; a `tasks.md`
-   the tool generated alongside is pushed but marked as after-approval and kept out of the review — and the body's
-   `Phase:` line reads `specification` while Changes and Validation keep their reserved line. Then stop. The maintainer
-   discusses on the PR and directs changes in conversation; push each through the publish gate. When the maintainer
-   closes the package deliberation in conversation, read the PR's comments
-   (`gh api repos/hoshiori-dev/devcontainer-features/issues/<pr>/comments`, where `<pr>` is the pull request number, not
-   the issue's: a PR's conversation lives under the issues API with its own number) and its review threads with their
-   resolution state (the GraphQL `reviewThreads` connection, field `isResolved`); list every unresolved thread, every
-   adjustment requested in the discussion that the change does not carry, and every pair of conclusions that contradict
-   each other; ask the maintainer to confirm them; and start the tasks and the implementation only when nothing is open
-   or the open items are confirmed. Record the closing on the `Approval:` line. The same reconciliation runs again at
-   the implementation deliberation, before the archive.
+   and `design.md` when warranted, created through OpenSpec's propose flow and passing `just spec-check`; no `tasks.md`
+   (the flow stops before it; delete one it wrote anyway) — and the body's `Phase:` line reads `specification` while
+   Changes and Validation keep their reserved line. Then stop. The maintainer discusses on the PR and directs changes in
+   conversation; push each through the publish gate. When the maintainer closes the package deliberation in
+   conversation, read the PR's comments (`gh api repos/hoshiori-dev/devcontainer-features/issues/<pr>/comments`, where
+   `<pr>` is the pull request number, not the issue's: a PR's conversation lives under the issues API with its own
+   number) and its review threads with their resolution state (the GraphQL `reviewThreads` connection, field
+   `isResolved`); list every unresolved thread, every adjustment requested in the discussion that the change does not
+   carry, and every pair of conclusions that contradict each other; ask the maintainer to confirm them; and only when
+   nothing is open or the open items are confirmed, write `tasks.md` from
+   `openspec instructions tasks --change <name> --json` and implement. Record the closing on the `Approval:` line. The
+   same reconciliation runs again at the implementation deliberation, before the archive.
 4. Keep the PR description current; comment major discoveries and decisions. The repository is public: credentials,
    tokens, internal hosts, and personal data never go into an issue, PR, commit, or log.
 5. Abandon by un-assigning, closing the draft with a status comment, and leaving the issue open.
@@ -46,7 +47,8 @@ gates), and `.agents/knowledge/agent-authority.md` (what you may do alone).
 
 An issue opens when the requirement appears, carrying the raw requirement and no acceptance criteria; it links the
 OpenSpec change once that exists. Issues derived from a change's tasks are optional, one per task that independently
-earns its own state, each naming the scenarios it closes. Never copy acceptance criteria into an issue.
+earns its own state, each naming the Acceptance items or scenarios it closes. Never copy acceptance criteria into an
+issue.
 
 Non-interactive creation ignores the forms: build the body by mirroring the form's `### <label>` headings
 (`.github/ISSUE_TEMPLATE/01-bug.yml`, `02-feature.yml`, `03-task.yml`) and set the form's type in the same call:
@@ -82,14 +84,14 @@ survive deletion, and public content is indexed within minutes. Every remote or 
    never weaken a check.
 2. Complete the PR checklist and update the final description. Set the `Phase:` line to `implementation`; replace the
    reserved line of Changes with permalinks to the commits (the exact lines for a local change, the whole file or
-   directory for a broad one) and the reserved line of Validation with each scenario and its result, linking the CI run;
-   and confirm every task of the change is ticked. Then follow `.agents/knowledge/agent-authority.md`: green checks are
-   evidence, not acceptance. Under it you may mark the PR ready (`gh pr ready`) and request review once the package gate
-   closed in this conversation, then hand the maintainer the report it defines. Marking ready opens the implementation
-   deliberation, so `spec-archived` is red until the archive commit lands: that red is the merge block, not a defect.
-   Archive only when the maintainer commands it in the conversation: the `openspec-archive-change` skill
-   (`/opsx:archive`), `just spec-check`, commit, push. A commit after the archive commit spends the closing; say so and
-   ask again. Auto-merge is not used; never edit the policy, protections, or required checks to unblock yourself —
-   propose the change to a maintainer instead.
+   directory for a broad one) and the reserved line of Validation with each Acceptance item and scenario and its result,
+   linking the CI run; and confirm every task of the change is ticked. Then follow
+   `.agents/knowledge/agent-authority.md`: green checks are evidence, not acceptance. Under it you may mark the PR ready
+   (`gh pr ready`) and request review once the package gate closed in this conversation, then hand the maintainer the
+   report it defines. Marking ready opens the implementation deliberation, so `spec-archived` is red until the archive
+   commit lands: that red is the merge block, not a defect. Archive only when the maintainer commands it in the
+   conversation: the `openspec-archive-change` skill (`/opsx:archive`), `just spec-check`, commit, push. A commit after
+   the archive commit spends the closing; say so and ask again. Auto-merge is not used; never edit the policy,
+   protections, or required checks to unblock yourself — propose the change to a maintainer instead.
 3. A maintainer merges; the closing keyword closes the linked issue — verify it closed. Merging a version bump publishes
    it: the Release workflow publishes to GHCR and tags `<id>/v<version>` (`checks.md`).

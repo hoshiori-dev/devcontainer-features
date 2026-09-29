@@ -25,14 +25,14 @@ _Reserved: filled in when the pull request is marked ready._
 
 ## Validation
 
-<!-- Filled in when the PR is marked ready: each scenario of the change and its result, and the CI run. -->
+<!-- Filled in when the PR is marked ready: each Acceptance item and scenario of the change and its result, and the CI run. -->
 
 _Reserved: filled in when the pull request is marked ready._
 
 ## Checklist
 
 - [ ] `just check` passes locally
-- [ ] The scenarios of the linked change record (its `tasks.md` for a change without specs) are met, or this PR has no
+- [ ] The Acceptance of the linked change's proposal, with the scenarios it points to, is met, or this PR has no
       OpenSpec change
 - [ ] The package deliberation was closed in conversation before the task list, and the implementation deliberation
       before the archive, or this PR has no OpenSpec change
