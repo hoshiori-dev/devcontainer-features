@@ -47,7 +47,7 @@ None.
 - Every scenario of the `deno` delta spec (`specs/deno/spec.md`) holds, each recorded with its result in the PR's
   Validation section: the scenarios of a successful installation on every image and architecture listed in
   `test/deno/compatibility.json`, and each failure scenario by the hand run design.md (Verifying failure scenarios)
-  names for it. The issue's acceptance sketch is covered by the scenarios "Latest version", "Exact version", and
+  names for it. The issue's acceptance sketch is covered by the scenarios "Omitted version", "Exact version", and
   "Different version the second time".
 - `test/deno/compatibility.json` holds the images and architectures planned in design.md (Supported images), and
   `just test deno` and `just test-scenarios deno` pass on them.

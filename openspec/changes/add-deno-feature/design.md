@@ -6,7 +6,7 @@ See proposal.md - Why. The behavior contract is `specs/deno/spec.md`; this docum
 were checked on 2026-09-30 unless marked otherwise.
 
 - `deno` is the repository's first feature: `src/` does not exist yet, and the README says no feature has been
-  published. `just new-feature deno` scaffolds `version` (default `latest`) and the two images planned below.
+  published. `just new-feature deno` scaffolds `version` (Options) and the two images planned below.
 - Latest stable release: `v2.9.7`, published 2026-09-17 (`gh api repos/denoland/deno/releases/latest`);
   `https://dl.deno.land/release-latest.txt` returns `v2.9.7` followed by a newline, with the `v`. The LTS pointer
   `https://dl.deno.land/release-lts-latest.txt` returns `v2.9.3`; per Deno's stability page, a bare version always names
@@ -83,8 +83,8 @@ were checked on 2026-09-30 unless marked otherwise.
   cannot fall back to HTTP and an HTTP error status fails the request. Checked by running
   `grep -rn 'https\?://' src/deno` and a review of every `curl` call against the inventory.
 - Every platform and option check runs before the first network access, apt included, so each failure scenario of
-  Supported platforms and Version selection downloads nothing. Checked by the order in the scripts and the hand runs of
-  those scenarios.
+  Supported platforms and Option version downloads nothing; for Resolving latest only the pointer is fetched and no
+  release archive is downloaded. Checked by the order in the scripts and the hand runs of those scenarios.
 - `install.sh` is POSIX `sh` with `set -eu` and holds only the platform checks; once they pass it `exec`s `bash` on a
   script in `src/deno/scripts/` that holds the rest with `set -euo pipefail`, so an image without bash still gets the
   platform message. Checked by shellcheck in `just check` and the hand run on `alpine`.
@@ -215,9 +215,27 @@ were checked on 2026-09-30 unless marked otherwise.
   that ref's metadata at build time (URL inventory). Rejected: no `installsAfter`, which leaves a user common-utils
   creates in the same build with a root-owned tools tree. Rejected: `dependsOn`, which would install common-utils, and
   its user and packages, for every user of this feature.
+
+## Options
+
+The delta spec's Option requirement is the contract; `proposals` and `description` live in
+`src/deno/devcontainer-feature.json`.
+
+| Name      | Type     | Default    | Enum or proposals              | Meaning                                                                                               |
+| --------- | -------- | ---------- | ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `version` | `string` | `"latest"` | proposals `["latest","2.8.0"]` | Deno release to install: `latest`, resolved from `release-latest.txt` at build time, or exact `X.Y.Z` |
+
+- **Default `latest`.** proposal.md (Why) asks for the version the container's author chooses or the latest release, so
+  a configuration that omits `version` follows upstream's current stable release. The trade-off is the pointer race in
+  Risks, which a pinned `version` avoids.
+- **Proposals, not an enum.** Every exact release with both checksum files is valid, and each new release adds one.
+  `2.8.0` is the first proposal that is not the default, so the duplicate test installs it (Context, Goals).
 - **One spelling of an exact version (maintainer decision).** `version` accepts `latest` or `X.Y.Z`; `v2.9.7` fails like
   any other value, with the message naming the accepted forms. Rejected: accepting the `v` prefix as a second spelling,
   which complicates the option's proposals and error message for no new capability.
+- Rejected: partial versions such as `2.9` and the LTS, release candidate, and canary channels (Non-Goals). Rejected: an
+  option that takes a download URL, a mirror, or credentials, which would let configuration redirect a verified download
+  (Goals).
 
 ## Supported images
 
@@ -263,8 +281,8 @@ environment variable of the feature redirects anything.
   image's own sources when a prerequisite is missing (URL inventory).
 - **Verification:** SHA-256 of the archive before extraction and of the executable before installation, both against
   checksum files of the same release; the latest pointer is format-checked, and whatever release it names is verified
-  the same way. The pointer and the checksum files themselves rest on TLS alone, which the spec states in its Version
-  selection and Verified download requirements, as `feature-authoring.md` (Downloads) demands.
+  the same way. The pointer and the checksum files themselves rest on TLS alone, which the spec states in its Resolving
+  latest and Verified download requirements, as `feature-authoring.md` (Downloads) demands.
 - **Keys:** none. Deno signs nothing the feature can check without extra tooling; authenticity rests on TLS to
   `github.com` and `release-assets.githubusercontent.com` (Risks).
 - **Metadata:** `containerEnv` only — `DENO_INSTALL_ROOT` and `PATH` so global tools land on `PATH` for every shell,
@@ -278,8 +296,9 @@ environment variable of the feature redirects anything.
 - **Idempotency:** Goals above; the spec's Installing twice requirement is what `duplicate.sh` and the two reinstall
   `build` scenarios assert. The group and the membership are created only when missing, and a second install re-applies
   the group, owner, and mode of the two directories (Decisions).
-- **Failure behavior:** the spec's Version selection, Verified download, Failed installation, and Supported platforms
-  requirements; every failure exits non-zero with a message on stderr and leaves the previous binary.
+- **Failure behavior:** the spec's Option version, Resolving latest, Verified download, Failed installation, and
+  Supported platforms requirements; every failure exits non-zero with a message on stderr and leaves the previous
+  binary.
 
 ## URL inventory
 
@@ -329,5 +348,5 @@ Container CLI, not by the feature's scripts.
 
 ## Open Questions
 
-None. The maintainer decided both questions of the approved package (Decisions: `installsAfter`, one spelling of an
-exact version).
+None. The maintainer decided both questions of the approved package (Decisions: `installsAfter`; Options: one spelling
+of an exact version).

@@ -21,9 +21,25 @@ Upstream sources:
 The feature SHALL install the Deno CLI as `/usr/local/bin/deno`, executable by every user, so that `deno` runs by name
 for the remote user and for root.
 
-#### Scenario: Latest version
+#### Scenario: Remote user and root
 
-- **WHEN** the feature is installed with `version` set to `latest`
+- **WHEN** the feature is installed
+- **THEN** `deno --version` runs by name as the remote user and as root
+
+### Requirement: Option version
+
+The feature SHALL accept the option `version` as declared here, with the value `latest` or an exact `MAJOR.MINOR.PATCH`
+release version, and SHALL fail the installation on any other value before anything is downloaded, with a message naming
+the option and the accepted forms.
+
+| Field   | Value      |
+| ------- | ---------- |
+| Type    | `string`   |
+| Default | `"latest"` |
+
+#### Scenario: Omitted version
+
+- **WHEN** the feature is installed without `version`, or with `version` set to `latest`
 - **THEN** `deno --version`, run as the remote user, reports the version the latest-release pointer named at build time
 
 #### Scenario: Exact version
@@ -31,20 +47,18 @@ for the remote user and for root.
 - **WHEN** the feature is installed with `version` set to an exact release version such as `2.9.7`
 - **THEN** `deno --version` reports that version when run as the remote user and when run as root
 
-### Requirement: Version selection
-
-The `version` option SHALL accept `latest` or an exact `MAJOR.MINOR.PATCH` release version. The feature SHALL resolve
-`latest` by reading `https://dl.deno.land/release-latest.txt` over HTTPS and SHALL use its content only when it has the
-form `v<MAJOR>.<MINOR>.<PATCH>` once surrounding whitespace is removed. Deno publishes no checksum or signature for the
-pointer, so the feature SHALL rely on TLS alone for it, over HTTPS on every hop, redirects included; the release it
-names is verified like any other. Any other `version` value SHALL fail the installation before anything is downloaded,
-with a message naming the option and the accepted forms.
-
 #### Scenario: Partial version rejected
 
 - **WHEN** the feature is installed with `version` set to `2.9`
 - **THEN** the installation fails with a message naming `version` and the accepted forms, and nothing is downloaded or
   installed
+
+### Requirement: Resolving latest
+
+The feature SHALL resolve `latest` by reading `https://dl.deno.land/release-latest.txt` over HTTPS and SHALL use its
+content only when it has the form `v<MAJOR>.<MINOR>.<PATCH>` once surrounding whitespace is removed. Deno publishes no
+checksum or signature for the pointer, so the feature SHALL rely on TLS alone for it, over HTTPS on every hop, redirects
+included; the release it names is verified like any other.
 
 #### Scenario: Malformed latest-release pointer
 
