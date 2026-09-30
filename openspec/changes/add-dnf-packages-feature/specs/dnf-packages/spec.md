@@ -14,14 +14,41 @@ Upstream sources:
 
 ## ADDED Requirements
 
+### Requirement: Option packages
+
+The feature SHALL accept the option `packages` as declared here, a comma-separated list of package entries in which
+whitespace around an entry and empty entries are ignored, and SHALL succeed without changing the image when the list
+names no package.
+
+| Field   | Value    |
+| ------- | -------- |
+| Type    | `string` |
+| Default | `""`     |
+
+#### Scenario: Omitted packages
+
+- **WHEN** the feature is installed without `packages`
+- **THEN** the feature exits with status 0, installs and removes nothing, and loads no repository metadata, also on an
+  image without `dnf`
+
+#### Scenario: Empty list is a no-op
+
+- **WHEN** `packages` is empty or holds only commas and whitespace
+- **THEN** the feature exits with status 0, installs and removes nothing, and loads no repository metadata, also on an
+  image without `dnf`
+
+#### Scenario: Spaces and empty entries are ignored
+
+- **WHEN** `packages` has spaces and tabs around its entries and an empty entry between two commas
+- **THEN** the named packages are installed exactly as if the whitespace and the empty entry were absent
+
 ### Requirement: Install the listed packages
 
 The feature SHALL install, with `dnf`, every package named in the comma-separated `packages` option, taking each package
 and its dependencies only from the repositories enabled in the image. It SHALL NOT install packages that a listed
 package only recommends or supplements (weak dependencies), and SHALL NOT upgrade installed packages other than the
 listed packages and what they need. A listed package that the image already has MAY be upgraded when the list names it
-without a version, as the image's `dnf` configuration decides. Whitespace around an entry and empty entries SHALL be
-ignored.
+without a version, as the image's `dnf` configuration decides.
 
 #### Scenario: Listed packages are installed
 
@@ -33,26 +60,11 @@ ignored.
 - **WHEN** `packages` names a package that recommends another package which nothing installed requires
 - **THEN** the listed package is installed and the recommended package is not
 
-#### Scenario: Spaces and empty entries are ignored
-
-- **WHEN** `packages` has spaces and tabs around its entries and an empty entry between two commas
-- **THEN** the named packages are installed exactly as if the whitespace and the empty entry were absent
-
 #### Scenario: Listed package already installed at its newest version
 
 - **WHEN** `packages` names, without a version, a package that is already installed at the newest version the enabled
   repositories offer
 - **THEN** the feature succeeds and the package stays at that version
-
-### Requirement: Empty package list
-
-The feature SHALL succeed without changing the image when `packages` names no package.
-
-#### Scenario: Empty list is a no-op
-
-- **WHEN** `packages` is empty or holds only commas and whitespace
-- **THEN** the feature exits with status 0, installs and removes nothing, and loads no repository metadata, also on an
-  image without `dnf`
 
 ### Requirement: Version and architecture qualifiers
 

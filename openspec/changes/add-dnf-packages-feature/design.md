@@ -143,10 +143,6 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
 - **POSIX `sh`, shared skeleton.** One skeleton keeps the five installers auditable side by side, and `alpine`, an image
   of the `apk-packages` sibling, ships no bash. This deviates from `feature-authoring.md` (Deviations). Rejected: bash
   with `set -euo pipefail`, which the convention calls for here because all three images ship bash.
-- **One option, `packages`, a comma-separated string defaulting to empty.** `proposals` hold two lists installed on no
-  supported image: `bc` and `bc,file`. Whitespace around entries and empty entries are dropped, so a trailing comma is
-  harmless. Rejected: an array (feature options are only `string` or `boolean`); options for repositories, groups, or
-  upgrades (out of scope).
 - **Validate, then the empty check, then the `dnf` check.** A refused entry fails first on every image, so the same bad
   list gives the same message everywhere; the empty check runs before the `dnf` check, so the default options succeed on
   any image, including one without `dnf`. Rejected: failing on an image without `dnf` even for an empty list, which
@@ -206,6 +202,20 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
   `scripts/`, and each of the five installers carries its own runner (Open question 4). Rejected: a `build` scenario
   that carries a first install, which cannot reach `src/` from its context; extending `scripts/test_feature.ts` with
   expected-failure scenarios, a test infrastructure change outside this change (Open question 4).
+
+### Options
+
+The feature's only option; the delta spec's Option requirement states its contract.
+
+| Name       | Type     | Default | Enum or proposals              | Meaning                                                                                                                                                                                               |
+| ---------- | -------- | ------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages` | `string` | `""`    | proposals: `"bc"`, `"bc,file"` | Comma-separated entries (`name`, `name-[epoch:]version[-release]`, `name.architecture`) that `dnf` installs; whitespace around entries and empty entries are dropped, so a trailing comma is harmless |
+
+- **Default `""`.** An empty list installs nothing and, because the empty check runs before the `dnf` check, succeeds on
+  any image, including one without `dnf` (decision "Validate, then the empty check, then the `dnf` check"). The
+  proposals are two lists installed on no supported image, so the install-twice test installs real packages (Goals).
+- **Rejected shapes:** an array (feature options are only `string` or `boolean`); options for repositories, groups, or
+  upgrades (out of scope); options for weak dependencies or keeping the cache (Non-Goals).
 
 ### Deviations from `feature-authoring.md`
 
@@ -269,7 +279,7 @@ question 4).
 | Weak dependencies are left out                                                     | Scenario with `ipcalc` on each image                                                                                                                                                                                                                                           |
 | Spaces and empty entries are ignored                                               | Scenario                                                                                                                                                                                                                                                                       |
 | Listed package already installed at its newest version                             | Direct: installs a package, lists it again, and compares the version                                                                                                                                                                                                           |
-| Empty list is a no-op                                                              | test.sh; Direct on an image without `dnf`                                                                                                                                                                                                                                      |
+| Omitted packages; Empty list is a no-op                                            | test.sh; Direct on an image without `dnf`                                                                                                                                                                                                                                      |
 | Pinned version is installed                                                        | Direct: the runner reads the offered versions at run time and pins one, so no fixed version goes stale                                                                                                                                                                         |
 | Unavailable pinned version fails; Architecture the repositories do not offer fails | Direct                                                                                                                                                                                                                                                                         |
 | Native architecture qualifier is installed                                         | Scenario with `.x86_64`                                                                                                                                                                                                                                                        |
