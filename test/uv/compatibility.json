@@ -1,0 +1,15 @@
+{
+  "$schema": "../compatibility.schema.json",
+  "images": [
+    {
+      "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+      "arch": ["amd64", "arm64"],
+      "remoteUser": "vscode"
+    },
+    { "image": "debian:12", "arch": ["amd64", "arm64"] },
+    { "image": "alpine:3.24", "arch": ["amd64", "arm64"] },
+    { "image": "almalinux:10", "arch": ["amd64", "arm64"] },
+    { "image": "archlinux:latest", "arch": ["amd64"] },
+    { "image": "opensuse/leap:16.0", "arch": ["amd64", "arm64"] }
+  ]
+}
