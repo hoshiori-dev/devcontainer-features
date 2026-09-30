@@ -178,7 +178,7 @@ install_key() {
 # --- Repository: one source definition, written whole at a fixed path.
 
 write_repository() {
-  local repo_file
+  local repo_file pkg_check=""
   if [[ "$FAMILY" == "apt" ]]; then
     printf 'deb [signed-by=%s] %s/deb/%s /\n' "$APT_KEYRING" "$REPO_BASE" "$ARCH" >"$APT_SOURCE"
     return
@@ -187,6 +187,8 @@ write_repository() {
     repo_file="/etc/yum.repos.d/$REPO_ID.repo"
   else
     repo_file="/etc/zypp/repos.d/$REPO_ID.repo"
+    # libzypp checks package signatures only for unsigned repositories unless pkg_gpgcheck is on (zypp.conf(5)).
+    pkg_check=$'\npkg_gpgcheck=1'
   fi
   mkdir -p "$(dirname "$repo_file")"
   cat >"$repo_file" <<EOF
@@ -195,7 +197,7 @@ name=NVIDIA Container Toolkit
 baseurl=$REPO_BASE/rpm/$ARCH
 enabled=1
 gpgcheck=1
-repo_gpgcheck=1
+repo_gpgcheck=1${pkg_check}
 gpgkey=file://$RPM_KEY
 EOF
 }

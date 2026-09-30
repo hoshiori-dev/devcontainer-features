@@ -121,7 +121,8 @@ repository_file_is_expected() {
   if ! grep -qx "baseurl=$url" "$file" \
     || ! grep -qx "gpgcheck=1" "$file" \
     || ! grep -qx "repo_gpgcheck=1" "$file" \
-    || [[ "$(grep '^gpgkey=' "$file")" != "gpgkey=file://$TOOLKIT_RPM_KEY" ]]; then
+    || [[ "$(grep '^gpgkey=' "$file")" != "gpgkey=file://$TOOLKIT_RPM_KEY" ]] \
+    || { [[ "$(toolkit_family)" == "zypper" ]] && ! grep -qx "pkg_gpgcheck=1" "$file"; }; then
     echo "unexpected $file: $(cat "$file")" >&2
     return 1
   fi
