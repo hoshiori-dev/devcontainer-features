@@ -48,11 +48,14 @@ installed_version() {
 
 # Prints the version the latest-release permanent link names now, without following it.
 latest_version() {
-  location=$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --head \
-    --output /dev/null --write-out '%{redirect_url}' \
+  location=$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --retry 3 \
+    --head --output /dev/null --write-out '%{redirect_url}' \
     https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest) \
     || return 1
-  tag=${location##*/}
+  # The same parsing as install.sh: drop a query or fragment and a trailing slash, keep the last segment.
+  tag=${location%%[?#]*}
+  tag=${tag%/}
+  tag=${tag##*/}
   printf '%s\n' "${tag#v}"
 }
 
@@ -91,7 +94,7 @@ package_caches_empty() {
 
 # No temporary directory or staged binary of install.sh remains.
 no_install_leftovers() {
-  for path in /tmp/glab-feature.* /usr/local/bin/.glab-feature.*; do
+  for path in /tmp/glab-feature.* "${TMPDIR:-/tmp}"/glab-feature.* /usr/local/bin/.glab-feature.*; do
     if [ -e "$path" ]; then
       echo "  leftover: $path"
       return 1
