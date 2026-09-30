@@ -19,7 +19,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+| Feature                             | Description                                                                                                          |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [`apt-packages`](src/apt-packages/) | Installs a list of system packages with `apt-get` from the repositories a Debian or Ubuntu image already configures. |
 
 ## Development
 

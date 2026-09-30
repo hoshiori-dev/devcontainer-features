@@ -53,7 +53,7 @@
 
 ## 4. Repository README
 
-- [ ] 4.1 Add the `apt-packages` row under "## Features" in the root `README.md`, with the id linking to
+- [x] 4.1 Add the `apt-packages` row under "## Features" in the root `README.md`, with the id linking to
       `src/apt-packages/` and a one-sentence description, replacing "No features have been published yet."; verify with
       `deno fmt --check README.md` and by reading the section
 
