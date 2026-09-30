@@ -121,8 +121,9 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
 - `daemon.json` is changed only by `nvidia-ctk runtime configure --runtime=docker`, without `--nvidia-set-as-default`
   and without `--cdi.enabled`; a zero-length file is treated as `{}` first, and a file that is not valid JSON is left to
   `nvidia-ctk`, which fails without writing. Checked by:
-  - the docker-in-docker scenario: the entry is in the file, and after a bounded wait for `docker info` to succeed (the
-    daemon starts with the container, not before the test), `docker info` lists `nvidia`;
+  - the docker-in-docker scenario, which leaves `configureDocker` unset so it also checks the spec's "Omitted
+    configureDocker" on an image with a Docker daemon: the entry is in the file, and after a bounded wait for
+    `docker info` to succeed (the daemon starts with the container, not before the test), `docker info` lists `nvidia`;
   - `build` scenarios on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` whose Dockerfile installs the
     distribution's Docker daemon package and seeds `daemon.json`: with another runtime, a `default-runtime`, and
     `log-level` (all kept, `nvidia` added); zero-length (valid JSON with `nvidia` afterwards); and with
@@ -155,6 +156,25 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   distributions.
 - Removing the prerequisites the feature installed.
 
+## Options
+
+Both options are new; the spec's Option requirements win where this table differs.
+
+| Name              | Type      | Default    | Enum or proposals               | Meaning                                                                                                     |
+| ----------------- | --------- | ---------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `version`         | `string`  | `"latest"` | proposals `["latest","1.19.1"]` | `latest` for the newest stable release, or one exact `MAJOR.MINOR.PATCH` release for all four packages      |
+| `configureDocker` | `boolean` | `true`     | —                               | Register the `nvidia` runtime with a Docker daemon installed in the dev container; skipped when none exists |
+
+- **`version` default `"latest"`.** It installs the newest stable package the repository serves (Decisions), which is
+  outside the known vulnerable ranges (proposal.md, Impact). The second `proposals` entry follows the rule in Goals.
+- **`configureDocker` default `true`.** Registering the runtime is what makes a Docker daemon in the dev container able
+  to hand GPUs to its containers (proposal.md, Why), and without `dockerd` the step is skipped, so enabling it costs
+  nothing on images without Docker. The duplicate test inputs in Context follow from this default.
+- **Rejected option shapes.** `version` also accepting `1.20.1-1`, the form of the install guide's
+  `NVIDIA_CONTAINER_TOOLKIT_VERSION` — rejected, the release suffix is a packaging detail the feature supplies, and the
+  stable index carries only `-1`. A `setAsDefault` option — rejected for v1, a later install without it does not clear
+  `default-runtime`, and users can pass `--runtime=nvidia`.
+
 ## Decisions
 
 - **Install from NVIDIA's package repositories.** They are signed end to end by one pinned key and resolve the
@@ -186,9 +206,7 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   the newest stable package, which is what the repository actually serves. Alternative: resolve `latest` through the
   GitHub releases API — rejected, one more endpoint whose answer can run ahead of the repository. Alternative: pin only
   `nvidia-container-toolkit` — rejected, naming all four is what the install guide does and makes a downgrade resolve
-  without solver surprises. Alternative: also accept `1.20.1-1`, the form of the install guide's
-  `NVIDIA_CONTAINER_TOOLKIT_VERSION` — rejected, the release suffix is a packaging detail the feature supplies, and the
-  stable index carries only `-1`.
+  without solver surprises. Accepting `1.20.1-1` is a rejected option shape (Options).
 - **Vulnerable releases stay installable; no minimum version.** `version` accepts every well-formed `MAJOR.MINOR.PATCH`
   the stable repository offers, as the maintainer decided on PR #29 (Context, **Review**). The user who pins an exact
   version carries its risk; the default `latest` is not affected. Alternative: a minimum version such as 1.17.8, below
@@ -198,8 +216,8 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   runtime by name, so a repeat adds nothing, and it keeps other settings. No daemon runs at build time; docker-in-docker
   reads the file when its entrypoint starts `dockerd`. Alternative: edit the JSON with `jq` — rejected, a new dependency
   duplicating upstream logic. Alternative: check for the `docker` CLI — rejected, docker-outside-of-docker installs only
-  the CLI and the host daemon cannot be configured from inside. Alternative: a `setAsDefault` option — rejected for v1,
-  a later install without it does not clear `default-runtime`, and users can pass `--runtime=nvidia`.
+  the CLI and the host daemon cannot be configured from inside. A `setAsDefault` option is a rejected option shape
+  (Options).
 - **`installsAfter` docker-in-docker, no `dependsOn`.** Ordering lets the feature find the `dockerd` that feature
   installs; `dependsOn` would force a privileged Docker daemon on users who run podman or only want the CLI tools. The
   ref is `ghcr.io/devcontainers/features/docker-in-docker` without a tag, so the ordering holds whichever major the user

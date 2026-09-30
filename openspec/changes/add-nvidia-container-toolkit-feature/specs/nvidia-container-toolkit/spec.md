@@ -68,17 +68,21 @@ key.
 - **WHEN** the repository index, the repository metadata, or a package is unsigned or not signed by the pinned key
 - **THEN** the package manager refuses it and the feature fails the build
 
-### Requirement: Choose the toolkit version
+### Requirement: Option version
 
-The `version` option SHALL select the toolkit version: `latest` installs the newest version that NVIDIA's stable
-repository offers at build time, and a version of the form `MAJOR.MINOR.PATCH` installs exactly that version of all four
-packages. The feature SHALL impose no minimum version: every `MAJOR.MINOR.PATCH` version the repository offers SHALL be
-installed as requested, including releases with known vulnerabilities. Any other value, including a version with a
-package release suffix such as `1.20.1-1`, SHALL fail the build.
+The feature SHALL accept the option `version` as declared here: `latest` installs the newest version that NVIDIA's
+stable repository offers at build time, a version of the form `MAJOR.MINOR.PATCH` that the repository offers installs
+exactly that version of all four packages with no minimum version, including releases with known vulnerabilities, and
+any other value, including a version with a package release suffix, fails the build.
 
-#### Scenario: Latest version
+| Field   | Value      |
+| ------- | ---------- |
+| Type    | `string`   |
+| Default | `"latest"` |
 
-- **WHEN** the feature is installed with `version` set to `latest`
+#### Scenario: Omitted version
+
+- **WHEN** the feature is installed without `version`, or with `version` set to `latest`
 - **THEN** `nvidia-ctk --version` reports the newest version in NVIDIA's stable repository at build time
 
 #### Scenario: Exact version
@@ -99,8 +103,40 @@ package release suffix such as `1.20.1-1`, SHALL fail the build.
 
 #### Scenario: Malformed version
 
-- **WHEN** the feature is installed with `version` set to a value that is neither `latest` nor `MAJOR.MINOR.PATCH`
+- **WHEN** the feature is installed with `version` set to a value that is neither `latest` nor `MAJOR.MINOR.PATCH`, such
+  as `1.20.1-1`
 - **THEN** the feature fails the build with a message naming the value, before it changes the image
+
+### Requirement: Option configureDocker
+
+The feature SHALL accept the option `configureDocker` as declared here: when it is enabled, the feature registers the
+NVIDIA runtime with a Docker daemon installed in the image as "Register the NVIDIA runtime with Docker" states, or, when
+no Docker daemon is installed, installs the toolkit, prints a message that it skipped the Docker configuration, and
+succeeds without creating `/etc/docker/daemon.json`; when it is disabled, the feature does not create or change
+`/etc/docker/daemon.json`.
+
+| Field   | Value     |
+| ------- | --------- |
+| Type    | `boolean` |
+| Default | `true`    |
+
+#### Scenario: Omitted configureDocker
+
+- **WHEN** the feature is installed without `configureDocker`
+- **THEN** it does what it does with `configureDocker` enabled: on an image with a Docker daemon it registers the
+  `nvidia` runtime in `/etc/docker/daemon.json`, and on an image without one it skips the Docker configuration
+
+#### Scenario: No Docker daemon
+
+- **WHEN** the feature is installed with `configureDocker` enabled on an image without `dockerd`, including one with
+  only the Docker CLI
+- **THEN** the toolkit is installed, the build log says the Docker configuration was skipped, the build succeeds, and
+  `/etc/docker/daemon.json` does not exist unless something else created it
+
+#### Scenario: Docker configuration disabled
+
+- **WHEN** the feature is installed with `configureDocker` disabled on an image with a Docker daemon
+- **THEN** `/etc/docker/daemon.json` is neither created nor changed
 
 ### Requirement: Register the NVIDIA runtime with Docker
 
@@ -108,11 +144,8 @@ When the `configureDocker` option is enabled and a Docker daemon (`dockerd`) is 
 runs, the feature SHALL register a runtime named `nvidia` whose path is `nvidia-container-runtime` in
 `/etc/docker/daemon.json`, creating the file when it is missing or empty. It SHALL keep every other setting already in
 that file and SHALL NOT change the daemon's default runtime. When that file exists but is not valid JSON, the feature
-SHALL fail the build and leave the file unchanged. When `configureDocker` is enabled and no Docker daemon is installed,
-the feature SHALL install the toolkit, print a message that it skipped the Docker configuration, and succeed without
-creating `/etc/docker/daemon.json`. When `configureDocker` is disabled, the feature SHALL NOT create or change
-`/etc/docker/daemon.json`. The feature SHALL be ordered after `ghcr.io/devcontainers/features/docker-in-docker` when
-both are installed.
+SHALL fail the build and leave the file unchanged. The feature SHALL be ordered after
+`ghcr.io/devcontainers/features/docker-in-docker` when both are installed.
 
 #### Scenario: Docker daemon installed by docker-in-docker
 
@@ -137,18 +170,6 @@ both are installed.
 - **WHEN** `/etc/docker/daemon.json` holds content that is not valid JSON, and the feature is installed with
   `configureDocker` enabled on an image with a Docker daemon
 - **THEN** the feature fails the build and the file is unchanged
-
-#### Scenario: No Docker daemon
-
-- **WHEN** the feature is installed with `configureDocker` enabled on an image without `dockerd`, including one with
-  only the Docker CLI
-- **THEN** the toolkit is installed, the build log says the Docker configuration was skipped, the build succeeds, and
-  `/etc/docker/daemon.json` does not exist unless something else created it
-
-#### Scenario: Docker configuration disabled
-
-- **WHEN** the feature is installed with `configureDocker` disabled on an image with a Docker daemon
-- **THEN** `/etc/docker/daemon.json` is neither created nor changed
 
 ### Requirement: Installing twice
 
