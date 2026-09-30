@@ -103,8 +103,10 @@ before the failure MAY remain.
 The feature SHALL set `DENO_INSTALL_ROOT` to `/usr/local/share/deno` in the container environment and SHALL put
 `/usr/local/share/deno/bin` on `PATH` there, so that executables created with `deno install --global` land in that
 directory and run by name in every shell. `/usr/local/share/deno/bin` SHALL come after the image's own `PATH` entries.
-The feature SHALL make `/usr/local/share/deno` and everything below it, `bin` included, owned by the remote user when
-that user exists at build time and is not root, and SHALL leave them owned by root otherwise.
+Because a login shell's startup files may reset `PATH` (Debian's `/etc/profile` does), the feature SHALL also append the
+directory to `PATH` in login shells through a file of its own under `/etc/profile.d/`, adding it only when it is not
+already there. The feature SHALL make `/usr/local/share/deno` and everything below it, `bin` included, owned by the
+remote user when that user exists at build time and is not root, and SHALL leave them owned by root otherwise.
 
 #### Scenario: Non-root remote user installs a global tool
 
@@ -112,6 +114,13 @@ that user exists at build time and is not root, and SHALL leave them owned by ro
   script
 - **THEN** the command succeeds without elevated privileges, the executable appears in `/usr/local/share/deno/bin`, and
   it runs by name from a new shell
+
+#### Scenario: Login shell runs a global tool
+
+- **WHEN** a global tool is installed with `deno install --global` and a login shell (`bash -l`) is started as the
+  remote user, on an image whose `/etc/profile` resets `PATH`
+- **THEN** the tool runs by name in that login shell, and `/usr/local/share/deno/bin` appears in its `PATH` once, after
+  the image's own entries
 
 #### Scenario: Root or absent remote user
 

@@ -155,8 +155,17 @@ were checked on 2026-09-30 unless marked otherwise.
   root lifecycle commands — a widening on images where that user has no `sudo`; the cost of appending is that a global
   tool named like a system command runs only by full path. Rejected: Deno's default `$HOME/.deno/bin`, which
   `containerEnv` cannot put on `PATH` because it is static JSON and the home is known only at build time. Rejected:
-  editing shell rc files, which non-login and non-interactive processes skip and which needs marker guards. Rejected: a
-  group-writable directory with a new group, more moving parts for the single remote user a dev container has.
+  editing users' shell rc files, which non-login and non-interactive processes skip and which needs marker guards.
+  Rejected: a group-writable directory with a new group, more moving parts for the single remote user a dev container
+  has.
+- **A feature-owned `/etc/profile.d/deno.sh` for login shells.** Debian's `/etc/profile` sets `PATH` from scratch, so a
+  login shell on `debian:12` (`bash -l`) loses the `containerEnv` entry; the implementation found this while testing,
+  and the maintainer chose this fix at the implementation review. The feature writes the whole file on every install
+  (never appends to it), and the file appends `/usr/local/share/deno/bin` to `PATH` only when it is absent, so a second
+  install adds nothing and a shell that already has the entry keeps one copy. Checked by a test that runs a global tool
+  by name in `bash -l` as the remote user on `debian:12` and counts the directory in `PATH`. Rejected: narrowing the
+  spec to shells that inherit the container environment, which leaves login shells on Debian without the tools.
+  Rejected: editing `/etc/profile` or users' rc files.
 - **`DENO_NO_UPDATE_CHECK=1`.** The feature owns the version; the update notice would point users to `deno upgrade`,
   which replaces a root-owned binary and bypasses verification.
 - **Prerequisites from apt, only when missing, kept afterwards.** `curl`, `ca-certificates`, and `unzip` through
@@ -234,7 +243,9 @@ environment variable of the feature redirects anything.
 - **Metadata:** `containerEnv` only — `DENO_INSTALL_ROOT` and `PATH` so global tools land on `PATH` for every shell,
   appended so they never shadow a system command, and `DENO_NO_UPDATE_CHECK` so Deno never offers to replace the
   verified binary. No `mounts`, `capAdd`, `privileged`, `securityOpt`, `init`, `entrypoint`, lifecycle commands, or
-  `dependsOn`; `installsAfter` names common-utils only for ordering (Decisions).
+  `dependsOn`; `installsAfter` names common-utils only for ordering (Decisions). Outside the metadata, the feature
+  writes one root-owned file, `/etc/profile.d/deno.sh`, that only appends the tools directory to `PATH` in login shells
+  (Decisions).
 - **Idempotency:** Goals above; the spec's Installing twice requirement is what `duplicate.sh` and the two reinstall
   `build` scenarios assert.
 - **Failure behavior:** the spec's Version selection, Verified download, Failed installation, and Supported platforms

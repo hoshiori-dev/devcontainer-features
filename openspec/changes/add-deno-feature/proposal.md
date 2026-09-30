@@ -11,8 +11,8 @@ feature verifies no download and fails when installed twice, which this reposito
 ## What Changes
 
 - A new feature `deno` installs a verified Deno CLI system-wide at the version the `version` option selects.
-- Tools installed with `deno install --global` run by name for every user, and the remote user installs them without
-  root.
+- Tools installed with `deno install --global` run by name for every user, in login shells too, and the remote user
+  installs them without root.
 - Unsupported images are rejected clearly.
 - The repository's root `README.md` lists `deno` under "## Features" as one row: the id linking to `src/deno/` and a
   one-sentence description, replacing "No features have been published yet.". It is separate from the generated
