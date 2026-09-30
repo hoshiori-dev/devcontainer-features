@@ -37,8 +37,29 @@ Everything inside `src/<id>/` ships in the published artifact; nothing outside i
 - Non-interactive always (`DEBIAN_FRONTEND=noninteractive`); clean package-manager caches at the end.
 - User-scoped setup targets `_REMOTE_USER` / `_REMOTE_USER_HOME` (also `_CONTAINER_USER`, `_CONTAINER_USER_HOME`), never
   a hard-coded user.
-- Download only from the sources listed in the spec, over HTTPS, and verify every download — a published checksum or a
-  signature whose key is pinned by fingerprint. No `curl | sh` from an unpinned source.
+- Downloads follow these rules:
+  - Sources: every URL the feature requests itself is named in its spec, uses HTTPS on every hop including redirects,
+    and points to a host the upstream controls, the release platform it publishes through (GitHub or GitLab releases and
+    their download redirects), or the official registry it publishes to — never a third-party mirror or repackaging.
+    Repositories the image itself configures fall under the package-manager rule.
+  - No weakening: never disable or weaken certificate, signature, or integrity checking through a flag, option,
+    configuration file, or environment variable — in `curl`, `wget`, package managers, registry clients, or installer
+    scripts.
+  - Package managers and registries: a package fetched from a signed repository or a registry index is verified by the
+    tool that fetches it; the feature need not add a second check. A package file the feature downloads itself is a
+    direct download.
+  - Added repositories: pin the signing key by full fingerprint and check it before use.
+  - Direct downloads: when upstream publishes a checksum or signature for the version and asset being installed, fetch
+    it at install time and verify against it — a signature against a key pinned by full fingerprint (or a pinned signer
+    identity for keyless signing). If upstream publishes one for that version but it is missing or unreachable at
+    install time, fail. When upstream publishes none for that version, install relying on TLS alone, and the spec states
+    this as a Requirement. A digest computed by the hosting platform (GitHub's asset digest) may be used, never
+    required.
+  - No per-version hashes: a feature never carries a hash tied to one upstream version; an exception needs a change to
+    this rule.
+  - Installer scripts: an installer upstream documents is fetched only from an upstream location and saved to a file
+    before it runs, never piped into a shell. Unless upstream publishes a checksum or signature for it, the spec states
+    that its content is not verified. The spec always names what the installer downloads.
 
 ## Idempotency
 
