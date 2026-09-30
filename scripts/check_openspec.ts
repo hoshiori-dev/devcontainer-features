@@ -1,16 +1,23 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write=/tmp --allow-run=git,openspec
-// Fails when OpenSpec's generated skills and commands differ from what `openspec init --tools claude`
-// produces for this checkout, the only supported way to regenerate them
-// (.agents/knowledge/spec-workflow.md). It regenerates them in a copy of the tracked files and
-// compares, so nothing in the working tree changes. The copy leaves out symlinks, so the claude
-// tool writes a real .claude/skills there, compared against the checkout's .claude/skills — the
-// symlink into .agents/skills. The marker `openspec update` leaves, .agents/skills/.openspec-target,
-// fails the check too.
+#!/usr/bin/env -S deno run --allow-read --allow-write=/tmp --allow-run=git,openspec --allow-env=LOG_TOKENS,LOG_STREAM
+// Two checks OpenSpec's own validator does not make (.agents/knowledge/spec-workflow.md):
+// - openspec/config.yaml holds no rule OpenSpec would drop. OpenSpec 1.13.2 replaces an invalid
+//   `rules` field with a warning on stderr: a rule that is not a string — an unquoted rule with a
+//   colon followed by a space parses as a mapping — drops that artifact's whole rule set, and an
+//   empty rule is dropped alone. The file is parsed with the YAML parser OpenSpec uses.
+// - OpenSpec's generated skills and commands equal what `openspec init --tools claude` produces for
+//   this checkout, the only supported way to regenerate them. It regenerates them in a copy of the
+//   tracked files and compares, so nothing in the working tree changes. The copy leaves out
+//   symlinks, so the claude tool writes a real .claude/skills there, compared against the
+//   checkout's .claude/skills — the symlink into .agents/skills. The marker `openspec update`
+//   leaves, .agents/skills/.openspec-target, fails the check too.
 //
 //   scripts/check_openspec.ts
 import { dirname, join, relative } from "jsr:@std/path@1.1.6";
 import { walk } from "jsr:@std/fs@1.0.24/walk";
+import { parse as parseYaml } from "npm:yaml@2.9.1";
 import { exists, git } from "./lib/repo.ts";
+
+export const CONFIG = "openspec/config.yaml";
 
 /** Directories the claude tool generates into, relative to the repository root. */
 export const GENERATED = [".claude/skills", ".claude/commands/opsx"];
@@ -21,11 +28,73 @@ export function isGenerated(path: string): boolean {
     return path.startsWith(".claude/skills/openspec-") || path.startsWith(".claude/commands/opsx/");
 }
 
+function yamlKind(value: unknown): string {
+    if (value === null) return "empty";
+    if (Array.isArray(value)) return "a list";
+    if (typeof value === "object") return "a mapping";
+    return `a ${typeof value}`;
+}
+
+/**
+ * The rules in a parsed config.yaml that OpenSpec 1.13.2 drops: `rules` that is not a mapping, a value that is not a
+ * list of strings (the whole artifact's rules go), and empty strings (dropped one by one).
+ */
+export function ruleProblems(config: unknown): string[] {
+    if (config === null || typeof config !== "object" || Array.isArray(config)) {
+        return [`the file is ${yamlKind(config)}, not a mapping`];
+    }
+    const rules = (config as Record<string, unknown>).rules;
+    if (rules === undefined) return [];
+    if (rules === null || typeof rules !== "object" || Array.isArray(rules)) {
+        return [`rules is ${yamlKind(rules)}, not a mapping of artifact ids to lists, so OpenSpec ignores every rule`];
+    }
+    const problems: string[] = [];
+    for (const [artifact, list] of Object.entries(rules)) {
+        const dropsAll = `so OpenSpec ignores every rule for ${artifact}`;
+        if (!Array.isArray(list)) {
+            problems.push(`rules.${artifact} is ${yamlKind(list)}, not a list of rules, ${dropsAll}`);
+            continue;
+        }
+        list.forEach((entry, index) => {
+            const at = `rules.${artifact} entry ${index + 1}`;
+            if (typeof entry !== "string") {
+                const shown = JSON.stringify(entry) ?? String(entry);
+                problems.push(
+                    `${at} is ${yamlKind(entry)} (${shown.length > 60 ? `${shown.slice(0, 57)}...` : shown}), not a ` +
+                        `string, ${dropsAll}. Quote it: YAML reads an unquoted colon followed by a space as a mapping`,
+                );
+            } else if (entry.length === 0) {
+                problems.push(`${at} is an empty string, which OpenSpec drops`);
+            }
+        });
+    }
+    return problems;
+}
+
+/** Problems reading or parsing `path`, or with its rules. */
+export async function configProblems(path: string): Promise<string[]> {
+    let config: unknown;
+    try {
+        config = parseYaml(await Deno.readTextFile(path));
+    } catch (error) {
+        return [`cannot be read as YAML: ${error instanceof Error ? error.message : String(error)}`];
+    }
+    return ruleProblems(config);
+}
+
 async function readOrUndefined(path: string): Promise<string | undefined> {
     return await exists(path) ? await Deno.readTextFile(path) : undefined;
 }
 
 if (import.meta.main) {
+    const config = await configProblems(CONFIG);
+    for (const problem of config) console.error(`- ${CONFIG}: ${problem}`);
+    if (config.length > 0) {
+        console.error(
+            `Fix ${CONFIG}: OpenSpec only warns on stderr and goes on without these rules (.agents/knowledge/spec-workflow.md).`,
+        );
+    }
+
     const problems: string[] = [];
     if (await exists(UPDATE_MARKER)) problems.push(`${UPDATE_MARKER} exists (left by \`openspec update\`); delete it`);
 
@@ -72,6 +141,7 @@ if (import.meta.main) {
                 ".agents/knowledge/spec-workflow.md.",
         );
     }
-    if (failed || problems.length > 0) Deno.exit(1);
-    console.log("OpenSpec's generated files are current");
+    if (config.length === 0) console.log(`${CONFIG}: every rule reaches OpenSpec`);
+    if (!failed && problems.length === 0) console.log("OpenSpec's generated files are current");
+    if (failed || problems.length > 0 || config.length > 0) Deno.exit(1);
 }
