@@ -11,7 +11,7 @@ MIN_VERSION="1.47.0"
 RELEASES="https://gitlab.com/gitlab-org/cli/-/releases"
 TARGET="/usr/local/bin/glab"
 FAMILIES="the Debian, Ubuntu, Fedora, and Alpine families"
-REQUESTED="${VERSION:-latest}"
+REQUESTED="${VERSION-latest}"
 
 work=""
 staged=""
