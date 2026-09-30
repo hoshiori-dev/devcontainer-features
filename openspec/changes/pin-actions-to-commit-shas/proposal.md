@@ -16,11 +16,12 @@ allowed-actions list.
   (`@<sha> # vX.Y.Z`), so Dependabot's weekly GitHub Actions updates keep both current.
 - The Actions row of `.agents/knowledge/github/platform-settings.md` adds "every action pinned to a full-length commit
   SHA" (`sha_pinning_required`) to its intended state, with its readback; the allowed-actions list is unchanged.
-- The pinning rule is stated where a workflow author reads it: the toolchain pins note in
-  `.agents/knowledge/github/checks.md` and the Synchronization table of `.agents/knowledge/github-workflow.md` (a new
-  action is pinned by SHA and, if third-party, added to the allowed list by a maintainer first).
-- The setting is on and recorded as enforced before this change merges: a maintainer turns it on once this PR's pinned
-  workflows are green, and the reruns on this PR show every workflow passing under it.
+- The pinning rule is stated where a workflow author reads it: the toolchain pins note and the Rules section of
+  `.agents/knowledge/github/checks.md` (which today exempt `actions/*`) and the Synchronization table of
+  `.agents/knowledge/github-workflow.md` (a new action is pinned by SHA and, if third-party, added to the allowed list
+  by a maintainer first).
+- The setting is on and recorded as enforced before this change merges: a maintainer turned it on on 2026-09-30, and
+  this PR's runs with the pins show every workflow passing under it.
 
 ## Capabilities
 
@@ -39,8 +40,9 @@ None. This change edits the harness only (`skip_specs: true`).
   `.agents/knowledge/github-workflow.md`.
 - Feature ids touched: none, so no version bump. `ci.yml` is test infrastructure, so CI selects the canary set, which is
   empty while no feature exists.
-- Remote settings: a maintainer turns `sha_pinning_required` on while this PR is open; until it merges, a workflow run
-  from any other branch that still uses a tag fails (no other PR is open today).
+- Remote settings: a maintainer turned `sha_pinning_required` on on 2026-09-30, before the pins; until this change
+  merges, any run of a workflow that still uses a tag fails — a push to `main`, a Dependabot PR, or another branch (no
+  other PR is open today).
 
 ## Acceptance
 

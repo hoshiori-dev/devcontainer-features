@@ -17,6 +17,8 @@
   ([Keeping your actions up to date with Dependabot](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/keeping-your-actions-up-to-date-with-dependabot)).
   `.github/dependabot.yml` already covers `/` and `.github/actions/*` weekly.
 - The `main` ruleset has no bypass actors, so a merge needs every required check green on the PR.
+- A maintainer turned `sha_pinning_required` on on 2026-09-30, after this change was proposed and before the pins
+  existed. No workflow ran between that and the pin commit.
 
 ## Goals / Non-Goals
 
@@ -25,8 +27,8 @@
 - Pin to the commit the tag resolves to today, so behavior does not change; checked by comparing each SHA with
   `gh api repos/<owner>/<repo>/git/matching-refs/tags/<tag>`.
 - Write every pin as `@<40-hex sha> # v<full version>`; checked by the `git grep` in the proposal's Acceptance.
-- Never leave `main` in a state where its workflows cannot run; checked by turning the setting on only while the pinned
-  workflows are green on this PR and by reading the first runs after it.
+- Keep the window in which `main`'s workflows cannot run as short as possible: the pins land in this PR before anything
+  else, and the first runs on this PR are read to confirm them.
 
 **Non-Goals:**
 
@@ -37,10 +39,11 @@
 ## Decisions
 
 - **Enforce while the PR is open, not after merge.** With the setting on, `pull_request` runs of this PR use its pinned
-  workflow files and pass, while tag-referencing runs elsewhere fail. Turning it on before merge lets this PR prove the
-  workflows pass under enforcement and record the tier in the same PR, as `git-workflow.md` asks. Rejected: turning it
-  on after merge, which leaves a follow-up PR only to record the tier and verifies the setting only on `main`; turning
-  it on before the pins exist, which fails every run including this PR's, with no bypass to recover.
+  workflow files and pass, while tag-referencing runs elsewhere fail. Enforcing before merge lets this PR prove the
+  workflows pass under enforcement and record the tier in the same PR, as `git-workflow.md` asks. The setting went on
+  before the pins rather than after them; that only moves the start of the window above, since this PR's own runs read
+  its pinned files. Rejected: turning it on after merge, which leaves a follow-up PR only to record the tier and
+  verifies the setting only on `main`.
 - **Keep the explicit allowed-actions list.** Pinning freezes the code of an allowed action; the list decides which
   publishers may run at all, and adding one stays a maintainer action. Rejected: allowing all Marketplace verified
   creators, which widens trust to every partner organization and leaves review as the only gate for a new action.
@@ -55,5 +58,7 @@
   records why.
 - **Local actions may be rejected.** If `./.github/actions/...` fails under the setting, the rerun on this PR shows it
   before merge; the maintainer turns the setting off and the change is revised.
-- **A window where other branches fail.** Between turning the setting on and merging, any other branch's run with a tag
-  reference fails; no other PR is open on 2026-09-30, and rebasing onto the merged `main` fixes one opened later.
+- **A window where other runs fail.** From the setting going on until this change merges, any run with a tag reference
+  fails: a push to `main`, a Dependabot PR, or another branch. No other PR is open on 2026-09-30, no push to `main`
+  happens before this merge, and rebasing onto the merged `main` fixes a branch opened later. If this PR stalls, the
+  maintainer turns the setting off until it lands.
