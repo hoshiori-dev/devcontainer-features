@@ -206,8 +206,8 @@ these modules SHALL fail the build before the installer is downloaded.
 ### Requirement: Keep the installation in the image
 
 The CLI SHALL run in any container built from the image, regardless of the contents of the `uv` feature's persistent
-volume. The installation SHALL write nothing under `/var/lib/uv-data`, the path at which the `uv` feature mounts that
-volume, and SHALL leave no uv or pip cache in the image.
+volume. The installation SHALL write nothing under `/var/lib/uv`, the path at which the `uv` feature mounts that volume,
+and SHALL leave no uv or pip cache in the image.
 
 #### Scenario: Container with the uv volume mounted
 
@@ -219,7 +219,7 @@ volume, and SHALL leave no uv or pip cache in the image.
 
 - **WHEN** the feature is installed together with the `uv` feature, and a container starts from the image with a new
   `uv` volume
-- **THEN** `/var/lib/uv-data` in that container is empty and owned by the remote user
+- **THEN** `/var/lib/uv` in that container is empty and owned by the remote user
 
 #### Scenario: No cache left behind
 

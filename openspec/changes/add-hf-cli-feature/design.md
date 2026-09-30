@@ -73,10 +73,10 @@ Upstream facts, read on 2026-09-30:
   image `archive.ubuntu.com/ubuntu` (`noble`, `-updates`, `-backports`) and `security.ubuntu.com/ubuntu`
   (`noble-security`) on amd64, `ports.ubuntu.com/ubuntu-ports` on arm64.
 - **The `uv` feature (#14)**, not merged; its draft installs `/usr/local/bin/uv` and sets in `containerEnv`
-  `UV_PYTHON_INSTALL_DIR` and `UV_CACHE_DIR` under `/var/lib/uv-data` (a volume, absent at build time), `UV_TOOL_DIR`,
+  `UV_PYTHON_INSTALL_DIR` and `UV_CACHE_DIR` under `/var/lib/uv` (a volume, absent at build time), `UV_TOOL_DIR`,
   `UV_TOOL_BIN_DIR` (ahead in `PATH`), and `UV_LINK_MODE`. A feature's `containerEnv` is emitted as `ENV` before its
   `install.sh` runs, so these variables are set while this feature installs. Its draft asks a feature that runs uv at
-  build time to write nothing under `/var/lib/uv-data` (no managed Python there; `UV_NO_CACHE=1` or a temporary cache),
+  build time to write nothing under `/var/lib/uv` (no managed Python there; `UV_NO_CACHE=1` or a temporary cache),
   because Docker copies the image's mount point into every new volume. Its "Later feature runs uv" scenario is observed
   in its own PR with a throwaway feature, and this change's global scenario `uv_and_hf_cli` becomes its lasting
   regression check. Its design lists as unverified whether `devcontainer features test` applies feature `mounts`.
@@ -123,10 +123,10 @@ Upstream facts, read on 2026-09-30:
   venv's interpreter runs as that user. Checked by `test.sh` (`find ~/.hf-cli ! -user <remote user>` is empty).
 - `/usr/local/bin/hf` is a root-owned symbolic link to `<home>/.hf-cli/venv/bin/hf`, replaced only after the version
   check passes. Checked by `test.sh`.
-- No uv or pip cache is written, and nothing under `/var/lib/uv-data` (the `uv` feature's volume path) is touched: the
+- No uv or pip cache is written, and nothing under `/var/lib/uv` (the `uv` feature's volume path) is touched: the
   installer's environment names no `UV_CACHE_DIR` or `UV_PYTHON_INSTALL_DIR`, and `uv pip install --python` downloads no
-  interpreter. Checked by the `uv_and_hf_cli` global scenario (`/var/lib/uv-data` is empty and owned by the remote
-  user), by `test.sh` (no `~/.cache/uv` or `~/.cache/pip` in root's or the remote user's home), and by review.
+  interpreter. Checked by the `uv_and_hf_cli` global scenario (`/var/lib/uv` is empty and owned by the remote user), by
+  `test.sh` (no `~/.cache/uv` or `~/.cache/pip` in root's or the remote user's home), and by review.
 - With `installSkill`, `~/.agents/skills/hf-cli/SKILL.md` must exist after the installer and contain
   `huggingface_hub v<version>`, else the build fails. Checked by the `install_skill` scenario and review.
 - A second install skips the installer when the marker is present, the installed version equals the requested one, and
@@ -198,13 +198,13 @@ running container, so its test asserts the venv path and the installed version, 
 
 The `uv_and_hf_cli` global scenario (`test/_global/`) installs the `uv` feature and this feature, both with default
 options, on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` as `vscode`. Its test asserts that `huggingface_hub`'s
-`INSTALLER` record in `~/.hf-cli/venv` is `uv`, that `UV_PYTHON_INSTALL_DIR` is `/var/lib/uv-data/python` in the
-container's environment, and that `/var/lib/uv-data` is a mount, empty, and owned by `vscode`. For the `uv` change's
-(#14) "Later feature runs uv", which this scenario checks again from this change on: the build succeeding shows that a
-later feature found and ran `uv` during its install, because this feature runs `uv --version` for its floor check and
-fails without it; the runtime value of `UV_PYTHON_INSTALL_DIR` equals the value later features saw during their install,
-because the `uv` feature's `containerEnv` is written as image `ENV` before they install (Context). This feature's
-`install.sh` does not assert that variable itself, since it keeps it away from the installer.
+`INSTALLER` record in `~/.hf-cli/venv` is `uv`, that `UV_PYTHON_INSTALL_DIR` is `/var/lib/uv/python` in the container's
+environment, and that `/var/lib/uv` is a mount, empty, and owned by `vscode`. For the `uv` change's (#14) "Later feature
+runs uv", which this scenario checks again from this change on: the build succeeding shows that a later feature found
+and ran `uv` during its install, because this feature runs `uv --version` for its floor check and fails without it; the
+runtime value of `UV_PYTHON_INSTALL_DIR` equals the value later features saw during their install, because the `uv`
+feature's `containerEnv` is written as image `ENV` before they install (Context). This feature's `install.sh` does not
+assert that variable itself, since it keeps it away from the installer.
 
 `test.sh` and the global scenario see the `uv` feature's volume only if `devcontainer features test` applies feature
 `mounts`, which the `uv` change's Risks list as unverified. If it does not, those assertions fail; the implementation
