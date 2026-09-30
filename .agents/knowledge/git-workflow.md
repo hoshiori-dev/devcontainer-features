@@ -7,9 +7,9 @@ only move forward — and there is no deployment chain, so `main` is the only lo
 
 ## Long-lived branches
 
-| Branch | Meaning                                                                                             | Accepts merges from | Protection tier                                                                                                  |
-| ------ | --------------------------------------------------------------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `main` | Every commit is releasable: pushing a commit that bumps a feature's version publishes that version. | Pull requests only  | Convention until the `main` ruleset in `.agents/knowledge/github/platform-settings.md` is applied, then enforced |
+| Branch | Meaning                                                                                             | Accepts merges from | Protection tier                                                                                    |
+| ------ | --------------------------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------- |
+| `main` | Every commit is releasable: pushing a commit that bumps a feature's version publishes that version. | Pull requests only  | Enforced since 2026-09-30 by the `main` ruleset in `.agents/knowledge/github/platform-settings.md` |
 
 Do not create any other long-lived branch (`develop`, `next`, per-feature lines). Needing one means the model changed,
 which is a maintainer decision recorded here first.
@@ -42,9 +42,8 @@ which is a maintainer decision recorded here first.
 | Branch in this repository   | Squash | One reviewed unit per change on `main`; the PR title becomes the commit title, so history reads as the list of changes. |
 | Fork or outside contributor | Squash | Same; the contributor's own commits do not need to follow the title convention.                                         |
 
-Enforcement: squash-only is a repository setting a maintainer has yet to apply (see the register below); until then it
-is a convention, and every merge uses squash. The squash commit title is the PR title and must follow Conventional
-Commits: `<type>(<scope>)[!]: <subject>`.
+Enforcement: squash-only is a repository setting, enforced since 2026-09-30 (see the register below). The squash commit
+title is the PR title and must follow Conventional Commits: `<type>(<scope>)[!]: <subject>`.
 
 - `<scope>` is the feature id for a change to one feature (`feat(node): add pnpm option`); for a harness change use the
   area (`ci`, `scripts`, `openspec`, `harness`); omit it for repository-wide changes.
@@ -63,13 +62,13 @@ floating tags consumers use.
 
 ## Enforcement register
 
-| Rule                                                                                                            | Tier                                  | Readback                                                                                                                                   | Upgrade trigger                                                              |
-| --------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| Changes reach `main` only through PRs; no force push or deletion                                                | Convention (ruleset not yet applied)  | `gh api repos/hoshiori-dev/devcontainer-features/rulesets`                                                                                 | A maintainer applies the `main` ruleset                                      |
-| `ci-gate`, `pr-title`, `pr-checklist`, `spec-archived`, `secret-scan` pass on an up-to-date branch before merge | Convention (ruleset not yet applied)  | same                                                                                                                                       | same                                                                         |
-| Squash only; branch deleted on merge                                                                            | Convention (settings not yet changed) | `gh api repos/hoshiori-dev/devcontainer-features --jq '{allow_squash_merge,allow_merge_commit,allow_rebase_merge,delete_branch_on_merge}'` | A maintainer changes the merge settings                                      |
-| PR title follows Conventional Commits                                                                           | Check `pr-title`                      | the PR's checks                                                                                                                            | —                                                                            |
-| Tags created only by the release workflow                                                                       | Convention                            | `git ls-remote --tags origin` against the release workflow's runs                                                                          | A hand-made tag appears — then add a tag ruleset restricting `*/v*` creation |
+| Rule                                                                                                            | Tier                  | Readback                                                                                                                                                    | Upgrade trigger                                                              |
+| --------------------------------------------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Changes reach `main` only through PRs; no force push or deletion                                                | Enforced (2026-09-30) | `gh api repos/hoshiori-dev/devcontainer-features/rulesets`                                                                                                  | —                                                                            |
+| `ci-gate`, `pr-title`, `pr-checklist`, `spec-archived`, `secret-scan` pass on an up-to-date branch before merge | Enforced (2026-09-30) | same                                                                                                                                                        | —                                                                            |
+| Squash only; branch deleted on merge                                                                            | Enforced (2026-09-30) | `gh api repos/hoshiori-dev/devcontainer-features --jq '{allow_squash_merge,allow_merge_commit,allow_rebase_merge,delete_branch_on_merge,allow_auto_merge}'` | —                                                                            |
+| PR title follows Conventional Commits                                                                           | Check `pr-title`      | the PR's checks                                                                                                                                             | —                                                                            |
+| Tags created only by the release workflow                                                                       | Convention            | `git ls-remote --tags origin` against the release workflow's runs                                                                                           | A hand-made tag appears — then add a tag ruleset restricting `*/v*` creation |
 
 When a maintainer applies a setting, change its tier here to "Enforced" in the same PR.
 
