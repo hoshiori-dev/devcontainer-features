@@ -36,7 +36,7 @@
 - [x] 2.3 Write `test/apt-packages/duplicate.sh` (scenarios "Listed packages are installed" with the `proposals` list
       and "Caches are removed"): every entry of `PACKAGES` installed after the second, default install, and no
       downloaded package or index file left; verify with `shellcheck`
-- [ ] 2.4 Write `test/apt-packages/scenarios.json` and one script per scenario for the Test plan's "Scenario" rows:
+- [x] 2.4 Write `test/apt-packages/scenarios.json` and one script per scenario for the Test plan's "Scenario" rows:
       "Listed packages are installed" on each amd64 image, "Recommended packages are left out" with "Spaces and empty
       entries are ignored", "Native architecture qualifier is installed" with `:amd64`, and "Package that asks a
       question installs unattended", each also asserting "Caches are removed"; verify with `just validate` and
