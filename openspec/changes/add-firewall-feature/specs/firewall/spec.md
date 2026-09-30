@@ -310,7 +310,8 @@ Each `allowedDomains` entry SHALL allow the name itself and every subdomain of i
 SHALL become reachable at the addresses the container's resolver returns for it, from the time of that lookup until the
 next start of the container, so addresses that change between lookups are followed, unless Requirement: Rule precedence
 refuses them. An address the container did not obtain through its resolver SHALL stay refused unless another option
-allows it.
+allows it. `NOTES.md` SHALL state that an entry allows every name under it, so a top-level domain or a shared suffix,
+such as a dynamic DNS provider's domain, allows nearly any destination.
 
 #### Scenario: Subdomain of an allowed domain
 
@@ -403,6 +404,8 @@ them, plus the ranges named for it. Each set follows the source named with it:
 
 - `github`: `github.com`, `githubusercontent.com`, and, with `defaultAction` `deny`, the IPv4 and IPv6 ranges of
   Requirement: GitHub ranges. Source: the `domains.website` list of the endpoint named in Requirement: GitHub ranges.
+  Its `web` ranges hold the addresses of GitHub Pages, so every Pages site, custom domains included, is reachable by
+  address although `github.io` is not among its domains.
 - `npm`: `registry.npmjs.org`. Source: the `registry` default in https://docs.npmjs.com/cli/v11/using-npm/config
 - `pypi`: `pypi.org`, `files.pythonhosted.org`. Source: https://docs.pypi.org/api/
 - `anthropic`: `api.anthropic.com`, `claude.ai`, `platform.claude.com`, which cover the API and sign-in only. Source:
@@ -411,7 +414,8 @@ them, plus the ranges named for it. Each set follows the source named with it:
   `marketplace.visualstudio.com`, `gallery.vsassets.io`, `gallerycdn.vsassets.io`, which cover VS Code Server and
   Marketplace downloads only. Source: https://code.visualstudio.com/docs/setup/network
 
-`NOTES.md` SHALL name the hosts that a preset's source lists and the preset leaves out.
+`NOTES.md` SHALL name the hosts that a preset's source lists and the preset leaves out, and SHALL state that the
+`github` preset makes every GitHub Pages site reachable.
 
 #### Scenario: GitHub preset
 
@@ -430,11 +434,12 @@ When `presets` contains `github` and `defaultAction` is `deny`, each start SHALL
 HTTPS, with a bounded time and response size. GitHub publishes no checksum or signature for this response, so the fetch
 SHALL rely on TLS alone, verified against the image's CA certificates, and SHALL NOT disable or weaken that
 verification. The start SHALL allow every IPv4 and IPv6 range in the response's `web`, `api`, and `git` lists. Every
-entry of those lists SHALL be validated as an IPv4 or IPv6 CIDR; an invalid entry, an error status, a timeout, or a
-malformed response SHALL make the whole fetch a failure handled by Requirement: Failure mode, and a response that
-reports GitHub's rate limit SHALL be recorded with that reason. Until the ranges are loaded, the only destinations
-reachable beyond loopback and the DNS resolvers SHALL be the addresses that one lookup of `api.github.com` through those
-resolvers returned at that start, on the HTTPS port, and the fetch SHALL connect only to those addresses.
+entry of those lists SHALL be validated as an `allowedCidrs` entry is (Requirement: Option allowedCidrs) and SHALL have
+a prefix of at least /8 for IPv4 and at least /16 for IPv6; an entry that fails either check, an error status, a
+timeout, or a malformed response SHALL make the whole fetch a failure handled by Requirement: Failure mode, and a
+response that reports GitHub's rate limit SHALL be recorded with that reason. Until the ranges are loaded, the only
+destinations reachable beyond loopback and the DNS resolvers SHALL be the addresses that one lookup of `api.github.com`
+through those resolvers returned at that start, on the HTTPS port, and the fetch SHALL connect only to those addresses.
 
 #### Scenario: Ranges loaded
 
@@ -444,6 +449,12 @@ resolvers returned at that start, on the HTTPS port, and the fetch SHALL connect
 #### Scenario: Fetch fails
 
 - **WHEN** `presets` contains `github` and the fetch times out or returns an invalid range
+- **THEN** no range from that response is allowed and the start is handled as a failure
+
+#### Scenario: Implausible range
+
+- **WHEN** `presets` contains `github` and the response lists a range with host bits set, a range shorter than the
+  minimum prefix, or a range that contains `192.0.2.1`
 - **THEN** no range from that response is allowed and the start is handled as a failure
 
 #### Scenario: GitHub preset not selected
@@ -459,11 +470,11 @@ resolvers returned at that start, on the HTTPS port, and the fetch SHALL connect
 ### Requirement: DNS only to the container's resolvers
 
 The container SHALL be able to send DNS queries beyond the loopback interface only to the resolvers named in
-`/etc/resolv.conf` before the feature first changed it; queries to Docker's embedded resolver `127.0.0.11` and to the
-feature's local resolver travel through the loopback interface and stay allowed. DNS traffic to any other address SHALL
-be refused, whatever `defaultAction` and the allowed entries say. Every name SHALL still resolve, including names that
-no option allows and denied names, since only connections are filtered. The feature SHALL keep the `search` and
-`options` lines of `/etc/resolv.conf` intact.
+`/etc/resolv.conf` as Docker last generated it (Requirement: Firewall applied at every start); queries to Docker's
+embedded resolver `127.0.0.11` and to the feature's local resolver travel through the loopback interface and stay
+allowed. DNS traffic to any other address SHALL be refused, whatever `defaultAction` and the allowed entries say. Every
+name SHALL still resolve, including names that no option allows and denied names, since only connections are filtered.
+The feature SHALL keep the `search` and `options` lines of `/etc/resolv.conf` intact.
 
 #### Scenario: Other DNS server refused
 
@@ -490,24 +501,35 @@ Requirement: Option filterForward.
 ### Requirement: Failure mode
 
 A start SHALL be a failure when the rules for the configured options cannot be applied in full: the rules cannot be
-loaded, the GitHub ranges fetch fails, or the resolver that learns allowed domains cannot start. What a failed start
-leaves in place is stated in Requirement: Option failureMode; in both modes the start SHALL be recorded as failed with
-its reason. When no rule can be loaded at all (the container lacks `NET_ADMIN`, the entrypoint does not run as root, or
-the kernel lacks nftables support), outbound traffic stays unrestricted in both modes. A resolver that exits after a
-successful start SHALL NOT change the recorded result or the rules; name lookups then fail until the next start.
+loaded, the GitHub ranges fetch fails, or the resolver that learns allowed and denied domains cannot start, including
+when another process already holds its address and port. A resolver that cannot start SHALL leave `/etc/resolv.conf`
+naming the container's own resolvers, never the process that holds the port. What a failed start leaves in place is
+stated in Requirement: Option failureMode; in both modes the start SHALL be recorded as failed with its reason. When no
+rule can be loaded at all (the container lacks `NET_ADMIN`, the entrypoint does not run as root, or the kernel lacks
+nftables support), outbound traffic stays unrestricted in both modes. A resolver that exits after a successful start
+SHALL NOT change the recorded result or the rules; name lookups then fail until the next start.
 
 #### Scenario: Rules cannot be loaded
 
 - **WHEN** the container runs without `NET_ADMIN` or the entrypoint does not run as root
 - **THEN** outbound traffic is not restricted and the start is recorded as not applied
 
+#### Scenario: Resolver port taken
+
+- **WHEN** `failureMode` is `closed` and another process holds the resolver's address and port when a start launches the
+  resolver
+- **THEN** the start is recorded as failed, only loopback and the DNS resolvers are reachable, and `/etc/resolv.conf`
+  names the container's own resolvers
+
 ### Requirement: Start check
 
 The feature SHALL run, as its `postStartCommand` and without privilege, a check that waits a bounded time for the record
 of the current start, treats a record left from an earlier start as missing, and verifies that `192.0.2.1`, which the
 rules refuse whatever the options say (Requirement: Rule precedence), is refused. The check SHALL send no traffic to any
-host on the Internet. On a failed, missing, or not-applied start it SHALL print the reason; with `failureMode` `closed`
-it SHALL exit non-zero, and with `warn` it SHALL exit zero after a warning on standard error.
+host on the Internet. It SHALL set its own `PATH`, SHALL run without the environment variables it inherits, and SHALL
+call its tools by absolute path, so a changed `PATH`, `ENV`, or `BASH_ENV` of the remote user does not change its
+result. On a failed, missing, or not-applied start it SHALL print the reason; with `failureMode` `closed` it SHALL exit
+non-zero, and with `warn` it SHALL exit zero after a warning on standard error.
 
 #### Scenario: Firewall in force
 
@@ -529,6 +551,12 @@ it SHALL exit non-zero, and with `warn` it SHALL exit zero after a warning on st
 - **WHEN** the only start record present belongs to an earlier start of the container
 - **THEN** the check treats the current start as not applied
 
+#### Scenario: Changed environment
+
+- **WHEN** the check runs with a `PATH` whose first directory holds programs named like the tools it uses, and with
+  `ENV` and `BASH_ENV` set
+- **THEN** its result and exit status are those of a run in a clean environment
+
 ### Requirement: Start record readable by the remote user
 
 Each start SHALL write a record of its result (applied, failed, or not applied), its reason, its time, and the options
@@ -538,6 +566,16 @@ in effect to a file whose path `NOTES.md` documents, readable and not writable b
 
 - **WHEN** the remote user reads the start record
 - **THEN** it names the result and the options in effect, and writing to it is denied
+
+### Requirement: Resolver runs unprivileged
+
+The resolver that learns allowed and denied domains SHALL run as an unprivileged user other than root and the remote
+user, keeping only the capability it needs to add addresses to the feature's sets.
+
+#### Scenario: Resolver user
+
+- **WHEN** the firewall is in force
+- **THEN** the resolver's process runs as neither root nor the remote user
 
 ### Requirement: No privilege for the remote user
 
@@ -589,11 +627,14 @@ that has root or passwordless `sudo` inside the container, that can use a Docker
 the `docker` group), that tunnels data through DNS lookups, that reaches other services sharing an allowed address or
 range, that reaches a denied host through an address it did not look up through the container's resolver, through a name
 that is not denied, or through a protocol that carries names inside allowed traffic (such as DNS over HTTPS), that
-reaches a denied range through a name of an allowed domain that resolves into it, or that changes the dev container
-configuration in the workspace for the next build. `NOTES.md` SHALL state that the guardrail holds only for a remote
-user without root, passwordless `sudo`, or access to a Docker daemon, that the default users of common dev container
-images, such as `vscode` in the Dev Containers base images, have passwordless `sudo`, and that with `defaultAction`
-`allow` the feature refuses only what the denied entries name.
+reaches a denied range through a name of an allowed domain that resolves into it, that makes a start fail on purpose
+while `failureMode` is `warn` (for example by exhausting GitHub's rate limit), that exploits the resolver, which keeps
+the capability to change the rules, that forges the start check's output through the dynamic loader of the remote user's
+environment, or that changes the dev container configuration in the workspace for the next build. `NOTES.md` SHALL state
+that the guardrail holds only for a remote user without root, passwordless `sudo`, or access to a Docker daemon, that
+the default users of common dev container images, such as `vscode` in the Dev Containers base images, have passwordless
+`sudo`, and that with `defaultAction` `allow` the feature refuses only what the denied entries name, and that with
+`failureMode` `warn` any process that can make a start fail removes the rules at that start.
 
 #### Scenario: Root removes the firewall
 
