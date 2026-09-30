@@ -272,7 +272,8 @@ Both options are new; the spec's Option requirements win where this table differ
   - `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` — amd64 and arm64; on NVIDIA's list.
   - `debian:12` — amd64; best effort, Debian 12 is not on NVIDIA's list.
   - `fedora:44` — amd64; best effort, Fedora is not on NVIDIA's list.
-  - `registry.opensuse.org/opensuse/leap:16.0` — amd64; best effort, Leap 16.0 is not on NVIDIA's list (Open Questions).
+  - `registry.opensuse.org/opensuse/leap:16.0` — amd64; best effort, Leap 16.0 is not on NVIDIA's list (resolved Open
+    Question).
   - Scenarios: the docker-in-docker scenario on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64) with
     `ghcr.io/devcontainers/features/docker-in-docker:4`; a docker-outside-of-docker scenario on the same image; one
     pinned-version scenario on each of `debian:12`, `fedora:44`, and `registry.opensuse.org/opensuse/leap:16.0`; one
@@ -323,12 +324,12 @@ none redirected. The image's own distribution repositories, used for prerequisit
 
 ## Open Questions
 
+None open. The maintainer resolved these at the package gate on 2026-09-30, each as recommended:
+
 - **Keep the zypper path with `registry.opensuse.org/opensuse/leap:16.0` (amd64) in v1?** NVIDIA lists only
-  openSUSE/SLES 15.x, and Leap 15.6 is end of life. Recommendation: keep it — the trial install and pinned downgrade
-  passed on Leap 16.0, which openSUSE supports for 24 months from its October 2025 release, and it is marked best
-  effort. If declined, drop zypper from v1: proposal.md What Changes then names Debian, Ubuntu, and Fedora images; the
-  spec's "Unsupported platforms fail the build" requirement names only apt and dnf, and the rpm repository serves dnf
-  only; the Leap image and its scenario leave the compatibility list; and zypper returns later as a MINOR bump.
+  openSUSE/SLES 15.x, and Leap 15.6 is end of life. Resolved: keep it, marked best effort — the trial install and pinned
+  downgrade passed on Leap 16.0, which openSUSE supports for 24 months from its October 2025 release. Rejected: dropping
+  zypper from v1 and adding it later as a MINOR bump.
 - **arm64 for `debian:12`, `fedora:44`, and `registry.opensuse.org/opensuse/leap:16.0`?** NVIDIA's repositories serve
-  arm64/aarch64 for every family, but NVIDIA lists Debian and openSUSE as amd64 only. Recommendation: amd64 only in v1;
-  adding an architecture later is a MINOR bump.
+  arm64/aarch64 for every family, but NVIDIA lists Debian and openSUSE as amd64 only. Resolved: amd64 only in v1; adding
+  an architecture later is a MINOR bump.
