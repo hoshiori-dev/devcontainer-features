@@ -1,0 +1,40 @@
+{
+  "exact_version": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "deno": {
+        "version": "2.8.0"
+      }
+    }
+  },
+  "reinstall_same_version": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "deno": {
+        "version": "2.8.0"
+      }
+    }
+  },
+  "reinstall_latest": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "deno": {
+        "version": "latest"
+      }
+    }
+  },
+  "prerequisites_present": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "remoteUser": "vscode",
+    "features": {
+      "deno": {}
+    }
+  }
+}
