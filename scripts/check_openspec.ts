@@ -1,5 +1,5 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write=/tmp --allow-run=git,openspec --allow-env=LOG_TOKENS,LOG_STREAM
-// Two checks OpenSpec's own validator does not make (.agents/knowledge/spec-workflow.md):
+// Three checks OpenSpec's own validator does not make (.agents/knowledge/spec-workflow.md):
 // - openspec/config.yaml holds no rule OpenSpec would drop. OpenSpec 1.13.2 replaces an invalid
 //   `rules` field with a warning on stderr: a rule that is not a string — an unquoted rule with a
 //   colon followed by a space parses as a mapping — drops that artifact's whole rule set, and an
@@ -10,12 +10,24 @@
 //   symlinks, so the claude tool writes a real .claude/skills there, compared against the
 //   checkout's .claude/skills — the symlink into .agents/skills. The marker `openspec update`
 //   leaves, .agents/skills/.openspec-target, fails the check too.
+// - Every Option requirement in a main spec or an active change's delta is readable, and each
+//   src/<id>/devcontainer-feature.json declares exactly the options its spec states (name, type,
+//   default, enum). The spec compared is what archive would produce: in a copy of openspec/ walked
+//   from the working tree, so uncommitted changes count, every active change with both specs/ and a
+//   tasks.md is archived in name order; a change without tasks.md is still before its package gate,
+//   so its deltas do not count yet. It relies on OpenSpec 1.13.2 behavior to re-verify on upgrade:
+//   `openspec archive <change> -y` applies deltas without prompting, whether or not tasks.md exists
+//   or its tasks are ticked, and refuses (exit code non-zero, nothing changed) a delta it cannot
+//   apply; a MODIFIED requirement replaces the whole requirement; archive keeps a table in a
+//   requirement body cell for cell.
 //
 //   scripts/check_openspec.ts
 import { dirname, join, relative } from "jsr:@std/path@1.1.6";
 import { walk } from "jsr:@std/fs@1.0.24/walk";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
-import { exists, git } from "./lib/repo.ts";
+import { exists, git, listDirs, readJsonc } from "./lib/repo.ts";
+import { optionDifferences, parseOptionRequirements } from "./lib/options.ts";
+import { activeChanges } from "./check_spec_archived.ts";
 
 export const CONFIG = "openspec/config.yaml";
 
@@ -88,9 +100,128 @@ export async function configProblems(path: string): Promise<string[]> {
     return ruleProblems(config);
 }
 
-/** The script fails when either check found a problem or `openspec init` itself failed. */
-export function exitCode(configProblems: string[], generatedProblems: string[], initFailed: boolean): number {
-    return initFailed || generatedProblems.length > 0 || configProblems.length > 0 ? 1 : 0;
+/** The script fails when any check found a problem or `openspec init` itself failed. */
+export function exitCode(
+    configProblems: string[],
+    generatedProblems: string[],
+    initFailed: boolean,
+    optionProblems: string[],
+): number {
+    return initFailed || generatedProblems.length > 0 || configProblems.length > 0 || optionProblems.length > 0 ? 1 : 0;
+}
+
+/** Spec files that may hold Option requirements: main specs and the deltas of active changes. */
+async function specFiles(root: string): Promise<string[]> {
+    const files: string[] = [];
+    for (const id of await listDirs(join(root, "openspec/specs"))) files.push(`openspec/specs/${id}/spec.md`);
+    for (const change of await activeChanges(join(root, "openspec/changes"))) {
+        for (const id of await listDirs(join(root, "openspec/changes", change, "specs"))) {
+            files.push(`openspec/changes/${change}/specs/${id}/spec.md`);
+        }
+    }
+    const present: string[] = [];
+    for (const file of files) if (await exists(join(root, file))) present.push(file);
+    return present;
+}
+
+/** Archives `change` in the OpenSpec root `dir`; returns OpenSpec's reason when it refuses, else undefined. */
+export type Archive = (dir: string, change: string) => Promise<string | undefined>;
+
+async function openspecArchive(dir: string, change: string): Promise<string | undefined> {
+    const archive = await new Deno.Command("openspec", {
+        args: ["archive", change, "-y"],
+        cwd: dir,
+        env: { OPENSPEC_NO_UPDATE_CHECK: "1" },
+        stdout: "piped",
+        stderr: "piped",
+    }).output();
+    if (archive.success) return undefined;
+    const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
+    // Task progress is irrelevant here: the copy archives changes whose tasks are still open.
+    return `${decode(archive.stdout)}\n${decode(archive.stderr)}`.split("\n").map((l) => l.trim())
+        .filter((l) => l && !/^(Task status:|Warning: .*incomplete task)/.test(l)).join(" | ");
+}
+
+/**
+ * Unreadable Option requirements anywhere, then each difference between a feature's metadata and the spec archive
+ * would produce. Every problem starts with the file to fix. `archive` is replaceable so tests need no OpenSpec.
+ */
+export async function optionProblems(root = ".", archive: Archive = openspecArchive): Promise<string[]> {
+    const problems: string[] = [];
+    const reported = new Map<string, Set<string>>(); // feature id -> problems already reported from its spec files
+    for (const file of await specFiles(root)) {
+        const id = file.split("/").at(-2)!;
+        for (const problem of parseOptionRequirements(await Deno.readTextFile(join(root, file))).problems) {
+            problems.push(`${file}: ${problem}`);
+            reported.set(id, (reported.get(id) ?? new Set()).add(problem));
+        }
+    }
+    const features = await listDirs(join(root, "src"));
+
+    // Archive runs even without features, so a change OpenSpec refuses is always reported.
+    const temp = await Deno.makeTempDir({ dir: "/tmp", prefix: "openspec-options-" });
+    try {
+        const source = join(root, "openspec");
+        for await (const entry of walk(source, { includeDirs: false, followSymlinks: false })) {
+            const path = relative(source, entry.path);
+            if (entry.isSymlink || path.startsWith("changes/archive/")) continue;
+            const target = join(temp, "openspec", path);
+            await Deno.mkdir(dirname(target), { recursive: true });
+            await Deno.copyFile(entry.path, target);
+        }
+        const applied = new Map<string, string[]>(); // feature id -> changes whose deltas count
+        const refused = new Set<string>(); // feature ids a refused change touches
+        for (const change of await activeChanges(join(temp, "openspec/changes"))) {
+            const dir = join(temp, "openspec/changes", change);
+            const ids = await listDirs(join(dir, "specs"));
+            if (ids.length === 0 || !(await exists(join(dir, "tasks.md")))) continue;
+            const refusal = await archive(temp, change);
+            if (refusal !== undefined) {
+                problems.push(
+                    `openspec/changes/${change}: OpenSpec refuses to archive it, so its deltas cannot be compared ` +
+                        `with devcontainer-feature.json: ${refusal}`,
+                );
+                for (const id of ids) refused.add(id);
+                continue;
+            }
+            for (const id of ids) applied.set(id, [...(applied.get(id) ?? []), change]);
+        }
+        for (const id of features) {
+            const specPath = join(temp, "openspec/specs", id, "spec.md");
+            if (refused.has(id) || !(await exists(specPath))) continue; // no spec yet: `just validate` reports it
+            const spec = parseOptionRequirements(await Deno.readTextFile(specPath));
+            const changes = applied.get(id) ?? [];
+            if (spec.problems.length > 0) {
+                // Most were reported above from the file holding the requirement; a RENAMED delta can create an
+                // unreadable Option requirement that exists only once archived.
+                const archivedAs = `openspec/specs/${id}/spec.md as archiving ${changes.join(", ")} would produce it`;
+                for (const problem of spec.problems) {
+                    if (!reported.get(id)?.has(problem)) problems.push(`${archivedAs}: ${problem}`);
+                }
+                continue;
+            }
+            let metadata: unknown;
+            try {
+                metadata = await readJsonc(join(root, "src", id, "devcontainer-feature.json"));
+            } catch {
+                continue; // unreadable metadata: `just validate` reports it
+            }
+            const differences = optionDifferences(spec.options, metadata);
+            if (differences.length === 0) continue;
+            const sources = [
+                ...(await exists(join(root, "openspec/specs", id, "spec.md")) ? [`openspec/specs/${id}/spec.md`] : []),
+                ...changes.map((change) => `openspec/changes/${change}/specs/${id}/spec.md`),
+            ];
+            for (const difference of differences) {
+                problems.push(
+                    `src/${id}/devcontainer-feature.json: ${difference} (spec: ${sources.join(" + ")})`,
+                );
+            }
+        }
+    } finally {
+        await Deno.remove(temp, { recursive: true });
+    }
+    return problems;
 }
 
 async function readOrUndefined(path: string): Promise<string | undefined> {
@@ -103,6 +234,15 @@ if (import.meta.main) {
     if (config.length > 0) {
         console.error(
             `Fix ${CONFIG}: OpenSpec only warns on stderr and goes on without these rules (.agents/knowledge/spec-workflow.md).`,
+        );
+    }
+
+    const options = await optionProblems();
+    for (const problem of options) console.error(`- ${problem}`);
+    if (options.length > 0) {
+        console.error(
+            "Make each devcontainer-feature.json declare exactly the options its spec states, or fix the Option " +
+                "requirement (.agents/knowledge/spec-workflow.md, Option requirements).",
         );
     }
 
@@ -153,6 +293,7 @@ if (import.meta.main) {
         );
     }
     if (config.length === 0) console.log(`${CONFIG}: every rule reaches OpenSpec`);
+    if (options.length === 0) console.log("Option requirements are readable and every feature's options match them");
     if (!failed && problems.length === 0) console.log("OpenSpec's generated files are current");
-    Deno.exit(exitCode(config, problems, failed));
+    Deno.exit(exitCode(config, problems, failed, options));
 }
