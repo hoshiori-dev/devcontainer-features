@@ -7,33 +7,40 @@ import { checkVersionBumps, versionBumpStep } from "./validate.ts";
 const SCHEMA = await Deno.readTextFile("test/compatibility.schema.json");
 
 /**
- * A repository on branch `main`. The helper's own git calls ignore the global and system configuration; the
- * repository's local settings override the global keys the checked git calls read, so a developer's configuration
- * cannot change a result.
+ * A repository on branch `main`. The helper's own git calls run without the caller's environment, so an inherited
+ * GIT_DIR or GIT_INDEX_FILE cannot point them at another repository, and ignore the global and system configuration.
+ * The checked code's git calls inherit both; the repository's local core.excludesFile overrides the global one they
+ * read, and the other local settings serve the helper's commits.
  */
 class Repo {
     private constructor(readonly root: string) {}
 
     static async create(): Promise<Repo> {
         const repo = new Repo(await Deno.makeTempDir({ dir: "/tmp", prefix: "validate-test-" }));
-        await repo.git("init", "--quiet", "-b", "main");
-        for (
-            const [key, value] of [
-                ["user.name", "Test"],
-                ["user.email", "test@example.invalid"],
-                ["commit.gpgsign", "false"],
-                ["core.excludesFile", join(repo.root, ".git", "no-excludes")],
-                ["core.hooksPath", join(repo.root, ".git", "no-hooks")],
-            ]
-        ) await repo.git("config", key, value);
-        await repo.write("test/compatibility.schema.json", SCHEMA);
-        return repo;
+        try {
+            await repo.git("init", "--quiet", "-b", "main");
+            for (
+                const [key, value] of [
+                    ["user.name", "Test"],
+                    ["user.email", "test@example.invalid"],
+                    ["commit.gpgsign", "false"],
+                    ["core.excludesFile", join(repo.root, ".git", "no-excludes")],
+                    ["core.hooksPath", join(repo.root, ".git", "no-hooks")],
+                ]
+            ) await repo.git("config", key, value);
+            await repo.write("test/compatibility.schema.json", SCHEMA);
+            return repo;
+        } catch (error) {
+            await Deno.remove(repo.root, { recursive: true });
+            throw error;
+        }
     }
 
     async git(...args: string[]): Promise<string> {
         const output = await new Deno.Command("git", {
             args,
             cwd: this.root,
+            clearEnv: true,
             env: { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
             stdout: "piped",
             stderr: "piped",
@@ -154,6 +161,19 @@ Deno.test("a branch behind main is judged from the merge base, against main's ve
         await repo.feature("a", "1.0.1");
         await repo.commit("change a");
         assertOne(await repo.check(), "still 1.0.1 (base: 1.1.0)");
+    });
+});
+
+Deno.test("a branch behind main compares its images with the branch point, not main's tip", async () => {
+    await withRepo(async (repo) => {
+        await repo.git("checkout", "--quiet", "main");
+        await repo.feature("a", "1.1.0", ["debian:12", "ubuntu:24.04"]);
+        await repo.commit("support ubuntu");
+        await repo.git("checkout", "--quiet", "topic");
+        // Against the branch point this adds debian:13; against main's tip it would also drop ubuntu:24.04.
+        await repo.feature("a", "1.2.0", ["debian:12", "debian:13"]);
+        await repo.commit("support debian 13");
+        assertEquals(await repo.check(), []);
     });
 });
 
