@@ -158,9 +158,9 @@ export function parseJsoncText(text: string): unknown {
     return parseJsonc(text);
 }
 
-/** Runs git; `ok` is false when it exits non-zero, and `err` carries its message. */
-export async function runGit(args: string[]): Promise<{ ok: boolean; out: string; err: string }> {
-    const output = await new Deno.Command("git", { args, stdout: "piped", stderr: "piped" }).output();
+/** Runs git in `cwd`; `ok` is false when it exits non-zero, and `err` carries its message. */
+export async function runGit(args: string[], cwd = "."): Promise<{ ok: boolean; out: string; err: string }> {
+    const output = await new Deno.Command("git", { args, cwd, stdout: "piped", stderr: "piped" }).output();
     const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
     return { ok: output.success, out: decode(output.stdout), err: decode(output.stderr).trim() };
 }
