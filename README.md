@@ -19,7 +19,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+| Feature       | Description                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| [uv](src/uv/) | Installs Astral's uv and uvx, optionally Python command-line tools, and keeps uv's interpreters and cache on a per-container volume. |
 
 ## Development
 
