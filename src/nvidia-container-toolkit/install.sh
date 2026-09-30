@@ -18,7 +18,9 @@ readonly APT_KEYRING="/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"
 readonly APT_SOURCE="/etc/apt/sources.list.d/nvidia-container-toolkit.list"
 readonly RPM_KEY="/etc/pki/rpm-gpg/RPM-GPG-KEY-nvidia-container-toolkit"
 readonly DAEMON_JSON="/etc/docker/daemon.json"
-readonly PACKAGES=(nvidia-container-toolkit nvidia-container-toolkit-base libnvidia-container-tools libnvidia-container1)
+readonly PACKAGES=(
+  nvidia-container-toolkit nvidia-container-toolkit-base libnvidia-container-tools libnvidia-container1
+)
 
 export DEBIAN_FRONTEND=noninteractive
 
