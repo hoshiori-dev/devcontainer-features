@@ -49,11 +49,11 @@ None.
 **Becomes true:**
 
 - On every image and architecture in `test/hf-mount/compatibility.json`, the default install and the install-twice test
-  pass (`just test hf-mount` locally and the PR's container jobs): they show the scenarios "Both backends selected",
-  "The installed daemon runs", "Latest release" (the container test asserts the `hf-mount <MAJOR.MINOR.PATCH>` form and
-  makes no API request), "Digest matches", "Token absent", "NFS dependencies", "FUSE dependencies", "Container starts
-  with no mount", and "Non-default options, then the defaults". Root and non-root runs are covered by the images whose
-  entry does and does not name a `remoteUser`.
+  pass (`just test hf-mount` locally and the PR's container jobs): they show the scenarios "Omitted version" (the
+  container test asserts the `hf-mount <MAJOR.MINOR.PATCH>` form and makes no API request), "Omitted backend", "Omitted
+  installMountDependencies", "The installed daemon runs", "Digest matches", "Token absent", "NFS dependencies", "FUSE
+  dependencies", "Container starts with no mount", and "Non-default options, then the defaults". Root and non-root runs
+  are covered by the images whose entry does and does not name a `remoteUser`.
 - On amd64, one scenario per case passes on its scenario image (`just test-scenarios hf-mount` and the PR's scenario
   job): "Only the NFS backend selected", "Only the FUSE backend selected", "Dependencies disabled", and "Pinned
   release".

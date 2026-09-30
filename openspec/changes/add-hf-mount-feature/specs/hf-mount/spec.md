@@ -13,45 +13,21 @@ Upstream sources:
 
 ## ADDED Requirements
 
-### Requirement: Daemon and selected backends are installed
+### Requirement: Option version
 
-The feature SHALL install the `hf-mount` daemon as `/usr/local/bin/hf-mount` and SHALL install the backends the
-`backend` option selects in the same directory: `hf-mount-nfs` for `nfs`, `hf-mount-fuse` for `fuse`, and both for
-`both`. Every installed binary SHALL be owned by root and executable by every user, and SHALL be on `PATH` without any
-change to the environment. The supported images are those listed in `test/hf-mount/compatibility.json`.
+The feature SHALL accept the option `version` as declared here and install the daemon and every selected backend from
+the one upstream release it names: `latest` the release GitHub reports as the latest release of `huggingface/hf-mount`,
+and a `MAJOR.MINOR.PATCH` value the release tagged `v<MAJOR.MINOR.PATCH>`; any other value fails the install before
+anything is downloaded, and a release that does not exist fails the install with a message naming the requested version.
 
-#### Scenario: Both backends selected
+| Field   | Value      |
+| ------- | ---------- |
+| Type    | `string`   |
+| Default | `"latest"` |
 
-- **WHEN** the feature is installed with `backend` set to `both`
-- **THEN** `/usr/local/bin/hf-mount`, `/usr/local/bin/hf-mount-nfs`, and `/usr/local/bin/hf-mount-fuse` exist, are
-  executable by the remote user, and `command -v hf-mount` resolves to `/usr/local/bin/hf-mount`
+#### Scenario: Omitted version
 
-#### Scenario: Only the NFS backend selected
-
-- **WHEN** the feature is installed with `backend` set to `nfs` on an image that has no `hf-mount-fuse`
-- **THEN** `/usr/local/bin/hf-mount` and `/usr/local/bin/hf-mount-nfs` exist and no `hf-mount-fuse` is installed
-
-#### Scenario: Only the FUSE backend selected
-
-- **WHEN** the feature is installed with `backend` set to `fuse` on an image that has no `hf-mount-nfs`
-- **THEN** `/usr/local/bin/hf-mount` and `/usr/local/bin/hf-mount-fuse` exist and no `hf-mount-nfs` is installed
-
-#### Scenario: The installed daemon runs
-
-- **WHEN** a container is started from an image with the feature installed and no mount is running
-- **THEN** `hf-mount --version` succeeds and `hf-mount status` exits with status 0, both as root and as the remote user
-
-### Requirement: Version selection
-
-The feature SHALL install the upstream release that the `version` option names: `latest` installs the release GitHub
-reports as the latest release of `huggingface/hf-mount`, and a `MAJOR.MINOR.PATCH` value installs the release tagged
-`v<MAJOR.MINOR.PATCH>`. Any other value SHALL fail the install before anything is downloaded, and a release that does
-not exist SHALL fail the install with a message naming the requested version. The daemon and every backend installed by
-one run SHALL come from the same release.
-
-#### Scenario: Latest release
-
-- **WHEN** the feature is installed with `version` set to `latest`
+- **WHEN** the feature is installed without `version`, or with `version` set to `latest`
 - **THEN** `hf-mount --version` reports `hf-mount <MAJOR.MINOR.PATCH>`, the version of the release GitHub reported as
   latest when the install ran
 
@@ -71,6 +47,67 @@ one run SHALL come from the same release.
 - **WHEN** the feature is installed with `version` set to a release number that `huggingface/hf-mount` never published
 - **THEN** the install fails with a message naming that version, and no binary under `/usr/local/bin` is created or
   replaced by that run
+
+### Requirement: Option backend
+
+The feature SHALL accept the option `backend` as declared here and install the backends it selects next to the daemon in
+`/usr/local/bin`: `hf-mount-nfs` for `nfs`, `hf-mount-fuse` for `fuse`, and both for `both`.
+
+| Field   | Value                   |
+| ------- | ----------------------- |
+| Type    | `string`                |
+| Default | `"both"`                |
+| Enum    | `["nfs","fuse","both"]` |
+
+#### Scenario: Omitted backend
+
+- **WHEN** the feature is installed without `backend`, or with `backend` set to `both`
+- **THEN** `/usr/local/bin/hf-mount`, `/usr/local/bin/hf-mount-nfs`, and `/usr/local/bin/hf-mount-fuse` exist, are
+  executable by the remote user, and `command -v hf-mount` resolves to `/usr/local/bin/hf-mount`
+
+#### Scenario: Only the NFS backend selected
+
+- **WHEN** the feature is installed with `backend` set to `nfs` on an image that has no `hf-mount-fuse`
+- **THEN** `/usr/local/bin/hf-mount` and `/usr/local/bin/hf-mount-nfs` exist and no `hf-mount-fuse` is installed
+
+#### Scenario: Only the FUSE backend selected
+
+- **WHEN** the feature is installed with `backend` set to `fuse` on an image that has no `hf-mount-nfs`
+- **THEN** `/usr/local/bin/hf-mount` and `/usr/local/bin/hf-mount-fuse` exist and no `hf-mount-nfs` is installed
+
+### Requirement: Option installMountDependencies
+
+The feature SHALL accept the option `installMountDependencies` as declared here: when it is enabled, the feature
+installs the mount helpers of the selected backends as "Mount dependencies follow the selected backends" states, and
+when it is disabled, installs no mount-helper package.
+
+| Field   | Value     |
+| ------- | --------- |
+| Type    | `boolean` |
+| Default | `true`    |
+
+#### Scenario: Omitted installMountDependencies
+
+- **WHEN** the feature is installed without `installMountDependencies`
+- **THEN** the mount helpers of the selected backends are installed, as when `installMountDependencies` is enabled
+
+#### Scenario: Dependencies disabled
+
+- **WHEN** the feature is installed with `installMountDependencies` disabled on an image without `mount.nfs` and
+  `fusermount3`
+- **THEN** the binaries are installed, and neither `mount.nfs` nor `fusermount3` is present afterwards
+
+### Requirement: Daemon and selected backends are installed
+
+The feature SHALL install the `hf-mount` daemon as `/usr/local/bin/hf-mount` whatever `backend` selects, and every
+binary it installs, the daemon and the selected backends, SHALL be owned by root and executable by every user, and SHALL
+be on `PATH` without any change to the environment. The supported images are those listed in
+`test/hf-mount/compatibility.json`.
+
+#### Scenario: The installed daemon runs
+
+- **WHEN** a container is started from an image with the feature installed and no mount is running
+- **THEN** `hf-mount --version` succeeds and `hf-mount status` exits with status 0, both as root and as the remote user
 
 ### Requirement: Downloads are verified against the GitHub release asset digest
 
@@ -157,9 +194,8 @@ carries a token or any other credential.
 
 When `installMountDependencies` is enabled, the feature SHALL install the distribution packages that provide the mount
 helpers of the selected backends: `nfs-common` on Debian and Ubuntu, or `nfs-utils` on Fedora, when NFS is selected,
-providing `mount.nfs`; and `fuse3` when FUSE is selected, providing `fusermount3`. When it is disabled, the feature
-SHALL install no mount-helper package. Apart from these, the feature SHALL install only the packages it needs to
-download and verify the binaries, and only when the image lacks them.
+providing `mount.nfs`; and `fuse3` when FUSE is selected, providing `fusermount3`. Apart from these, the feature SHALL
+install only the packages it needs to download and verify the binaries, and only when the image lacks them.
 
 #### Scenario: NFS dependencies
 
@@ -170,12 +206,6 @@ download and verify the binaries, and only when the image lacks them.
 
 - **WHEN** the feature is installed with `installMountDependencies` enabled and `backend` selecting FUSE
 - **THEN** `fusermount3` is on `PATH`
-
-#### Scenario: Dependencies disabled
-
-- **WHEN** the feature is installed with `installMountDependencies` disabled on an image without `mount.nfs` and
-  `fusermount3`
-- **THEN** the binaries are installed, and neither `mount.nfs` nor `fusermount3` is present afterwards
 
 ### Requirement: Unsupported platforms fail before changing the image
 

@@ -89,6 +89,27 @@ Research for this change, re-checked against upstream on 2026-09-30:
 - Configuring `/etc/fuse.conf`, sudo rules, or container privileges; `NOTES.md` documents them instead.
 - Removing binaries or packages a previous install added.
 
+## Options
+
+All three options are new. Where this table and the delta spec's Option requirements differ, the delta spec wins.
+
+| Option                     | Type      | Default    | Enum or proposals                                      | Meaning                                                                       |
+| -------------------------- | --------- | ---------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `version`                  | `string`  | `"latest"` | proposals: `latest` and the current release (`0.13.1`) | The upstream release to install; accepts `latest` or `MAJOR.MINOR.PATCH` only |
+| `backend`                  | `string`  | `"both"`   | enum, in this order: `nfs`, `fuse`, `both`             | The backends installed next to the daemon, which is always installed          |
+| `installMountDependencies` | `boolean` | `true`     | none                                                   | Whether the mount helpers of the selected backends are installed              |
+
+- `version` defaults to `latest`: upstream releases several times a month, and following it needs no feature release per
+  upstream release (Decisions, Source); users who need stability pin it (Risks).
+- `backend` defaults to `both`, so either backend can be chosen at run time without a rebuild, at a cost of about 27 MB
+  per backend.
+- `installMountDependencies` defaults to `true`, since neither backend can mount without its helper.
+- The enum order and the release in `proposals` decide the duplicate test's first install (Context): the test depends on
+  that release staying downloadable, and refreshing a stale proposal is a PATCH bump.
+- Rejected: a token option (issue #18: options appear in build logs); a separate option per backend (two booleans allow
+  selecting none, which installs a daemon that cannot mount); accepting a leading `v` in `version` (two spellings of one
+  value; the message names the accepted forms).
+
 ## Decisions
 
 - **Source: raw release assets from `github.com/huggingface/hf-mount`, verified against the Releases API `digest`.**
@@ -103,15 +124,6 @@ Research for this change, re-checked against upstream on 2026-09-30:
   an allow-list of versions (stronger against a compromised release, but the download rules forbid per-version hashes
   without a change to the rule, and it would mean no `latest` and a feature release for every upstream release, which
   comes several times a month).
-- **Options.** `version` (string, default `latest`, proposals `latest` and the current release; accepts `latest` or
-  `MAJOR.MINOR.PATCH` only), `backend` (enum in the order `nfs`, `fuse`, `both`, default `both`, so either backend can
-  be chosen at run time without a rebuild at a cost of about 27 MB per backend), `installMountDependencies` (boolean,
-  default `true`, since neither backend can mount without its helper). The daemon is always installed. The enum order
-  and the release in `proposals` decide the duplicate test's first install (Context): the test depends on that release
-  staying downloadable, and refreshing a stale proposal is a PATCH bump. Rejected: a token option (issue #18: options
-  appear in build logs); a separate option per backend (two booleans allow selecting none, which installs a daemon that
-  cannot mount); accepting a leading `v` in `version` (two spellings of one value; the message names the accepted
-  forms).
 - **Install location: `/usr/local/bin`, all binaries side by side.** The daemon finds its backend next to itself first,
   and `/usr/local/bin` is on `PATH` in every supported image, so no environment change is needed. Rejected: a versioned
   directory with symlinks (no second version needs to coexist).
@@ -232,7 +244,7 @@ has no `dependsOn` or `installsAfter`. A renamed or transferred upstream reposit
 - [Upstream renames assets or drops `aarch64`] → The exact-name match fails the install with the missing asset named;
   the fix is a feature change.
 - [Upstream deletes the release in `proposals`] → The duplicate test's first install fails; refreshing the proposal is a
-  PATCH bump (Decisions, Options).
+  PATCH bump (Options).
 - [Parsing pretty-printed JSON with `sed`/`grep` depends on GitHub's formatting] → Any ambiguity fails closed (Goals);
   the container tests show when GitHub's format changes.
 - [`nfs-common` pulls `rpcbind`, whose maintainer scripts were not yet run inside a container build] → The default
