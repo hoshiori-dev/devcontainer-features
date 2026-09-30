@@ -375,8 +375,12 @@ export function compatBumpProblems(
     return [];
 }
 
-async function readBaseJsonc(base: string, path: string): Promise<{ found: boolean; value?: unknown }> {
-    const old = await runGit(["show", `${base}:${path}`]);
+async function readBaseJsonc(
+    base: string,
+    path: string,
+    root = ".",
+): Promise<{ found: boolean; value?: unknown }> {
+    const old = await runGit(["show", `${base}:${path}`], root);
     if (!old.ok) return { found: false };
     try {
         return { found: true, value: parseJsoncText(old.out) };
@@ -386,16 +390,17 @@ async function readBaseJsonc(base: string, path: string): Promise<{ found: boole
     }
 }
 
-export async function baseExists(base: string): Promise<boolean> {
-    return (await runGit(["rev-parse", "--verify", "--quiet", `${base}^{commit}`])).ok;
+export async function baseExists(base: string, root = "."): Promise<boolean> {
+    return (await runGit(["rev-parse", "--verify", "--quiet", `${base}^{commit}`], root)).ok;
 }
 
 /**
  * What changed is measured from the merge base, so commits main gained after the branch point never count as the
  * branch's changes; the version must still exceed the base tip's, since that is what is already published.
+ * `root` is the repository to ask git about; `model` must be loaded from the same one.
  */
-export async function checkVersionBumps(model: RepoModel, base: string): Promise<Problem[]> {
-    if (!(await baseExists(base))) {
+export async function checkVersionBumps(model: RepoModel, base: string, root = "."): Promise<Problem[]> {
+    if (!(await baseExists(base, root))) {
         return [{
             file: ".",
             message:
@@ -404,12 +409,12 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
     }
     // Compare the working tree, not only HEAD, so `just check` before a commit sees what CI will see after it.
     const paths = ["src", "test/*/compatibility.json"];
-    const mergeBase = await runGit(["merge-base", base, "HEAD"]);
+    const mergeBase = await runGit(["merge-base", base, "HEAD"], root);
     const fork = mergeBase.out.trim();
     const listings = mergeBase.ok
         ? [
-            await runGit(["diff", "--name-only", "--no-renames", fork, "--", ...paths]),
-            await runGit(["ls-files", "--others", "--exclude-standard", "--", ...paths]),
+            await runGit(["diff", "--name-only", "--no-renames", fork, "--", ...paths], root),
+            await runGit(["ls-files", "--others", "--exclude-standard", "--", ...paths], root),
         ]
         : [mergeBase];
     const failed = listings.find((listing) => !listing.ok);
@@ -432,7 +437,7 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
         const feature = model.features.get(id);
         const head = feature?.json?.version;
         if (typeof head !== "string" || !RELEASE_VERSION.test(head)) continue; // reported by checkFeatures
-        const old = await readBaseJsonc(base, `src/${id}/devcontainer-feature.json`);
+        const old = await readBaseJsonc(base, `src/${id}/devcontainer-feature.json`, root);
         if (!old.found) continue; // new feature
         const baseVersion = (old.value as { version?: unknown } | null | undefined)?.version;
         if (typeof baseVersion !== "string" || !tryParse(baseVersion)) {
@@ -442,7 +447,7 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
             continue;
         }
         if (compatChanged.has(id) && feature?.compat) {
-            const oldCompat = await readBaseJsonc(fork, `test/${id}/compatibility.json`);
+            const oldCompat = await readBaseJsonc(fork, `test/${id}/compatibility.json`, root);
             if (!oldCompat.found || oldCompat.value !== undefined) {
                 const compatProblems = compatBumpProblems(
                     id,
@@ -467,17 +472,35 @@ export async function checkVersionBumps(model: RepoModel, base: string): Promise
     return problems;
 }
 
+/**
+ * The command line's version bump step: with `allowMissingBase` and no such base commit, it skips with a notice
+ * instead of reporting the missing base as a problem.
+ */
+export async function versionBumpStep(
+    model: RepoModel,
+    base: string,
+    allowMissingBase: boolean,
+    root = ".",
+): Promise<{ problems: Problem[]; notice?: string }> {
+    if (allowMissingBase && !(await baseExists(base, root))) {
+        return {
+            problems: [],
+            notice: `base ${base} does not exist, so there is nothing to compare versions with; ` +
+                "skipping the version bump check.",
+        };
+    }
+    return { problems: await checkVersionBumps(model, base, root) };
+}
+
 if (import.meta.main) {
     const args = parseArgs(Deno.args, { string: ["base"], boolean: ["allow-missing-base"] });
     const model = await loadRepo(".");
     const problems = await checkFeatures(model, FEATURE_SCHEMA);
     const annotate = Deno.env.get("GITHUB_ACTIONS") === "true";
-    if (args.base && args["allow-missing-base"] && !(await baseExists(args.base))) {
-        const note = `base ${args.base} does not exist, so there is nothing to compare versions with; ` +
-            "skipping the version bump check.";
-        console.error(annotate ? `::notice::${note}` : `note: ${note}`);
-    } else if (args.base) {
-        problems.push(...(await checkVersionBumps(model, args.base)));
+    if (args.base) {
+        const step = await versionBumpStep(model, args.base, args["allow-missing-base"]);
+        if (step.notice) console.error(annotate ? `::notice::${step.notice}` : `note: ${step.notice}`);
+        problems.push(...step.problems);
     }
     for (const problem of problems) {
         console.error(
