@@ -36,11 +36,12 @@
 - [x] 3.3 Write the source definition whole at its fixed path: a `signed-by` line in
       `/etc/apt/sources.list.d/nvidia-container-toolkit.list`, or `nvidia-container-toolkit.repo` under
       `/etc/yum.repos.d/` or `/etc/zypp/repos.d/` with `repo_gpgcheck=1`, `gpgcheck=1`, and a `gpgkey=file://` of the
-      verified key, never `--gpg-auto-import-keys` or a remote `gpgkey=`; verify by review of `install.sh`
-- [x] 3.4 In `test/nvidia-container-toolkit/test.sh`, assert the source file's content, that the key file holds exactly
-      the pinned primary key, that no remote `gpgkey=` appears, that the package manager lists NVIDIA's stable
-      repository for the image's architecture, and that no temporary `GNUPGHOME` remains; verify `shellcheck` passes
-      (the container run is task 7.2)
+      verified key, plus `pkg_gpgcheck=1` for zypper (libzypp otherwise skips package signatures of a signed repository,
+      zypp.conf(5)), never `--gpg-auto-import-keys` or a remote `gpgkey=`; verify by review of `install.sh`
+- [x] 3.4 In `test/nvidia-container-toolkit/test.sh`, assert the source file's content (including `pkg_gpgcheck=1` on
+      zypper), that the key file holds exactly the pinned primary key, that no remote `gpgkey=` appears, that the
+      package manager lists NVIDIA's stable repository for the image's architecture, and that no temporary `GNUPGHOME`
+      remains; verify `shellcheck` passes (the container run is task 7.2)
 
 ## 4. Packages and the version option
 
