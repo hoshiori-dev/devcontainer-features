@@ -105,8 +105,9 @@ The feature SHALL set `DENO_INSTALL_ROOT` to `/usr/local/share/deno` in the cont
 directory and run by name in every shell. `/usr/local/share/deno/bin` SHALL come after the image's own `PATH` entries.
 Because a login shell's startup files may reset `PATH` (Debian's `/etc/profile` does), the feature SHALL also append the
 directory to `PATH` in login shells through a file of its own under `/etc/profile.d/`, adding it only when it is not
-already there. The feature SHALL make `/usr/local/share/deno` and everything below it, `bin` included, owned by the
-remote user when that user exists at build time and is not root, and SHALL leave them owned by root otherwise.
+already there. When the remote user exists at build time and is not root, the feature SHALL make `/usr/local/share/deno`
+and `/usr/local/share/deno/bin` writable by that user without elevated privileges, also after the Dev Container CLI
+changes that user's UID or GID to match the host; otherwise it SHALL leave them owned by root.
 
 #### Scenario: Non-root remote user installs a global tool
 
@@ -114,6 +115,13 @@ remote user when that user exists at build time and is not root, and SHALL leave
   script
 - **THEN** the command succeeds without elevated privileges, the executable appears in `/usr/local/share/deno/bin`, and
   it runs by name from a new shell
+
+#### Scenario: Remote user's UID changed after the build
+
+- **WHEN** the remote user is a non-root user that exists at build time, and its UID and GID are changed after the
+  build, as the Dev Container CLI's `updateRemoteUserUID` does to match the host
+- **THEN** that user still installs a global tool with `deno install --global` without elevated privileges, and the tool
+  runs by name from a new shell
 
 #### Scenario: Login shell runs a global tool
 

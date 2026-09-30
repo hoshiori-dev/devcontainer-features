@@ -52,6 +52,19 @@ were checked on 2026-09-30 unless marked otherwise.
   `env: can't execute 'bash'` before its first line runs.
 - The Dev Container CLI's duplicate test (CLI 0.89.0) gives a string option with `proposals` the first proposal that is
   not the default, unless `--permit-randomization` is passed, which `scripts/test_feature.ts` does not do.
+- The Dev Container CLI changes the remote user's UID and GID after the features are installed. The maintainer reported
+  that PR #30's CI failed: "the tools tree is owned by vscode" (`test.sh`, `duplicate.sh`, and the `exact_version`
+  scenario) failed on `base:ubuntu-24.04`, amd64 and arm64, while the same tests passed locally. The failing containers
+  ran from images tagged `-features-uid`. CLI 0.89.0 builds that image from its `scripts/updateUID.Dockerfile` when
+  `updateRemoteUserUID` is not `false`, on a Linux host, for a remote user other than root: it rewrites that user's UID
+  and GID in `/etc/passwd` to the host user's, rewrites the GID of that user's primary group in `/etc/group`, and runs
+  `chown -R` on the home folder only. GitHub-hosted runners run as UID 1001, so `vscode` changed from 1000 to 1001 and
+  lost the `/usr/local/share/deno` tree the feature had given to UID 1000; locally the host UID is 1000 and nothing
+  changed. Every user whose host UID is not 1000 gets the same result. Supplementary group members in `/etc/group` are
+  stored by user name, which the rewrite leaves alone.
+- First-party precedent: `devcontainers/features` `src/node/install.sh` (commit `96405515`) creates a system group `nvm`
+  when missing ("Create nvm group to the user's UID or GID to change while still allowing access to nvm"), adds the user
+  to it, and gives its directory group `nvm` with `g+rws`.
 - Prior art `ghcr.io/devcontainers-extra/features/deno` 1.0.4 verifies no checksum, fails a second install on a plain
   `ln -s`, and does not install `unzip`; nothing is taken from it.
 
@@ -82,7 +95,7 @@ were checked on 2026-09-30 unless marked otherwise.
   `/usr/local/bin` and the temporary directory afterwards.
 - A second run acts only where the result would differ: the download is skipped, with a log line saying the version is
   already installed, when the second field of the first line of `/usr/local/bin/deno --version` equals the resolved
-  version; `mkdir -p` and the ownership rule are re-applied; no file is appended to. Checked by:
+  version; `mkdir -p` and the group rule of Decisions are re-applied; no file is appended to. Checked by:
   - `test/deno/duplicate.sh`: the `version` proposals are `latest` and `2.8.0`, so the duplicate test installs `2.8.0`
     and then `latest` (Context), always two different versions, and asserts the version `latest` resolved to;
   - a `build` scenario from `debian:12` whose Dockerfile places a stub `/usr/local/bin/deno` that reports `2.8.0` and a
@@ -149,15 +162,29 @@ were checked on 2026-09-30 unless marked otherwise.
   binary on interruption and fails with "text file busy" while it runs. Rejected: `mv` from the temporary directory,
   which copies instead of renaming when `/tmp` is another filesystem.
 - **Global tools in `/usr/local/share/deno`, appended to `PATH`.** `containerEnv` sets
-  `DENO_INSTALL_ROOT=/usr/local/share/deno` and `PATH=${PATH}:/usr/local/share/deno/bin`; the directory tree, `bin`
-  included, is owned by `_REMOTE_USER` when `id -u` finds that user and it is not root, otherwise by root. Rejected:
-  prepending the directory to `PATH`, which would let the remote user shadow `ls`, `git`, or `deno` for root shells and
-  root lifecycle commands — a widening on images where that user has no `sudo`; the cost of appending is that a global
-  tool named like a system command runs only by full path. Rejected: Deno's default `$HOME/.deno/bin`, which
-  `containerEnv` cannot put on `PATH` because it is static JSON and the home is known only at build time. Rejected:
-  editing users' shell rc files, which non-login and non-interactive processes skip and which needs marker guards.
-  Rejected: a group-writable directory with a new group, more moving parts for the single remote user a dev container
-  has.
+  `DENO_INSTALL_ROOT=/usr/local/share/deno` and `PATH=${PATH}:/usr/local/share/deno/bin`; who may write the directory
+  follows the next decision. Rejected: prepending the directory to `PATH`, which would let the remote user shadow `ls`,
+  `git`, or `deno` for root shells and root lifecycle commands — a widening on images where that user has no `sudo`; the
+  cost of appending is that a global tool named like a system command runs only by full path. Rejected: Deno's default
+  `$HOME/.deno/bin`, which `containerEnv` cannot put on `PATH` because it is static JSON and the home is known only at
+  build time. Rejected: editing users' shell rc files, which non-login and non-interactive processes skip and which
+  needs marker guards.
+- **Write access through a `deno` group (maintainer's CI report).** When `id -u` finds `_REMOTE_USER` and it is not
+  root, the feature creates a system group `deno` if it is missing, adds `_REMOTE_USER` to it if not yet a member, and
+  gives `/usr/local/share/deno` and `/usr/local/share/deno/bin` owner root, group `deno`, and mode 2775, so both are
+  group-writable and new entries inherit the group. Membership is recorded by name, so it survives the CLI's UID and GID
+  change (Context), as the node feature's `nvm` group does. When the remote user is root or absent, the feature creates
+  no group and both directories are owned by root with mode 0755. A second install re-applies the group, owner, and mode
+  to the two directories, never recursively, so tools already in `bin` keep their owner; creating the group and adding
+  the member happen only when missing. Checked by `test.sh`, `duplicate.sh`, and the `exact_version` scenario asserting
+  the owner, group, mode, and membership and installing a global tool as the remote user — on GitHub-hosted runners,
+  where the CLI's own change to UID 1001 applies — and by a scenario on `base:ubuntu-24.04` (`remoteUser` `vscode`)
+  whose test changes `vscode`'s UID and GID with the same `/etc/passwd` and `/etc/group` edits as `updateUID.Dockerfile`
+  through the image's `sudo`, then installs a global tool as `vscode` in a new process, so the remap is covered on a
+  host whose UID is 1000 too. Rejected: making the tree owned by the remote user, the approved rule, which the CLI's UID
+  change breaks because it chowns the home folder only. Rejected: mode 1777, which lets every user of the container
+  write the directory on `PATH`. Rejected: a lifecycle command that chowns the tree at container start, which runs as
+  the remote user without the privilege to chown a tree it does not own, and adds a lifecycle command to the metadata.
 - **A feature-owned `/etc/profile.d/deno.sh` for login shells.** Debian's `/etc/profile` sets `PATH` from scratch, so a
   login shell on `debian:12` (`bash -l`) loses the `containerEnv` entry; the implementation found this while testing,
   and the maintainer chose this fix at the implementation review. The feature writes the whole file on every install
@@ -181,13 +208,13 @@ were checked on 2026-09-30 unless marked otherwise.
   version against 2.27, and `uname -m` (`x86_64` → amd64, `aarch64` or `arm64` → arm64). Rejected: the command
   `dpkg --print-architecture`, which would tie the architecture check to the package manager; it is used nowhere else.
 - **`installsAfter: ["ghcr.io/devcontainers/features/common-utils"]`, no `dependsOn` (maintainer decision).** It orders
-  this feature after common-utils when both are installed, so a remote user common-utils creates exists before the
-  ownership rule runs; it installs nothing on its own and adds no privilege. The ref carries no tag because the Dev
-  Container spec does not allow an `installsAfter` entry to be pinned to a tag or digest; `just validate` checks only
-  in-repo refs, and `feature-authoring.md`'s "major tag" rule for external features applies to `dependsOn`. The Dev
-  Container CLI resolves that ref's metadata at build time (URL inventory). Rejected: no `installsAfter`, which leaves a
-  user common-utils creates in the same build with a root-owned tools tree. Rejected: `dependsOn`, which would install
-  common-utils, and its user and packages, for every user of this feature.
+  this feature after common-utils when both are installed, so a remote user common-utils creates exists before the group
+  rule runs; it installs nothing on its own and adds no privilege. The ref carries no tag because the Dev Container spec
+  does not allow an `installsAfter` entry to be pinned to a tag or digest; `just validate` checks only in-repo refs, and
+  `feature-authoring.md`'s "major tag" rule for external features applies to `dependsOn`. The Dev Container CLI resolves
+  that ref's metadata at build time (URL inventory). Rejected: no `installsAfter`, which leaves a user common-utils
+  creates in the same build with a root-owned tools tree. Rejected: `dependsOn`, which would install common-utils, and
+  its user and packages, for every user of this feature.
 - **One spelling of an exact version (maintainer decision).** `version` accepts `latest` or `X.Y.Z`; `v2.9.7` fails like
   any other value, with the message naming the accepted forms. Rejected: accepting the `v` prefix as a second spelling,
   which complicates the option's proposals and error message for no new capability.
@@ -196,10 +223,10 @@ were checked on 2026-09-30 unless marked otherwise.
 
 Planned `test/deno/compatibility.json` (the spec never lists images):
 
-| Image                                               | Arch         | `remoteUser` | Covers                                                                 |
-| --------------------------------------------------- | ------------ | ------------ | ---------------------------------------------------------------------- |
-| `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` | amd64, arm64 | `vscode`     | Prerequisites present; non-root remote user owns the global tools tree |
-| `debian:12`                                         | amd64, arm64 | (none, root) | Prerequisites missing; root owns the global tools tree                 |
+| Image                                               | Arch         | `remoteUser` | Covers                                                                             |
+| --------------------------------------------------- | ------------ | ------------ | ---------------------------------------------------------------------------------- |
+| `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` | amd64, arm64 | `vscode`     | Prerequisites present; non-root remote user in group `deno`, its UID changed in CI |
+| `debian:12`                                         | amd64, arm64 | (none, root) | Prerequisites missing; root owns the global tools tree                             |
 
 Both have glibc well above 2.27 (2.39 and 2.36). Every scenario image is `base:ubuntu-24.04` or `debian:12` on amd64,
 including the `build` scenarios named in Goals. `test.sh` compares `deno --version` with the latest pointer read at test
@@ -246,8 +273,11 @@ environment variable of the feature redirects anything.
   `dependsOn`; `installsAfter` names common-utils only for ordering (Decisions). Outside the metadata, the feature
   writes one root-owned file, `/etc/profile.d/deno.sh`, that only appends the tools directory to `PATH` in login shells
   (Decisions).
+- **Users and groups:** one new system group, `deno`, created only for a non-root remote user; its only member the
+  feature adds is the remote user, and it grants write access to `/usr/local/share/deno` and its `bin` only (Decisions).
 - **Idempotency:** Goals above; the spec's Installing twice requirement is what `duplicate.sh` and the two reinstall
-  `build` scenarios assert.
+  `build` scenarios assert. The group and the membership are created only when missing, and a second install re-applies
+  the group, owner, and mode of the two directories (Decisions).
 - **Failure behavior:** the spec's Version selection, Verified download, Failed installation, and Supported platforms
   requirements; every failure exits non-zero with a message on stderr and leaves the previous binary.
 
@@ -285,6 +315,10 @@ Container CLI, not by the feature's scripts.
 - [A non-root remote user created after this feature runs gets a root-owned tools tree] → `deno install --global` then
   needs `sudo`; `installsAfter` orders this feature after common-utils, the usual creator of that user, and a user
   created by anything ordered later still gets the root-owned tree.
+- [Files a global tool creates are owned by the user who ran `deno install --global`, after a UID change the new UID,
+  and the setgid bit gives new entries group `deno` but passes itself on to new directories only; whether a new file or
+  directory is group-writable depends on that user's umask] → Accepted: the remote user installs and replaces its own
+  tools, and write access to `bin` is what removing or adding an entry needs.
 - [`test.sh` reads the latest pointer at test time, so a Deno release between build and test fails that run once] →
   Accepted: the window is minutes and a rerun passes; capturing the value at build time would need the feature to write
   state only a test reads.
