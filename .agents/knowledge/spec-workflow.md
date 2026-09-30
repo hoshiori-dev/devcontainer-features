@@ -18,9 +18,10 @@ create `openspec/` directories or change metadata by hand. Hand edits stop at th
 delta specs, and at a main spec's Purpose under the two exceptions in Scope of specifications. Validation:
 `just spec-check` runs OpenSpec's validator in strict mode over all specs and changes and is part of `just check`; it
 also fails when a rule in `openspec/config.yaml` would not reach OpenSpec, which drops a whole artifact's rules with
-only a warning when one of them is not a string (quote a rule that contains a colon followed by a space). Run it after
-every artifact edit, before publishing the draft PR, before marking the PR ready, and after archiving; a red check is a
-red check.
+only a warning when one of them is not a string (quote a rule that contains a colon followed by a space). It also fails
+when an Option requirement cannot be read, when a feature's options differ from its spec, or when OpenSpec refuses to
+archive a change the comparison needs (Option requirements). Run it after every artifact edit, before publishing the
+draft PR, before marking the PR ready, and after archiving; a red check is a red check.
 
 ## Artifact map
 
@@ -43,14 +44,15 @@ files (verified with OpenSpec 1.13.2 on 2026-09-29), and `just spec-check` fails
 
 ## Artifact roles
 
-Each artifact of a change owns one role; nothing is restated in another. `openspec/config.yaml` rules point here.
+Each artifact of a change owns one role; nothing is restated in another, except the design's option table (Source of
+truth). `openspec/config.yaml` rules point here.
 
-| Artifact    | Owns                                                                                                                                                                                                                  | Never holds                                           |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| proposal    | The end state: why, the goal, what changes, the capabilities whose contracts change (named), and `## Acceptance`                                                                                                      | The contract itself, the approach, steps              |
-| delta specs | The executable contract of feature behavior: requirements and scenarios                                                                                                                                               | Implementation choices, anything but feature behavior |
-| design      | How the end state is reached: the approaches discussed, decisions with rejected alternatives, the chosen approach's constraints and invariants (each with how it is checked), information needed only for this change | The goal or acceptance (see proposal), steps          |
-| tasks       | Implementation steps, each with its own verification; written only after the package gate closes                                                                                                                      | Acceptance; anything the package gate must see        |
+| Artifact    | Owns                                                                                                                                                                                                                                                           | Never holds                                           |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| proposal    | The end state: why, the goal, what changes, the capabilities whose contracts change (named), and `## Acceptance`                                                                                                                                               | The contract itself, the approach, steps              |
+| delta specs | The executable contract of feature behavior: requirements and scenarios, including each option's Option requirement                                                                                                                                            | Implementation choices, anything but feature behavior |
+| design      | How the end state is reached: the approaches discussed, decisions with rejected alternatives, the chosen approach's constraints and invariants (each with how it is checked), information needed only for this change, and the table of the options it touches | The goal or acceptance (see proposal), steps          |
+| tasks       | Implementation steps, each with its own verification; written only after the package gate closes                                                                                                                                                               | Acceptance; anything the package gate must see        |
 
 - The proposal's `## Acceptance` has two lists of checkable items: **Becomes true** (the end state) and **Stays true**
   (what must not change). For feature behavior it points to the delta specs' scenarios instead of restating them; the
@@ -63,17 +65,21 @@ Each artifact of a change owns one role; nothing is restated in another. `opensp
 
 ## Source of truth
 
-| Fact                                      | Rules                                                                                               | Points to it                                                             |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| What the collection is for                | `README.md`                                                                                         | `AGENTS.md`                                                              |
-| Feature and test conventions              | `.agents/knowledge/feature-authoring.md`, `.agents/knowledge/testing.md`                            | `openspec/config.yaml`, specs never restate them                         |
-| Behavior of a feature                     | `openspec/specs/<feature-id>/spec.md`                                                               | issues, PRs, `src/<id>/NOTES.md`                                         |
-| A feature's option names, types, defaults | `src/<id>/devcontainer-feature.json`                                                                | the spec names options in scenarios but never restates types or defaults |
-| Images a feature supports                 | `test/<id>/compatibility.json`                                                                      | the spec refers to it and never lists images                             |
-| Upstream sources a feature depends on     | reference links: the Purpose's "Upstream sources" list; behavior-shaping sources: Requirements only | `design.md` of the change that chose it                                  |
-| Acceptance of a change                    | the proposal's `## Acceptance`, pointing to the delta specs' scenarios for feature behavior         | PRs, issues                                                              |
+| Fact                                                       | Rules                                                                                               | Points to it                                        |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| What the collection is for                                 | `README.md`                                                                                         | `AGENTS.md`                                         |
+| Feature and test conventions                               | `.agents/knowledge/feature-authoring.md`, `.agents/knowledge/testing.md`                            | `openspec/config.yaml`, specs never restate them    |
+| Behavior of a feature                                      | `openspec/specs/<feature-id>/spec.md`                                                               | issues, PRs, `src/<id>/NOTES.md`                    |
+| A feature's options: names, types, defaults, `enum` values | the spec's Option requirements (Option requirements)                                                | `design.md` of the change that adds or changes them |
+| A feature's option `proposals` and `description`           | `src/<id>/devcontainer-feature.json`                                                                | the generated `src/<id>/README.md`                  |
+| Images a feature supports                                  | `test/<id>/compatibility.json`                                                                      | the spec refers to it and never lists images        |
+| Upstream sources a feature depends on                      | reference links: the Purpose's "Upstream sources" list; behavior-shaping sources: Requirements only | `design.md` of the change that chose it             |
+| Acceptance of a change                                     | the proposal's `## Acceptance`, pointing to the delta specs' scenarios for feature behavior         | PRs, issues                                         |
 
-A file under "Points to it" may summarize in one line and must link; it never restates the fact.
+A file under "Points to it" may summarize in one line and must link; it never restates the fact. The one exception is a
+change's `design.md`, which lists the options that change adds, changes, renames, or removes: it is frozen at archive,
+and where it differs from the delta spec, the delta spec wins. `src/<id>/devcontainer-feature.json` is not a pointer: it
+implements the Option requirements the way `install.sh` implements behavior, and `just spec-check` keeps the two equal.
 
 ## Lifecycle
 
@@ -103,13 +109,13 @@ archive to turn it green.
 The package gate is exercised on the approval package: the proposal, the delta specs, and `design.md` when one is
 warranted — always for a new feature, and otherwise when more than one reasonable approach exists or the change touches
 structure, options, dependencies (`dependsOn`, `installsAfter`), or files outside the change; a wording change inside
-one requirement needs none. The review covers goals and scope, behavior per option, idempotency, supported images,
-failure behavior, security (downloads, checksums, signing keys), and the design's bounds: approach, constraints,
-preferences, rejected alternatives. The design lists no steps; a design written as a procedure is rewritten before the
-draft opens. It is committed, so it carries no secret or private data. A hand correction of a main spec's Purpose that
-the change carries (Scope of specifications) is part of the package: it is committed before the draft opens, so the gate
-approves the corrected text. `tasks.md` does not exist yet at this gate; the gate approves the acceptance in the
-proposal, never a task list.
+one requirement needs none. The review covers goals and scope, each option's requirement (type, default, `enum` values)
+and behavior next to the design's option table, idempotency, supported images, failure behavior, security (downloads,
+checksums, signing keys), and the design's bounds: approach, constraints, preferences, rejected alternatives. The design
+lists no steps; a design written as a procedure is rewritten before the draft opens. It is committed, so it carries no
+secret or private data. A hand correction of a main spec's Purpose that the change carries (Scope of specifications) is
+part of the package: it is committed before the draft opens, so the gate approves the corrected text. `tasks.md` does
+not exist yet at this gate; the gate approves the acceptance in the proposal, never a task list.
 
 Mode, both gates: conversational. A gate closes only when the maintainer says so in the current conversation — "spec
 approved" for the package gate, an explicit command to archive for the freeze gate. Nothing is recorded on GitHub. An
@@ -184,6 +190,50 @@ behavior become Requirements ("SHALL download from … and verify against …"),
 sources" list of the spec's Purpose as `- <label>: <url>` entries, and research needed only for one change goes in that
 change's `design.md`.
 
+## Option requirements
+
+A feature's spec states each of its options as its own requirement, an Option requirement. `scripts/lib/options.ts`
+reads this format, so the two change together.
+
+- The header is `### Requirement: Option <name>` with the bare option name. The prefix is reserved: no other requirement
+  starts with the word "Option".
+- The body is one SHALL sentence and a `Field | Value` table with the rows `Type`, `Default`, and, for an `enum`,
+  `Enum`. Every value is one code span: `Type` holds the bare keyword `boolean` or `string` (not a JSON string), and
+  `Default` and `Enum` hold JSON literals (`"latest"`, `""`, `true`, `["closed","warn"]`). The default has the option's
+  type, and an `Enum` belongs only to a string option, holds the default, and lists the values in the order tools show
+  them. Write a `|` in a value as `\|`; a value holding a backtick cannot be written.
+- `proposals`, `description`, and the environment variable an option arrives in stay out of specs
+  (`devcontainer-feature.json` and `feature-authoring.md`, Metadata).
+- The requirement's scenarios cover what the option's values do, at least the omitted case; behavior that depends on
+  several options gets its own requirement. Scenario names never carry a value (`Omitted version`, not
+  `Latest by default`): a MODIFIED requirement must keep every scenario name, so a name holding an old default would
+  outlive it.
+- A feature without options has no Option requirement.
+
+```markdown
+### Requirement: Option failureMode
+
+The feature SHALL accept the option `failureMode` as declared here.
+
+| Field   | Value               |
+| ------- | ------------------- |
+| Type    | `string`            |
+| Default | `"closed"`          |
+| Enum    | `["closed","warn"]` |
+
+#### Scenario: Omitted failureMode
+
+- **WHEN** the feature is installed without `failureMode`
+- **THEN** a blocked connection fails the command
+```
+
+`just spec-check` reads every Option requirement in main specs and in active changes, then compares each
+`src/<id>/devcontainer-feature.json` with its spec as archive would produce it. Main specs always count; a change's
+deltas join once it has a `tasks.md`, since before the package gate the metadata still matches the main spec. A change
+that alters the options of a feature whose `src/<id>/` exists therefore keeps the `spec` check red from its `tasks.md`
+until the implementation updates the metadata. A change with a `tasks.md` that OpenSpec refuses to archive fails the
+check, quoting OpenSpec's reason. For a design's option table, see Source of truth.
+
 ## Update this file when
 
 - OpenSpec is upgraded, replaced, or its layout moves, or the pinned CI version changes.
@@ -192,3 +242,4 @@ change's `design.md`.
 - The management model or the authority policy changes in a way that touches acceptance.
 - The archive executor changes, or the `spec-archived` check is renamed or removed.
 - The rule for when a design is warranted changes.
+- The Option requirement format changes; `scripts/lib/options.ts` changes with it.

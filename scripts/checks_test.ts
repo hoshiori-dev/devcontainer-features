@@ -8,6 +8,7 @@ import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
 import { compatBumpProblems, inRepoRefProblem, scenarioImageProblems, scenarioImages } from "./validate.ts";
 import { type Compat, type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
+import { optionDifferences, parseOptionRequirements } from "./lib/options.ts";
 
 Deno.test("titleProblems accepts the convention", () => {
     assertEquals(titleProblems("feat(node): add pnpm option"), []);
@@ -55,7 +56,7 @@ Deno.test("bodyProblems wants whole heading lines and the template's own securit
 Deno.test("scaffold produces the required files for a valid id", () => {
     assert(ID_PATTERN.test("node-lts"));
     assert(!ID_PATTERN.test("Node"));
-    const files = Object.keys(scaffold("demo", "Demo"));
+    const files = Object.keys(scaffold("demo", "Demo", new Map()));
     for (
         const required of [
             "src/demo/install.sh",
@@ -68,13 +69,63 @@ Deno.test("scaffold produces the required files for a valid id", () => {
     }
 });
 
+Deno.test("scaffold declares exactly the spec's options and reads each one in install.sh", () => {
+    const spec = parseOptionRequirements(
+        [
+            "### Requirement: Option version",
+            "",
+            "The feature SHALL accept the option `version`.",
+            "",
+            "| Field | Value |",
+            "| ----- | ----- |",
+            "| Type | `string` |",
+            '| Default | `"latest"` |',
+            "",
+            "### Requirement: Option failure-mode",
+            "",
+            "The feature SHALL accept the option `failure-mode`.",
+            "",
+            "| Field | Value |",
+            "| ----- | ----- |",
+            "| Type | `string` |",
+            '| Default | `"a\\"$b}"` |',
+            '| Enum | `["a\\"$b}","warn"]` |',
+            "",
+            "### Requirement: Option installTools",
+            "",
+            "The feature SHALL accept the option `installTools`.",
+            "",
+            "| Field | Value |",
+            "| ----- | ----- |",
+            "| Type | `boolean` |",
+            "| Default | `false` |",
+            "",
+        ].join("\n"),
+    );
+    assertEquals(spec.problems, []);
+    const files = scaffold("demo", "Demo", spec.options);
+    assertEquals(optionDifferences(spec.options, JSON.parse(files["src/demo/devcontainer-feature.json"])), []);
+    const install = files["src/demo/install.sh"];
+    assert(install.includes('VERSION="${VERSION:-latest}"'), install);
+    assert(install.includes('FAILURE_MODE="${FAILURE_MODE:-a\\"\\$b\\}}"'), install);
+    assert(install.includes('INSTALLTOOLS="${INSTALLTOOLS:-false}"'), install);
+    assert(install.includes("(VERSION, FAILURE_MODE, INSTALLTOOLS)"), install);
+    const bare = scaffold("demo", "Demo", new Map());
+    assert(!("options" in JSON.parse(bare["src/demo/devcontainer-feature.json"])));
+    assert(bare["src/demo/install.sh"].includes("(none)"));
+});
+
 Deno.test("releaseTag uses <id>/v<version>", () => {
     assertEquals(releaseTag("node", "1.2.3"), "node/v1.2.3");
 });
 
 Deno.test("release.yml and new_feature.ts publish under REPO", async () => {
     assert((await Deno.readTextFile(".github/workflows/release.yml")).includes(`--namespace ${REPO}\n`));
-    assert(scaffold("demo", "Demo")["src/demo/devcontainer-feature.json"].includes(`github.com/${REPO}/tree/main`));
+    assert(
+        scaffold("demo", "Demo", new Map())["src/demo/devcontainer-feature.json"].includes(
+            `github.com/${REPO}/tree/main`,
+        ),
+    );
 });
 
 function repoWith(versions: Record<string, string>): RepoModel {
@@ -182,8 +233,12 @@ Deno.test("configProblems reports a file that is not valid YAML or not a mapping
 });
 
 Deno.test("exitCode fails on a dropped rule even when the generated files are current", () => {
-    assertEquals(exitCode(["rules.specs entry 1 is a mapping"], [], false), 1);
-    assertEquals(exitCode([], ["a generated file differs"], false), 1);
-    assertEquals(exitCode([], [], true), 1);
-    assertEquals(exitCode([], [], false), 0);
+    assertEquals(exitCode(["rules.specs entry 1 is a mapping"], [], false, []), 1);
+    assertEquals(exitCode([], ["a generated file differs"], false, []), 1);
+    assertEquals(exitCode([], [], true, []), 1);
+    assertEquals(exitCode([], [], false, []), 0);
+});
+
+Deno.test("exitCode fails on an option problem even when everything else passes", () => {
+    assertEquals(exitCode([], [], false, ['src/demo/devcontainer-feature.json: option "version": default ...']), 1);
 });
