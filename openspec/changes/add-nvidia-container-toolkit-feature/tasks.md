@@ -2,7 +2,7 @@
 
 ## 1. Scaffold and metadata
 
-- [ ] 1.1 Scaffold the feature with `just new-feature nvidia-container-toolkit --name "NVIDIA Container Toolkit"` and
+- [x] 1.1 Scaffold the feature with `just new-feature nvidia-container-toolkit --name "NVIDIA Container Toolkit"` and
       complete `src/nvidia-container-toolkit/devcontainer-feature.json`: version `1.0.0`, description,
       `documentationURL`, the options `version` (proposals `["latest","1.19.1"]`) and `configureDocker` with their
       descriptions, `installsAfter: ["ghcr.io/devcontainers/features/docker-in-docker"]`, and none of `dependsOn`,
@@ -15,7 +15,7 @@
 
 ## 2. Input and platform validation
 
-- [ ] 2.1 In `install.sh` (`#!/usr/bin/env bash`, `set -euo pipefail`), validate `version` as exactly `latest` or
+- [x] 2.1 In `install.sh` (`#!/usr/bin/env bash`, `set -euo pipefail`), validate `version` as exactly `latest` or
       `^[0-9]+\.[0-9]+\.[0-9]+$` with bash `[[ =~ ]]`, detect the family from `/etc/os-release` `ID` and `ID_LIKE` (apt;
       dnf requiring a `dnf` executable; zypper) and the architecture (`dpkg --print-architecture` or `uname -m`,
       amd64/x86_64 and arm64/aarch64), failing with a message naming the value, distribution, or architecture before
@@ -23,9 +23,9 @@
 
 ## 3. Signing key and repository
 
-- [ ] 3.1 Install `curl`, `ca-certificates`, and `gnupg`/`gpg2` from the image's own repositories only when missing;
+- [x] 3.1 Install `curl`, `ca-certificates`, and `gnupg`/`gpg2` from the image's own repositories only when missing;
       verify by review of `install.sh` and `shellcheck`
-- [ ] 3.2 Download the key with `curl --proto '=https' -fsSL` from `https://nvidia.github.io/libnvidia-container/gpgkey`
+- [x] 3.2 Download the key with `curl --proto '=https' -fsSL` from `https://nvidia.github.io/libnvidia-container/gpgkey`
       into a temporary `GNUPGHOME` with a feature-specific name that a `trap` removes on success and failure; accept it
       only when `gpg --show-keys --with-colons` yields exactly one `pub` record whose `fpr` is
       `C95B321B61E88C1809C4F759DDCAE044F796ECB0`, otherwise fail naming that fingerprint; export only that fingerprint
@@ -33,7 +33,7 @@
       `/etc/pki/rpm-gpg/RPM-GPG-KEY-nvidia-container-toolkit` (directory created when missing) followed by
       `rpm --import` (dnf, zypper); verify `shellcheck` passes and by review that no key reaches the package manager any
       other way
-- [ ] 3.3 Write the source definition whole at its fixed path: a `signed-by` line in
+- [x] 3.3 Write the source definition whole at its fixed path: a `signed-by` line in
       `/etc/apt/sources.list.d/nvidia-container-toolkit.list`, or `nvidia-container-toolkit.repo` under
       `/etc/yum.repos.d/` or `/etc/zypp/repos.d/` with `repo_gpgcheck=1`, `gpgcheck=1`, and a `gpgkey=file://` of the
       verified key, never `--gpg-auto-import-keys` or a remote `gpgkey=`; verify by review of `install.sh`
@@ -44,7 +44,7 @@
 
 ## 4. Packages and the version option
 
-- [ ] 4.1 Install the four packages together, unpinned for `latest` and pinned to `<version>-1` for an exact version,
+- [x] 4.1 Install the four packages together, unpinned for `latest` and pinned to `<version>-1` for an exact version,
       with explicit downgrades (apt `--allow-downgrades`, zypper `--oldpackage`, dnf `install` of the pinned versions);
       fail with a message naming the requested version when the install fails or when the four packages do not all
       report the requested version afterwards; clean the package-manager caches at the end; verify `shellcheck` passes
@@ -63,7 +63,7 @@
 
 ## 5. Docker runtime registration
 
-- [ ] 5.1 When `configureDocker` is true and a `dockerd` executable exists, treat a zero-length
+- [x] 5.1 When `configureDocker` is true and a `dockerd` executable exists, treat a zero-length
       `/etc/docker/daemon.json` as `{}` and run `nvidia-ctk runtime configure --runtime=docker` without
       `--nvidia-set-as-default` or `--cdi.enabled`, failing the build when it fails; otherwise print that the Docker
       configuration was skipped and leave the file alone; verify `shellcheck` passes and by review of `install.sh`
