@@ -22,5 +22,5 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Run `just check`, mark the PR ready, confirm GitHub reports it blocked while `spec-archived` is red, and
+- [x] 3.1 Run `just check`, mark the PR ready, confirm GitHub reports it blocked while `spec-archived` is red, and
       record each Acceptance item of proposal.md with its result in the PR's Validation section
