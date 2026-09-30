@@ -14,6 +14,15 @@ source dev-container-features-test-lib
 check "the first start is recorded as applied" record_current applied
 check "the start check passes" check_passes
 
+# error_with_reason PATTERN: the start check exits non-zero and prints an error naming PATTERN on
+# standard error (Failure reported as an error).
+error_with_reason() {
+  stderr=$("$SHARE/check.sh" 2>&1 >/dev/null)
+  status=$?
+  echo "$stderr"
+  [ "$status" != 0 ] && printf '%s\n' "$stderr" | grep -q "error:.*$1"
+}
+
 # Fetch fails
 nft -f - <<'EOF'
 table inet firewall-test {
@@ -35,7 +44,8 @@ check "the closed table is left" closed_table
 check "resolv.conf names the recorded resolvers" names_recorded_resolvers
 check "names still resolve" resolves github.com
 check "github.com on port 80 refused" refused http://github.com/
-check "the start check fails (failureMode closed)" check_fails
+check "the start check fails with the fetch as its reason (failureMode closed)" \
+  error_with_reason 'the start failed:.*api.github.com/meta'
 nft delete table inet firewall-test
 
 # Rules cannot be loaded
@@ -44,7 +54,7 @@ setpriv --inh-caps=-net_admin --ambient-caps=-net_admin --bounding-set=-net_admi
 check "without CAP_NET_ADMIN the start is recorded as not applied" record_current not-applied
 check "no rule of the feature is in place" no_table
 check "outbound traffic is unrestricted" reachable https://registry.npmjs.org/
-check "the start check fails" check_fails
+check "the start check fails with the not-applied reason" error_with_reason 'no rule could be loaded'
 
 # Resolver port taken (the previous run stopped the resolver)
 check "an unprivileged process holds 127.0.0.1:53" hold_resolver_port
