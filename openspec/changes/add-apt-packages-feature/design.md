@@ -98,10 +98,6 @@ through the AWS ECR mirror of the Docker official image because Docker Hub rate-
 - **POSIX `sh`, shared skeleton.** One skeleton keeps the five installers auditable side by side, and `alpine`, an image
   of the `apk-packages` sibling, ships no bash. This deviates from `feature-authoring.md` (Deviations). Rejected: bash
   with `set -euo pipefail`, which the convention calls for here because both apt images ship bash.
-- **One option, `packages`, a comma-separated string defaulting to empty.** `proposals` hold two lists installed on
-  neither image: `bc` and `bc,file`. Whitespace around entries and empty entries are dropped, so a trailing comma is
-  harmless. Rejected: an array (feature options are only `string` or `boolean`); `upgradePackages`, `ppas`, and
-  `preserveAptList` from prior art (out of scope).
 - **Validate, then the empty check, then the `apt-get` check.** A refused entry fails first on every image, so the same
   bad list gives the same message everywhere; the empty check runs before the `apt-get` check, so the default options
   succeed on any image, including one without `apt-get`. Rejected: failing on an image without `apt-get` even for an
@@ -141,6 +137,22 @@ through the AWS ECR mirror of the Docker official image because Docker Hub rate-
   scenario that carries a first install, which cannot reach `src/` from its context; two scenario keys for the feature,
   which the CLI installs once; extending `scripts/test_feature.ts` with expected-failure scenarios, a test
   infrastructure change outside this change (Open question 4).
+
+### Options
+
+The feature's only option; the delta spec's Option requirement states its contract.
+
+| Name       | Type     | Default | Enum or proposals              | Meaning                                                                                                                                                                                 |
+| ---------- | -------- | ------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages` | `string` | `""`    | proposals: `"bc"`, `"bc,file"` | Comma-separated entries (`name`, `name=version`, `name:architecture`) that `apt-get` installs; whitespace around entries and empty entries are dropped, so a trailing comma is harmless |
+
+- **Default `""`.** An empty list installs nothing and, because the empty check runs before the `apt-get` check,
+  succeeds on any image, including one without `apt-get` (decision "Validate, then the empty check, then the `apt-get`
+  check"). The proposals are two lists installed on neither image, so the install-twice test installs real packages
+  (Goals).
+- **Rejected shapes:** an array (feature options are only `string` or `boolean`); `upgradePackages`, `ppas`, and
+  `preserveAptList` from prior art (out of scope); options for recommended packages, target releases, or keeping the
+  index lists (Non-Goals).
 
 ### Deviations from `feature-authoring.md`
 
@@ -197,7 +209,7 @@ duplicate.sh.
 | Listed packages are installed                                                                                                                              | Scenario on each image; duplicate.sh with the `proposals` list                                                                                                                                          |
 | Recommended packages are left out; Spaces and empty entries are ignored                                                                                    | Scenario                                                                                                                                                                                                |
 | Listed package already installed at its candidate version                                                                                                  | Direct: installs a package, lists it again, and compares the version                                                                                                                                    |
-| Empty list is a no-op                                                                                                                                      | test.sh; Direct on an image without `apt-get`                                                                                                                                                           |
+| Omitted packages; Empty list is a no-op                                                                                                                    | test.sh; Direct on an image without `apt-get`                                                                                                                                                           |
 | Pinned version is installed                                                                                                                                | Direct: the runner reads the offered versions at run time and pins one, so no fixed version goes stale                                                                                                  |
 | Unavailable pinned version fails; Architecture the image has not enabled fails                                                                             | Direct                                                                                                                                                                                                  |
 | Native architecture qualifier is installed                                                                                                                 | Scenario with `:amd64`                                                                                                                                                                                  |

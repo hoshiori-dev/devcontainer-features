@@ -12,12 +12,40 @@ Upstream sources:
 
 ## ADDED Requirements
 
+### Requirement: Option packages
+
+The feature SHALL accept the option `packages` as declared here, a comma-separated list of package entries in which
+whitespace around an entry and empty entries are ignored, and SHALL succeed without changing the image when the list
+names no package.
+
+| Field   | Value    |
+| ------- | -------- |
+| Type    | `string` |
+| Default | `""`     |
+
+#### Scenario: Omitted packages
+
+- **WHEN** the feature is installed without `packages`
+- **THEN** the feature exits with status 0, installs and removes nothing, and does not refresh the package index, also
+  on an image without `apt-get`
+
+#### Scenario: Empty list is a no-op
+
+- **WHEN** `packages` is empty or holds only commas and whitespace
+- **THEN** the feature exits with status 0, installs and removes nothing, and does not refresh the package index, also
+  on an image without `apt-get`
+
+#### Scenario: Spaces and empty entries are ignored
+
+- **WHEN** `packages` has spaces and tabs around its entries and an empty entry between two commas
+- **THEN** the named packages are installed exactly as if the whitespace and the empty entry were absent
+
 ### Requirement: Install the listed packages
 
 The feature SHALL install, with `apt-get`, every package named in the comma-separated `packages` option, taking each
 package and its dependencies only from the repositories configured in the image. It SHALL NOT install packages that a
 listed package only recommends or suggests, and SHALL NOT upgrade installed packages other than the listed packages and
-what they need. Whitespace around an entry and empty entries SHALL be ignored.
+what they need.
 
 #### Scenario: Listed packages are installed
 
@@ -29,26 +57,11 @@ what they need. Whitespace around an entry and empty entries SHALL be ignored.
 - **WHEN** `packages` names a package that recommends another package which nothing installed depends on
 - **THEN** the listed package is installed and the recommended package is not
 
-#### Scenario: Spaces and empty entries are ignored
-
-- **WHEN** `packages` has spaces and tabs around its entries and an empty entry between two commas
-- **THEN** the named packages are installed exactly as if the whitespace and the empty entry were absent
-
 #### Scenario: Listed package already installed at its candidate version
 
 - **WHEN** `packages` names, without a version, a package that is already installed at the candidate version apt selects
   from the configured repositories and their pin priorities
 - **THEN** the feature succeeds and the package stays at that version
-
-### Requirement: Empty package list
-
-The feature SHALL succeed without changing the image when `packages` names no package.
-
-#### Scenario: Empty list is a no-op
-
-- **WHEN** `packages` is empty or holds only commas and whitespace
-- **THEN** the feature exits with status 0, installs and removes nothing, and does not refresh the package index, also
-  on an image without `apt-get`
 
 ### Requirement: Version and architecture qualifiers
 
