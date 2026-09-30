@@ -50,22 +50,71 @@ SHALL NOT add a package repository or signing key, and SHALL NOT download anythi
 - **WHEN** the feature has been installed
 - **THEN** the image's package repository and signing key configuration is unchanged
 
-### Requirement: Option validation at build time
+### Requirement: Option presets
 
-The install SHALL reject, with a message naming the offending value:
+The feature SHALL accept the option `presets` as declared here: comma-separated names of the destination sets of
+Requirement: Presets, ignoring surrounding whitespace and empty entries, combined as the union of their destinations,
+with an empty list selecting none and an entry that is not a known preset failing the install with a message naming it.
 
-- a `presets` entry that is not a known preset;
-- an `allowedDomains` entry that is not a valid DNS name, including an entry with a wildcard label such as `*.example`
-  (subdomains are always included);
-- an `allowedCidrs` entry that is not a valid IPv4 or IPv6 address or CIDR, that has bits set outside its prefix length,
-  or whose range contains `192.0.2.1`, the address the start check probes (Requirement: Start check).
+| Field   | Value      |
+| ------- | ---------- |
+| Type    | `string`   |
+| Default | `"github"` |
 
-Entries in these options are separated by commas; surrounding whitespace and empty entries are ignored.
+#### Scenario: Omitted presets
+
+- **WHEN** the feature is installed without `presets`
+- **THEN** the `github` preset is selected and no other
 
 #### Scenario: Unknown preset
 
 - **WHEN** `presets` contains a name that is not a known preset
 - **THEN** the build fails with a message naming that entry
+
+#### Scenario: Presets combine
+
+- **WHEN** `presets` contains `github` and `npm`
+- **THEN** both `api.github.com` and `registry.npmjs.org` are reachable
+
+### Requirement: Option allowedDomains
+
+The feature SHALL accept the option `allowedDomains` as declared here: comma-separated DNS names, ignoring surrounding
+whitespace and empty entries, each allowed as Requirement: Allowed domains states, with an entry that is not a valid DNS
+name, including an entry with a wildcard label such as `*.example` (subdomains are always included), failing the install
+with a message naming it.
+
+| Field   | Value    |
+| ------- | -------- |
+| Type    | `string` |
+| Default | `""`     |
+
+#### Scenario: Omitted allowedDomains
+
+- **WHEN** the feature is installed without `allowedDomains`
+- **THEN** no domain is allowed beyond those of the selected presets
+
+### Requirement: Option allowedCidrs
+
+The feature SHALL accept the option `allowedCidrs` as declared here: comma-separated IPv4 or IPv6 addresses or CIDRs,
+ignoring surrounding whitespace and empty entries, each allowing every address in that range, or that single address, on
+every protocol and port, with an entry that is not a valid IPv4 or IPv6 address or CIDR, that has bits set outside its
+prefix length, or whose range contains `192.0.2.1`, the address the start check probes (Requirement: Start check),
+failing the install with a message naming it.
+
+| Field   | Value    |
+| ------- | -------- |
+| Type    | `string` |
+| Default | `""`     |
+
+#### Scenario: Omitted allowedCidrs
+
+- **WHEN** the feature is installed without `allowedCidrs`
+- **THEN** no address range is allowed beyond those of the selected presets
+
+#### Scenario: IPv4 and IPv6 ranges
+
+- **WHEN** `allowedCidrs` lists one IPv4 and one IPv6 range
+- **THEN** connections to addresses in either range are allowed and addresses outside both stay refused
 
 #### Scenario: Malformed CIDR
 
@@ -77,6 +126,60 @@ Entries in these options are separated by commas; surrounding whitespace and emp
 - **WHEN** `allowedCidrs` contains an entry with host bits set, or an entry such as `0.0.0.0/0` that contains
   `192.0.2.1`
 - **THEN** the build fails with a message naming that entry
+
+### Requirement: Option failureMode
+
+The feature SHALL accept the option `failureMode` as declared here, which decides what a failed start (Requirement:
+Failure mode) leaves in place: with `closed`, only loopback and the DNS resolvers stay reachable, and with `warn`, every
+rule the feature applied is removed, leaving outbound traffic unrestricted by the feature.
+
+| Field   | Value               |
+| ------- | ------------------- |
+| Type    | `string`            |
+| Default | `"closed"`          |
+| Enum    | `["closed","warn"]` |
+
+#### Scenario: Omitted failureMode
+
+- **WHEN** the feature is installed without `failureMode` and a start fails after the rules could be loaded
+- **THEN** only loopback and the DNS resolvers are reachable and the start is recorded as failed
+
+#### Scenario: Failed start leaves only the resolvers
+
+- **WHEN** `failureMode` is `closed` and a start fails after the rules could be loaded
+- **THEN** only loopback and the DNS resolvers are reachable and the start is recorded as failed
+
+#### Scenario: Failed start removes the rules
+
+- **WHEN** `failureMode` is `warn` and a start fails
+- **THEN** the feature leaves no rule in place and the start is recorded as failed with its reason
+
+### Requirement: Option filterForward
+
+The feature SHALL accept the option `filterForward` as declared here: when it is enabled, traffic that the container
+forwards, such as traffic of containers nested in it, is subject to the same allowlist as its own outbound traffic,
+including the DNS restriction, and when it is disabled, the feature does not filter forwarded traffic.
+
+| Field   | Value     |
+| ------- | --------- |
+| Type    | `boolean` |
+| Default | `true`    |
+
+#### Scenario: Omitted filterForward
+
+- **WHEN** the feature is installed without `filterForward` and a container nested inside connects to a host no option
+  allows
+- **THEN** the connection is refused
+
+#### Scenario: Nested container filtered
+
+- **WHEN** `filterForward` is enabled and a container nested inside connects to a host no option allows
+- **THEN** the connection is refused
+
+#### Scenario: Forwarded traffic not filtered
+
+- **WHEN** `filterForward` is disabled and a nested container connects to a host no option allows
+- **THEN** the feature does not refuse it
 
 ### Requirement: Firewall applied at every start
 
@@ -145,16 +248,6 @@ obtain through its resolver SHALL stay refused unless another option allows it.
   start, and no other option allows it
 - **THEN** the connection is refused
 
-### Requirement: Allowed CIDRs
-
-Each `allowedCidrs` entry SHALL allow every address in that IPv4 or IPv6 range, or that single address, on every
-protocol and port.
-
-#### Scenario: IPv4 and IPv6 ranges
-
-- **WHEN** `allowedCidrs` lists one IPv4 and one IPv6 range
-- **THEN** connections to addresses in either range are allowed and addresses outside both stay refused
-
 ### Requirement: Presets
 
 `presets` SHALL select named destination sets, each allowing the domains listed here the way `allowedDomains` allows
@@ -170,19 +263,13 @@ them, plus the ranges named for it. Each set follows the source named with it:
   `marketplace.visualstudio.com`, `gallery.vsassets.io`, `gallerycdn.vsassets.io`, which cover VS Code Server and
   Marketplace downloads only. Source: https://code.visualstudio.com/docs/setup/network
 
-`NOTES.md` SHALL name the hosts that a preset's source lists and the preset leaves out. Several presets SHALL combine as
-the union of their destinations; an empty `presets` SHALL select none.
+`NOTES.md` SHALL name the hosts that a preset's source lists and the preset leaves out.
 
 #### Scenario: GitHub preset
 
 - **WHEN** `presets` contains `github`
 - **THEN** HTTPS connections to `github.com` and `api.github.com` succeed and a connection to a host outside every
   allowed set is refused
-
-#### Scenario: Presets combine
-
-- **WHEN** `presets` contains `github` and `npm`
-- **THEN** both `api.github.com` and `registry.npmjs.org` are reachable
 
 #### Scenario: No preset
 
@@ -236,47 +323,23 @@ the `search` and `options` lines of `/etc/resolv.conf` intact.
 
 ### Requirement: Forwarded traffic
 
-When `filterForward` is enabled, traffic that the container forwards, such as traffic of containers nested in it, SHALL
-be subject to the same allowlist as its own outbound traffic, including the DNS restriction. When it is disabled, the
-feature SHALL NOT filter forwarded traffic. In both cases, traffic from the container to networks that exist only inside
-it, such as the bridges of a nested Docker daemon, traffic forwarded into those networks, and reply traffic of forwarded
-connections that were allowed SHALL be allowed.
-
-#### Scenario: Nested container filtered
-
-- **WHEN** `filterForward` is enabled and a container nested inside connects to a host no option allows
-- **THEN** the connection is refused
+Whatever `filterForward` is, traffic from the container to networks that exist only inside it, such as the bridges of a
+nested Docker daemon, traffic forwarded into those networks, and reply traffic of forwarded connections that were
+allowed SHALL be allowed; which forwarded traffic the allowlist filters is stated in Requirement: Option filterForward.
 
 #### Scenario: Nested container on a user-defined network reaches an allowed domain
 
 - **WHEN** `filterForward` is enabled and a nested container on a user-defined network connects to an allowed domain
 - **THEN** the connection succeeds
 
-#### Scenario: Forward filtering disabled
-
-- **WHEN** `filterForward` is disabled and a nested container connects to a host no option allows
-- **THEN** the feature does not refuse it
-
 ### Requirement: Failure mode
 
 A start SHALL be a failure when the rules for the configured options cannot be applied in full: the rules cannot be
-loaded, the GitHub ranges fetch fails, or the resolver that learns allowed domains cannot start. With `failureMode`
-`closed`, a failed start SHALL leave only loopback and the DNS resolvers reachable. With `failureMode` `warn`, a failed
-start SHALL remove every rule the feature applied, leaving outbound traffic unrestricted by the feature. In both modes
-the start SHALL be recorded as failed with its reason. When no rule can be loaded at all (the container lacks
-`NET_ADMIN`, the entrypoint does not run as root, or the kernel lacks nftables support), outbound traffic stays
-unrestricted in both modes. A resolver that exits after a successful start SHALL NOT change the recorded result or the
-rules; name lookups then fail until the next start.
-
-#### Scenario: Closed on failure
-
-- **WHEN** `failureMode` is `closed` and a start fails after the rules could be loaded
-- **THEN** only loopback and the DNS resolvers are reachable and the start is recorded as failed
-
-#### Scenario: Warn on failure
-
-- **WHEN** `failureMode` is `warn` and a start fails
-- **THEN** the feature leaves no rule in place and the start is recorded as failed with its reason
+loaded, the GitHub ranges fetch fails, or the resolver that learns allowed domains cannot start. What a failed start
+leaves in place is stated in Requirement: Option failureMode; in both modes the start SHALL be recorded as failed with
+its reason. When no rule can be loaded at all (the container lacks `NET_ADMIN`, the entrypoint does not run as root, or
+the kernel lacks nftables support), outbound traffic stays unrestricted in both modes. A resolver that exits after a
+successful start SHALL NOT change the recorded result or the rules; name lookups then fail until the next start.
 
 #### Scenario: Rules cannot be loaded
 
@@ -296,12 +359,12 @@ after a warning on standard error.
 - **WHEN** the current start was applied and a destination outside the allowlist is refused
 - **THEN** the check exits zero and prints a one-line summary
 
-#### Scenario: Failure with closed mode
+#### Scenario: Failure reported as an error
 
 - **WHEN** `failureMode` is `closed` and the current start failed or was not applied
 - **THEN** the check prints the reason and exits non-zero, so the dev container tool reports the failure
 
-#### Scenario: Failure with warn mode
+#### Scenario: Failure reported as a warning
 
 - **WHEN** `failureMode` is `warn` and the current start failed or was not applied
 - **THEN** the check prints a warning with the reason on standard error and exits zero

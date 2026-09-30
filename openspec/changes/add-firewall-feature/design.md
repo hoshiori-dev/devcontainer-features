@@ -225,17 +225,23 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   after common-utils has created the remote user and upgraded packages (`upgradePackages`), and the "No sudoers entry"
   test sees common-utils' final sudoers and groups. Neither is a functional dependency, so no `dependsOn`. References
   use the full GHCR refs without a tag.
-- **Option shape** (maintainer decision). Types and defaults, owned by `devcontainer-feature.json` once it exists:
+- **Option shape.** Names, types, and defaults are maintainer decisions. Every option is new; the delta spec's Option
+  requirements are normative and win where this table differs:
 
-  | Option           | Type                                 | Default    |
-  | ---------------- | ------------------------------------ | ---------- |
-  | `presets`        | string, comma-separated, `proposals` | `"github"` |
-  | `allowedDomains` | string, comma-separated              | `""`       |
-  | `allowedCidrs`   | string, comma-separated              | `""`       |
-  | `failureMode`    | enum `closed`, `warn`                | `"closed"` |
-  | `filterForward`  | boolean                              | `true`     |
+  | Option           | Type    | Default    | Enum or proposals                                                  | Meaning                                                                                                                                                 |
+  | ---------------- | ------- | ---------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `presets`        | string  | `"github"` | proposals `"github"`, `"npm"`, `"pypi"`, `"anthropic"`, `"vscode"` | Comma-separated named destination sets to allow                                                                                                         |
+  | `allowedDomains` | string  | `""`       | none                                                               | Comma-separated domains to allow, each with every subdomain                                                                                             |
+  | `allowedCidrs`   | string  | `""`       | none                                                               | Comma-separated IPv4 or IPv6 addresses or CIDRs to allow                                                                                                |
+  | `failureMode`    | string  | `"closed"` | enum `"closed"`, `"warn"`                                          | When the rules cannot be applied in full: closed keeps only loopback and DNS reachable and fails the start check; warn removes the rules and only warns |
+  | `filterForward`  | boolean | `true`     | none                                                               | Apply the allowlist to traffic the container forwards, such as that of nested containers                                                                |
 
-  Rejected: one boolean per preset (`w3cj`), which turns every new preset into a new option.
+  Defaults: `presets` is `"github"` by the maintainer's decision (Open Questions 2). `allowedDomains` and `allowedCidrs`
+  are empty, so nothing beyond the presets is allowed unless named. `failureMode` is `"closed"` so a start that cannot
+  apply the rules stays restricted and fails loudly, which is what surfaces a firewall that is not in force; `warn` is
+  for containers that must start anyway (Risks). `filterForward` is `true` so nested containers' traffic is filtered by
+  default, as the proposal states, instead of leaving a nested Docker daemon as an unfiltered way out. Rejected: one
+  boolean per preset (`w3cj`), which turns every new preset into a new option.
 - **POSIX `sh`.** Alpine ships no bash, so `install.sh` and the start-time scripts use `#!/bin/sh` with `set -eu`.
 
 ### Security review surface
@@ -288,44 +294,44 @@ Planned scenarios, all on `debian:12` (amd64) where the test runs as root: `doma
 after stopping dnsmasq, deleting the feature's table, leaving `resolv.conf` naming dnsmasq, adding a table of its own,
 and setting variables named like the options. A "Validation" entry is a run recorded in the PR's Validation section.
 
-| Scenario of the spec                                        | Covered by                                                                                                              |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Supported image                                             | `test.sh` on every image                                                                                                |
-| Unsupported distribution                                    | Validation: `devcontainer build` on an image of an unsupported distribution                                             |
-| Package verification fails                                  | Validation: `devcontainer build` from a Dockerfile that removes the image's archive keys                                |
-| No repository added                                         | Review of `install.sh`; `test.sh` asserts no repository or key file names the feature                                   |
-| Unknown preset, Malformed CIDR, CIDR that cannot be applied | Validation: `devcontainer build` runs (Goals: Validated options, twice)                                                 |
-| First start                                                 | `test.sh` (record of the current start is `applied`); ordering by review of the entrypoint                              |
-| Restart re-applies the same rules                           | `rerun`; Validation: `docker restart`, then the check as the remote user                                                |
-| Allowed domain is reachable, GitHub preset                  | `test.sh` (`github.com`, `api.github.com`)                                                                              |
-| Unlisted domain is refused                                  | `test.sh` (`registry.npmjs.org`)                                                                                        |
-| IPv6 default deny                                           | `rerun` asserts the IPv6 rules and the reject in the ruleset; Validation: a container on an IPv6-enabled Docker network |
-| Inbound connection still answered                           | Validation: a published port reached from the host; `rerun` asserts that the table has no `input` chain                 |
-| Subdomain of an allowed domain, No preset                   | `domains`                                                                                                               |
-| Address not obtained through the resolver                   | `domains` (a literal address of `github.com`)                                                                           |
-| IPv4 and IPv6 ranges                                        | `cidrs` (IPv4 by connection, IPv6 by ruleset); Validation: IPv6 on an IPv6-enabled Docker network                       |
-| Presets combine                                             | `github-npm`                                                                                                            |
-| Ranges loaded                                               | `test.sh` (learned sets flushed as root, then a literal `github.com` address)                                           |
-| Fetch fails                                                 | `fetch-fails` (a table of its own drops traffic to `api.github.com`, script re-run)                                     |
-| GitHub preset not selected                                  | `domains` (the record names no fetch)                                                                                   |
-| Other DNS server refused                                    | `test.sh` (TCP to `8.8.8.8` port 53 is refused at once)                                                                 |
-| Unlisted name still resolves                                | `test.sh` (`registry.npmjs.org` resolves and is refused)                                                                |
-| Nested container filtered, user-defined network             | `dind`                                                                                                                  |
-| Forward filtering disabled                                  | `dind-no-forward`                                                                                                       |
-| Closed on failure, Failure with closed mode                 | `fetch-fails` (check exits non-zero)                                                                                    |
-| Warn on failure, Failure with warn mode                     | `warn`                                                                                                                  |
-| Rules cannot be loaded                                      | `fetch-fails` (table deleted, script re-run under `setpriv` without `CAP_NET_ADMIN`)                                    |
-| Firewall in force                                           | `test.sh` (the check as the remote user)                                                                                |
-| Stale record                                                | `rerun` (record's start time set to an earlier one, check run)                                                          |
-| Remote user reads the record                                | `test.sh` on `base:ubuntu-24.04` as `vscode`                                                                            |
-| No sudoers entry                                            | `test.sh`                                                                                                               |
-| Environment does not change the rules                       | `rerun`                                                                                                                 |
-| Other rules untouched                                       | `rerun`                                                                                                                 |
-| With docker-in-docker                                       | `dind`                                                                                                                  |
-| Metadata of a built container                               | `test.sh` (bounding set is Docker's default plus `NET_ADMIN`)                                                           |
-| Root removes the firewall                                   | `rerun` (`registry.npmjs.org` reachable after the table is deleted, before the re-run)                                  |
-| Different options the second time                           | `duplicate.sh`                                                                                                          |
-| Same options twice                                          | Validation: `install.sh` run twice with the same options in a plain container of each image                             |
+| Scenario of the spec                                                                      | Covered by                                                                                                              |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Supported image                                                                           | `test.sh` on every image                                                                                                |
+| Unsupported distribution                                                                  | Validation: `devcontainer build` on an image of an unsupported distribution                                             |
+| Package verification fails                                                                | Validation: `devcontainer build` from a Dockerfile that removes the image's archive keys                                |
+| No repository added                                                                       | Review of `install.sh`; `test.sh` asserts no repository or key file names the feature                                   |
+| Unknown preset, Malformed CIDR, CIDR that cannot be applied                               | Validation: `devcontainer build` runs (Goals: Validated options, twice)                                                 |
+| First start                                                                               | `test.sh` (record of the current start is `applied`); ordering by review of the entrypoint                              |
+| Restart re-applies the same rules                                                         | `rerun`; Validation: `docker restart`, then the check as the remote user                                                |
+| Allowed domain is reachable, GitHub preset, Omitted presets                               | `test.sh` (`github.com`, `api.github.com`)                                                                              |
+| Unlisted domain is refused, Omitted allowedDomains, Omitted allowedCidrs                  | `test.sh` (`registry.npmjs.org`)                                                                                        |
+| IPv6 default deny                                                                         | `rerun` asserts the IPv6 rules and the reject in the ruleset; Validation: a container on an IPv6-enabled Docker network |
+| Inbound connection still answered                                                         | Validation: a published port reached from the host; `rerun` asserts that the table has no `input` chain                 |
+| Subdomain of an allowed domain, No preset                                                 | `domains`                                                                                                               |
+| Address not obtained through the resolver                                                 | `domains` (a literal address of `github.com`)                                                                           |
+| IPv4 and IPv6 ranges                                                                      | `cidrs` (IPv4 by connection, IPv6 by ruleset); Validation: IPv6 on an IPv6-enabled Docker network                       |
+| Presets combine                                                                           | `github-npm`                                                                                                            |
+| Ranges loaded                                                                             | `test.sh` (learned sets flushed as root, then a literal `github.com` address)                                           |
+| Fetch fails                                                                               | `fetch-fails` (a table of its own drops traffic to `api.github.com`, script re-run)                                     |
+| GitHub preset not selected                                                                | `domains` (the record names no fetch)                                                                                   |
+| Other DNS server refused                                                                  | `test.sh` (TCP to `8.8.8.8` port 53 is refused at once)                                                                 |
+| Unlisted name still resolves                                                              | `test.sh` (`registry.npmjs.org` resolves and is refused)                                                                |
+| Nested container filtered, user-defined network, Omitted filterForward                    | `dind`                                                                                                                  |
+| Forwarded traffic not filtered                                                            | `dind-no-forward`                                                                                                       |
+| Omitted failureMode, Failed start leaves only the resolvers, Failure reported as an error | `fetch-fails` (check exits non-zero)                                                                                    |
+| Failed start removes the rules, Failure reported as a warning                             | `warn`                                                                                                                  |
+| Rules cannot be loaded                                                                    | `fetch-fails` (table deleted, script re-run under `setpriv` without `CAP_NET_ADMIN`)                                    |
+| Firewall in force                                                                         | `test.sh` (the check as the remote user)                                                                                |
+| Stale record                                                                              | `rerun` (record's start time set to an earlier one, check run)                                                          |
+| Remote user reads the record                                                              | `test.sh` on `base:ubuntu-24.04` as `vscode`                                                                            |
+| No sudoers entry                                                                          | `test.sh`                                                                                                               |
+| Environment does not change the rules                                                     | `rerun`                                                                                                                 |
+| Other rules untouched                                                                     | `rerun`                                                                                                                 |
+| With docker-in-docker                                                                     | `dind`                                                                                                                  |
+| Metadata of a built container                                                             | `test.sh` (bounding set is Docker's default plus `NET_ADMIN`)                                                           |
+| Root removes the firewall                                                                 | `rerun` (`registry.npmjs.org` reachable after the table is deleted, before the re-run)                                  |
+| Different options the second time                                                         | `duplicate.sh`                                                                                                          |
+| Same options twice                                                                        | Validation: `install.sh` run twice with the same options in a plain container of each image                             |
 
 ## URL inventory
 
