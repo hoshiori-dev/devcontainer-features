@@ -20,6 +20,6 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Run `just check`, push, and confirm the CI, PR, and Secret Scanning workflows and the CodeQL analysis pass on
+- [x] 3.1 Run `just check`, push, and confirm the CI, PR, and Secret Scanning workflows and the CodeQL analysis pass on
       this PR with the setting on; record each Acceptance item of proposal.md with its result in the PR's Validation
       section
