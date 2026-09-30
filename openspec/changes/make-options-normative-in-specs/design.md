@@ -47,6 +47,8 @@
   contract.
 - Detecting two active changes that modify the same Option requirement (see Context).
 - Editing the open feature drafts.
+- Machine-checking a design's option table against its delta spec; the design's format is free, and the package gate
+  reviews both side by side.
 
 ## Decisions
 
@@ -111,21 +113,30 @@
   edited by hand.
 - **A shared parser in `scripts/lib/`**, used by `check_openspec.ts` and `new_feature.ts`, with no permissions of its
   own. Rejected: exporting it from `check_openspec.ts` — importing that module pulls in its YAML parser and the
-  environment reads it needs into `new_feature.ts`. Touching `scripts/lib/` makes CI run the canary features on this PR;
-  that cost is accepted.
+  environment reads it needs into `new_feature.ts`. Touching `scripts/lib/` makes CI select the canary set on this PR,
+  which is empty today; that cost is accepted.
 - **`just new-feature <id>` reads the delta spec of the one active change holding `specs/<id>/`** and writes each Option
   requirement into the metadata (type, default, `enum`, a TODO description) and into `install.sh` as a variable with its
   default. No active change, or more than one, is an error naming them.
+- **A design describes the options its change touches**, as a table of every option the change adds, changes, renames,
+  or removes: name, type, default, `enum` or `proposals`, and meaning (the draft of `description`), followed by the
+  reason for each default and the rejected option shapes. Untouched options are not listed. The delta spec wins where
+  the two differ, and the design is frozen at archive, so this restatement never outlives the change. It is the only
+  place `proposals` and the meaning are reviewed before `devcontainer-feature.json` exists, and the duplicate test
+  depends on the chosen proposals. Rejected: values in the delta spec only, with the design giving reasons — the
+  reviewer reads options scattered over one requirement each, and `proposals` have no place at the package gate; listing
+  every option — restates the untouched ones for no review benefit.
 - **Rule wording and placement.** `rules.specs` swaps "leave their types and defaults to devcontainer-feature.json" for
-  a pointer to the format; the `rules.design` entry that already names option changes gains "record why each default was
-  chosen and the rejected option shapes; the values live in the delta spec", so the trigger stays stated once. In
-  `spec-workflow.md`, the Source of truth options row names the Option requirements as the rule and the change's design
-  (reasons only) under "Points to it"; a note beside the table says `devcontainer-feature.json` implements them the way
-  `install.sh` implements behavior and `just spec-check` keeps them equal, so it is neither a pointer nor a second
-  source. A second row gives `proposals` and `description` to `devcontainer-feature.json`, with the README pointing to
-  it. The Option requirements section also says that writing `tasks.md` turns the comparison on for that change, and
-  "Update this file when" gains the format changing (with the shared parser). Artifact operations and the package gate's
-  review list name the check and each option's requirement.
+  a pointer to the format; the `rules.design` entry that already names option changes gains the option table and its
+  reasons, so the trigger stays stated once. In `spec-workflow.md`, the Source of truth options row names the Option
+  requirements as the rule and the change's design under "Points to it", and the rule under the table that a pointer
+  "never restates the fact" gains one exception scoped to that row: a design may list the options its change touches,
+  frozen at archive, the delta spec winning where they differ. A note beside the table says `devcontainer-feature.json`
+  implements them the way `install.sh` implements behavior and `just spec-check` keeps them equal, so it is neither a
+  pointer nor a second source. A second row gives `proposals` and `description` to `devcontainer-feature.json`, with the
+  README pointing to it. The Option requirements section also says that writing `tasks.md` turns the comparison on for
+  that change, and "Update this file when" gains the format changing (with the shared parser). Artifact operations and
+  the package gate's review list name the check and each option's requirement.
 
 ## Risks / Trade-offs
 
@@ -138,11 +149,15 @@
   feature change; the check runs again on `main` after each merge.
 - [A scenario name carries a value and outlives it] → The format section says why names stay neutral; reviewed at the
   package gate, not machine-checked.
+- [A design's option table and its delta spec diverge during the deliberation] → The delta spec wins by rule, the
+  package gate reviews both, and a maintainer's requested change is carried into both before the gate closes; an
+  archived design that disagrees with a later implementation is history, not contract.
 - [The line between an Option requirement and a multi-option behavior requirement blurs] → The format section's example
   and the rule "behavior that depends on several options gets its own requirement".
 
 ## Migration Plan
 
 No main spec exists, so nothing on `main` migrates. Each open feature draft adds Option requirements to its own ADDED
-delta before its package gate closes; the drafts that already hold `devcontainer-feature.json` copy their values from it
-and ask the maintainer to confirm the added requirements.
+delta and gathers its option facts into the design's option table before its package gate closes; the drafts that
+already hold `devcontainer-feature.json` copy their values from it and ask the maintainer to confirm the added
+requirements.

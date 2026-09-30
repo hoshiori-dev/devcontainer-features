@@ -18,11 +18,13 @@ rationale; no feature has merged yet, so no main spec needs migrating.
   default, and `enum` values. Its scenarios cover what the option's values do.
 - `.agents/knowledge/spec-workflow.md` defines the Option requirement format, and its Source of truth table makes the
   spec's Option requirements the owner of option names, types, defaults, and `enum` values.
-  `src/<id>/devcontainer-feature.json` implements them and keeps sole ownership of `proposals` and `description`. The
-  package gate's review names each option's requirement.
+  `src/<id>/devcontainer-feature.json` implements them and keeps sole ownership of `proposals` and `description`. A
+  change's design may list the options that change touches — the one restatement the table allows, frozen at archive,
+  with the delta spec winning where the two differ. The package gate's review names each option's requirement.
 - `rules.specs` in `openspec/config.yaml` points to that format instead of leaving types and defaults to
-  `devcontainer-feature.json`; `rules.design` says a design records why each default was chosen and the rejected option
-  shapes, while the values live in the delta spec.
+  `devcontainer-feature.json`; `rules.design` asks a design to describe, in a table, every option the change adds,
+  changes, renames, or removes — name, type, default, `enum` or `proposals`, and meaning — with the reason for each
+  default and the rejected option shapes.
 - `just spec-check` — and so `just check` and the CI `spec` job — fails when a feature's options in
   `devcontainer-feature.json` differ from its spec, naming the feature, the option, and the field; an option change
   counts from the moment its implementation starts. It also fails when an Option requirement in a main spec or an active
@@ -58,9 +60,11 @@ None. This change edits the harness only (`skip_specs: true`).
 
 - `.agents/knowledge/spec-workflow.md` defines the Option requirement format, and its Source of truth table names the
   spec's Option requirements as the owner of option names, types, defaults, and `enum` values, and
-  `devcontainer-feature.json` as the owner of `proposals` and `description`.
+  `devcontainer-feature.json` as the owner of `proposals` and `description`; it lets a change's design list the options
+  that change touches, frozen at archive, with the delta spec winning where the two differ.
 - No rule in `openspec/config.yaml` and no knowledge file tells authors to leave option types or defaults out of specs;
-  `rules.specs` points to the Option requirement format, and `rules.design` asks for the reasons behind each default.
+  `rules.specs` points to the Option requirement format, and `rules.design` asks for the table of the options a change
+  touches (name, type, default, `enum` or `proposals`, meaning) with the reasons behind each default.
 - In a copy of the repository holding a feature whose spec and `devcontainer-feature.json` agree, `just spec-check`
   passes; changing the default, the type, or the `enum` values on one side, or adding an option to one side only, makes
   it fail with a message naming the feature, the option, and the field.
@@ -86,6 +90,7 @@ None. This change edits the harness only (`skip_specs: true`).
   generated-files check.
 - `just spec-check` changes nothing in the working tree, and it sees changes that are not committed yet, untracked files
   included.
+- No row of the Source of truth table other than the options row gains an exception to "never restates the fact".
 - The approval gates keep their owners, modes, and order.
 - No file of an open feature draft changes in this PR, and no feature version changes.
 - `just check` passes, and every required check passes on this PR.
