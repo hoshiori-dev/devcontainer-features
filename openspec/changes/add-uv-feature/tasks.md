@@ -20,16 +20,16 @@
       architecture, an unsupported distribution, or a missing remote user, all before any download or file change;
       verify with shellcheck and review against "Option version", "Option toolsToInstall", and "Fail on unsupported
       platforms and invalid options"
-- [ ] 2.2 Install missing prerequisites (curl, CA certificates, tar, `sha256sum`) only from the image's repositories
+- [x] 2.2 Install missing prerequisites (curl, CA certificates, tar, `sha256sum`) only from the image's repositories
       with the family's package manager (`pacman -Syu --needed` on Arch), without recommended or weak dependencies,
       cleaning package caches, and run no package manager when nothing is missing; verify with shellcheck and the
       `minimal_image` build scenario on `debian:12`, whose test compares the apt sources and keyrings with the image's
-- [ ] 2.3 Resolve `latest` from the redirect of `https://github.com/astral-sh/uv/releases/latest` without following it,
+- [x] 2.3 Resolve `latest` from the redirect of `https://github.com/astral-sh/uv/releases/latest` without following it,
       skip the download when `/usr/local/bin/uv` already reports the release, otherwise download the archive of the
       container's architecture and C library and its `.sha256` over HTTPS only, verify the checksum in a temporary
       directory, and replace `uv` and `uvx` in `/usr/local/bin` by rename; verify with shellcheck and `test/uv/test.sh`
       ("Omitted version", "glibc image", "musl image", "Checksum matches")
-- [ ] 2.4 Create `/var/lib/uv` empty and owned by the remote user, `/usr/local/share/uv/{tools,python,bin}` owned by the
+- [x] 2.4 Create `/var/lib/uv` empty and owned by the remote user, `/usr/local/share/uv/{tools,python,bin}` owned by the
       remote user and its primary group, and `/etc/profile.d/uv.sh` (root-owned, 0644, overwritten on every install)
       that prepends `/usr/local/share/uv/bin` to `PATH` only when it is missing; verify with `test/uv/test.sh` ("New
       volume", "Environment of the remote user" in the environment and in login shells)
@@ -80,21 +80,21 @@
 
 ## 6. Observations in throwaway containers
 
-- [ ] 6.1 Observe the failure scenarios with the methods the design names (a `uname` stub printing `riscv64`,
+- [x] 6.1 Observe the failure scenarios with the methods the design names (a `uname` stub printing `riscv64`,
       `photon:5.0`, a `curl` wrapper that alters or fails the `.sha256` request, `version` `9.9.9`, `_REMOTE_USER`
       naming no account, an unpublished tool, `version` `0.12.15` with one tool, and each invalid `version` and
       `toolsToInstall` form) and record each result in the PR's Validation section
-- [ ] 6.2 Observe the `dnf`, `pacman`, and `zypper` prerequisite branches on `almalinux:10`, `archlinux:latest`, and
+- [x] 6.2 Observe the `dnf`, `pacman`, and `zypper` prerequisite branches on `almalinux:10`, `archlinux:latest`, and
       `opensuse/leap:16.0` with `tar` removed without its dependents, and record that `install.sh` installs `tar` and
       succeeds
-- [ ] 6.3 Install the feature twice in one container with identical options, and with two non-empty tool lists that list
+- [x] 6.3 Install the feature twice in one container with identical options, and with two non-empty tool lists that list
       one tool again with another constraint, and record "Same options", "Different options", and "Tool listed again"
-- [ ] 6.4 Build a throwaway, uncommitted local feature that installs after `uv`, runs `uv --version`, and fails unless
+- [x] 6.4 Build a throwaway, uncommitted local feature that installs after `uv`, runs `uv --version`, and fails unless
       `UV_PYTHON_INSTALL_DIR` is `/var/lib/uv/python`, and record one build ("Later feature runs uv")
-- [ ] 6.5 Observe "Rebuild keeps a workspace environment" on a real rebuild of one dev container and "Separate dev
+- [x] 6.5 Observe "Rebuild keeps a workspace environment" on a real rebuild of one dev container and "Separate dev
       containers" on two dev containers on one Docker host, and record both
 
 ## 7. Integration
 
-- [ ] 7.1 Run `just check`, `just test uv`, and `just test-scenarios uv`, and record the results with every Acceptance
+- [x] 7.1 Run `just check`, `just test uv`, and `just test-scenarios uv`, and record the results with every Acceptance
       item in the PR's Validation section
