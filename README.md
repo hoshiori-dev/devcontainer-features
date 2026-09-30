@@ -19,7 +19,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+| Feature                                                     | Description                                                                                                                                |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`nvidia-container-toolkit`](src/nvidia-container-toolkit/) | Installs the NVIDIA Container Toolkit from NVIDIA's signed repository and registers its runtime with a Docker daemon in the dev container. |
 
 ## Development
 
