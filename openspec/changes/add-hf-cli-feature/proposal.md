@@ -59,11 +59,11 @@ None.
 
 **Becomes true:**
 
-- "Default options", "Installer-managed environment", "Shell files untouched", "Latest resolves to a stable release",
-  "Image without Python", "No cache left behind", "Anonymous request to the Hub", "Update check off", "Skill disabled",
-  and "No token after install" in `specs/hf-cli/spec.md` pass in `test/hf-cli/test.sh` on every image and architecture
-  in `test/hf-cli/compatibility.json`, and "Remote user is root or unset" there on the image without a remote user; the
-  build-log line of "Latest resolves to a stable release" is recorded in the PR's Validation section.
+- "Default options", "Installer-managed environment", "Shell files untouched", "Omitted version", "Image without
+  Python", "No cache left behind", "Anonymous request to the Hub", "Update check off", "Omitted installSkill", and "No
+  token after install" in `specs/hf-cli/spec.md` pass in `test/hf-cli/test.sh` on every image and architecture in
+  `test/hf-cli/compatibility.json`, and "Remote user is root or unset" there on the image without a remote user; the
+  build-log line of "Omitted version" is recorded in the PR's Validation section.
 - "Pinned version", "Skill enabled", and "Redirected sources in the build environment" pass as scenarios in
   `test/hf-cli/scenarios.json`.
 - "Different version the second time", "Skill enabled, then disabled", and "No token after install" pass in

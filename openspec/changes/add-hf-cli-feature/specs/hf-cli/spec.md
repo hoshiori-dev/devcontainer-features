@@ -34,11 +34,6 @@ shell startup or profile file.
 - **THEN** the remote user can run `hf version` successfully
 - **AND** the virtual environment holds no `transformers` distribution
 
-#### Scenario: Pinned version
-
-- **WHEN** the feature is installed with `version` set to an existing release such as `1.33.0`
-- **THEN** the installed `huggingface_hub` is exactly that version
-
 #### Scenario: Installer-managed environment
 
 - **WHEN** the feature is installed
@@ -60,6 +55,39 @@ shell startup or profile file.
 
 - **WHEN** the feature is installed
 - **THEN** no shell startup or profile file of the remote user or of root contains a line the installer adds
+
+### Requirement: Option version
+
+The feature SHALL accept the option `version` as declared here and install exactly the `huggingface_hub` release it
+selects: `latest` means the release that "Resolve the latest version" names at build time, and any other value SHALL be
+a release version of the form `MAJOR.MINOR.PATCH` (digits only) at or above `1.27.0`, the first release whose installer
+accepts every option the feature passes, which the feature SHALL check before any download.
+
+| Field   | Value      |
+| ------- | ---------- |
+| Type    | `string`   |
+| Default | `"latest"` |
+
+#### Scenario: Omitted version
+
+- **WHEN** the feature is installed without `version`, or with `version` set to `latest`
+- **THEN** the build log names the resolved version
+- **AND** that version is installed
+
+#### Scenario: Pinned version
+
+- **WHEN** the feature is installed with `version` set to an existing release such as `1.33.0`
+- **THEN** the installed `huggingface_hub` is exactly that version
+
+#### Scenario: Malformed version
+
+- **WHEN** `version` is not `latest` and not of the form `MAJOR.MINOR.PATCH`, for example `2.0.0rc0` or `2.0`
+- **THEN** the build fails with a message naming the accepted forms, before anything is downloaded
+
+#### Scenario: Version below the floor
+
+- **WHEN** `version` is lower than `1.27.0`, for example `1.26.1`
+- **THEN** the build fails with a message naming the lowest accepted version, before anything is downloaded
 
 ### Requirement: Download the installer from the release tag
 
@@ -89,32 +117,10 @@ of https://pypi.org/pypi/huggingface_hub/json and SHALL install exactly that rel
 signature for that response, so the feature relies on TLS alone for it. A value that is not of the form
 `MAJOR.MINOR.PATCH` (digits only) SHALL fail the build. The feature SHALL NOT fall back to an unpinned install.
 
-#### Scenario: Latest resolves to a stable release
-
-- **WHEN** the feature is installed with `version` set to `latest`
-- **THEN** the build log names the resolved version
-- **AND** that version is installed
-
 #### Scenario: Endpoint unusable
 
 - **WHEN** the latest-version endpoint cannot be reached or returns a value that is not a release version
 - **THEN** the build fails with a message naming the endpoint, and no installer runs
-
-### Requirement: Validate the requested version
-
-A `version` other than `latest` SHALL be a release version of the form `MAJOR.MINOR.PATCH` (digits only) at or above
-`1.27.0`, the first release whose installer accepts every option the feature passes. The feature SHALL check this before
-any download.
-
-#### Scenario: Malformed version
-
-- **WHEN** `version` is not `latest` and not of the form `MAJOR.MINOR.PATCH`, for example `2.0.0rc0` or `2.0`
-- **THEN** the build fails with a message naming the accepted forms, before anything is downloaded
-
-#### Scenario: Version below the floor
-
-- **WHEN** `version` is lower than `1.27.0`, for example `1.26.1`
-- **THEN** the build fails with a message naming the lowest accepted version, before anything is downloaded
 
 ### Requirement: Pin the installed version
 
@@ -240,13 +246,23 @@ a newer release nor prints update or skill hints. The CLI is upgraded by rebuild
 - **WHEN** the remote user runs `hf` in the container
 - **THEN** `HF_HUB_DISABLE_UPDATE_CHECK` is `1` in the remote user's environment
 
-### Requirement: Install the agent skill on request
+### Requirement: Option installSkill
 
-When `installSkill` is enabled, the feature SHALL let the installer add the `hf-cli` skill, which the installed CLI
-generates locally without downloading it: `~/.agents/skills/hf-cli` in the remote user's home, and a link to it named
-`hf-cli` in that user's `~/.claude/skills`. Because the installer only warns when this step fails, the feature SHALL
-fail the build unless `~/.agents/skills/hf-cli/SKILL.md` exists afterwards and names the installed version. When
-`installSkill` is disabled, the feature SHALL pass `--exclude-skill` and SHALL create no skill files.
+The feature SHALL accept the option `installSkill` as declared here: when it is enabled, the feature lets the installer
+add the `hf-cli` skill, which the installed CLI generates locally without downloading it, as `~/.agents/skills/hf-cli`
+in the remote user's home and a link to it named `hf-cli` in that user's `~/.claude/skills`, and, because the installer
+only warns when this step fails, fails the build unless `~/.agents/skills/hf-cli/SKILL.md` exists afterwards and names
+the installed version; when it is disabled, the feature passes `--exclude-skill` and creates no skill files.
+
+| Field   | Value     |
+| ------- | --------- |
+| Type    | `boolean` |
+| Default | `false`   |
+
+#### Scenario: Omitted installSkill
+
+- **WHEN** the feature is installed without `installSkill`, or with `installSkill` disabled
+- **THEN** the feature creates no `~/.agents/skills/hf-cli` or `~/.claude/skills/hf-cli` in the remote user's home
 
 #### Scenario: Skill enabled
 
@@ -254,11 +270,6 @@ fail the build unless `~/.agents/skills/hf-cli/SKILL.md` exists afterwards and n
 - **THEN** `~/.agents/skills/hf-cli/SKILL.md` exists in the remote user's home, owned by the remote user, and names the
   installed `huggingface_hub` version
 - **AND** `~/.claude/skills/hf-cli` links to it
-
-#### Scenario: Skill disabled
-
-- **WHEN** the feature is installed with `installSkill` disabled
-- **THEN** the feature creates no `~/.agents/skills/hf-cli` or `~/.claude/skills/hf-cli` in the remote user's home
 
 #### Scenario: Skill generation fails
 

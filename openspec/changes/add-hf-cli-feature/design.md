@@ -163,15 +163,38 @@ Upstream facts, read on 2026-09-30:
 - Verifying the installer's content (upstream publishes no checksum or signature for it; Decisions), locking transitive
   dependency versions, and verifying PEP 740 attestations.
 
+## Options
+
+The feature has two options, both new in this change; the spec's Option requirements state them.
+
+| Name           | Type      | Default    | Enum or proposals               | Meaning                                                                                                                           |
+| -------------- | --------- | ---------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `version`      | `string`  | `"latest"` | proposals `["latest","1.33.0"]` | The `huggingface_hub` release to install: `latest`, resolved from PyPI at build time, or `MAJOR.MINOR.PATCH` at or above `1.27.0` |
+| `installSkill` | `boolean` | `false`    | none                            | Let the installer add the upstream `hf-cli` agent skill for the remote user                                                       |
+
+- **Default `latest` for `version`.** A configuration that omits `version` gets the current release, as upstream's own
+  installer does, yet each build installs exactly one release and logs it; a pinned `version` gives reproducible builds.
+  Proposals, not an enum: every release from the floor on is valid, and each new release adds one. `1.33.0` is the
+  proposal after the default, so the duplicate test installs it with `installSkill` enabled and then the defaults
+  (Context); its installer is identical to `v2.0.0`'s, and it differs from what `latest` resolves to, so the second
+  install takes the `--force` path.
+- **Default `false` for `installSkill`** (Open Questions, item 2). The skill changes what coding agents in the container
+  read and writes into `~/.claude`, so the feature adds it only on request, although upstream's installer adds it by
+  default.
+- **Rejected shapes.** A token, login, or credential option (issue #17; the spec's "Take no credentials"); options for a
+  package index, a mirror, or extra installer arguments (they would let configuration redirect or weaken verified
+  downloads, against "Verify package downloads"; Open Questions, item 1); an `HF_HOME` location or `--with-transformers`
+  option (Non-Goals); a `disableUpdateCheck` option (`containerEnv` has no option substitution; Decisions); an enum of
+  releases (every upstream release would need a feature release).
+
 ## Test fixtures
 
-`version` has the `proposals` `latest`, then `1.33.0`, so the duplicate test installs 1.33.0 with `installSkill` enabled
-and then the defaults. Scenario jobs run on amd64 only. The `pinned_version` scenario installs `1.27.0`, the floor. The
-`install_skill` scenario runs on `base:ubuntu-24.04` as `vscode`. The `redirected_sources` scenario is a `build`
-scenario on `debian:12` whose Dockerfile sets `UV_DEFAULT_INDEX`, `UV_INDEX_URL`, `PIP_INDEX_URL`, `HF_CLI_PIP_ARGS`,
-and `HF_HOME` to unusable values, and writes `/etc/uv/uv.toml` and `/etc/pip.conf` naming an unreachable index. Those
-`ENV` values stay set in the running container, so its test asserts the venv path and the installed version, and runs
-`hf version` with them cleared (`env -u`): they are the scenario's build input, not the runtime contract.
+Scenario jobs run on amd64 only. The `pinned_version` scenario installs `1.27.0`, the floor. The `install_skill`
+scenario runs on `base:ubuntu-24.04` as `vscode`. The `redirected_sources` scenario is a `build` scenario on `debian:12`
+whose Dockerfile sets `UV_DEFAULT_INDEX`, `UV_INDEX_URL`, `PIP_INDEX_URL`, `HF_CLI_PIP_ARGS`, and `HF_HOME` to unusable
+values, and writes `/etc/uv/uv.toml` and `/etc/pip.conf` naming an unreachable index. Those `ENV` values stay set in the
+running container, so its test asserts the venv path and the installed version, and runs `hf version` with them cleared
+(`env -u`): they are the scenario's build input, not the runtime contract.
 
 The `uv_and_hf_cli` global scenario (`test/_global/`) installs the `uv` feature and this feature, both with default
 options, on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` as `vscode`. Its test asserts that `huggingface_hub`'s
@@ -252,7 +275,7 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
 - **The skill is the installer's step, verified afterwards.** Rejected: always `--exclude-skill` and a separate
   `hf skills add` (repeats the installer's per-version flags); trusting the installer (it only warns on failure).
 - **`HF_HUB_DISABLE_UPDATE_CHECK=1` in `containerEnv`** (Open Questions, item 3). Rejected: dropping it (the daily
-  notice then advertises `hf update`); a `disableUpdateCheck` option (`containerEnv` has no option substitution).
+  notice then advertises `hf update`); a `disableUpdateCheck` option (Options).
 - **Distribution family as in the `uv` feature: `ID` or `ID_LIKE` in `/etc/os-release` naming `debian` or `ubuntu`.**
   Only the prerequisites depend on the distribution, and derivatives use the same apt package names. Rejected: `ID`
   alone (refuses Mint, Pop!_OS, Kali, or Raspbian, on which the `uv` feature installs).
@@ -290,10 +313,10 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
 - **Inputs:** `version` is validated before any use; `installSkill` is a boolean. No option takes a credential. The
   build environment's uv, pip, and `HF_*` variables and configuration files are not inputs.
 - **Idempotency:** see Goals and the spec's "Install twice".
-- **Failure behavior:** the spec's "Validate the requested version", "Resolve the latest version", "Download the
-  installer from the release tag", "Pin the installed version", "Require a verifying uv", "Provide the installer's
-  Python", "Install the agent skill on request", "Refuse unsupported platforms", and the missing remote user in "Install
-  the Hugging Face CLI with the standalone installer"; each fails before `/usr/local/bin/hf` is written.
+- **Failure behavior:** the spec's "Option version", "Resolve the latest version", "Download the installer from the
+  release tag", "Pin the installed version", "Require a verifying uv", "Provide the installer's Python", "Option
+  installSkill", "Refuse unsupported platforms", and the missing remote user in "Install the Hugging Face CLI with the
+  standalone installer"; each fails before `/usr/local/bin/hf` is written.
 
 ## Supported images
 
@@ -385,14 +408,15 @@ Decisions for the maintainer, each with a recommendation:
    Alternative: pass through uv and pip configuration, which breaks the inventory and the redirect scenario. The spec's
    "Verify package downloads" encodes the recommendation, so approving the spec decides it.
 2. **`installSkill` default.** Upstream installs the skill by default; the feature does not. Recommendation: `false`,
-   since the skill changes what coding agents in the container read and writes into `~/.claude`.
+   since the skill changes what coding agents in the container read and writes into `~/.claude`. The spec's "Option
+   installSkill" writes `false`, so approving the spec decides it.
 3. **Keep `HF_HUB_DISABLE_UPDATE_CHECK=1`?** Now that `hf update` recognizes the installation, the daily notice would
    offer it. Recommendation: keep it, because that update pipes the mutable `hf.co` script into bash, may edit rc files,
    needs `curl` (absent from `debian:12`), and is undone by the next rebuild, which installs the pinned `version`.
    Alternative: drop it, and let users update in place between rebuilds. The spec's "Disable the update check" encodes
    the recommendation, so approving the spec decides it.
 4. **Accepted versions.** Recommendation: stable `MAJOR.MINOR.PATCH` at or above `1.27.0`, pre-releases rejected. The
-   spec's "Validate the requested version" encodes it, so approving the spec decides it.
+   spec's "Option version" encodes it, so approving the spec decides it.
 5. **Lock transitive dependencies?** Recommendation: not in 1.0.0; the top-level pin plus digest checks suffice.
 6. **Images for 1.0.0.** Recommendation: the two glibc images above on amd64 and arm64. The `uv` feature plans
    `alpine:3.24`; Alpine can follow as a MINOR bump once `python3` from `apk` is shown to suit the installer.
