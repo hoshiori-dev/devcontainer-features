@@ -1,0 +1,18 @@
+{
+  "version_explicit": {
+    "image": "debian:12",
+    "features": {
+      "glab": {
+        "version": "1.119.0"
+      }
+    }
+  },
+  "version_leading_v": {
+    "image": "alpine:3.24",
+    "features": {
+      "glab": {
+        "version": "v1.119.0"
+      }
+    }
+  }
+}
