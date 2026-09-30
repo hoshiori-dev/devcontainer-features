@@ -54,12 +54,12 @@ Every CI job runs a command that also runs locally.
 CI pins Deno, just, the devcontainer CLI, and OpenSpec in `.github/actions/setup-tools/action.yml`, the only place CI
 versions live; shellcheck is the runner image's (0.9.0 on ubuntu-24.04, as in the dev container's apt package). The dev
 container installs its own copies (OpenSpec at `@latest` via `.devcontainer/setup.sh`). Before bumping a pin, run
-`just check` locally with that version. `denoland/setup-deno` is pinned by commit SHA with its version in a comment;
-`actions/*` by major tag; Dependabot proposes updates for both. Deno scripts pin their `jsr:` / `npm:` imports inline,
-and CI's OpenSpec install uses the same permission flags as `setup.sh`. The local registry image the feature tests
-publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts/test_feature.ts`. The TruffleHog action in `secret.yml`
-is pinned by commit SHA, and the image it runs by digest in its `version` input: Dependabot bumps only the action, so
-update the image with it.
+`just check` locally with that version. Every action, `actions/*` included, is pinned by full commit SHA with its
+version in a comment (`@<sha> # vX.Y.Z`); Dependabot proposes updates for them. Deno scripts pin their `jsr:` / `npm:`
+imports inline, and CI's OpenSpec install uses the same permission flags as `setup.sh`. The local registry image the
+feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts/test_feature.ts`. The TruffleHog action in
+`secret.yml` is pinned by commit SHA, and the image it runs by digest in its `version` input: Dependabot bumps only the
+action, so update the image with it.
 
 ## Release path
 
@@ -77,4 +77,5 @@ update the image with it.
 
 Never weaken, skip, or delete a check to make it pass: changing a check's strictness is a separate, maintainer-approved
 decision. Declare `permissions:` in every workflow, with job-level grants only where a job writes. Never use
-`pull_request_target`. Actions outside `actions/*` are pinned by full commit SHA.
+`pull_request_target`. Every action, `actions/*` included, is pinned by full commit SHA with its version in a comment;
+the repository setting `sha_pinning_required` fails any run that references a tag (`platform-settings.md`).
