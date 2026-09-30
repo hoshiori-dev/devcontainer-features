@@ -56,7 +56,9 @@ The feature SHALL download the release archive from
 verify it against the SHA-256 checksum published beside it as the same URL with `.sha256` appended, before anything from
 the archive is installed. For `latest`, the feature SHALL resolve the release from the redirect of
 `https://github.com/astral-sh/uv/releases/latest` and SHALL accept only a `MAJOR.MINOR.PATCH` release name from it. The
-feature SHALL run no installer script from upstream.
+feature SHALL trust that redirect on TLS alone, because upstream publishes no checksum or signature for it; it yields
+only the release name, and the archive of that release is verified as above. The feature SHALL run no installer script
+from upstream.
 
 #### Scenario: Checksum matches
 
