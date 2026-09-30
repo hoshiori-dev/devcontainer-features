@@ -2,9 +2,10 @@
 
 ## Context
 
-- OpenSpec 1.13.2 parses `config.yaml` with the `yaml` npm package (dependency `^2.8.3`, resolved to 2.9.1 in the dev
-  container and pinned for CI in `.github/actions/setup-tools/action.yml`). Its `rules` handling, read from
-  `dist/core/project-config.js` on 2026-09-30:
+- OpenSpec 1.13.2 parses `config.yaml` with the `yaml` npm package. CI pins OpenSpec itself to 1.13.2 in
+  `.github/actions/setup-tools/action.yml`, not `yaml`: its dependency range `^2.8.3` resolved to 2.9.1 in the dev
+  container on 2026-09-30, and CI resolves it within that range when it installs OpenSpec. Its `rules` handling, read
+  from `dist/core/project-config.js` on 2026-09-30:
   - `rules` that is not a mapping: warns `Invalid 'rules' field in config (must be object)` and drops every rule;
   - a value that fails `z.array(z.string())`: warns
     `Rules for '<artifact>' must be an array of strings, ignoring this
