@@ -26,16 +26,24 @@ run time, installing it when the image lacks it.
 - **AND** `glab --version` run as the remote user exits 0
 - **AND** `git --version` run as the remote user exits 0
 
-### Requirement: Version selection
+### Requirement: Option version
 
-The `version` option SHALL select the release to install. The value `latest` SHALL mean the release that
-https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest redirects to at build time; the feature SHALL read that
-redirect over HTTPS without following it and SHALL rely on TLS alone for it, since upstream publishes no checksum or
-signature for it. Any other value SHALL be a release version `MAJOR.MINOR.PATCH` of decimal numbers, with or without a
-leading `v`. The feature SHALL reject, before downloading anything, a value of any other form and a version below
-`1.47.0`. It SHALL fail before downloading any archive when `latest` resolves to anything other than a release version
-of that form at or above `1.47.0`, such as a pre-release tag, and SHALL fail when the requested release has no artifact
-for the architecture.
+The feature SHALL accept the option `version` as declared here and install the release it selects: `latest` means the
+release that https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest redirects to at build time, and any other
+value is a release version `MAJOR.MINOR.PATCH` of decimal numbers at or above `1.47.0`, with or without a leading `v`;
+the feature SHALL reject any other value before downloading anything, and SHALL fail before downloading any archive when
+`latest` resolves to a tag of any other form.
+
+| Field   | Value      |
+| ------- | ---------- |
+| Type    | `string`   |
+| Default | `"latest"` |
+
+#### Scenario: Omitted version
+
+- **WHEN** the feature is installed without `version`, or with `version` set to `latest`
+- **THEN** `glab --version` reports the release that the permanent link to the latest release pointed to during the
+  build
 
 #### Scenario: Explicit version
 
@@ -47,16 +55,10 @@ for the architecture.
 - **WHEN** the feature is installed with `version` set to `v1.119.0`
 - **THEN** `glab --version` reports `1.119.0`
 
-#### Scenario: Latest resolved at build time
-
-- **WHEN** the feature is installed with `version` set to `latest`
-- **THEN** `glab --version` reports the release that the permanent link to the latest release pointed to during the
-  build
-
-#### Scenario: Latest that is not a usable release
+#### Scenario: Permanent link to an unusable tag
 
 - **WHEN** the feature is installed with `version` set to `latest` and the permanent link to the latest release points
-  to a tag that is not a release version at or above `1.47.0`
+  to a tag that is not a release version at or above `1.47.0`, such as a pre-release tag
 - **THEN** the install fails before downloading any archive, with a message naming the tag, and `/usr/local/bin/glab` is
   left as it was before the install
 
@@ -80,11 +82,14 @@ for the architecture.
 The feature SHALL download the release archive from
 `https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/glab_<version>_linux_<arch>.tar.gz` and its checksum
 list from `https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/checksums.txt`, where `<version>` has no
-leading `v` and `<arch>` is `amd64` or `arm64`, over HTTPS only, including every redirect. It SHALL install the
-archive's `glab` only when the checksum list holds exactly one entry whose file name equals the archive's name and the
-archive's SHA-256 digest equals that entry. The feature SHALL rely on TLS alone for the checksum list itself, which
-upstream publishes unsigned from the same origin as the archive, so this verification establishes the archive's
-integrity against the published release, not the publisher's authenticity.
+leading `v` and `<arch>` is `amd64` or `arm64`, over HTTPS only, including every redirect, and SHALL fail when the
+requested release has no archive for the architecture. It SHALL install the archive's `glab` only when the checksum list
+holds exactly one entry whose file name equals the archive's name and the archive's SHA-256 digest equals that entry.
+The feature SHALL rely on TLS alone for the checksum list itself, which upstream publishes unsigned from the same origin
+as the archive, so this verification establishes the archive's integrity against the published release, not the
+publisher's authenticity. To resolve `latest`, the feature SHALL read the redirect of the latest-release permanent link
+over HTTPS without following it and SHALL rely on TLS alone for it, since upstream publishes no checksum or signature
+for it.
 
 #### Scenario: Digest matches
 

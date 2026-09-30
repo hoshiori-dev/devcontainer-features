@@ -123,6 +123,24 @@ with a temporary `GLAB_CONFIG_DIR`:
 - Images of a supported family that lack its package manager (Amazon Linux 2 and CentOS 7 have only `yum`), and
   distroless images; the feature fails clearly on them.
 
+## Options
+
+The feature has one option, new in this change; the spec's Option requirement states it.
+
+| Name      | Type     | Default    | Enum or proposals               | Meaning                                                                                                    |
+| --------- | -------- | ---------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `version` | `string` | `"latest"` | proposals `["latest","1.47.0"]` | The release to install: `latest`, or a release version at or above `1.47.0`, with or without a leading `v` |
+
+- **Default `latest`.** It follows upstream's weekly releases without a feature release for each; users who need
+  reproducible builds pin `version` (Risks). The duplicate test installs the first proposal that is not the default,
+  `1.47.0`, first and the defaults second (Context), so the second install takes the replace path, and the first
+  exercises the minimum and the older version output.
+- **Rejected shapes.** An option for a login, a token, or a GitLab host — out of scope by the issue, and the spec rules
+  it out; an `enum` of release versions — every upstream release would need a feature release, and `latest` would be
+  impossible; the current release as the second proposal — it equals what `latest` resolves to, so the second install
+  would skip and the replace path would never run in CI; a release between the two proposals — it tests nothing `1.47.0`
+  does not.
+
 ## Decisions
 
 - **Release archive from the GitLab release permalinks.** The feature downloads
@@ -146,11 +164,6 @@ with a temporary `GLAB_CONFIG_DIR`:
   following the redirect and parsing HTML.
 - **Minimum version `1.47.0`.** The first release with today's archive names and layout; older values fail with a clear
   message. Rejected: a second naming scheme for releases from before October 2024.
-- **`version` proposals `["latest", "1.47.0"]`, default `latest`.** The duplicate test then installs `1.47.0` first and
-  the defaults second (Context), so the second install takes the replace path, and the first exercises the minimum and
-  the older version output. Rejected: the current release as the second proposal — it equals what `latest` resolves to,
-  so the second install would skip and the replace path would never run in CI; a release between the two — it tests
-  nothing `1.47.0` does not.
 - **Tests resolve `command -v glab` instead of comparing its text.** On `fedora:44`, `/usr/local/sbin` is a symbolic
   link to `bin` and comes first on `PATH`, so `command -v glab` prints `/usr/local/sbin/glab` for the same file; the
   implementation found this, and the two scenarios were reworded for the maintainer's renewed approval. Rejected:
@@ -202,7 +215,7 @@ with a temporary `GLAB_CONFIG_DIR`:
   prerequisites come from the image's own repositories.
 - **Options:** only `version`, validated before use; no credential, token, or host option, by design (issue #13).
 - **Idempotency:** the spec's "Installing twice" requirement, reached through the skip check and atomic replace (Goals)
-  and tested through the `version` proposals (Decisions).
+  and tested through the `version` proposals (Options).
 - **Failure behavior:** the spec's failure scenarios, checked as described under Goals; every failure exits non-zero,
   which fails the image build.
 
