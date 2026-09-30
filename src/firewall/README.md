@@ -115,8 +115,9 @@ the Internet.
   `defaultAction` `allow` instead.
 - The `github` preset allows `github.com`, `githubusercontent.com`, and GitHub's `web`, `api`, and `git` ranges. The
   `web` ranges hold the addresses of GitHub Pages, so **every GitHub Pages site, custom domains included, is
-  reachable**. `domains.website` of GitHub's meta endpoint also lists `*.githubassets.com` and `*.github.dev`, which the
-  preset leaves out; the `actions`, `codespaces`, `copilot`, and `packages` (GHCR) ranges are left out too.
+  reachable**. `domains.website` of GitHub's meta endpoint also lists `*.githubassets.com`, `*.github.io`, and
+  `*.github.dev`, which the preset leaves out as domains; `*.github.io` is reachable anyway by address through the `web`
+  ranges. The `actions`, `codespaces`, `copilot`, and `packages` (GHCR) ranges are left out too.
 - The `npm` preset allows `registry.npmjs.org`; `pypi` allows `pypi.org` and `files.pythonhosted.org`.
 - The `anthropic` preset (`api.anthropic.com`, `claude.ai`, `platform.claude.com`) covers the API and sign-in only. Its
   source, https://code.claude.com/docs/en/network-config, also lists `claude.com`, `mcp-proxy.anthropic.com`,
