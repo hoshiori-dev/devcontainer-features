@@ -18,8 +18,10 @@
 **Goals:**
 
 - The version bump code takes the repository directory as a parameter that defaults to the current directory, so
-  existing callers and the command line are unchanged. Checked by `just validate` giving the same result before and
-  after, and by the unchanged call in `import.meta.main` compiling under `deno check`.
+  existing callers need no change, and the command line behaves as before even though its main block now calls the
+  extracted missing-base function (Decisions). Checked by running `scripts/validate.ts` with `--base origin/main`, and
+  with a base that does not exist both with and without `--allow-missing-base`, before and after the change: the output,
+  including the skip notice, and the exit code are the same.
 - The tests run the production code path, not a copy: they call the exported functions of `scripts/validate.ts` on a
   model from `loadRepo(<tmp repo>)`. Checked by the mutations in the proposal's Acceptance.
 - Each test builds its own repository and removes it in a `finally`, so tests share no state and can run in any order.
