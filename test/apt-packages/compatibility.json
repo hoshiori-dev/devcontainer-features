@@ -1,0 +1,7 @@
+{
+  "$schema": "../compatibility.schema.json",
+  "images": [
+    { "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04", "arch": ["amd64", "arm64"] },
+    { "image": "debian:12", "arch": ["amd64", "arm64"] }
+  ]
+}

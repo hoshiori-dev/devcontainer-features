@@ -2,15 +2,15 @@
 
 ## 1. Feature
 
-- [ ] 1.1 Scaffold `src/apt-packages/` and `test/apt-packages/` with `just new-feature apt-packages` and verify that the
+- [x] 1.1 Scaffold `src/apt-packages/` and `test/apt-packages/` with `just new-feature apt-packages` and verify that the
       generated `devcontainer-feature.json` declares exactly one option, `packages` (`string`, default `""`), as the
       Option requirement states
-- [ ] 1.2 Complete `src/apt-packages/devcontainer-feature.json`: version `1.0.0`, `name`, a one-sentence `description`,
+- [x] 1.2 Complete `src/apt-packages/devcontainer-feature.json`: version `1.0.0`, `name`, a one-sentence `description`,
       `documentationURL`, and `packages` with the proposals `"bc"` and `"bc,file"` and a description (design, Options);
       verify with `just validate` and `just spec-check`, and by reading the file for the absence of `dependsOn`,
       `installsAfter`, `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`, `containerEnv`, and
       lifecycle commands
-- [ ] 1.3 Write `src/apt-packages/install.sh` as POSIX `sh` with `set -eu` in the design's order (parse, validate, the
+- [x] 1.3 Write `src/apt-packages/install.sh` as POSIX `sh` with `set -eu` in the design's order (parse, validate, the
       empty check, the `apt-get` check, refresh when no index exists, install, clean): the allowlist and the trailing
       `-` rule from decision "A strict allowlist per manager", exit 1 naming a refused entry, exit 0 for an empty list,
       exit 1 naming `apt-get`, Debian, and Ubuntu when `apt-get` is missing (`/etc/os-release` read only for the
@@ -21,7 +21,7 @@
       `shellcheck`, by reviewing it against the design's Goals (no URL, download tool, `eval`, `sh -c`, unquoted entry,
       or listed weakening option), and by running its parse, validation, empty, and missing-`apt-get` paths under `dash`
       with a stub `apt-get` on the `PATH`
-- [ ] 1.4 Write `src/apt-packages/NOTES.md` (entry syntax and what is refused, a present index used as is and how to
+- [x] 1.4 Write `src/apt-packages/NOTES.md` (entry syntax and what is refused, a present index used as is and how to
       refresh or clear it, signatures protecting integrity but not freshness over the images' plain-HTTP sources, option
       values carrying no untrusted `"`, `$`, or backtick, packages that add repositories or keys themselves, upgrades
       and refused downgrades on a second install, supported images), regenerate `src/apt-packages/README.md` with
@@ -29,11 +29,11 @@
 
 ## 2. Container tests
 
-- [ ] 2.1 Write `test/apt-packages/compatibility.json` with `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` and
+- [x] 2.1 Write `test/apt-packages/compatibility.json` with `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` and
       `debian:12`, each on `amd64` and `arm64`; verify with `just validate` and against the design's Supported images
-- [ ] 2.2 Write `test/apt-packages/test.sh` for the default options (scenario "Omitted packages": none of the
+- [x] 2.2 Write `test/apt-packages/test.sh` for the default options (scenario "Omitted packages": none of the
       `proposals` packages installed, no package index left); verify with `shellcheck`
-- [ ] 2.3 Write `test/apt-packages/duplicate.sh` (scenarios "Listed packages are installed" with the `proposals` list
+- [x] 2.3 Write `test/apt-packages/duplicate.sh` (scenarios "Listed packages are installed" with the `proposals` list
       and "Caches are removed"): every entry of `PACKAGES` installed after the second, default install, and no
       downloaded package or index file left; verify with `shellcheck`
 - [ ] 2.4 Write `test/apt-packages/scenarios.json` and one script per scenario for the Test plan's "Scenario" rows:

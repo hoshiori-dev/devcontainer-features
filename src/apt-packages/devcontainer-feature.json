@@ -1,0 +1,15 @@
+{
+  "id": "apt-packages",
+  "version": "1.0.0",
+  "name": "APT packages",
+  "description": "Installs a list of system packages with apt-get from the repositories the Debian or Ubuntu image already configures.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apt-packages",
+  "options": {
+    "packages": {
+      "type": "string",
+      "default": "",
+      "proposals": ["bc", "bc,file"],
+      "description": "Comma-separated packages to install: name, name=version, or name:architecture. Whitespace around entries and empty entries are ignored; an empty list installs nothing."
+    }
+  }
+}
