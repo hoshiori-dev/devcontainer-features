@@ -1,25 +1,45 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write=src,test
 // Scaffolds a new feature: src/<id>/ (metadata, install.sh, NOTES.md) and test/<id>/ (test.sh,
-// duplicate.sh, compatibility.json). Every generated file is a starting point to rework against
-// the approved OpenSpec change; nothing here is a finished decision.
+// duplicate.sh, compatibility.json). The options come from the Option requirements in the delta
+// spec of the one active OpenSpec change holding specs/<id>/ (.agents/knowledge/spec-workflow.md,
+// Option requirements), so `just spec-check` accepts them as generated. Every other generated file
+// is a starting point to rework against the approved change; nothing here is a finished decision.
 //
 //   scripts/new_feature.ts <id> [--name "Display name"]
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { exists, REPO } from "./lib/repo.ts";
+import { type OptionContract, optionVariable, parseOptionRequirements } from "./lib/options.ts";
+import { activeChanges } from "./check_spec_archived.ts";
 
 export const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-export function scaffold(id: string, name: string): Record<string, string> {
+/** A default inside `"${VAR:-...}"`: backslash, double quote, dollar, backtick, and closing brace escaped. */
+function shellQuoted(value: string): string {
+    return value.replace(/[\\"$`}]/g, (c) => `\\${c}`);
+}
+
+export function scaffold(id: string, name: string, options: Map<string, OptionContract>): Record<string, string> {
+    const metadataOptions = Object.fromEntries(
+        [...options].map(([option, contract]) => [option, {
+            type: contract.type,
+            ...(contract.enum ? { enum: contract.enum } : {}),
+            default: contract.default,
+            description: `TODO: what ${option} does.`,
+        }]),
+    );
     const metadata = {
         id,
         version: "1.0.0",
         name,
         description: `TODO: one sentence on what ${id} installs.`,
         documentationURL: `https://github.com/${REPO}/tree/main/src/${id}`,
-        options: {
-            version: { type: "string", proposals: ["latest"], default: "latest", description: "Version to install." },
-        },
+        ...(options.size > 0 ? { options: metadataOptions } : {}),
     };
+    const variables = [...options].map(([option, contract]) => {
+        const variable = optionVariable(option);
+        return `${variable}="\${${variable}:-${shellQuoted(String(contract.default))}}"`;
+    });
+    const variableNames = variables.length > 0 ? [...options.keys()].map(optionVariable).join(", ") : "none";
     const compat = {
         $schema: "../compatibility.schema.json",
         images: [
@@ -31,12 +51,10 @@ export function scaffold(id: string, name: string): Record<string, string> {
         [`src/${id}/devcontainer-feature.json`]: `${JSON.stringify(metadata, null, 2)}\n`,
         [`src/${id}/install.sh`]: `#!/usr/bin/env bash
 # Installs ${id}. Runs as root at image build time; options arrive as upper-cased env vars
-# (VERSION). Must be idempotent: a second run on the same image succeeds and changes nothing.
+# (${variableNames}). Must be idempotent: a second run on the same image succeeds and changes nothing.
 set -euo pipefail
-
-VERSION="\${VERSION:-latest}"
-
-echo "TODO: install ${id} \${VERSION}" >&2
+${variables.length > 0 ? `\n${variables.join("\n")}\n` : ""}
+echo "TODO: install ${id}" >&2
 exit 1
 `,
         [`src/${id}/NOTES.md`]:
@@ -80,7 +98,26 @@ if (import.meta.main) {
         console.error(`error: src/${id} or test/${id} already exists.`);
         Deno.exit(1);
     }
-    for (const [path, content] of Object.entries(scaffold(id, args.name ?? id))) {
+    const holders: string[] = [];
+    for (const change of await activeChanges()) {
+        if (await exists(`openspec/changes/${change}/specs/${id}/spec.md`)) holders.push(change);
+    }
+    if (holders.length !== 1) {
+        console.error(
+            holders.length === 0
+                ? `error: no active OpenSpec change holds specs/${id}/spec.md; create the feature's change first.`
+                : `error: more than one active OpenSpec change holds specs/${id}/spec.md: ${holders.join(", ")}.`,
+        );
+        Deno.exit(1);
+    }
+    const specPath = `openspec/changes/${holders[0]}/specs/${id}/spec.md`;
+    const parsed = parseOptionRequirements(await Deno.readTextFile(specPath));
+    if (parsed.problems.length > 0) {
+        for (const problem of parsed.problems) console.error(`- ${specPath}: ${problem}`);
+        console.error("error: fix the Option requirements first (.agents/knowledge/spec-workflow.md).");
+        Deno.exit(1);
+    }
+    for (const [path, content] of Object.entries(scaffold(id, args.name ?? id, parsed.options))) {
         await Deno.mkdir(path.slice(0, path.lastIndexOf("/")), { recursive: true });
         await Deno.writeTextFile(path, content, { mode: path.endsWith(".sh") ? 0o755 : 0o644 });
         console.log(`created ${path}`);

@@ -28,7 +28,7 @@ scripts-check:
 validate base="origin/main":
     ./scripts/validate.ts --base "$1"
 
-# Validate every OpenSpec spec and change in strict mode, the rules in config.yaml, and OpenSpec's generated files
+# Strict-validate OpenSpec specs and changes; check config.yaml rules, feature options, and generated files
 spec-check:
     OPENSPEC_NO_UPDATE_CHECK=1 openspec validate --all --strict --no-interactive
     ./scripts/check_openspec.ts
