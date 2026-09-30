@@ -341,8 +341,11 @@ const CHECKS: Check[] = [
         on: "apt",
         network: "bridge",
         async run(c, t) {
+            // The dpkg status, not zlib1g-dev's state: some images (devcontainers/base:ubuntu-24.04) ship zlib1g-dev.
+            const status = await c.dpkgStatus();
             t.exit(await c.install("bc,zlib1g.dev"), "nonzero", "zlib1g.dev");
-            t.ok(!(await c.installed("bc")) && !(await c.installed("zlib1g-dev")), "a package was installed");
+            t.ok(!(await c.installed("bc")), "bc was installed");
+            t.ok((await c.dpkgStatus()) === status, "dpkg's status file changed");
             // Premise: read as a regular expression, zlib1g.dev matches a package the repositories offer.
             t.ok((await c.sh("apt-cache show zlib1g-dev >/dev/null")).code === 0, "zlib1g-dev is not offered");
         },
