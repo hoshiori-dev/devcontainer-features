@@ -161,24 +161,53 @@ the installed version.
 
 ### Requirement: Prerequisite packages
 
-On an image that lacks `curl`, `ca-certificates`, or `unzip`, the feature SHALL install the missing packages with apt
-and SHALL leave them installed. On an image that has all three, the feature SHALL install and remove no package.
+On an image that lacks `curl`, `unzip`, or a CA certificate bundle, the feature SHALL install the missing ones with the
+package manager of the image's family (`apt-get` for the Debian family, `dnf` for the Fedora family, `zypper` for the
+openSUSE family), SHALL leave them installed, and SHALL leave no repository metadata or downloaded package in that
+package manager's cache. A CA certificate bundle is present when `/etc/ssl/certs/ca-certificates.crt`,
+`/etc/pki/tls/certs/ca-bundle.crt`, `/etc/ssl/ca-bundle.pem`, or `/etc/ssl/cert.pem` is a non-empty file. On an image
+that has all three, the feature SHALL install and remove no package. When one is missing and the image lacks its
+family's package manager, the feature SHALL fail before downloading anything, with a message naming what is missing and
+the package manager it needs.
 
-#### Scenario: Image without the prerequisites
+#### Scenario: Debian-family image without the prerequisites
 
-- **WHEN** the feature is installed on a supported image that has none of `curl`, `ca-certificates`, and `unzip`
-- **THEN** the installation succeeds and all three are installed afterwards
+- **WHEN** the feature is installed on a Debian-family image that has neither `curl`, `unzip`, nor a CA certificate
+  bundle
+- **THEN** the installation succeeds, all three are present afterwards, and apt's package lists hold no package index
+
+#### Scenario: Fedora-family image without unzip
+
+- **WHEN** the feature is installed on a Fedora-family image that has `dnf`, `curl`, and a CA certificate bundle but
+  lacks `unzip`
+- **THEN** the installation succeeds, `unzip` is present afterwards, and dnf's cache holds no repository metadata and no
+  downloaded package
+
+#### Scenario: openSUSE-family image without unzip
+
+- **WHEN** the feature is installed on an openSUSE-family image that has `zypper`, `curl`, and a CA certificate bundle
+  but lacks `unzip`
+- **THEN** the installation succeeds, `unzip` is present afterwards, and zypper's cache holds no file
 
 #### Scenario: Image with the prerequisites
 
-- **WHEN** the feature is installed on a supported image that already has `curl`, `ca-certificates`, and `unzip`
+- **WHEN** the feature is installed on a supported image that already has `curl`, `unzip`, and a CA certificate bundle
 - **THEN** the set of installed packages is unchanged
+
+#### Scenario: Package manager missing
+
+- **WHEN** the feature is installed on an image of a supported family that lacks `unzip` and lacks that family's package
+  manager, such as a Fedora-family image whose only package manager is `microdnf`
+- **THEN** the installation fails with a message naming `unzip` and the package manager it needs, and nothing is
+  downloaded
 
 ### Requirement: Supported platforms
 
-The feature SHALL support the images listed in `test/deno/compatibility.json`, and SHALL install only on Debian- or
-Ubuntu-based images with glibc 2.27 or newer on amd64 or arm64. On any other image it SHALL fail before downloading
-anything, with a message naming what is unsupported.
+The feature SHALL support the images listed in `test/deno/compatibility.json`, and SHALL install only on images with
+glibc 2.27 or newer, on amd64 or arm64, whose `/etc/os-release` places them in a supported family: the Debian family
+(`debian` or `ubuntu`), the Fedora family (`fedora`, `rhel`, or `centos`), or the openSUSE family (`opensuse`). The
+first word of `ID`, then of `ID_LIKE`, that names a family decides it. On any other image it SHALL fail before
+downloading anything, with a message naming what is unsupported.
 
 #### Scenario: musl-based image
 
@@ -186,15 +215,23 @@ anything, with a message naming what is unsupported.
 - **THEN** the installation fails with a message stating that Deno publishes glibc builds only, and nothing is
   downloaded
 
-#### Scenario: Distribution outside the Debian family
+#### Scenario: C library not identified
 
-- **WHEN** the feature is installed on a glibc-based image whose distribution is neither Debian, Ubuntu, nor derived
-  from them
-- **THEN** the installation fails with a message naming the distribution, and nothing is downloaded
+- **WHEN** the feature is installed on an image that is not musl-based and on which `getconf GNU_LIBC_VERSION` reports
+  no glibc version, such as an image without `getconf`
+- **THEN** the installation fails with a message stating that the C library could not be identified and that Deno needs
+  glibc 2.27 or newer, and nothing is downloaded
+
+#### Scenario: Unsupported distribution
+
+- **WHEN** the feature is installed on a glibc-based image whose `/etc/os-release` names none of the supported families,
+  such as Arch Linux
+- **THEN** the installation fails with a message naming the distribution and the supported families, and nothing is
+  downloaded
 
 #### Scenario: glibc older than 2.27
 
-- **WHEN** the feature is installed on a Debian- or Ubuntu-based image whose glibc is older than 2.27
+- **WHEN** the feature is installed on an image of a supported family whose glibc is older than 2.27
 - **THEN** the installation fails with a message naming the glibc version found and the minimum, and nothing is
   downloaded
 
