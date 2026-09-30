@@ -127,8 +127,7 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
 
 **Non-Goals:**
 
-- GPU drivers, CUDA, and exposing host GPUs to the dev container (`hostRequirements.gpu`, `--gpus`); NOTES.md tells
-  users they provide those.
+- Everything the proposal places out of scope; NOTES.md tells users they provide GPU drivers and host GPU access.
 - Configuring containerd, CRI-O, or podman; CDI (`--cdi.enabled`); making `nvidia` the default runtime; rootless or
   `no-cgroups` handling for nested Docker.
 - NVIDIA's experimental channel, GitHub release tarballs, ppc64le, yum-only distributions (Amazon Linux 2), and musl
@@ -199,7 +198,10 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
 
 - **Downloads.** The feature itself downloads one file, the signing key. Everything else comes through the package
   manager from the repositories in the URL inventory. Prerequisites come from the image's preconfigured distribution
-  repositories.
+  repositories. Against the download rules in `.agents/knowledge/feature-authoring.md`: the key falls under "Added
+  repositories" (pinned by full fingerprint, checked before use), NVIDIA's and the image's repositories under "Package
+  managers and registries", every URL is named in the spec and served over HTTPS without redirects, and no download
+  relies on TLS alone, so the spec needs no TLS-only Requirement.
 - **Verification.** Key: exactly one primary key, with the pinned full fingerprint, and only that fingerprint exported.
   apt: `InRelease` signature against the feature-owned keyring, then the index's SHA512 hashes for each `.deb`. dnf and
   zypper: `repomd.xml.asc` signature (`repo_gpgcheck=1`) and each package's header signature (`gpgcheck=1`) against the

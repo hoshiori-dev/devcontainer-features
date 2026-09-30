@@ -19,6 +19,9 @@ means adding NVIDIA's package repository, trusting its signing key, pinning four
 - A `configureDocker` option registers the `nvidia` runtime with a Docker daemon installed in the dev container.
 - The feature is ordered after the docker-in-docker feature, so a daemon that feature installs is configured.
 - The feature can be installed twice, with the same or different options.
+- The repository's root `README.md` lists the feature under "Features": one row whose id links to
+  `src/nvidia-container-toolkit/`, with a one-sentence description; if the section still holds "No features have been
+  published yet.", the row replaces that line.
 - Installing GPU drivers or CUDA, exposing the host's GPUs to the dev container itself, and testing on real GPUs stay
   out of scope.
 
@@ -38,7 +41,9 @@ None.
 - Feature ids touched: `nvidia-container-toolkit`, new at version `1.0.0`. No other feature changes, so no other bump.
 - Files: `src/nvidia-container-toolkit/` (`devcontainer-feature.json`, `install.sh`, `NOTES.md`, generated `README.md`),
   `test/nvidia-container-toolkit/` (`test.sh`, `duplicate.sh`, `scenarios.json` and its scripts, `compatibility.json`),
-  and `openspec/specs/nvidia-container-toolkit/spec.md` at archive.
+  and `openspec/specs/nvidia-container-toolkit/spec.md` at archive; the root `README.md` gains the feature's row under
+  "Features".
+- `test/canary.json` does not change; canary membership is left to the maintainer.
 - Dependencies: `installsAfter` the external feature `ghcr.io/devcontainers/features/docker-in-docker`; no `dependsOn`.
 - CI: the new feature's jobs on each compatibility image, and one scenario job running its scenarios, among them one
   that installs it together with docker-in-docker.
@@ -58,13 +63,17 @@ None.
   the second time"; and "Different version the second time" from `latest` to an older exact version, on one image of
   each package-manager family.
 - `just check` passes, including `just validate` for the new feature's metadata, version `1.0.0`, and compatibility
-  list, and `just docs` leaves the generated README unchanged.
+  list, and `just docs` leaves the generated `src/nvidia-container-toolkit/README.md` unchanged.
+- The root `README.md` has one row for `nvidia-container-toolkit` under "## Features", linking to
+  `src/nvidia-container-toolkit/` with a one-sentence description, and no longer says "No features have been published
+  yet.".
 - `just test nvidia-container-toolkit` and `just test-scenarios nvidia-container-toolkit` pass locally.
 
 **Stays true:**
 
 - The feature adds no `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`, `containerEnv`, or
   lifecycle commands to the dev container, and does not install GPU drivers or CUDA.
-- Every file the feature downloads is authenticated, by the pinned fingerprint or by a signature from the key it pins,
-  before it is used.
+- NVIDIA's signing key is authenticated by its pinned fingerprint, and everything from NVIDIA's repository by a
+  signature from that key, before it is used; the prerequisites (`curl`, `ca-certificates`, `gnupg`/`gpg2`) come from
+  the image's own repositories and are verified by its package manager.
 - No other feature's files, version, or tests change.
