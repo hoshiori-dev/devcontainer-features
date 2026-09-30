@@ -35,8 +35,10 @@ for the remote user and for root.
 
 The `version` option SHALL accept `latest` or an exact `MAJOR.MINOR.PATCH` release version. The feature SHALL resolve
 `latest` by reading `https://dl.deno.land/release-latest.txt` over HTTPS and SHALL use its content only when it has the
-form `v<MAJOR>.<MINOR>.<PATCH>` once surrounding whitespace is removed. Any other `version` value SHALL fail the
-installation before anything is downloaded, with a message naming the option and the accepted forms.
+form `v<MAJOR>.<MINOR>.<PATCH>` once surrounding whitespace is removed. Deno publishes no checksum or signature for the
+pointer, so the feature SHALL rely on TLS alone for it, over HTTPS on every hop, redirects included; the release it
+names is verified like any other. Any other `version` value SHALL fail the installation before anything is downloaded,
+with a message naming the option and the accepted forms.
 
 #### Scenario: Partial version rejected
 
@@ -58,8 +60,9 @@ The feature SHALL download the release archive only from
 verify the archive against the SHA-256 checksum published at
 `https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.zip.sha256sum`. Before installing the
 extracted `deno` executable, the feature SHALL verify it against the SHA-256 checksum published at
-`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.sha256sum`. The feature SHALL NOT install a
-release that does not publish both checksum files.
+`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.sha256sum`. Deno publishes no signature for
+the checksum files, so the feature SHALL rely on TLS alone for them, over HTTPS on every hop, redirects included. The
+feature SHALL NOT install a release that does not publish both checksum files.
 
 #### Scenario: Archive checksum mismatch
 

@@ -5,9 +5,8 @@
 See proposal.md - Why. The behavior contract is `specs/deno/spec.md`; this document names how it is reached. Facts below
 were checked on 2026-09-30 unless marked otherwise.
 
-- `deno` is the repository's first feature: `src/` does not exist yet, `test/canary.json` is empty, and the README says
-  no feature has been published. `just new-feature deno` scaffolds `version` (default `latest`) and the two images
-  planned below.
+- `deno` is the repository's first feature: `src/` does not exist yet, and the README says no feature has been
+  published. `just new-feature deno` scaffolds `version` (default `latest`) and the two images planned below.
 - Latest stable release: `v2.9.7`, published 2026-09-17 (`gh api repos/denoland/deno/releases/latest`);
   `https://dl.deno.land/release-latest.txt` returns `v2.9.7` followed by a newline, with the `v`. The LTS pointer
   `https://dl.deno.land/release-lts-latest.txt` returns `v2.9.3`; per Deno's stability page, a bare version always names
@@ -115,10 +114,12 @@ were checked on 2026-09-30 unless marked otherwise.
 - **Download from GitHub releases.** The archive and both checksum files come from
   `github.com/denoland/deno/releases/download/`. Rejected: `dl.deno.land/release/<version>/`, which mirrors the same
   stable files today but also serves LTS builds that can replace a stable build under the same number (upstream
-  installer's comment), and would add a second download host. Rejected: piping `https://deno.land/install.sh` into a
-  shell, which verifies nothing and runs unpinned remote code. Rejected: distribution packages, which Deno's
-  installation guide calls community maintained and often behind, with no official apt repository. Rejected: the npm
-  `deno` package, which needs Node.js.
+  installer's comment), and would add a second download host. Rejected: upstream's installer
+  `https://deno.land/install.sh`, which `feature-authoring.md` (Downloads) allows only saved to a file, never piped into
+  a shell, with the spec stating that its content is not verified unless upstream publishes a checksum or signature for
+  it; the script it serves also downloads from `dl.deno.land` (Context), bypassing the two checksum checks this feature
+  makes. Rejected: distribution packages, which Deno's installation guide calls community maintained and often behind,
+  with no official apt repository. Rejected: the npm `deno` package, which needs Node.js.
 - **Resolve `latest` from `release-latest.txt`.** The endpoint upstream's own installer uses; one unauthenticated GET
   with a one-line body. After surrounding whitespace is removed, its value must match `^v[0-9]+\.[0-9]+\.[0-9]+$` before
   any URL is built from it. Rejected: the GitHub API, rate-limited to 60 unauthenticated requests per hour per IP, which
@@ -129,9 +130,11 @@ were checked on 2026-09-30 unless marked otherwise.
   as the archive, so they prove integrity, and TLS to GitHub is the authenticity anchor. The cost is the installable
   range in Context. Rejected: requiring the archive checksum always and the executable checksum only when the release
   publishes it, which would open `2.0.1` to `2.7.13` (84 releases) at the same level of assurance; the maintainer chose
-  both files, and a later MINOR change can revisit it. Rejected for v1: GitHub's release attestation, which covers only
-  immutable releases and needs `gh` or Sigstore tooling in every image; a later MINOR change can add it. Rejected:
-  `sha256sum -c` on the downloaded checksum file, which lets the file's name field pick the path to check.
+  both files, and a later MINOR change can revisit it. `feature-authoring.md` (Downloads) would also allow a release
+  that publishes no checksum on TLS alone, stated as a Requirement; this feature is stricter and installs none. Rejected
+  for v1: GitHub's release attestation, which covers only immutable releases and needs `gh` or Sigstore tooling in every
+  image; a later MINOR change can add it. Rejected: `sha256sum -c` on the downloaded checksum file, which lets the
+  file's name field pick the path to check.
 - **Tell a missing checksum file from an unknown version.** Both checksum files are fetched before the archive. When
   either returns 404, one `HEAD` request on the archive URL decides the message: if the archive exists, the message
   names every missing checksum file (both for `1.x`, `.zip.sha256sum` for `2.0.0`, `deno-<target>.sha256sum` for `2.0.1`
@@ -215,7 +218,8 @@ environment variable of the feature redirects anything.
   image's own sources when a prerequisite is missing (URL inventory).
 - **Verification:** SHA-256 of the archive before extraction and of the executable before installation, both against
   checksum files of the same release; the latest pointer is format-checked, and whatever release it names is verified
-  the same way.
+  the same way. The pointer and the checksum files themselves rest on TLS alone, which the spec states in its Version
+  selection and Verified download requirements, as `feature-authoring.md` (Downloads) demands.
 - **Keys:** none. Deno signs nothing the feature can check without extra tooling; authenticity rests on TLS to
   `github.com` and `release-assets.githubusercontent.com` (Risks).
 - **Metadata:** `containerEnv` only — `DENO_INSTALL_ROOT` and `PATH` so global tools land on `PATH` for every shell,
@@ -274,9 +278,5 @@ Deno's own update check is disabled. The feature references no other feature, so
    because the Dev Container spec does not allow `installsAfter` entries to be pinned to a tag or digest; the
    `just validate` recipe checks only in-repo refs, and `feature-authoring.md`'s "major tag" rule for external features
    reads as applying to `dependsOn`. Recommendation: yes; it adds no install and no privilege.
-2. **Make `deno` the first canary in `test/canary.json`?** The list is empty, so a change to the test infrastructure
-   currently exercises no feature test. `test/canary.json` is itself a test-infrastructure path (`INFRA_PATHS`), so
-   changing it in this PR also runs the canary set and the global scenarios; a separate change without specs avoids
-   that. Recommendation: yes, in this PR, until a faster feature exists; it downloads about 40 MB per job.
-3. **Accept `v2.9.7` as a spelling of `2.9.7`?** Recommendation: no; one spelling keeps the option's proposals and error
+2. **Accept `v2.9.7` as a spelling of `2.9.7`?** Recommendation: no; one spelling keeps the option's proposals and error
    message simple, and the error names the accepted forms.

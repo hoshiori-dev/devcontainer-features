@@ -14,7 +14,9 @@ feature verifies no download and fails when installed twice, which this reposito
 - Tools installed with `deno install --global` run by name for every user, and the remote user installs them without
   root.
 - Unsupported images are rejected clearly.
-- The repository README lists `deno` as its first feature.
+- The repository's root `README.md` lists `deno` under "## Features" as one row: the id linking to `src/deno/` and a
+  one-sentence description, replacing "No features have been published yet.". It is separate from the generated
+  `src/deno/README.md`.
 
 The contract for the feature's behavior is `specs/deno/spec.md`.
 
@@ -34,10 +36,8 @@ None.
 - Feature ids touched: `deno`, new at version `1.0.0`.
 - Files: `src/deno/` (`devcontainer-feature.json`, `install.sh`, `scripts/`, `NOTES.md`, generated `README.md`),
   `test/deno/` (`compatibility.json`, `test.sh`, `duplicate.sh`, `scenarios.json` with its scripts and `build` scenario
-  folders), `README.md` (Features section), and, depending on an open question in design.md, `test/canary.json`.
-  `openspec/specs/deno/spec.md` appears at archive.
-- `test/canary.json` is a test-infrastructure path, so if it changes, CI also runs the canary set and the global
-  scenarios for this change.
+  folders), and the root `README.md` (one row under "## Features"). `openspec/specs/deno/spec.md` appears at archive.
+- Membership of `deno` in `test/canary.json` is left to the maintainer; this change does not touch that file.
 - No other feature, script, workflow, or knowledge file changes.
 
 ## Acceptance
@@ -53,7 +53,9 @@ None.
   `just test deno` and `just test-scenarios deno` pass on them.
 - `src/deno/devcontainer-feature.json` declares id `deno` at version `1.0.0`, the metadata named in design.md and
   nothing wider, and `src/deno/README.md` is the output of `just docs`.
-- The repository README's Features section lists `deno`.
+- The root `README.md` has one row for `deno` under "## Features", in place of "No features have been published yet.":
+  the id linking to `src/deno/` and a one-sentence description. This is checked apart from the generated
+  `src/deno/README.md`.
 
 **Stays true:**
 
