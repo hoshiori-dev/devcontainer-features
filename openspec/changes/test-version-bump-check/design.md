@@ -26,10 +26,16 @@
   model from `loadRepo(<tmp repo>)`. Checked by the mutations in the proposal's Acceptance.
 - Each test builds its own repository and removes it in a `finally`, so tests share no state and can run in any order.
   Checked by running a single test with `--filter` as well as the whole file.
-- The developer's global and system git configuration cannot change a result. The helper runs its own git commands with
-  `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`, and writes repository-local settings that override the
-  global keys the production git calls read (`core.excludesFile`, `core.hooksPath`) and the ones its commits need
-  (`user.name`, `user.email`, `commit.gpgsign`). Checked by the hostile-configuration run in the proposal's Acceptance.
+- The developer's environment and git configuration cannot redirect the tests' writes or change a result through the
+  settings the checked code depends on. The helper runs its own git commands without the caller's environment, so an
+  inherited `GIT_DIR` or `GIT_INDEX_FILE` cannot point them at another repository, and with
+  `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`. It writes repository-local settings: `core.excludesFile`,
+  which overrides the global one the production git calls read, and what its own commits need (`user.name`,
+  `user.email`, `commit.gpgsign`, and `core.hooksPath` so that no hook runs on them). The production git calls still
+  inherit the environment and every other global setting, as the command line does, so a setting that breaks git in
+  every repository, such as a failing clean filter, fails these tests too. Checked by the hostile-configuration run in
+  the proposal's Acceptance, and by a run with `GIT_DIR` pointing at another repository, which leaves that repository
+  unchanged.
 
 **Non-Goals:**
 
