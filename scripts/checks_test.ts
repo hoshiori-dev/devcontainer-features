@@ -1,7 +1,9 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.19";
 import { parse } from "jsr:@std/semver@1.0.8";
+import { parse as parseYaml } from "npm:yaml@2.9.1";
 import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
+import { CONFIG, configProblems, exitCode, ruleProblems } from "./check_openspec.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
 import { compatBumpProblems, inRepoRefProblem, scenarioImageProblems, scenarioImages } from "./validate.ts";
@@ -132,4 +134,56 @@ Deno.test("compatBumpProblems wants MAJOR to drop an image and MINOR to add one"
     assert(check(one, arm, "1.2.0", "1.2.1")[0].message.includes("debian:12 (arm64)"));
     assertEquals(check(one, two, "1.2.0", "1.3.0"), []);
     assertEquals(check(one, { images: [{ image: "debian:12", remoteUser: "x" }] }, "1.2.0", "1.2.0"), []);
+});
+
+Deno.test("ruleProblems accepts rule lists of strings and a config without rules", async () => {
+    assertEquals(ruleProblems(parseYaml('rules:\n  specs:\n    - "Entries use - <label>: <url> form."\n')), []);
+    assertEquals(ruleProblems(parseYaml("schema: spec-driven\n")), []);
+    assertEquals(await configProblems(CONFIG), []);
+});
+
+Deno.test("ruleProblems names a rule that YAML reads as a mapping and how to fix it", () => {
+    const problems = ruleProblems(
+        parseYaml("rules:\n  specs:\n    - Entries use - <label>: <url> form.\n    - Fine.\n"),
+    );
+    assertEquals(problems.length, 1);
+    for (const part of ["rules.specs entry 1", "a mapping", "every rule for specs", "Quote it"]) {
+        assert(problems[0].includes(part), `${part} not in: ${problems[0]}`);
+    }
+});
+
+Deno.test("ruleProblems reports other non-strings, empty rules, a value that is not a list, and rules that is not a mapping", () => {
+    const entries = ruleProblems(parseYaml('rules:\n  design:\n    - 42\n    -\n    - ""\n    - true\n'));
+    assertEquals(entries.length, 4, entries.join("\n"));
+    assert(entries[0].startsWith("rules.design entry 1 is a number"), entries[0]);
+    assert(entries[0].endsWith("Quote it so YAML reads it as a string"), entries[0]);
+    assert(entries[1].startsWith("rules.design entry 2 is empty"), entries[1]);
+    assert(entries[1].endsWith("Write the rule after the dash, or delete the dash"), entries[1]);
+    assert(entries[2].startsWith("rules.design entry 3 is an empty string"), entries[2]);
+    assert(entries[3].startsWith("rules.design entry 4 is a boolean"), entries[3]);
+    const scalar = ruleProblems(parseYaml("rules:\n  tasks: one rule\n"));
+    assertEquals(scalar.length, 1);
+    assert(scalar[0].startsWith("rules.tasks is a string, not a list"), scalar[0]);
+    const list = ruleProblems(parseYaml("rules:\n  - one rule\n"));
+    assertEquals(list.length, 1);
+    assert(list[0].startsWith("rules is a list, not a mapping"), list[0]);
+});
+
+Deno.test("configProblems reports a file that is not valid YAML or not a mapping", async () => {
+    const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "config-test-" });
+    try {
+        await Deno.writeTextFile(`${dir}/broken.yaml`, "rules:\n  specs: [unclosed\n");
+        assert((await configProblems(`${dir}/broken.yaml`))[0].startsWith("cannot be read as YAML"));
+        await Deno.writeTextFile(`${dir}/list.yaml`, "- a\n");
+        assertEquals(await configProblems(`${dir}/list.yaml`), ["the file is a list, not a mapping"]);
+    } finally {
+        await Deno.remove(dir, { recursive: true });
+    }
+});
+
+Deno.test("exitCode fails on a dropped rule even when the generated files are current", () => {
+    assertEquals(exitCode(["rules.specs entry 1 is a mapping"], [], false), 1);
+    assertEquals(exitCode([], ["a generated file differs"], false), 1);
+    assertEquals(exitCode([], [], true), 1);
+    assertEquals(exitCode([], [], false), 0);
 });

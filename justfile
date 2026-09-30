@@ -22,13 +22,13 @@ lint:
 scripts-check:
     deno check scripts/ .agents/skills/github-project-workflow/scripts/
     deno lint scripts/ .agents/skills/github-project-workflow/scripts/
-    deno test --allow-read --allow-write=/tmp --allow-run=git scripts/
+    deno test --allow-read --allow-write=/tmp --allow-run=git --allow-env=LOG_TOKENS,LOG_STREAM scripts/
 
 # Validate feature layout, metadata, and version bumps against a base ref
 validate base="origin/main":
     ./scripts/validate.ts --base "$1"
 
-# Validate every OpenSpec spec and change in strict mode, and that OpenSpec's generated files are current
+# Validate every OpenSpec spec and change in strict mode, the rules in config.yaml, and OpenSpec's generated files
 spec-check:
     OPENSPEC_NO_UPDATE_CHECK=1 openspec validate --all --strict --no-interactive
     ./scripts/check_openspec.ts

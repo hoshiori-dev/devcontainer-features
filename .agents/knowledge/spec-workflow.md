@@ -16,9 +16,11 @@ remembered one. No separate skill wraps OpenSpec here: its own generated skills 
 Creating a change, validating, syncing, and archiving run through OpenSpec's commands or its generated skills; never
 create `openspec/` directories or change metadata by hand. Hand edits stop at the text of proposal, design, tasks, and
 delta specs, and at a main spec's Purpose under the two exceptions in Scope of specifications. Validation:
-`just spec-check` runs OpenSpec's validator in strict mode over all specs and changes and is part of `just check`. Run
-it after every artifact edit, before publishing the draft PR, before marking the PR ready, and after archiving; a red
-check is a red check.
+`just spec-check` runs OpenSpec's validator in strict mode over all specs and changes and is part of `just check`; it
+also fails when a rule in `openspec/config.yaml` would not reach OpenSpec, which drops a whole artifact's rules with
+only a warning when one of them is not a string (quote a rule that contains a colon followed by a space). Run it after
+every artifact edit, before publishing the draft PR, before marking the PR ready, and after archiving; a red check is a
+red check.
 
 ## Artifact map
 
