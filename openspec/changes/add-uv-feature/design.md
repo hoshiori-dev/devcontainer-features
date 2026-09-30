@@ -10,8 +10,8 @@
   is therefore a contract for later features, not only for users.
 - The Dev Container spec adds a feature's `containerEnv` to the image as `ENV` before the feature's `install.sh` runs,
   so `install.sh` and every later feature already see `UV_PYTHON_INSTALL_DIR` and `UV_CACHE_DIR` pointing at
-  `/var/lib/uv-data`, while the volume is not mounted during the build. Anything written there at build time lands in
-  the image's mount point: Docker copies it into a new, empty volume and hides it behind an existing one.
+  `/var/lib/uv`, while the volume is not mounted during the build. Anything written there at build time lands in the
+  image's mount point: Docker copies it into a new, empty volume and hides it behind an existing one.
 - When Docker creates a named volume and mounts it over an image directory, it copies that directory's contents and its
   owner and mode into the volume, only while the volume is empty (moby `copyExistingContents` into containerd continuity
   `fs.CopyDir`, whose `copyFileInfo` calls `os.Lchown`; disabled by `volume-nocopy`). A mount point owned by the remote
@@ -47,13 +47,20 @@
     rate-limited the pull: `debian:12` has tar, `sha256sum`, and bash, and lacks curl, wget, and CA certificates;
     `alpine:3.24` has busybox `wget`, tar, `sha256sum`, and CA certificates, and lacks curl and bash; root's login shell
     is `/bin/bash` and `/bin/sh` respectively.
-  - `/etc/profile` of `debian:12` and `alpine:3.24` sets `PATH` to a fixed list, so a login shell started inside the
-    container drops a directory that `containerEnv` put in `PATH`; `/etc/profile` of the Ubuntu base image does not.
-    Both profiles source `/etc/profile.d/*.sh` afterwards, and a snippet there that adds the directory when it is
-    missing restored it on all three images, for `sh -l`, `bash -li`, and a login shell started with an empty
-    environment. The devcontainer CLI (0.89.0) merges the container's `PATH` back into the environment its
-    `userEnvProbe` reads from a login shell, so processes the CLI starts (`devcontainer exec`, the test scripts, the
-    editor's server) keep the directory without the snippet.
+  - `almalinux:10` (`ID_LIKE="rhel centos fedora"`, glibc 2.39), `archlinux:latest` (`ID=arch`, glibc 2.44), and
+    `opensuse/leap:16.0` (`ID_LIKE="suse opensuse"`, glibc 2.40) ship curl, tar, `sha256sum`, CA certificates, and bash;
+    their curl reads the `releases/latest` redirect with `--proto '=https' --proto-redir '=https'` (302 to the 0.12.21
+    tag), and root's login shell is bash. `almalinux:10` and `opensuse/leap:16.0` publish amd64 and arm64 images;
+    `archlinux:latest` publishes amd64 only (`docker buildx imagetools inspect`). The Arch image ships no package
+    database, so `pacman -S` finds no package until a `-Sy`, and Arch supports a sync only together with a full upgrade
+    (`-Syu`). Photon OS (`photon:5.0`, `ID=photon`, no `ID_LIKE`) belongs to none of the families.
+  - `/etc/profile` of `debian:12`, `alpine:3.24`, and `opensuse/leap:16.0` sets `PATH` to a fixed list, so a login shell
+    started inside the container drops a directory that `containerEnv` put in `PATH`; `/etc/profile` of the Ubuntu base
+    image, `almalinux:10`, and `archlinux:latest` does not. Every profile sources `/etc/profile.d/*.sh` afterwards, and
+    a snippet there that adds the directory when it is missing restored it on all six images, for `sh -l`, `bash -li`,
+    and a login shell started with an empty environment. The devcontainer CLI (0.89.0) merges the container's `PATH`
+    back into the environment its `userEnvProbe` reads from a login shell, so processes the CLI starts
+    (`devcontainer exec`, the test scripts, the editor's server) keep the directory without the snippet.
   - The CLI's `dev-container-features-test-lib` (0.89.0) is a bash script (`#!/bin/bash`, arrays), and the CLI runs
     `./test.sh` and `./<scenario>.sh` through `devcontainer exec`, so the script's shebang decides the interpreter.
 
@@ -80,12 +87,11 @@
   image that already configures uv (its own environment or `/etc/uv/uv.toml`) keeps that configuration. Checked by
   review of `install.sh` and by a scenario asserting that the container environment carries no such variable from the
   feature.
-- The image's `/var/lib/uv-data` is empty and owned by the remote user when this feature's install ends; build-time uv
-  runs with `UV_PYTHON_INSTALL_DIR=/usr/local/share/uv/python`, `UV_CACHE_DIR` in a temporary directory removed at the
-  end, and `UV_MANAGED_PYTHON=1`, so tool interpreters are uv-managed and in the image regardless of any system Python.
-  Checked by `test.sh`, which asserts, before running uv, that `/var/lib/uv-data` is a mount, empty, and owned by the
-  remote user, and by a tools scenario asserting that each tool's interpreter resolves under
-  `/usr/local/share/uv/python`.
+- The image's `/var/lib/uv` is empty and owned by the remote user when this feature's install ends; build-time uv runs
+  with `UV_PYTHON_INSTALL_DIR=/usr/local/share/uv/python`, `UV_CACHE_DIR` in a temporary directory removed at the end,
+  and `UV_MANAGED_PYTHON=1`, so tool interpreters are uv-managed and in the image regardless of any system Python.
+  Checked by `test.sh`, which asserts, before running uv, that `/var/lib/uv` is a mount, empty, and owned by the remote
+  user, and by a tools scenario asserting that each tool's interpreter resolves under `/usr/local/share/uv/python`.
 - The build-time layout under `/usr/local/share/uv/` (`tools`, `python`, `bin`) is owned by the remote user and that
   user's primary group when the remote user is not root, so the remote user can run `uv tool` at runtime (Open
   Questions, item 1). Checked by a scenario running as `vscode` that upgrades a tool.
@@ -98,26 +104,36 @@
   and by running `install.sh` twice in one throwaway container, once with identical options and once with two non-empty
   tool lists that list one tool again with another constraint, recorded in the PR.
 - Prerequisites (curl, CA certificates, tar, `sha256sum`) are installed only when missing, from the image's configured
-  `apt` or `apk` repositories, non-interactively, with package caches cleaned afterwards, and stay in the image. Checked
-  by the `debian:12` and `alpine:3.24` jobs, and by a `build` scenario on `debian:12` whose Dockerfile records a SHA-256
-  of every file under `/etc/apt/sources.list*`, `/etc/apt/trusted.gpg*`, and `/usr/share/keyrings/`, which the scenario
-  test compares with the built image.
+  repositories through the family's package manager (`apt-get`, `dnf`, `pacman -Syu --needed`, `apk`, or `zypper`),
+  non-interactively and without recommended or weak dependencies where the manager has such a setting, with package
+  caches cleaned afterwards, and stay in the image; when nothing is missing, no package manager runs. Checked by the
+  `debian:12` and `alpine:3.24` jobs, which lack curl, and by a `build` scenario on `debian:12` whose Dockerfile records
+  a SHA-256 of every file under `/etc/apt/sources.list*`, `/etc/apt/trusted.gpg*`, and `/usr/share/keyrings/`, which the
+  scenario test compares with the built image. The `dnf`, `pacman`, and `zypper` images lack no prerequisite, so their
+  branches are observed during implementation in a throwaway container of each image with `tar` removed without its
+  dependents (`rpm -e --nodeps`, `pacman -Rdd`), running `install.sh` and recording in the PR that it installs `tar` and
+  succeeds.
 - `test.sh`, `duplicate.sh`, and the scenario scripts are POSIX `sh` that re-execute themselves with bash before
   sourcing the bash-only test library; on an image without bash they first add it from the image's `apk` repositories,
   inside the test container only. Checked by shellcheck and by the `alpine:3.24` jobs.
 - Failure scenarios a successful build cannot show are produced in a throwaway container running `install.sh`: an
   unsupported architecture with a `uname` stub earlier on `PATH` that prints another machine name (for example
-  `riscv64`); an unsupported distribution on an image outside the supported families (for example Fedora); a mismatching
-  or missing checksum with a `curl` wrapper earlier on `PATH` that alters or fails only the `.sha256` request; a missing
-  release with an unpublished version such as `9.9.9`; a missing remote user with `_REMOTE_USER` naming no account; an
-  uninstallable tool with an unpublished package name; an old release with tools with `version` `0.12.15` and one tool.
-  Each result is recorded in the PR.
+  `riscv64`); an unsupported distribution on an image outside the supported families (Photon OS, `photon:5.0`); a
+  mismatching or missing checksum with a `curl` wrapper earlier on `PATH` that alters or fails only the `.sha256`
+  request; a missing release with an unpublished version such as `9.9.9`; a missing remote user with `_REMOTE_USER`
+  naming no account; an uninstallable tool with an unpublished package name; an old release with tools with `version`
+  `0.12.15` and one tool. Each result is recorded in the PR.
 - Later features find `uv` and this feature's environment during their install, because `containerEnv` is written as
   image `ENV` before they install (Context). Checked by a throwaway local feature, not committed, that installs after
-  this one, runs `uv --version`, and fails unless `UV_PYTHON_INSTALL_DIR` is `/var/lib/uv-data/python`; one build of it
-  is recorded in the PR. From `hf-cli`'s change (#17) on, its global scenario `uv_and_hf_cli` checks this again: its
-  build fails unless `hf-cli`'s install runs `uv`, and its runtime value of the variable is the one later features saw,
-  by the same `ENV` fact.
+  this one, runs `uv --version`, and fails unless `UV_PYTHON_INSTALL_DIR` is `/var/lib/uv/python`; one build of it is
+  recorded in the PR. From `hf-cli`'s change (#17) on, its global scenario `uv_and_hf_cli` checks this again: its build
+  fails unless `hf-cli`'s install runs `uv`, and its runtime value of the variable is the one later features saw, by the
+  same `ENV` fact.
+- `NOTES.md` gives users the facts they check before adopting the feature: the supported distribution families with
+  their package managers, pointing to `test/uv/compatibility.json` for the tested images and to the
+  `mcr.microsoft.com/devcontainers/base` images of those families; the layout of the volume (`/var/lib/uv`, mounted from
+  `uv-${devcontainerId}`, with `python/` as `UV_PYTHON_INSTALL_DIR` and `cache/` as `UV_CACHE_DIR`); and the upstream
+  references of the spec's Purpose. Checked by review of `NOTES.md` against the spec.
 - Nothing a rebuild replaces holds a path a workspace `.venv/` links to: interpreters uv installs at runtime exist only
   on the volume. Checked by the rebuild observation in the proposal's Acceptance.
 
@@ -200,20 +216,27 @@ The feature has two options, both new in this change; the spec's Option requirem
   every file, and uv checks it only from 0.12.16 on. Rejected: accepting older releases as a documented exception (Open
   Questions, item 6); pinning hashes through a constraints file (not verified that `uv tool install` enforces them, and
   the user's list would need hashes).
-- **A named volume `uv-${devcontainerId}` at `/var/lib/uv-data`, one per dev container.** `${devcontainerId}` is allowed
-  in a feature's `mounts` and stable across rebuilds; the first-party docker-in-docker and powershell features use the
-  same pattern. Rejected: one volume shared by all dev containers (owners differ between projects, and one project's
-  cache and interpreters would leak into another); a host bind mount (depends on a host path); no mount (the issue's
-  problem).
-- **Ownership through the mount point, not at runtime.** The image's `/var/lib/uv-data` is created empty and owned by
+- **A named volume `uv-${devcontainerId}` at `/var/lib/uv`, one per dev container.** `${devcontainerId}` is allowed in a
+  feature's `mounts` and stable across rebuilds; the first-party docker-in-docker and powershell features use the same
+  pattern. Rejected: one volume shared by all dev containers (owners differ between projects, and one project's cache
+  and interpreters would leak into another); a host bind mount (depends on a host path); no mount (the issue's problem).
+- **Ownership through the mount point, not at runtime.** The image's `/var/lib/uv` is created empty and owned by
   `_REMOTE_USER`, and Docker copies that owner into the new volume. Rejected: an `entrypoint` or `postStartCommand` that
   runs `chown` (runs as root on every start, widens metadata, and cannot run as root in every setup); making the volume
   world-writable.
 - **`UV_LINK_MODE=copy`.** The cache volume and the workspace bind mount are always different filesystems, so the
   default `clone` always falls back to copying and warns on every install. Rejected: the default (the warning);
   `hardlink` (impossible across filesystems); `symlink` (uv discourages it: cleaning the cache breaks environments).
-- **Distribution families: Debian/Ubuntu (`ID` or `ID_LIKE` naming `debian` or `ubuntu`) and Alpine (`ID=alpine`);
-  anything else fails.** The distribution matters only for installing prerequisites (Open Questions, item 3).
+- **Distribution families, by `ID` or `ID_LIKE` in `/etc/os-release`: Debian/Ubuntu (`debian`, `ubuntu`) with `apt`,
+  RHEL/Fedora (`rhel`, `centos`, `fedora`) with `dnf`, Arch Linux (`arch`) with `pacman`, Alpine (`alpine`) with `apk`,
+  and openSUSE/SUSE (`suse`, `opensuse`, or an `ID` starting with `opensuse`) with `zypper`; anything else fails**
+  (maintainer decision, replacing Open Questions item 3). The distribution matters only for installing prerequisites, so
+  a family costs one package-manager branch and one compatibility image. Rejected: Debian/Ubuntu and Alpine only, with
+  other families as later MINORs; proceeding on any distribution that already has the prerequisites (a missing one would
+  then fail late, with no package manager to install it).
+- **On Arch Linux, `pacman -Syu --needed` only when a prerequisite is missing.** Arch supports no partial upgrade, and
+  its image ships no package database. Rejected: `pacman -Sy <pkg>` (a partial upgrade, which Arch does not support);
+  failing on Arch when a prerequisite is missing (the image lacks none today, but a slimmer Arch image would fail).
 - **`installsAfter: ghcr.io/devcontainers/features/common-utils`**, so a remote user that feature creates exists before
   ownership is set. No `dependsOn`: nothing is needed from another feature.
 
@@ -224,13 +247,13 @@ The feature has two options, both new in this change; the spec's Option requirem
 | Downloads             | HTTPS only; exactly the URLs in the URL inventory; no installer script; no URL, path, or option from a user option reaches curl or uv (validation above).                                                                                                                                                                                                                                                  |
 | Verification          | uv archive: SHA-256 from the same release's `.sha256`, checked before unpacking. `latest` redirect: TLS alone, stated in the spec's "Verify the uv release before installing it". Managed interpreters: SHA-256 compiled into uv, checked by uv. PyPI packages: SHA-256 supplied by the index, checked by uv 0.12.16 or later; the feature refuses tools with an older release and adds no pin of its own. |
 | Keys                  | None. uv publishes no signing key; the feature installs no repository key.                                                                                                                                                                                                                                                                                                                                 |
-| `mounts`              | One named volume `uv-${devcontainerId}` → `/var/lib/uv-data`, needed so interpreters and cache survive a rebuild; no bind mount, no host path.                                                                                                                                                                                                                                                             |
+| `mounts`              | One named volume `uv-${devcontainerId}` → `/var/lib/uv`, needed so interpreters and cache survive a rebuild; no bind mount, no host path.                                                                                                                                                                                                                                                                  |
 | `containerEnv`        | `UV_PYTHON_INSTALL_DIR`, `UV_CACHE_DIR`, `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_LINK_MODE`, and `PATH` with `/usr/local/share/uv/bin` prepended; nothing secret, nothing that changes an index or a download source.                                                                                                                                                                                        |
 | Shell startup         | `/etc/profile.d/uv.sh` (root-owned, mode 0644) prepends `/usr/local/share/uv/bin` to `PATH` when it is missing; nothing else.                                                                                                                                                                                                                                                                              |
 | `installsAfter`       | `ghcr.io/devcontainers/features/common-utils` (ordering only).                                                                                                                                                                                                                                                                                                                                             |
 | `dependsOn`           | None.                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Not used              | `privileged`, `capAdd`, `securityOpt`, `entrypoint`, `init`, lifecycle commands.                                                                                                                                                                                                                                                                                                                           |
-| Files owned by a user | `/var/lib/uv-data` (empty mount point) and `/usr/local/share/uv/` belong to the remote user when it is not root (Open Questions, item 1).                                                                                                                                                                                                                                                                  |
+| Files owned by a user | `/var/lib/uv` (empty mount point) and `/usr/local/share/uv/` belong to the remote user when it is not root (Open Questions, item 1).                                                                                                                                                                                                                                                                       |
 | Idempotency           | Same release skips the download; binaries replaced by rename; tool installs are additive; `/etc/profile.d/uv.sh` overwritten whole; directories created only if missing.                                                                                                                                                                                                                                   |
 | Failure behavior      | As in the spec's "Fail on unsupported platforms and invalid options", "Verify the uv release before installing it", "Option version", and "Option toolsToInstall"; a remote user that does not exist fails the install.                                                                                                                                                                                    |
 
@@ -245,13 +268,19 @@ Planned `test/uv/compatibility.json`:
       "remoteUser": "vscode"
     },
     { "image": "debian:12", "arch": ["amd64", "arm64"] },
-    { "image": "alpine:3.24", "arch": ["amd64", "arm64"] }
+    { "image": "alpine:3.24", "arch": ["amd64", "arm64"] },
+    { "image": "almalinux:10", "arch": ["amd64", "arm64"] },
+    { "image": "archlinux:latest", "arch": ["amd64"] },
+    { "image": "opensuse/leap:16.0", "arch": ["amd64", "arm64"] }
   ]
 }
 ```
 
 The first entry covers glibc with a non-root remote user, the second glibc as root on a minimal image, the third musl.
-Fedora is left out: it adds no C library, and a later MINOR can add it.
+The last three cover the `dnf`, `pacman`, and `zypper` families, each with a root remote user on the distribution's own
+image. Arch Linux publishes no arm64 image, so `archlinux:latest` runs on amd64 only; its rolling `latest` tag is the
+only one upstream maintains. Fedora belongs to the RHEL/Fedora family without an image of its own: it shares `dnf` with
+`almalinux:10` and adds no C library.
 
 ## URL inventory
 
@@ -270,7 +299,7 @@ serve the remote user's own uv commands at runtime.
 | 6  | `https://github.com/astral-sh/python-build-standalone/releases/download/<build>/<same file as row 5>`                                                   | Fallback when row 5 fails                                                       | Build, `toolsToInstall` not empty, row 5 unavailable | As row 5                                                                                               | https://docs.astral.sh/uv/reference/environment/ (`UV_PYTHON_INSTALL_MIRROR`); `crates/uv-python/src/downloads.rs` as in row 5                            | 2026-09-30: 3.14.7, all four triples 200, final host `release-assets.githubusercontent.com`                                                                                          |
 | 7  | `https://pypi.org/simple/<package>/`                                                                                                                    | Resolve each tool and its dependencies                                          | Build, `toolsToInstall` not empty                    | TLS; supplies the SHA-256 of each file in row 8                                                        | https://docs.astral.sh/uv/concepts/indexes/ (PyPI is the default index); https://docs.pypi.org/api/index-api/                                             | 2026-09-30: `pycowsay` 200 on `pypi.org`; uv 0.12.21 requested it in a local run                                                                                                     |
 | 8  | `https://files.pythonhosted.org/packages/<path>`                                                                                                        | Distribution files and their metadata                                           | Build, `toolsToInstall` not empty                    | SHA-256 from row 7, checked by uv 0.12.16 or later; the feature adds no pin                            | https://docs.pypi.org/api/index-api/ (index responses link files on this host)                                                                            | 2026-09-30: `pycowsay-0.0.0.2-py3-none-any.whl` and its `.metadata` 200 on `files.pythonhosted.org`                                                                                  |
-| 9  | The image's configured `apt` or `apk` repositories                                                                                                      | curl, CA certificates, tar, `sha256sum` when missing                            | Build, only when a prerequisite is missing           | The distribution's signed repository metadata, with keys the image already has                         | Not configured by this feature                                                                                                                            | Not applicable                                                                                                                                                                       |
+| 9  | The image's configured `apt`, `dnf`, `pacman`, `apk`, or `zypper` repositories                                                                          | curl, CA certificates, tar, `sha256sum` when missing                            | Build, only when a prerequisite is missing           | The distribution's signed repository metadata, with keys the image already has                         | Not configured by this feature                                                                                                                            | Not applicable                                                                                                                                                                       |
 | 10 | `ghcr.io/devcontainers/features/common-utils` (OCI, `installsAfter`)                                                                                    | Ordering only; this feature never fetches it, the CLI does if the user lists it | Build (Dev Container CLI)                            | OCI digests, verified by the CLI                                                                       | https://github.com/devcontainers/features/tree/main/src/common-utils                                                                                      | 2026-09-30: anonymous GHCR tag list 200, tags include `2`                                                                                                                            |
 
 ## Risks / Trade-offs
@@ -281,16 +310,16 @@ serve the remote user's own uv commands at runtime.
   of one release offline.
 - [`test.sh` compares `uv --version` with `releases/latest` at test time, so a release published between the build and
   the test fails the job] → The window is minutes; a rerun clears it.
-- [A later feature that runs uv at build time as root without its own directories writes into `/var/lib/uv-data` in the
+- [A later feature that runs uv at build time as root without its own directories writes into `/var/lib/uv` in the
   image. Docker copies those root-owned files into every new volume, so the remote user's uv fails with permission
   denied on the cache or interpreter directory, and the volume no longer holds only what the remote user wrote] →
-  `NOTES.md` states the contract for dependents: the paths under `/var/lib/uv-data` are for runtime only, and a feature
-  that runs uv at build time, as any user, keeps uv's interpreter and cache writes out of it: it downloads no managed
-  Python (for example `uv pip install --python <interpreter>`) or sets its own `UV_PYTHON_INSTALL_DIR` outside it, and
-  it sets `UV_NO_CACHE=1` or a temporary `UV_CACHE_DIR`. `hf-cli`'s change (#17) follows it (Context) and adds the
-  global scenario `uv_and_hf_cli`, which installs both features and asserts that uv installed `hf-cli`'s package, that
-  `UV_PYTHON_INSTALL_DIR` is `/var/lib/uv-data/python`, and that `/var/lib/uv-data` is a mount, empty, and owned by the
-  remote user in a container started with a new volume.
+  `NOTES.md` states the contract for dependents: the paths under `/var/lib/uv` are for runtime only, and a feature that
+  runs uv at build time, as any user, keeps uv's interpreter and cache writes out of it: it downloads no managed Python
+  (for example `uv pip install --python <interpreter>`) or sets its own `UV_PYTHON_INSTALL_DIR` outside it, and it sets
+  `UV_NO_CACHE=1` or a temporary `UV_CACHE_DIR`. `hf-cli`'s change (#17) follows it (Context) and adds the global
+  scenario `uv_and_hf_cli`, which installs both features and asserts that uv installed `hf-cli`'s package, that
+  `UV_PYTHON_INSTALL_DIR` is `/var/lib/uv/python`, and that `/var/lib/uv` is a mount, empty, and owned by the remote
+  user in a container started with a new volume.
 - [A dependent that installs tools as root into `/usr/local/share/uv/tools` leaves root-owned environments in a
   directory the remote user owns, so the remote user's `uv tool upgrade --all` fails on them] → `NOTES.md` asks
   dependents to give such environments the remote user as owner, as this feature does, or to use their own tool
@@ -328,14 +357,13 @@ Decisions for the maintainer, each with a recommendation:
    or appending.
 2. **A volume that already exists with another owner** (the remote user changed). Recommendation: no runtime fix;
    `NOTES.md` documents removing the volume. An `entrypoint` that runs `chown` would widen metadata for a rare case.
-3. **Distributions outside Debian/Ubuntu and Alpine.** Recommendation: fail, per the feature conventions, and add a
-   family (for example Fedora with `dnf`) as a MINOR together with its image in the compatibility list. The alternative
-   is to proceed on any distribution that already has curl, tar, and `sha256sum`.
+3. **Distribution families.** Decided by the maintainer: Debian/Ubuntu, RHEL/Fedora, Arch Linux, Alpine, and
+   openSUSE/SUSE, each with its image in the compatibility list (Decisions); anything else fails.
 4. **An option for the Python version of build-time tools** (for example `toolsPythonVersion`). Recommendation: not now;
    uv's default interpreter is enough for the known consumers, and an option can arrive as a MINOR.
-5. **`PATH` in login shells on images whose `/etc/profile` resets it** (`debian:12`, `alpine:3.24`). Recommendation:
-   `/etc/profile.d/uv.sh`, as specified. The alternative is no snippet and a spec narrowed to processes the dev
-   container tooling starts, with the gap documented in `NOTES.md`.
+5. **`PATH` in login shells on images whose `/etc/profile` resets it** (`debian:12`, `alpine:3.24`,
+   `opensuse/leap:16.0`). Recommendation: `/etc/profile.d/uv.sh`, as specified. The alternative is no snippet and a spec
+   narrowed to processes the dev container tooling starts, with the gap documented in `NOTES.md`.
 6. **Tools with a uv release older than 0.12.16**, which installs PyPI packages with TLS only. Recommendation: fail the
    build, as specified. The alternative is to allow it as an explicit exception to the download rules in
    `.agents/knowledge/feature-authoring.md` (a registry package installed on TLS alone), stated as a Requirement in the

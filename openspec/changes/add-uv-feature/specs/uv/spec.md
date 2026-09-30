@@ -11,9 +11,11 @@ Upstream sources:
 - Home: https://github.com/astral-sh/uv
 - Documentation: https://docs.astral.sh/uv/
 - Installation guide: https://docs.astral.sh/uv/getting-started/installation/
+- Tools concept: https://docs.astral.sh/uv/concepts/tools/
 - Storage locations: https://docs.astral.sh/uv/reference/storage/
 - Environment variables: https://docs.astral.sh/uv/reference/environment/
 - Changelog: https://github.com/astral-sh/uv/blob/main/CHANGELOG.md
+- GitHub releases: https://github.com/astral-sh/uv/releases
 
 ## ADDED Requirements
 
@@ -110,8 +112,11 @@ The feature SHALL install tools only with a uv release that checks index-supplie
 ### Requirement: Install download prerequisites only from the image's repositories
 
 The feature SHALL install curl, CA certificates, tar, and `sha256sum`, when the image lacks them, only from the package
-repositories the image already configures, and SHALL add no package repository or signing key. What it installs this way
-stays in the image.
+repositories the image already configures, with the package manager of the distribution's family (`apt`, `dnf`,
+`pacman`, `apk`, or `zypper`), and SHALL add no package repository or signing key. On Arch Linux, whose package manager
+supports installing a package only together with a full system upgrade, installing a missing prerequisite SHALL also
+upgrade the image's packages; when nothing is missing, the feature SHALL run no package manager. What it installs this
+way stays in the image.
 
 #### Scenario: Minimal image
 
@@ -172,20 +177,19 @@ runtime.
 
 ### Requirement: Persist interpreters and cache per dev container
 
-The feature SHALL mount a named volume `uv-${devcontainerId}`, one per dev container, at `/var/lib/uv-data`, and SHALL
-point uv's managed-interpreter directory and cache into it. A newly created volume SHALL be owned by the remote user and
-SHALL hold nothing written at build time.
+The feature SHALL mount a named volume `uv-${devcontainerId}`, one per dev container, at `/var/lib/uv`, and SHALL point
+uv's managed-interpreter directory (`python/`) and cache (`cache/`) into it. A newly created volume SHALL be owned by
+the remote user and SHALL hold nothing written at build time.
 
 #### Scenario: New volume
 
 - **WHEN** a dev container with this feature is created and its volume does not exist yet
-- **THEN** `/var/lib/uv-data` is a mount of that volume, owned by the remote user, and holds no files before uv first
-  runs
+- **THEN** `/var/lib/uv` is a mount of that volume, owned by the remote user, and holds no files before uv first runs
 
 #### Scenario: Runtime interpreter on the volume
 
 - **WHEN** the remote user creates a virtual environment with a uv-managed interpreter that is not installed yet
-- **THEN** the interpreter is installed under `/var/lib/uv-data`, and the environment's interpreter link resolves there
+- **THEN** the interpreter is installed under `/var/lib/uv`, and the environment's interpreter link resolves there
 
 #### Scenario: Rebuild keeps a workspace environment
 
@@ -200,8 +204,8 @@ SHALL hold nothing written at build time.
 
 ### Requirement: Point uv at the feature's locations
 
-The feature SHALL set, for every process in the container, `UV_PYTHON_INSTALL_DIR` to `/var/lib/uv-data/python`,
-`UV_CACHE_DIR` to `/var/lib/uv-data/cache`, `UV_TOOL_DIR` to `/usr/local/share/uv/tools`, `UV_TOOL_BIN_DIR` to
+The feature SHALL set, for every process in the container, `UV_PYTHON_INSTALL_DIR` to `/var/lib/uv/python`,
+`UV_CACHE_DIR` to `/var/lib/uv/cache`, `UV_TOOL_DIR` to `/usr/local/share/uv/tools`, `UV_TOOL_BIN_DIR` to
 `/usr/local/share/uv/bin`, `UV_LINK_MODE` to `copy`, and SHALL put `/usr/local/share/uv/bin` in `PATH` ahead of
 `/usr/local/bin` and `/usr/bin`, also in login shells whose system profile resets `PATH`.
 
@@ -224,7 +228,7 @@ variables this feature sets.
 #### Scenario: Later feature runs uv
 
 - **WHEN** a feature that installs after this one runs `uv --version` during its own install
-- **THEN** the command succeeds and `UV_PYTHON_INSTALL_DIR` is set to `/var/lib/uv-data/python`
+- **THEN** the command succeeds and `UV_PYTHON_INSTALL_DIR` is set to `/var/lib/uv/python`
 
 ### Requirement: Install twice
 
@@ -254,10 +258,11 @@ and a tool listed again SHALL end up satisfying the entry of the later install.
 ### Requirement: Fail on unsupported platforms and invalid options
 
 The feature SHALL fail the build with a message naming the problem, before downloading anything, when the container's
-architecture is neither x86_64 nor aarch64, when the distribution is neither Debian- or Ubuntu-based nor Alpine, or when
-`toolsToInstall` is not empty and `version` names a release older than 0.12.16. It SHALL also fail when the remote user
-it is installed for does not exist. The Option requirements state how invalid values of a single option fail. The
-supported images are those in `test/uv/compatibility.json`.
+architecture is neither x86_64 nor aarch64, when the distribution belongs to none of the supported families (Debian- or
+Ubuntu-based, RHEL- or Fedora-based, Arch Linux, Alpine, and openSUSE or SUSE), or when `toolsToInstall` is not empty
+and `version` names a release older than 0.12.16. It SHALL also fail when the remote user it is installed for does not
+exist. The Option requirements state how invalid values of a single option fail. The supported images are those in
+`test/uv/compatibility.json`.
 
 #### Scenario: Unsupported architecture
 
@@ -266,7 +271,7 @@ supported images are those in `test/uv/compatibility.json`.
 
 #### Scenario: Unsupported distribution
 
-- **WHEN** the feature is installed on a distribution that is neither Debian- or Ubuntu-based nor Alpine
+- **WHEN** the feature is installed on a distribution outside the supported families
 - **THEN** the build fails with a message naming the distribution, and nothing is downloaded
 
 #### Scenario: Tools with a uv release that does not check index hashes

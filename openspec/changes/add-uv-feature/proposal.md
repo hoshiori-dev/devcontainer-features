@@ -13,6 +13,8 @@ point at nothing until the interpreter is downloaded again.
 
 - A new feature `uv` installs a verified upstream release of `uv` and `uvx` for every user of the container, at the
   version the `version` option names.
+- It installs on Debian- and Ubuntu-based, RHEL- and Fedora-based, Arch Linux, Alpine, and openSUSE images, including
+  the `mcr.microsoft.com/devcontainers/base` images of those distributions, and fails on any other distribution.
 - Python command-line tools listed in the `toolsToInstall` option are installed at build time from uv's default sources,
   verified by uv, and are on `PATH`, together with the interpreters they run on, inside the image.
 - Each dev container gets its own persistent volume, owned by the remote user, that holds the Python interpreters uv
@@ -45,7 +47,8 @@ None.
 - Metadata that widens the container: one named volume per dev container (`mounts`); no `privileged`, `capAdd`,
   `securityOpt`, `entrypoint`, or `init`.
 - Dependencies: `installsAfter` the first-party `common-utils` feature; no `dependsOn`.
-- CI: the new feature's compatibility images run its tests on amd64 and arm64.
+- CI: the new feature's compatibility images run its tests on amd64 and arm64, except `archlinux:latest`, which has no
+  arm64 image and runs on amd64 only.
 - Canary: this change does not touch `test/canary.json`; the maintainer maintains canary membership by hand.
 
 ## Acceptance
