@@ -52,7 +52,7 @@ None.
 
 **Becomes true:**
 
-- "Latest release", "glibc image", "musl image", "Checksum matches", "No tools requested", "New volume", and
+- "Omitted version", "glibc image", "musl image", "Checksum matches", "Omitted toolsToInstall", "New volume", and
   "Environment of the remote user" in `specs/uv/spec.md` pass in `test/uv/test.sh` on each image and architecture in
   `test/uv/compatibility.json`.
 - "Pinned release", "Minimal image", "Tools on PATH", "Tools survive a replaced volume", "Remote user manages tools",
@@ -62,9 +62,10 @@ None.
 - "Different options" passes in `test/uv/duplicate.sh` on each compatibility image, and "Same options", "Different
   options" with two non-empty `toolsToInstall` lists, and "Tool listed again" are observed by installing the feature
   twice in one container and recorded in the PR's Validation section.
-- Every scenario of "Verify the uv release before installing it" and "Fail on unsupported platforms and invalid options"
-  that a successful build cannot show is observed during implementation with the method the design names for it and
-  recorded in the PR's Validation section.
+- Every scenario of "Verify the uv release before installing it" and "Fail on unsupported platforms and invalid
+  options", and every failure scenario of "Option version" and "Option toolsToInstall", that a successful build cannot
+  show is observed during implementation with the method the design names for it and recorded in the PR's Validation
+  section.
 - "Rebuild keeps a workspace environment" is observed on a real rebuild of one dev container, and "Separate dev
   containers" on two dev containers on one Docker host, both recorded in the PR's Validation section.
 - `test/uv/test.sh` asserts the executable and the environment that "Later feature runs uv" relies on, and the scenario

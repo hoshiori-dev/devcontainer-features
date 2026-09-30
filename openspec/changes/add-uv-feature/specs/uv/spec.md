@@ -17,15 +17,21 @@ Upstream sources:
 
 ## ADDED Requirements
 
-### Requirement: Install uv and uvx
+### Requirement: Option version
 
-The feature SHALL install the `uv` and `uvx` executables of one upstream uv release as `/usr/local/bin/uv` and
-`/usr/local/bin/uvx`, executable by every user. The `version` option SHALL name either `latest`, meaning the newest
-release at build time, or one release as `MAJOR.MINOR.PATCH`.
+The feature SHALL accept the option `version` as declared here, naming either `latest`, meaning the newest release at
+build time, or one release as `MAJOR.MINOR.PATCH`; SHALL install the `uv` and `uvx` executables of that upstream uv
+release as `/usr/local/bin/uv` and `/usr/local/bin/uvx`, executable by every user; and SHALL fail the build on any other
+value, with a message naming the value, before downloading anything.
 
-#### Scenario: Latest release
+| Field   | Value      |
+| ------- | ---------- |
+| Type    | `string`   |
+| Default | `"latest"` |
 
-- **WHEN** the feature is installed with `version` set to `latest`
+#### Scenario: Omitted version
+
+- **WHEN** the feature is installed without `version`, or with `version` set to `latest`
 - **THEN** `uv --version` and `uvx --version`, run as the remote user, report the newest uv release published when the
   image was built
 
@@ -33,6 +39,16 @@ release at build time, or one release as `MAJOR.MINOR.PATCH`.
 
 - **WHEN** the feature is installed with `version` naming a published release
 - **THEN** `uv --version` reports exactly that release
+
+#### Scenario: Release does not exist
+
+- **WHEN** `version` names a release that upstream has not published
+- **THEN** the build fails with a message naming the requested version
+
+#### Scenario: Invalid version
+
+- **WHEN** `version` is neither `latest` nor `MAJOR.MINOR.PATCH`
+- **THEN** the build fails with a message naming the value, and nothing is downloaded
 
 ### Requirement: Select the release build for the platform
 
@@ -71,11 +87,6 @@ from upstream.
 - **THEN** the build fails with a message naming the archive, and `/usr/local/bin/uv` and `/usr/local/bin/uvx` are left
   as they were before this install
 
-#### Scenario: Release does not exist
-
-- **WHEN** `version` names a release that upstream has not published
-- **THEN** the build fails with a message naming the requested version
-
 ### Requirement: Verify build-time tool downloads
 
 When `toolsToInstall` is not empty, uv downloads at build time, on the feature's behalf, the interpreters and packages
@@ -107,28 +118,51 @@ stays in the image.
 - **WHEN** the feature is installed on an image without curl or CA certificates
 - **THEN** the install succeeds, and the image's package repository configuration and signing keys are unchanged
 
-### Requirement: Install tools at build time
+### Requirement: Option toolsToInstall
 
-The feature SHALL install each tool listed in the `toolsToInstall` option, a comma-separated list, with
-`uv tool install` at build time, and SHALL put the tools' executables on `PATH` for every user. Whitespace around an
-entry SHALL be ignored, and empty entries SHALL be skipped. The tools' environments and the uv-managed interpreters they
-run on SHALL live in the image, outside the persistent volume. The remote user SHALL be able to upgrade and add tools
-with `uv tool` at runtime.
+The feature SHALL accept the option `toolsToInstall` as declared here, a comma-separated list in which whitespace around
+an entry is ignored and empty entries are skipped; SHALL install each listed tool with `uv tool install` at build time
+and put the tools' executables on `PATH` for every user; SHALL fail the build when an entry is not a package name with
+at most one bracketed extra and one version constraint (an option, URL, path, or any whitespace inside an entry), with a
+message naming the entry, before downloading anything; and SHALL fail the build when `uv tool install` cannot install a
+listed tool.
+
+| Field   | Value    |
+| ------- | -------- |
+| Type    | `string` |
+| Default | `""`     |
+
+#### Scenario: Omitted toolsToInstall
+
+- **WHEN** the feature is installed without `toolsToInstall`, or with `toolsToInstall` empty or holding only separators
+  and whitespace
+- **THEN** no tool is installed and no Python interpreter is downloaded at build time
 
 #### Scenario: Tools on PATH
 
 - **WHEN** the feature is installed with `toolsToInstall` listing two tools
 - **THEN** the executables of both tools run for the remote user by name, without a path
 
+#### Scenario: Invalid tool entry
+
+- **WHEN** an entry of `toolsToInstall` starts with `-`, is a URL or a path, or contains whitespace inside it
+- **THEN** the build fails with a message naming the entry, and nothing is downloaded or installed
+
+#### Scenario: Tool cannot be installed
+
+- **WHEN** an entry of `toolsToInstall` names a package that uv cannot resolve or install
+- **THEN** the build fails
+
+### Requirement: Keep build-time tools in the image
+
+The environments of the tools that `toolsToInstall` installs, and the uv-managed interpreters they run on, SHALL live in
+the image, outside the persistent volume. The remote user SHALL be able to upgrade and add tools with `uv tool` at
+runtime.
+
 #### Scenario: Tools survive a replaced volume
 
 - **WHEN** a tool from `toolsToInstall` runs in a container whose persistent volume is new and empty
 - **THEN** the tool runs, and its interpreter resolves to a path outside the persistent volume
-
-#### Scenario: No tools requested
-
-- **WHEN** `toolsToInstall` is empty or holds only separators and whitespace
-- **THEN** no tool is installed and no Python interpreter is downloaded at build time
 
 #### Scenario: Remote user manages tools
 
@@ -220,12 +254,10 @@ and a tool listed again SHALL end up satisfying the entry of the later install.
 ### Requirement: Fail on unsupported platforms and invalid options
 
 The feature SHALL fail the build with a message naming the problem, before downloading anything, when the container's
-architecture is neither x86_64 nor aarch64, when the distribution is neither Debian- or Ubuntu-based nor Alpine, when
-`version` is neither `latest` nor `MAJOR.MINOR.PATCH`, when an entry of `toolsToInstall` is not a package name with at
-most one bracketed extra and one version constraint (an option, URL, path, or any whitespace inside an entry), or when
+architecture is neither x86_64 nor aarch64, when the distribution is neither Debian- or Ubuntu-based nor Alpine, or when
 `toolsToInstall` is not empty and `version` names a release older than 0.12.16. It SHALL also fail when the remote user
-it is installed for does not exist, and when `uv tool install` cannot install a listed tool. The supported images are
-those in `test/uv/compatibility.json`.
+it is installed for does not exist. The Option requirements state how invalid values of a single option fail. The
+supported images are those in `test/uv/compatibility.json`.
 
 #### Scenario: Unsupported architecture
 
@@ -237,16 +269,6 @@ those in `test/uv/compatibility.json`.
 - **WHEN** the feature is installed on a distribution that is neither Debian- or Ubuntu-based nor Alpine
 - **THEN** the build fails with a message naming the distribution, and nothing is downloaded
 
-#### Scenario: Invalid version
-
-- **WHEN** `version` is neither `latest` nor `MAJOR.MINOR.PATCH`
-- **THEN** the build fails with a message naming the value, and nothing is downloaded
-
-#### Scenario: Invalid tool entry
-
-- **WHEN** an entry of `toolsToInstall` starts with `-`, is a URL or a path, or contains whitespace inside it
-- **THEN** the build fails with a message naming the entry, and nothing is downloaded or installed
-
 #### Scenario: Tools with a uv release that does not check index hashes
 
 - **WHEN** `toolsToInstall` is not empty and `version` names a release older than 0.12.16
@@ -256,8 +278,3 @@ those in `test/uv/compatibility.json`.
 
 - **WHEN** the feature is installed for a remote user that does not exist in the image
 - **THEN** the build fails with a message naming the user
-
-#### Scenario: Tool cannot be installed
-
-- **WHEN** an entry of `toolsToInstall` names a package that uv cannot resolve or install
-- **THEN** the build fails

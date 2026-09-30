@@ -134,6 +134,32 @@
   Docker-run images only.
 - Architectures other than x86_64 and aarch64, which have no CI runner here.
 
+## Options
+
+The feature has two options, both new in this change; the spec's Option requirements state them.
+
+| Name             | Type     | Default    | Enum or proposals                | Meaning                                                                                                                            |
+| ---------------- | -------- | ---------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `version`        | `string` | `"latest"` | proposals `["latest","0.12.16"]` | The uv release to install: `latest`, the newest release at build time, or one release as `MAJOR.MINOR.PATCH`                       |
+| `toolsToInstall` | `string` | `""`       | proposals `["","pycowsay"]`      | Python command-line tools to install at build time, comma-separated, each a package name with at most one extra and one constraint |
+
+- **Default `latest` for `version`.** A configuration that omits `version` follows upstream releases without a feature
+  release for each; a pinned `version` gives reproducible builds (Risks). The Acceptance runs "Omitted version" in
+  `test.sh`, which installs the defaults. Proposals, not an enum: every published release is valid, and each new release
+  adds one. `0.12.16`, the oldest release allowed with tools (Decisions), differs from what `latest` resolves to, so the
+  second install of `duplicate.sh`, with the defaults, takes the replace path.
+- **Default empty `toolsToInstall`.** The default image downloads no interpreter and reaches none of URL inventory rows
+  5–8, and `duplicate.sh` installs the defaults second with an empty tool list (Goals). `pycowsay` is the small tool
+  verified in the URL inventory; it gives the first install of `duplicate.sh` a tool to keep.
+- **Rejected shapes.** An enum of uv releases (every uv release would need a feature release, and `latest` would be
+  impossible); options for a package index, a mirror, a Python download source, or a hash policy (they would let
+  configuration redirect or weaken verified downloads, against "Verify build-time tool downloads"); one option per tool
+  or a JSON list (options are `boolean` or `string`; a comma-separated list matches the first-party Python feature's
+  `toolsToInstall`, with the limit in Risks).
+- **Not in this change, pending Open Questions item 4.** An option for the Python version of build-time tools. The
+  recommendation there is to leave it out, so this table does not list it; if the maintainer decides otherwise, the
+  table and the delta spec gain it before implementation.
+
 ## Decisions
 
 - **Release archive from GitHub Releases, verified against its per-archive `.sha256`.** Rejected: uv's `uv-installer.sh`
@@ -206,7 +232,7 @@
 | Not used              | `privileged`, `capAdd`, `securityOpt`, `entrypoint`, `init`, lifecycle commands.                                                                                                                                                                                                                                                                                                                           |
 | Files owned by a user | `/var/lib/uv-data` (empty mount point) and `/usr/local/share/uv/` belong to the remote user when it is not root (Open Questions, item 1).                                                                                                                                                                                                                                                                  |
 | Idempotency           | Same release skips the download; binaries replaced by rename; tool installs are additive; `/etc/profile.d/uv.sh` overwritten whole; directories created only if missing.                                                                                                                                                                                                                                   |
-| Failure behavior      | As in the spec's "Fail on unsupported platforms and invalid options" and "Verify the uv release before installing it"; a remote user that does not exist fails the install.                                                                                                                                                                                                                                |
+| Failure behavior      | As in the spec's "Fail on unsupported platforms and invalid options", "Verify the uv release before installing it", "Option version", and "Option toolsToInstall"; a remote user that does not exist fails the install.                                                                                                                                                                                    |
 
 Planned `test/uv/compatibility.json`:
 
