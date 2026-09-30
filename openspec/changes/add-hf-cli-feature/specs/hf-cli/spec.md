@@ -67,8 +67,10 @@ The feature SHALL download the installer to a file, over HTTPS, from
 `https://raw.githubusercontent.com/huggingface/huggingface_hub/refs/tags/v<version>/utils/installers/install.sh`, where
 `<version>` is the resolved version, and SHALL run it only from that file; it SHALL NOT pipe a download into a shell. A
 response other than a direct `200` SHALL fail the build with a message naming the tag, before the installer runs.
-Upstream publishes no checksum or signature for the installer: the feature verifies only the TLS connection to that host
-and that the file comes from the release tag of the upstream repository; it does not verify the file's content.
+Upstream publishes no checksum or signature for the installer, so the installer's content is not verified: the feature
+relies on TLS to that host alone and on the path naming the upstream repository's release tag. The installer downloads
+only the Python packages that "Verify package downloads" names (`huggingface_hub`, its dependencies, and `pip`), from
+the sources named there; its skill step generates the skill locally and downloads nothing.
 
 #### Scenario: No release tag for the version
 
@@ -83,7 +85,8 @@ and that the file comes from the release tag of the upstream repository; it does
 ### Requirement: Resolve the latest version
 
 When `version` is `latest`, the feature SHALL resolve it at build time to the release named by the `info.version` field
-of https://pypi.org/pypi/huggingface_hub/json and SHALL install exactly that release. A value that is not of the form
+of https://pypi.org/pypi/huggingface_hub/json and SHALL install exactly that release. PyPI publishes no checksum or
+signature for that response, so the feature relies on TLS alone for it. A value that is not of the form
 `MAJOR.MINOR.PATCH` (digits only) SHALL fail the build. The feature SHALL NOT fall back to an unpinned install.
 
 #### Scenario: Latest resolves to a stable release

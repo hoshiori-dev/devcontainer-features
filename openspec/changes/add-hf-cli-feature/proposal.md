@@ -15,9 +15,9 @@ and keeping the image's shell files and build inputs under control.
 - A new feature `hf-cli` installs the Hugging Face CLI (`hf`) with the upstream standalone installer, for the remote
   user, at the `huggingface_hub` version its `version` option selects, and puts `hf` on the `PATH` of the remote user
   and root. The installation is the one the installer documents, so the CLI recognizes it as installer-managed.
-- The installer comes from the upstream repository's release tag for that version; the version is pinned and checked
-  after installation. The installer itself has no upstream checksum or signature, so this falls short of the
-  repository's download-verification rule; whether that is accepted is the design's first open question.
+- The installer comes from the upstream repository's release tag for that version and runs from a saved file, as the
+  repository's rule for installer scripts allows; upstream publishes no checksum or signature for it, so its content is
+  not verified. The version is pinned and checked after installation.
 - The feature depends on the `uv` feature, so the installer installs `huggingface_hub` and its dependencies through uv,
   which checks every package file against the digests the Python Package Index publishes; the installer's own upgrade of
   `pip` is checked by pip against the same index digests. The installation writes nothing under the `uv` feature's
@@ -28,6 +28,8 @@ and keeping the image's shell files and build inputs under control.
   `version`; the design's open questions include whether to keep this.
 - The feature has no token, login, or credential option; users authenticate after the container starts, as the issue
   requires.
+- The repository's root `README.md` lists `hf-cli` under "Features": one row whose id links to `src/hf-cli/`, with a
+  one-sentence description; the first row replaces "No features have been published yet.".
 
 ## Capabilities
 
@@ -44,9 +46,9 @@ None.
 ## Impact
 
 - Feature ids touched: `hf-cli`, new at version `1.0.0`. No other feature changes, so no other version bump.
-- Files: `src/hf-cli/`, `test/hf-cli/`, the new `test/_global/` (`scenarios.json` and the `uv_and_hf_cli` scenario), and
-  `openspec/specs/hf-cli/spec.md` at archive. `test/canary.json` gains `hf-cli`, the first feature with an in-repo
-  `dependsOn`, as `.agents/knowledge/testing.md` asks (design, open questions).
+- Files: `src/hf-cli/`, `test/hf-cli/`, the new `test/_global/` (`scenarios.json` and the `uv_and_hf_cli` scenario),
+  `openspec/specs/hf-cli/spec.md` at archive, and the root `README.md` (one row under "Features").
+- Canary membership in `test/canary.json` is left to the maintainer; this change does not touch it.
 - Dependencies: `dependsOn` the `uv` feature (`ghcr.io/hoshiori-dev/devcontainer-features/uv:1`). The implementation
   waits until the `uv` feature (#14) is merged; from then on, CI re-tests `hf-cli` whenever `uv` changes.
 - Users' images gain a system `python3` with `venv` where they had none, and a virtual environment and `~/.local/bin/hf`
@@ -79,13 +81,14 @@ None.
   carries no source or check setting but the feature's; "Options" holds by review of `devcontainer-feature.json`.
 - Every URL the feature, the installer it runs, the tools they call, and its tests access, other than the pulls of the
   test images, appears in the design's URL inventory.
-- `test/canary.json` lists `hf-cli` (design, Open Questions, item 8).
+- The root `README.md` has one row for `hf-cli` under "## Features", its id linking to `src/hf-cli/` and a one-sentence
+  description, and no longer says "No features have been published yet."; this is separate from the generated
+  `src/hf-cli/README.md`.
 - `just check`, `just test hf-cli`, `just test-scenarios hf-cli`, and `just test-global` pass.
 
 **Stays true:**
 
-- No existing feature, spec, or shared script changes, and no existing test except the canary list; the `uv` feature's
-  contract is used as it is merged.
+- No existing feature, spec, shared script, or test changes; the `uv` feature's contract is used as it is merged.
 - The feature widens nothing the container may do: no `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`,
   `init`, or lifecycle command.
 - Nothing the feature installs runs or reaches the network when the container starts.

@@ -160,8 +160,8 @@ Upstream facts, read on 2026-09-30:
 - An `HF_HOME` override, pre-downloading models or datasets, any authentication (issue #17), and the `transformers` CLI.
 - Musl (Alpine), RPM, or other distributions in 1.0.0; each can be added later as a MINOR bump.
 - Removing a skill when a later install disables `installSkill`, and installing any skill other than `hf-cli`.
-- Verifying the installer's content (Open Questions, item 1), locking transitive dependency versions, and verifying PEP
-  740 attestations.
+- Verifying the installer's content (upstream publishes no checksum or signature for it; Decisions), locking transitive
+  dependency versions, and verifying PEP 740 attestations.
 
 ## Test fixtures
 
@@ -202,7 +202,16 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
   `https://hf.co/cli/install.sh` into bash, as documented (a mutable redirect, unpinned, and a partial download would
   run); downloading `hf.co/cli/install.sh` to a file (still mutable and not tied to a version); the `main` branch
   (moves); the short ref form `…/v<version>/…` (the maintainer's first template: GitHub resolves a branch of that name
-  too, and GitHub's own raw link uses `refs/tags/`); a copy of the installer in `src/hf-cli/` (Open Questions, item 1).
+  too, and GitHub's own raw link uses `refs/tags/`); a copy of the installer in `src/hf-cli/` (the installer would no
+  longer match the installed version); the SHA-256 digests of reviewed installer revisions, failing on any other (hashes
+  tied to upstream versions, which `feature-authoring.md` forbids without a change to that rule, and each new upstream
+  revision would break `latest` until a PATCH release).
+- **The installer download complies with `feature-authoring.md`'s download rules** (#36). Installer scripts: upstream
+  documents the installer, the feature fetches it from the upstream repository's tag, saves it to a file, and never
+  pipes it into a shell; upstream publishes no checksum or signature for it, so the spec's "Download the installer from
+  the release tag" states that its content is not verified and names what the installer downloads. Sources: the URL is
+  HTTPS, answers 200 without a redirect, and is named in the spec. Direct downloads relying on TLS alone (the installer
+  and the latest-version answer) are stated in the spec's Requirements.
 - **The download's answer is the tag check.** A 404 means no tag of that name holds the installer; the failure names the
   tag. Rejected: the GitHub REST API (`api.github.com/…/git/ref/tags/v<version>`: 60 unauthenticated requests per hour
   per IP address, shared on CI runners), and `git ls-remote` (`debian:12` has no git).
@@ -242,7 +251,7 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
   create root-owned `__pycache__` directories that the user's later `--force` or `hf update` could not remove.
 - **The skill is the installer's step, verified afterwards.** Rejected: always `--exclude-skill` and a separate
   `hf skills add` (repeats the installer's per-version flags); trusting the installer (it only warns on failure).
-- **`HF_HUB_DISABLE_UPDATE_CHECK=1` in `containerEnv`** (Open Questions, item 4). Rejected: dropping it (the daily
+- **`HF_HUB_DISABLE_UPDATE_CHECK=1` in `containerEnv`** (Open Questions, item 3). Rejected: dropping it (the daily
   notice then advertises `hf update`); a `disableUpdateCheck` option (`containerEnv` has no option substitution).
 - **Distribution family as in the `uv` feature: `ID` or `ID_LIKE` in `/etc/os-release` naming `debian` or `ubuntu`.**
   Only the prerequisites depend on the distribution, and derivatives use the same apt package names. Rejected: `ID`
@@ -254,16 +263,15 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
 
 - **Downloads and verification** (every URL in the inventory below):
   - The installer: TLS to `raw.githubusercontent.com` and a path naming the upstream release tag. Its content is not
-    verified: upstream publishes no checksum or signature, and a tag can be moved. This does not meet
-    `feature-authoring.md`'s "verify every download — a published checksum or a signature whose key is pinned by
-    fingerprint", nor, strictly, "no `curl | sh` from an unpinned source": the file is not piped, but its source is a
-    tag, not a content pin (Open Questions, item 1).
+    verified: upstream publishes no checksum or signature, and a tag can be moved. `feature-authoring.md`'s "Installer
+    scripts" rule allows this, since the file is saved and run, never piped, and the spec states it (Decisions).
   - `huggingface_hub` and its dependencies: SHA-256 digests from PyPI's simple index, enforced by uv (0.12.16 or later),
     wheels only.
   - `pip`, upgraded by the installer inside the new venv: the SHA-256 digest from the index, enforced by the pip that
     `python3-venv` provides (tested), a check pip documents as protection against corruption.
   - `python3`, `python3-venv`, `ca-certificates`: apt's signed repository metadata and the image's keyrings.
-  - The latest-version answer: TLS to `pypi.org`, then validated as a version.
+  - The latest-version answer: TLS to `pypi.org` alone, as the spec's "Resolve the latest version" states, then
+    validated as a version.
   - The uv binary's verification belongs to the `uv` feature.
 - **Keys:** none pinned by the feature. PyPI's digests arrive over TLS from the index, so the trust root is PyPI and the
   Web PKI; for the installer it is GitHub, the Web PKI, and the upstream repository's tag.
@@ -272,7 +280,7 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
   runs only `install.sh`, apt, and the checks, and writes `/usr/local/bin/hf`.
 - **Code executed at run time by root:** `/usr/local/bin/hf` runs the remote user's venv, which that user owns and can
   change, so anything running as the remote user can get code run as root the next time root runs `hf`. This is the same
-  kind of trust inversion as the `uv` feature's user-writable tool directory ahead in `PATH` (Open Questions, item 9).
+  kind of trust inversion as the `uv` feature's user-writable tool directory ahead in `PATH` (Open Questions, item 7).
 - **Metadata:** `dependsOn` `ghcr.io/hoshiori-dev/devcontainer-features/uv:1`; `containerEnv`
   `HF_HUB_DISABLE_UPDATE_CHECK=1`, which only silences the CLI. No `installsAfter`, `mounts`, `capAdd`, `privileged`,
   `securityOpt`, `entrypoint`, `init`, or lifecycle command.
@@ -326,8 +334,9 @@ apt uses the repositories that image's own sources name; the feature adds none.
 
 ## Risks / Trade-offs
 
-- [The installer's content is not verified, and a moved tag would change it] → Open Questions, item 1; the file runs as
-  the remote user, not root, with a fixed argument list and environment, and the version and skill checks run after it.
+- [The installer's content is not verified, and a moved tag would change it] → accepted under `feature-authoring.md`'s
+  installer-script rule, as the spec states; the file runs as the remote user, not root, with a fixed argument list and
+  environment, and the version and skill checks run after it.
 - [A future installer revision adds a default step, drops a flag, or changes paths] → an unknown flag or a moved venv
   fails the build visibly (the marker, version, and link checks); a new default step would run unseen until a test or
   review notices. CI tests `latest` only when this feature or its dependency changes.
@@ -339,7 +348,7 @@ apt uses the repositories that image's own sources name; the feature adds none.
   the update check stays off, and `NOTES.md` says to rebuild with another `version`.
 - [Users other than the remote user and root cannot run `hf` when the remote user's home is not searchable by others, as
   on `base:ubuntu-24.04` (Context)] → the per-user install is the maintainer's decision; `NOTES.md` states it.
-- [Root running `hf` runs code the remote user can change] → Open Questions, item 9.
+- [Root running `hf` runs code the remote user can change] → Open Questions, item 7.
 - [The `uv` feature puts `/usr/local/share/uv/bin` ahead of `/usr/local/bin` in `PATH`, so `huggingface_hub` in its
   `toolsToInstall` puts another `hf` first] → that `hf`, not this feature's, runs by name; the spec's
   `/usr/local/bin/hf` is a path, not a promise about name resolution. `NOTES.md` says not to list `huggingface_hub`
@@ -365,48 +374,29 @@ apt uses the repositories that image's own sources name; the feature adds none.
 - [A PyPI release published before its GitHub tag makes `latest` fail with "no release tag" until the tag appears] → the
   failure names the tag; pinning `version` to the previous release works meanwhile.
 - [Fixing the package sources blocks users whose builds may only reach an internal index or mirror] → only proxies keep
-  working; Open Questions, item 2.
+  working; Open Questions, item 1.
 
 ## Open Questions
 
 Decisions for the maintainer, each with a recommendation:
 
-1. **The installer download against the repository's verification rule.** `feature-authoring.md` requires every download
-   to be verified by a published checksum or a signature with a pinned key, and forbids `curl | sh` from an unpinned
-   source. Upstream publishes neither for the installer, so the feature verifies only TLS and that the file comes from
-   the version's release tag; it never pipes the file, but the tag is not a content pin. Packages are checked against
-   PyPI's index digests (uv, and pip for its own upgrade), and apt packages against the image's keyrings. Options: (a)
-   accept this as a recorded exception for `hf-cli`, as the spec's "Download the installer from the release tag" states;
-   (b) ship the SHA-256 digests of the installer revisions a maintainer has reviewed and fail on any other (three
-   revisions cover `1.27.0`–`2.0.0` today, but each new upstream revision breaks `latest` until a feature PATCH
-   release); (c) ship a reviewed copy of the installer in `src/hf-cli/` (no download, but the installer no longer
-   matches the installed version, and it contradicts the source decided for this change). Recommendation: (a); choose
-   (b) if content verification outweighs `latest` breaking on upstream installer changes. The spec encodes (a), so
-   approving the spec decides it. The exception is recorded in that requirement, which lives on in
-   `openspec/specs/hf-cli/spec.md`, and in `NOTES.md`; `feature-authoring.md` stays unchanged, since feature-specific
-   information lives with the feature.
-2. **Fix the package sources, or honor a configured index or mirror?** Recommendation: fix them, so the URL inventory is
+1. **Fix the package sources, or honor a configured index or mirror?** Recommendation: fix them, so the URL inventory is
    complete and a build environment cannot redirect the install, weaken its checks, or add installer arguments.
    Alternative: pass through uv and pip configuration, which breaks the inventory and the redirect scenario. The spec's
    "Verify package downloads" encodes the recommendation, so approving the spec decides it.
-3. **`installSkill` default.** Upstream installs the skill by default; the feature does not. Recommendation: `false`,
+2. **`installSkill` default.** Upstream installs the skill by default; the feature does not. Recommendation: `false`,
    since the skill changes what coding agents in the container read and writes into `~/.claude`.
-4. **Keep `HF_HUB_DISABLE_UPDATE_CHECK=1`?** Now that `hf update` recognizes the installation, the daily notice would
+3. **Keep `HF_HUB_DISABLE_UPDATE_CHECK=1`?** Now that `hf update` recognizes the installation, the daily notice would
    offer it. Recommendation: keep it, because that update pipes the mutable `hf.co` script into bash, may edit rc files,
    needs `curl` (absent from `debian:12`), and is undone by the next rebuild, which installs the pinned `version`.
    Alternative: drop it, and let users update in place between rebuilds. The spec's "Disable the update check" encodes
    the recommendation, so approving the spec decides it.
-5. **Accepted versions.** Recommendation: stable `MAJOR.MINOR.PATCH` at or above `1.27.0`, pre-releases rejected. The
+4. **Accepted versions.** Recommendation: stable `MAJOR.MINOR.PATCH` at or above `1.27.0`, pre-releases rejected. The
    spec's "Validate the requested version" encodes it, so approving the spec decides it.
-6. **Lock transitive dependencies?** Recommendation: not in 1.0.0; the top-level pin plus digest checks suffice.
-7. **Images for 1.0.0.** Recommendation: the two glibc images above on amd64 and arm64. The `uv` feature plans
+5. **Lock transitive dependencies?** Recommendation: not in 1.0.0; the top-level pin plus digest checks suffice.
+6. **Images for 1.0.0.** Recommendation: the two glibc images above on amd64 and arm64. The `uv` feature plans
    `alpine:3.24`; Alpine can follow as a MINOR bump once `python3` from `apk` is shown to suit the installer.
-8. **`hf-cli` as a canary.** `testing.md` asks both for "fast, stable" canaries and for one with an in-repo `dependsOn`
-   once such a pair exists; `hf-cli` is the only such pair, but slow and dependent on GitHub, PyPI, and
-   `huggingface.co`. Recommendation: add it, since it is the only feature that exercises staging of a `dependsOn`.
-   Alternative: defer until a faster dependent exists. The proposal's Acceptance encodes the recommendation, so
-   approving the package as written decides it; the alternative drops that item.
-9. **Root running the remote user's `hf`.** Recommendation: accept it, as the `uv` change recommends for its
+7. **Root running the remote user's `hf`.** Recommendation: accept it, as the `uv` change recommends for its
    user-writable tool directory: the remote user of a dev container can usually become root anyway, and `NOTES.md`
    states it. The spec's "The CLI SHALL run for the remote user and for root" encodes this, so approving the spec
    decides it. Alternative: drop "and for root" from the spec and tell root in `NOTES.md` not to run `hf`; a root-owned
