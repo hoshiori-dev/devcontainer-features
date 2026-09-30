@@ -2,37 +2,37 @@
 
 ## 1. Scaffold and metadata
 
-- [ ] 1.1 Scaffold `src/firewall/` and `test/firewall/` with `just new-feature firewall`, then set the metadata in
+- [x] 1.1 Scaffold `src/firewall/` and `test/firewall/` with `just new-feature firewall`, then set the metadata in
       `src/firewall/devcontainer-feature.json`: version `1.0.0`, name, description, a description per option, the
       `presets` proposals of design.md, `capAdd: ["NET_ADMIN"]`, the `entrypoint` and `postStartCommand` of design.md
       (Security review surface), and `installsAfter` docker-in-docker and common-utils without a tag, with no
       `dependsOn`, `privileged`, `mounts`, `containerEnv`, `init`, or `securityOpt`; verify `just validate` and
       `just spec-check` pass.
-- [ ] 1.2 Write `test/firewall/compatibility.json` with the four images of design.md (Supported images) on `amd64` and
+- [x] 1.2 Write `test/firewall/compatibility.json` with the four images of design.md (Supported images) on `amd64` and
       `arm64`, `remoteUser` `vscode` on `base:ubuntu-24.04`; verify `just validate` passes.
-- [ ] 1.3 Replace the root `README.md`'s "No features have been published yet." with a "Features" row for `firewall`
+- [x] 1.3 Replace the root `README.md`'s "No features have been published yet." with a "Features" row for `firewall`
       linking to `src/firewall/` with a one-sentence description; verify `deno fmt --check` passes.
 
 ## 2. Install
 
-- [ ] 2.1 Write the shared validator `src/firewall/scripts/common.sh` (POSIX `sh`, used by `install.sh` at build time
+- [x] 2.1 Write the shared validator `src/firewall/scripts/common.sh` (POSIX `sh`, used by `install.sh` at build time
       and by the start-time script): comma-list splitting that ignores whitespace and empty entries, known presets and
       their domains (Requirement: Presets), DNS names without wildcard labels, and IPv4 and IPv6 addresses and CIDRs
       with the host-bit check, the `192.0.2.1` check for allowed and fetched entries, and the /8 and /16 minimums for
       fetched ranges; verify `shellcheck` is clean and the checks in 2.3 cover every rejection.
-- [ ] 2.2 Write `src/firewall/install.sh` (POSIX `sh`, `set -eu`): detect the distribution family from `/etc/os-release`
+- [x] 2.2 Write `src/firewall/install.sh` (POSIX `sh`, `set -eu`): detect the distribution family from `/etc/os-release`
       and fail naming it when unsupported, validate every option before changing the image, install only missing
       packages from the image's repositories (Debian and Ubuntu `nftables dnsmasq-base`, Alpine
       `nftables dnsmasq-dnssec-nftset`, Fedora `nftables dnsmasq`, each with `curl jq ca-certificates`) and clean the
       package caches, fail when the installed dnsmasq lacks nftset support or its `dnsmasq` user is missing, and
       overwrite the root-owned options file and scripts under `/usr/local/share/firewall/`; verify `shellcheck` is clean
       and review it against design.md's URL inventory (no URL fetched at build).
-- [ ] 2.3 Write `test/firewall/test.sh` (POSIX `sh`, since Alpine ships no bash) for the build-time scenarios: scripts
+- [x] 2.3 Write `test/firewall/test.sh` (POSIX `sh`, since Alpine ships no bash) for the build-time scenarios: scripts
       and packages present (Supported image), no repository or key file names the feature (No repository added), no
       sudoers entry or group membership for the remote user (No sudoers entry), bounding set of Docker's default plus
       `NET_ADMIN` (Metadata of a built container), owner and mode of every file the start-time script reads, and the
       range validator against fixture responses (Implausible range); verify `shellcheck` is clean.
-- [ ] 2.4 Write `test/firewall/duplicate.sh` (POSIX `sh`): after an install with non-default options (without the
+- [x] 2.4 Write `test/firewall/duplicate.sh` (POSIX `sh`): after an install with non-default options (without the
       `github` preset, `defaultAction` `allow`, denied entries) and a second one with defaults, the options file and the
       current start record hold only the defaults and the defaults' rules are in force (Different options the second
       time); verify `shellcheck` is clean.
@@ -47,7 +47,7 @@
 
 ## 3. Start-time firewall and start check
 
-- [ ] 3.1 Write `src/firewall/scripts/apply.sh` (POSIX `sh`, run as root by the entrypoint), following design.md's Goals
+- [x] 3.1 Write `src/firewall/scripts/apply.sh` (POSIX `sh`, run as root by the entrypoint), following design.md's Goals
       and Decisions: a clean environment and fixed `PATH`; the start record under `/run/firewall/` with the start time
       of PID 1; the resolvers recorded once per container in `/var/lib/firewall/` and written back into
       `/etc/resolv.conf` in place; the closed table first; with the `github` preset and `defaultAction` `deny`, one
@@ -57,22 +57,22 @@
       pairs, learned sets); dnsmasq from its own configuration as the `dnsmasq` user on `127.0.0.1`; `resolv.conf`
       naming it only once it runs; and both failure modes; verify `shellcheck` is clean and the generated rulesets pass
       `nft -c -f`.
-- [ ] 3.2 Write `src/firewall/scripts/check.sh` (POSIX `sh`, the `postStartCommand`): re-execute under `env -i` with a
+- [x] 3.2 Write `src/firewall/scripts/check.sh` (POSIX `sh`, the `postStartCommand`): re-execute under `env -i` with a
       fixed `PATH`, call tools by absolute path, wait at most 90 seconds for the current start's record, probe
       `192.0.2.1:443` for a refusal within 3 seconds, print a one-line summary, and exit non-zero with `closed` or warn
       on standard error and exit zero with `warn`; verify `shellcheck` is clean.
-- [ ] 3.3 Extend `test/firewall/test.sh` with the runtime scenarios design.md assigns to it (First start, Allowed domain
+- [x] 3.3 Extend `test/firewall/test.sh` with the runtime scenarios design.md assigns to it (First start, Allowed domain
       is reachable, GitHub preset, Omitted presets, Unlisted domain is refused and the omitted-option scenarios, Other
       DNS server refused, Unlisted name still resolves, Ranges loaded, Firewall in force, Resolver user, Remote user
       reads the record) and a timed refusal under one second; verify `shellcheck` is clean.
-- [ ] 3.4 Write `test/firewall/scenarios.json` and the scenario scripts `domains`, `cidrs`, `github-npm`, `rerun`,
+- [x] 3.4 Write `test/firewall/scenarios.json` and the scenario scripts `domains`, `cidrs`, `github-npm`, `rerun`,
       `fetch-fails`, `warn`, `allow-all`, `denied-cidrs`, `denied-domains`, and `denied-in-range` on `debian:12` with
       the options of design.md (Test coverage), each asserting the spec scenarios design.md maps to it; verify
       `shellcheck` is clean and `just validate` passes.
-- [ ] 3.5 Write the `dind` and `dind-no-forward` scenarios with docker-in-docker, running a nested container from an
+- [x] 3.5 Write the `dind` and `dind-no-forward` scenarios with docker-in-docker, running a nested container from an
       image imported from the dev container's own filesystem on a user-defined network; verify `shellcheck` is clean and
       `just validate` passes.
-- [ ] 3.6 Write `src/firewall/NOTES.md`: the guardrail limits of Requirement: Guardrail, not a security boundary first
+- [x] 3.6 Write `src/firewall/NOTES.md`: the guardrail limits of Requirement: Guardrail, not a security boundary first
       (passwordless `sudo` of the usual base images, Docker access, `defaultAction` `allow`, `failureMode` `warn`), the
       `vscode` preset in the first lines, the metadata the feature adds, the start record's path, the window before the
       first rules load, the hosts each preset's source lists and the preset leaves out, that the `github` preset reaches
@@ -87,6 +87,6 @@
 
 ## 4. Integration
 
-- [ ] 4.1 Run `just check` and verify it passes with the generated `README.md` in place.
+- [x] 4.1 Run `just check` and verify it passes with the generated `README.md` in place.
 - [ ] 4.2 Verify `just affected` selects only `firewall`, CI passes on amd64 and arm64, and record every Acceptance item
       of proposal.md with its result in the PR's Validation section.
