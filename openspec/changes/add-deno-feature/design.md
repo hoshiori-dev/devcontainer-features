@@ -95,10 +95,10 @@ were checked on 2026-09-30 unless marked otherwise.
   afterwards. Checked by the tests on `debian:12` (all missing, all present afterwards) and a `build` scenario from
   `base:ubuntu-24.04` whose Dockerfile saves the `dpkg-query -W` listing; its test compares that listing with the one
   after installation.
-- The metadata holds `options.version` and the three `containerEnv` entries of the security review below, and nothing
-  else that widens the container. `PATH` gets `/usr/local/share/deno/bin` after the image's own entries, so nothing the
-  remote user writes there shadows a system command for root or later build steps. Checked by review against this
-  document and `just validate`.
+- The metadata holds `options.version`, the three `containerEnv` entries of the security review below, and the one
+  `installsAfter` entry of Decisions, and nothing else that widens the container. `PATH` gets
+  `/usr/local/share/deno/bin` after the image's own entries, so nothing the remote user writes there shadows a system
+  command for root or later build steps. Checked by review against this document and `just validate`.
 
 **Non-Goals:**
 
@@ -171,8 +171,17 @@ were checked on 2026-09-30 unless marked otherwise.
   checks each give their own message: `/etc/os-release` (`ID` or `ID_LIKE` naming `debian` or `ubuntu`), the glibc
   version against 2.27, and `uname -m` (`x86_64` → amd64, `aarch64` or `arm64` → arm64). Rejected: the command
   `dpkg --print-architecture`, which would tie the architecture check to the package manager; it is used nowhere else.
-- **No `dependsOn` and no `installsAfter` in v1.** The feature needs nothing another feature provides, and the ownership
-  rule tolerates a missing user (Open Questions 1).
+- **`installsAfter: ["ghcr.io/devcontainers/features/common-utils"]`, no `dependsOn` (maintainer decision).** It orders
+  this feature after common-utils when both are installed, so a remote user common-utils creates exists before the
+  ownership rule runs; it installs nothing on its own and adds no privilege. The ref carries no tag because the Dev
+  Container spec does not allow an `installsAfter` entry to be pinned to a tag or digest; `just validate` checks only
+  in-repo refs, and `feature-authoring.md`'s "major tag" rule for external features applies to `dependsOn`. The Dev
+  Container CLI resolves that ref's metadata at build time (URL inventory). Rejected: no `installsAfter`, which leaves a
+  user common-utils creates in the same build with a root-owned tools tree. Rejected: `dependsOn`, which would install
+  common-utils, and its user and packages, for every user of this feature.
+- **One spelling of an exact version (maintainer decision).** `version` accepts `latest` or `X.Y.Z`; `v2.9.7` fails like
+  any other value, with the message naming the accepted forms. Rejected: accepting the `v` prefix as a second spelling,
+  which complicates the option's proposals and error message for no new capability.
 
 ## Supported images
 
@@ -224,8 +233,8 @@ environment variable of the feature redirects anything.
   `github.com` and `release-assets.githubusercontent.com` (Risks).
 - **Metadata:** `containerEnv` only — `DENO_INSTALL_ROOT` and `PATH` so global tools land on `PATH` for every shell,
   appended so they never shadow a system command, and `DENO_NO_UPDATE_CHECK` so Deno never offers to replace the
-  verified binary. No `mounts`, `capAdd`, `privileged`, `securityOpt`, `init`, `entrypoint`, lifecycle commands,
-  `dependsOn`, or `installsAfter`.
+  verified binary. No `mounts`, `capAdd`, `privileged`, `securityOpt`, `init`, `entrypoint`, lifecycle commands, or
+  `dependsOn`; `installsAfter` names common-utils only for ordering (Decisions).
 - **Idempotency:** Goals above; the spec's Installing twice requirement is what `duplicate.sh` and the two reinstall
   `build` scenarios assert.
 - **Failure behavior:** the spec's Version selection, Verified download, Failed installation, and Supported platforms
@@ -235,7 +244,8 @@ environment variable of the feature redirects anything.
 
 Every URL the feature's scripts access. `<version>` is the resolved `X.Y.Z`; `<target>` is `x86_64-unknown-linux-gnu` or
 `aarch64-unknown-linux-gnu`. Nothing is accessed at container start: the feature defines no lifecycle command, and
-Deno's own update check is disabled. The feature references no other feature, so no OCI ref is resolved on its behalf.
+Deno's own update check is disabled. The one OCI ref the feature names, in `installsAfter`, is resolved by the Dev
+Container CLI, not by the feature's scripts.
 
 | URL / template                                                                                                            | Purpose                                                            | When                                                                                                     | Integrity / authenticity                                                                                                                                      | Official source evidence                                                                                                                                                                                                                                  | Verified                                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -244,6 +254,7 @@ Deno's own update check is disabled. The feature references no other feature, so
 | `https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.zip.sha256sum`                               | Checksum of the archive                                            | Build, before the archive                                                                                | HTTPS only; same release as the archive, so integrity, not authenticity; name field must equal the asset name                                                 | https://docs.deno.com/runtime/getting_started/installation/ ("Each asset has a matching `.sha256sum` file")                                                                                                                                               | 2026-09-30: `v2.9.7`, both targets, HTTP 200, final host `release-assets.githubusercontent.com`, `<hex>  <asset>.zip` |
 | `https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.sha256sum`                                   | Checksum of the extracted executable                               | Build, before the archive                                                                                | HTTPS only; same release as the archive; name field must equal `deno`                                                                                         | https://github.com/denoland/deno/releases/expanded_assets/v2.9.7 and `https://api.github.com/repos/denoland/deno/releases/tags/v2.9.7` (asset list of the release)                                                                                        | 2026-09-30: `v2.9.7`, both targets, HTTP 200, final host `release-assets.githubusercontent.com`, `<hex>  deno`        |
 | `https://release-assets.githubusercontent.com/github-production-release-asset/<id>/<uuid>?…`                              | Redirect target of the three GitHub rows (signed, short-lived URL) | Build, followed from the rows above                                                                      | TLS; content checked as in the rows above                                                                                                                     | https://api.github.com/meta (lists `release-assets.githubusercontent.com` among GitHub's domains)                                                                                                                                                         | 2026-09-30: observed as the final host of all six `v2.9.7` Linux asset URLs                                           |
+| `ghcr.io/devcontainers/features/common-utils` (OCI ref in `installsAfter`)                                                | Order this feature after common-utils when both are installed      | Build, by the Dev Container CLI resolving the feature set; installs nothing unless the user installs it  | OCI registry over HTTPS; the CLI reads its metadata only, and nothing from it runs unless the user installs common-utils                                      | https://github.com/devcontainers/features/tree/main/src/common-utils (official reference collection, published to `ghcr.io/devcontainers/features`)                                                                                                       | 2026-09-30: `devcontainer features info manifest` (CLI 0.89.0) returned the manifest, `common-utils` version `2.7.0`  |
 | The image's configured apt sources (for the planned images `deb.debian.org`, `archive.ubuntu.com`, or `ports.ubuntu.com`) | `curl`, `ca-certificates`, `unzip` when missing                    | Build, only when one is missing                                                                          | apt's signed `Release` files with the keys the image ships; the feature adds no source and no key                                                             | Not applicable: the image, not the feature, chooses these hosts                                                                                                                                                                                           | Not fetched: depends on the image                                                                                     |
 
 ## Risks / Trade-offs
@@ -261,7 +272,8 @@ Deno's own update check is disabled. The feature references no other feature, so
 - [Requiring both checksum files excludes releases `2.0.1` to `2.7.13`] → The failure names the missing file; a later
   MINOR change can open that range (Decisions).
 - [A non-root remote user created after this feature runs gets a root-owned tools tree] → `deno install --global` then
-  needs `sudo`; Open Questions 1 decides whether to order after common-utils.
+  needs `sudo`; `installsAfter` orders this feature after common-utils, the usual creator of that user, and a user
+  created by anything ordered later still gets the root-owned tree.
 - [`test.sh` reads the latest pointer at test time, so a Deno release between build and test fails that run once] →
   Accepted: the window is minutes and a rerun passes; capturing the value at build time would need the feature to write
   state only a test reads.
@@ -272,11 +284,5 @@ Deno's own update check is disabled. The feature references no other feature, so
 
 ## Open Questions
 
-1. **Add `installsAfter: ["ghcr.io/devcontainers/features/common-utils"]`?** It orders this feature after common-utils
-   when both are installed, so a remote user common-utils creates exists before ownership is applied; the Dev Container
-   CLI would then also resolve that ref's metadata at build time, and it joins the URL inventory. The ref carries no tag
-   because the Dev Container spec does not allow `installsAfter` entries to be pinned to a tag or digest; the
-   `just validate` recipe checks only in-repo refs, and `feature-authoring.md`'s "major tag" rule for external features
-   reads as applying to `dependsOn`. Recommendation: yes; it adds no install and no privilege.
-2. **Accept `v2.9.7` as a spelling of `2.9.7`?** Recommendation: no; one spelling keeps the option's proposals and error
-   message simple, and the error names the accepted forms.
+None. The maintainer decided both questions of the approved package (Decisions: `installsAfter`, one spelling of an
+exact version).
