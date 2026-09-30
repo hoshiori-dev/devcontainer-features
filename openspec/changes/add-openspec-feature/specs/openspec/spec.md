@@ -20,6 +20,9 @@ it and every one of its dependencies from the public npm registry at https://reg
 registry configured in the image, and SHALL make `openspec` runnable from `PATH` by every user of the container, the
 remote user included. The `version` option SHALL accept `latest` or one exact published version (`MAJOR.MINOR.PATCH`
 with an optional pre-release suffix); `latest` SHALL resolve to the version the registry names as latest at build time.
+The feature SHALL look the version up at https://registry.npmjs.org/@fission-ai/openspec/latest, or at
+`https://registry.npmjs.org/@fission-ai/openspec/<version>` for an exact version, relying on TLS alone; the lookup only
+selects the version, whose packages are then verified as "Verify every installed package" requires.
 
 #### Scenario: Latest version
 
@@ -56,10 +59,12 @@ with an optional pre-release suffix); `latest` SHALL resolve to the version the 
 The feature SHALL verify every package it installs, `@fission-ai/openspec` and each of its dependencies, against the
 `sha512` integrity hash the npm registry publishes for that version, and SHALL verify each package's npm registry
 signature, and its provenance attestations where the registry publishes them, with the registry signing keys and the
-Sigstore trust root served by npm's Sigstore TUF repository at https://tuf-repo-cdn.sigstore.dev. A package whose
-integrity does not match, whose registry signature is missing or invalid, or whose published provenance attestation is
-invalid SHALL fail the build; a package published without a provenance attestation SHALL NOT fail the build for that
-reason. The command `openspec` SHALL never reach a package that did not pass.
+Sigstore trust root served by npm's Sigstore TUF repository at https://tuf-repo-cdn.sigstore.dev. When that TUF
+repository has no target for the npm registry, the registry signing keys SHALL come from
+https://registry.npmjs.org/-/npm/v1/keys, relying on TLS alone. A package whose integrity does not match, whose registry
+signature is missing or invalid, or whose published provenance attestation is invalid SHALL fail the build; a package
+published without a provenance attestation SHALL NOT fail the build for that reason. The command `openspec` SHALL never
+reach a package that did not pass.
 
 #### Scenario: Verified install
 
