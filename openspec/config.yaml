@@ -24,12 +24,12 @@ rules:
     - When an upstream source shapes behavior (download location, checksum or signature verification, signing keys), state it and its URL as a Requirement and leave it out of the "Upstream sources:" list; each URL lives in one place.
     - A delta spec holds only `## Purpose` (new capabilities only) and ADDED, MODIFIED, REMOVED, or RENAMED Requirements sections; archive silently drops any other section. The Purpose of an existing spec changes only by hand (.agents/knowledge/spec-workflow.md, Scope of specifications).
     - Refer to test/<id>/compatibility.json for supported images; never list images in a spec.
-    - Name options in scenarios, but leave their types and defaults to devcontainer-feature.json.
+    - State each option as its own Option requirement in the format of "Option requirements" in .agents/knowledge/spec-workflow.md; leave proposals and description to devcontainer-feature.json.
     - Include a requirement stating what installing the feature a second time, with the same or different options, does.
   design:
     - Describe how the proposal's end state is reached; never restate its goal or acceptance (see "Artifact roles" in .agents/knowledge/spec-workflow.md).
     - Put in Goals / Non-Goals the constraints and invariants of the chosen approach, each with how it is checked; put information needed only for this change in Context.
-    - Write one for every new feature and for any change to options, dependencies, or security-sensitive metadata.
+    - Write one for every new feature and for any change to options, dependencies, or security-sensitive metadata. For options, a table lists every option the change adds, changes, renames, or removes (name, type, default, enum or proposals, meaning), followed by the reason for each default and the rejected option shapes (.agents/knowledge/spec-workflow.md, Source of truth).
     - Record the chosen upstream source and verification method, the rejected alternatives, and research needed only for this change.
     - State bounds, not steps. Never include secrets, credentials, or private data.
   tasks:
