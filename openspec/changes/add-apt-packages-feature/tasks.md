@@ -44,7 +44,7 @@
 
 ## 3. Direct checks
 
-- [ ] 3.1 Write the host-side runner `test/apt-packages/direct_checks.ts` (Deno, decision "Direct checks for what a
+- [x] 3.1 Write the host-side runner `test/apt-packages/direct_checks.ts` (Deno, decision "Direct checks for what a
       scenario cannot assert"): it runs `src/apt-packages/install.sh`, mounted read-only, as root in throwaway
       containers of every image the compatibility list names for the host's architecture and of `alpine:3.22`, and
       checks each Test plan row marked "Direct", choosing versions at run time and failing clearly when no package is
