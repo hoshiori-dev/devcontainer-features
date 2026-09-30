@@ -14,12 +14,40 @@ Upstream sources:
 
 ## ADDED Requirements
 
+### Requirement: Option packages
+
+The feature SHALL accept the option `packages` as declared here, read it as a comma-separated list of entries in which
+whitespace around an entry and empty entries are ignored, and succeed without changing the image when the list names no
+package.
+
+| Field   | Value    |
+| ------- | -------- |
+| Type    | `string` |
+| Default | `""`     |
+
+#### Scenario: Omitted packages
+
+- **WHEN** the feature is installed without `packages`
+- **THEN** the feature exits with status 0, installs, upgrades, and removes nothing, and does not synchronize the
+  package databases, also on an image without `pacman`
+
+#### Scenario: Empty list is a no-op
+
+- **WHEN** `packages` is empty or holds only commas and whitespace
+- **THEN** the feature exits with status 0, installs, upgrades, and removes nothing, and does not synchronize the
+  package databases, also on an image without `pacman`
+
+#### Scenario: Spaces and empty entries are ignored
+
+- **WHEN** `packages` has spaces and tabs around its entries and an empty entry between two commas
+- **THEN** the named packages are installed exactly as if the whitespace and the empty entry were absent
+
 ### Requirement: Install the listed packages
 
-The feature SHALL install, with `pacman`, every package named in the comma-separated `packages` option, taking each
-package and its dependencies only from the repositories configured in the image. It SHALL NOT install packages that a
-listed package only names as optional dependencies, and SHALL NOT reinstall a listed package that is already installed
-at the version the repositories offer. Whitespace around an entry and empty entries SHALL be ignored.
+The feature SHALL install, with `pacman`, every package named in the `packages` option, taking each package and its
+dependencies only from the repositories configured in the image. It SHALL NOT install packages that a listed package
+only names as optional dependencies, and SHALL NOT reinstall a listed package that is already installed at the version
+the repositories offer.
 
 #### Scenario: Listed packages are installed
 
@@ -30,11 +58,6 @@ at the version the repositories offer. Whitespace around an entry and empty entr
 
 - **WHEN** `packages` names a package with an optional dependency that nothing installed depends on
 - **THEN** the listed package is installed and the optional dependency is not
-
-#### Scenario: Spaces and empty entries are ignored
-
-- **WHEN** `packages` has spaces and tabs around its entries and an empty entry between two commas
-- **THEN** the named packages are installed exactly as if the whitespace and the empty entry were absent
 
 #### Scenario: Listed package already up to date
 
@@ -55,16 +78,6 @@ removing the replaced package. The feature SHALL NOT downgrade any installed pac
 - **WHEN** the image has installed packages older than the versions the configured repositories offer and `packages`
   names at least one package
 - **THEN** after the feature succeeds, no installed package is older than the version the repositories offer
-
-### Requirement: Empty package list
-
-The feature SHALL succeed without changing the image when `packages` names no package.
-
-#### Scenario: Empty list is a no-op
-
-- **WHEN** `packages` is empty or holds only commas and whitespace
-- **THEN** the feature exits with status 0, installs, upgrades, and removes nothing, and does not synchronize the
-  package databases, also on an image without `pacman`
 
 ### Requirement: Version constraints
 

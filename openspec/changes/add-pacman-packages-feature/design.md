@@ -130,10 +130,6 @@ Facts this change relies on, checked on 2026-09-30 against upstream documents an
 - **POSIX `sh`, shared skeleton.** One skeleton keeps the five installers auditable side by side, and `alpine`, an image
   of the `apk-packages` sibling, ships no bash. This deviates from `feature-authoring.md` (Deviations). Rejected: bash
   with `set -euo pipefail`, which the convention calls for here because the image ships bash.
-- **One option, `packages`, a comma-separated string defaulting to empty.** `proposals` hold two lists not installed in
-  the image: `bc` and `bc,tree`. Whitespace around entries and empty entries are dropped, so a trailing comma is
-  harmless. Rejected: an array (feature options are only `string` or `boolean`); an option to skip the upgrade (Arch
-  supports no partial upgrade).
 - **Validate, then the empty check, then the `pacman` check.** A refused entry fails first on every image, so the same
   bad list gives the same message everywhere; the empty check runs before the `pacman` check, so the default options
   succeed on any image, including one without `pacman`. Rejected: failing on an image without `pacman` even for an empty
@@ -180,6 +176,21 @@ Facts this change relies on, checked on 2026-09-30 against upstream documents an
   carries a first install, which cannot reach `src/` from its context; two scenario keys for the feature, which the CLI
   installs once; extending `scripts/test_feature.ts` with expected-failure scenarios, a test infrastructure change
   outside this change (Open question 3).
+
+### Options
+
+The feature is new, so its one option is added:
+
+| Name       | Type     | Default | Enum or proposals                | Meaning                                                                                                                                                                                                                                       |
+| ---------- | -------- | ------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages` | `string` | `""`    | proposals `"bc"` and `"bc,tree"` | Comma-separated packages to install with `pacman` from the image's configured repositories, each a name, a provided name, or a group, optionally with a version constraint (`name>=version`); a non-empty list also upgrades the whole system |
+
+- **Default `""`.** No package list suits every image, so the feature installs nothing unless told to; with the default,
+  it succeeds on any image, including one without `pacman` (decision "Validate, then the empty check").
+- **Comma-separated.** Whitespace around entries and empty entries are dropped, so a trailing comma is harmless.
+- **Proposals.** Two lists not installed in the image, so the CLI's install-twice test installs real packages (Goals).
+- **Rejected shapes:** an array (feature options are only `string` or `boolean`); an option to skip the upgrade (Arch
+  supports no partial upgrade); options to install optional dependencies or to keep the sync databases (Non-Goals).
 
 ### Deviations from `feature-authoring.md`
 
@@ -248,7 +259,7 @@ signature under the image's `SigLevel`, because the image leaves `RemoteFileSigL
 | Spaces and empty entries are ignored                                                          | Scenario                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Listed package already up to date                                                             | Direct: installs a package, lists it again, and compares its version and install date                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Outdated installed packages are upgraded                                                      | Direct: after the run, a fresh `pacman -Sy` and `pacman -Qu` list nothing; when `-Qu` lists a package, the runner repeats the check once in a fresh container, because a mirror update between the feature's synchronization and its own can list a package that was current when the feature ran; when the image had nothing outdated, the runner first installs the previous version of a small package from the Arch Linux Archive                                                                         |
-| Empty list is a no-op                                                                         | test.sh; Direct on the image without `pacman`                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Omitted packages; Empty list is a no-op                                                       | test.sh; Direct on the image without `pacman`                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Satisfied constraint is installed; Unsatisfied constraint fails                               | Direct, with `name=<offered pkgver>`, `name>=<offered version>`, and `name<<offered version>`                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | The three refusal scenarios                                                                   | Direct, each also asserting an empty `/var/lib/pacman/sync` and an unchanged `pacman -Q`; also on the image without `pacman`, where `/bin/sh` is busybox                                                                                                                                                                                                                                                                                                                                                      |
 | Unknown package fails; Entry is not matched as a regular expression                           | Direct                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
