@@ -3,7 +3,7 @@ import { parse } from "jsr:@std/semver@1.0.8";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
 import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
-import { CONFIG, configProblems, ruleProblems } from "./check_openspec.ts";
+import { CONFIG, configProblems, exitCode, ruleProblems } from "./check_openspec.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
 import { compatBumpProblems, inRepoRefProblem, scenarioImageProblems, scenarioImages } from "./validate.ts";
@@ -156,7 +156,9 @@ Deno.test("ruleProblems reports other non-strings, empty rules, a value that is 
     const entries = ruleProblems(parseYaml('rules:\n  design:\n    - 42\n    -\n    - ""\n    - true\n'));
     assertEquals(entries.length, 4, entries.join("\n"));
     assert(entries[0].startsWith("rules.design entry 1 is a number"), entries[0]);
+    assert(entries[0].endsWith("Quote it so YAML reads it as a string"), entries[0]);
     assert(entries[1].startsWith("rules.design entry 2 is empty"), entries[1]);
+    assert(entries[1].endsWith("Write the rule after the dash, or delete the dash"), entries[1]);
     assert(entries[2].startsWith("rules.design entry 3 is an empty string"), entries[2]);
     assert(entries[3].startsWith("rules.design entry 4 is a boolean"), entries[3]);
     const scalar = ruleProblems(parseYaml("rules:\n  tasks: one rule\n"));
@@ -177,4 +179,11 @@ Deno.test("configProblems reports a file that is not valid YAML or not a mapping
     } finally {
         await Deno.remove(dir, { recursive: true });
     }
+});
+
+Deno.test("exitCode fails on a dropped rule even when the generated files are current", () => {
+    assertEquals(exitCode(["rules.specs entry 1 is a mapping"], [], false), 1);
+    assertEquals(exitCode([], ["a generated file differs"], false), 1);
+    assertEquals(exitCode([], [], true), 1);
+    assertEquals(exitCode([], [], false), 0);
 });

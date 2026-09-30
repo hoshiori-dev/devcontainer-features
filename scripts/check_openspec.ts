@@ -58,10 +58,16 @@ export function ruleProblems(config: unknown): string[] {
         list.forEach((entry, index) => {
             const at = `rules.${artifact} entry ${index + 1}`;
             if (typeof entry !== "string") {
+                const kind = yamlKind(entry);
                 const shown = JSON.stringify(entry) ?? String(entry);
+                const fix = kind === "a mapping"
+                    ? "Quote it: YAML reads an unquoted colon followed by a space as a mapping"
+                    : kind === "empty"
+                    ? "Write the rule after the dash, or delete the dash"
+                    : "Quote it so YAML reads it as a string";
                 problems.push(
-                    `${at} is ${yamlKind(entry)} (${shown.length > 60 ? `${shown.slice(0, 57)}...` : shown}), not a ` +
-                        `string, ${dropsAll}. Quote it: YAML reads an unquoted colon followed by a space as a mapping`,
+                    `${at} is ${kind} (${shown.length > 60 ? `${shown.slice(0, 57)}...` : shown}), not a string, ` +
+                        `${dropsAll}. ${fix}`,
                 );
             } else if (entry.length === 0) {
                 problems.push(`${at} is an empty string, which OpenSpec drops`);
@@ -80,6 +86,11 @@ export async function configProblems(path: string): Promise<string[]> {
         return [`cannot be read as YAML: ${error instanceof Error ? error.message : String(error)}`];
     }
     return ruleProblems(config);
+}
+
+/** The script fails when either check found a problem or `openspec init` itself failed. */
+export function exitCode(configProblems: string[], generatedProblems: string[], initFailed: boolean): number {
+    return initFailed || generatedProblems.length > 0 || configProblems.length > 0 ? 1 : 0;
 }
 
 async function readOrUndefined(path: string): Promise<string | undefined> {
@@ -143,5 +154,5 @@ if (import.meta.main) {
     }
     if (config.length === 0) console.log(`${CONFIG}: every rule reaches OpenSpec`);
     if (!failed && problems.length === 0) console.log("OpenSpec's generated files are current");
-    if (failed || problems.length > 0 || config.length > 0) Deno.exit(1);
+    Deno.exit(exitCode(config, problems, failed));
 }
