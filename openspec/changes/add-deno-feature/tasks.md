@@ -39,7 +39,8 @@
       after the image's entries), the prerequisites installed, the tools tree owned by the remote user or root, and
       `deno install --global` of a local script running by name from a new shell; verify with `just test deno`
 - [x] 3.3 Write `test/deno/duplicate.sh` asserting that after `2.8.0` then `latest`, `deno --version` reports the
-      version the latest pointer names and the tools directory is intact; verify with `just test deno`
+      version the latest pointer names, no staging file is left, and the tools tree exists with its owner (tools
+      surviving a reinstall are the scenarios' part); verify with `just test deno`
 - [x] 3.4 Write `test/deno/scenarios.json` with its scripts and `build` folders: an exact version checked as the remote
       user and as root on `base:ubuntu-24.04`; a `debian:12` build with a stub `deno` reporting `2.8.0` and a plain tool
       in `/usr/local/share/deno/bin`, installed once with `2.8.0` (stub unchanged, tool runs) and once with `latest`
