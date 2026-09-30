@@ -46,7 +46,10 @@ Research for this change, checked on 2026-09-30; see `proposal.md` for the motiv
 - **dnsmasq `--nftset`** (dnsmasq manual): adds the addresses of every answer for the listed domains and their
   subdomains to existing nftables sets, `4#` or `6#` selecting the address family. dnsmasq keeps `CAP_NET_ADMIN` after
   dropping privileges when nftsets are configured (`src/dnsmasq.c`, dnsmasq 2.91 as packaged by Ubuntu). Fedora's
-  `/etc/dnsmasq.conf` includes `/etc/dnsmasq.d`.
+  `/etc/dnsmasq.conf` includes `/etc/dnsmasq.d`. Of the `--nftset` entries whose domain matches a reply's question name,
+  dnsmasq applies only the one with the longest domain, the later one on a tie (`domain_find_sets` in `src/forward.c`,
+  read in Debian's packaging repository at 2.89 and in the upstream mirror `imp/dnsmasq` as of 2026-03); the manual
+  states that rule for `--server` and `--address` only.
 - **Kernel**: rules live in the host kernel. The WSL2 kernel `6.18.33.2-microsoft-standard-WSL2` has `nf_tables` with
   the `inet` family built in. GitHub-hosted runner kernels and Docker Desktop kernels were not checked; the first CI run
   on each architecture checks them.
@@ -91,23 +94,32 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   table that adds exactly those addresses on TCP 443 replaces it; the fetch connects only to those addresses (the
   client's name resolution is pinned to them), so a second lookup cannot return an address the table lacks. The full
   table replaces the closed one in one transaction. dnsmasq starts only after the full table is loaded, because that
-  load recreates the learned sets empty. No later step deletes the table except `failureMode` `warn` on failure.
-  Checked: review of the script's order, and the `fetch-fails` scenario.
-- **Chains.** Base chains: `output` and, with `filterForward`, `forward`, both at filter priority with policy drop and
-  an explicit reject as their last rule; no `input` chain. Both accept, in this order: established and related
-  connections; ICMPv6 types 133–136 (neighbour and router discovery) and 143 (MLDv2 reports); DNS (UDP and TCP 53) to
-  the recorded resolvers; destinations in the configured, fetched, and learned sets; traffic to the nested bridges
-  (`docker0`, `br-*`). `output` also accepts everything leaving through `lo`, which covers Docker's DNAT of
-  `127.0.0.11`. Checked: the `rerun` scenario asserts the chain contents with `nft -j list table`; the `dind` scenario.
+  load recreates the learned sets empty. With `defaultAction` `allow`, nothing is fetched and the full table replaces
+  the closed one directly. No later step deletes the table except `failureMode` `warn` on failure. Checked: review of
+  the script's order, and the `fetch-fails` scenario.
+- **Chains.** Base chains: `output` and, with `filterForward`, `forward`, both at filter priority with policy drop; no
+  `input` chain. Both run, in this order: accept established and related connections; accept ICMPv6 types 133–136
+  (neighbour and router discovery) and 143 (MLDv2 reports); accept DNS (UDP and TCP 53) to the recorded resolvers and
+  reject all other DNS; accept traffic to the nested bridges (`docker0`, `br-*`); reject `192.0.2.1`; then one rule pair
+  per prefix length, from /32 and /128 down to /0, the reject rule for that length's denied entries before the accept
+  rule for its allowed ones, each matching an anonymous set of those entries (deduplicated, since GitHub's lists repeat
+  ranges), with the learned sets in the /32 and /128 pairs; last, an accept or a reject by `defaultAction`. `output`
+  first accepts everything leaving through `lo`, which covers Docker's DNAT of `127.0.0.11`. Ordering by prefix length
+  yields the longest match without computing range differences, and a same-length tie refuses. Checked: the `rerun`
+  scenario asserts the chain contents with `nft -j list table`; the `denied-cidrs`, `denied-domains`, and `dind`
+  scenarios.
 - **Bounded start.** The start-time script ends within 60 seconds even when the network is unreachable: the lookup of
   `api.github.com` is bounded at 5 seconds, the GitHub fetch at 20 seconds per attempt with at most two attempts (only
   after a connection error or timeout; an HTTP error status, including a rate-limit response, is not retried) and at 2
   MiB of response, and dnsmasq must answer within 5 seconds of its start. The check waits at most 90 seconds for the
   current start's record, longer than the script's bound, so a slow start that succeeds is never reported missing.
   Checked: review, and the `fetch-fails` scenario measures the script's run time.
-- **Learned addresses in their own sets.** Addresses dnsmasq learns go to IPv4 and IPv6 sets separate from the interval
-  sets of configured and fetched ranges, so a learned address inside a range never makes an insert fail. Checked: the
-  `github-npm` scenario connects to `raw.githubusercontent.com`, which resolves inside a fetched `web` range.
+- **Learned addresses in their own sets.** Addresses dnsmasq learns go to four named sets (allowed and denied, IPv4 and
+  IPv6), separate from the configured and fetched ranges, so a learned address inside a range never makes an insert
+  fail. Each domain entry gets one `--nftset` line naming only its own verdict's sets, so dnsmasq's longest match
+  (Context) decides between an allowed domain and a denied one; a name in both lists gets only the denied line. Checked:
+  the `github-npm` scenario connects to `raw.githubusercontent.com`, which resolves inside a fetched `web` range; the
+  `denied-domains` and `denied-in-range` scenarios.
 - **Rejected, not dropped.** Refused outbound TCP connections get a TCP reset (connection refused), other protocols ICMP
   administratively prohibited, so they fail at once. The check accepts only a refused TCP connection to `192.0.2.1:443`
   within 3 seconds as proof; a timeout or an unreachable network means the firewall is not in force. Checked: `test.sh`
@@ -134,25 +146,29 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
 - **Validated options, twice.** `install.sh` validates every option value and fails the build; the start-time script
   validates the stored configuration again and treats an invalid one as a failure. Checked: a failing build cannot be a
   scenario, so the PR's Validation section records `devcontainer build` runs with an unknown preset, a malformed CIDR, a
-  CIDR with host bits set, `0.0.0.0/0`, and a wildcard domain.
+  CIDR with host bits set, `0.0.0.0/0` in `allowedCidrs`, a wildcard domain, `*` alone in `allowedDomains`, and a
+  malformed entry, one with host bits set, and a wildcard domain in `deniedCidrs` and `deniedDomains`.
 - **Idempotent install.** `install.sh` overwrites its configuration and scripts, installs packages only when missing,
   and adds no line to any shared file. Checked: `duplicate.sh` installs with non-default options (without the `github`
-  preset), then defaults, and asserts that the defaults are in effect.
+  preset, with `defaultAction` `allow` and denied entries), then defaults, and asserts that the defaults are in effect.
 - **Distribution packages only.** No URL is fetched at build time; packages come from the image's configured
   repositories with the package manager's default verification. Checked: review of `install.sh` against the URL
   inventory below.
 - **Test destinations.** Tests connect only to hosts in the URL inventory: `github.com`, `api.github.com`, and
-  `raw.githubusercontent.com` as allowed hosts, `registry.npmjs.org` as allowed with the `npm` preset and as the host
-  outside the allowlist otherwise. Addresses that the rules refuse inside the container (`192.0.2.1`, `8.8.8.8` on port
-  53) are never reached. Nested containers run an image imported from the dev container's own filesystem, so no test
-  pulls from a registry. Checked: review of the test scripts against the inventory.
-- **GitHub fetches in tests stay within the rate limit.** Only a start with the `github` preset fetches. Each
-  compatibility job starts two containers with the defaults (`test.sh` and the final install of `duplicate.sh`) and so
-  fetches twice; the scenario job fetches at most six times, because scenarios that do not test GitHub behaviour select
-  other presets; a full local run (`just test firewall` on one architecture and `just test-scenarios firewall`) fetches
-  at most 14 times from one address, so four full runs fit in GitHub's hourly limit. A rate-limited start fails with the
-  reason in the check's output, so a red job names its cause; a re-run after the limit resets is the remedy. Tests carry
-  no token. Checked: the scenario list below; the first CI run.
+  `raw.githubusercontent.com` as allowed hosts, `registry.npmjs.org` as allowed with the `npm` preset, as denied with
+  `deniedDomains`, and as the host no entry names otherwise. Connections to a literal address use one of
+  `raw.githubusercontent.com`'s (`185.199.108.133` to `185.199.111.133`) with that name as the TLS server name.
+  Addresses that the rules refuse inside the container (`192.0.2.1`, `8.8.8.8` on port 53) are never reached. Nested
+  containers run an image imported from the dev container's own filesystem, so no test pulls from a registry. Checked:
+  review of the test scripts against the inventory.
+- **GitHub fetches in tests stay within the rate limit.** Only a start with the `github` preset and `defaultAction`
+  `deny` fetches. Each compatibility job starts two containers with the defaults (`test.sh` and the final install of
+  `duplicate.sh`) and so fetches twice; the scenario job fetches at most seven times, because scenarios that do not test
+  GitHub behaviour select other presets or `defaultAction` `allow`; a full local run (`just test firewall` on one
+  architecture and `just test-scenarios firewall`) fetches at most 15 times from one address, so four full runs fit in
+  GitHub's hourly limit. A rate-limited start fails with the reason in the check's output, so a red job names its cause;
+  a re-run after the limit resets is the remedy. Tests carry no token. Checked: the scenario list below; the first CI
+  run.
 
 **Non-Goals:**
 
@@ -166,6 +182,9 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
 - Inbound filtering, host firewalling, and filtering traffic between the container and bridges that exist only inside it
   (a nested Docker's `docker0` and `br-*`).
 - Filtering by DNS name (every name resolves), by TLS SNI, or through an HTTP proxy.
+- A denylist that holds against a process avoiding the container's resolver: `deniedDomains` refuses only addresses
+  learned from lookups of denied names, so literal addresses, DNS over HTTPS, and names that are not denied pass it
+  where `defaultAction` is `allow`.
 - A command for the remote user to re-apply or loosen the rules; a restart re-applies them.
 - Restarting dnsmasq after it exits; lookups then fail until the next start (spec, Requirement: Failure mode).
 - Support for `--network=host`, where the rules would land in the host's network namespace (see Open Questions).
@@ -188,19 +207,35 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   and needs separate IPv4 and IPv6 rules; flushing the filter tables (prior art), which destroys Docker's rules;
   `DOCKER-USER`, which Docker's nftables backend does not have.
 - **Domains through dnsmasq `--nftset`.** A local dnsmasq forwards to the recorded resolvers and adds the addresses of
-  every answer for an allowed domain to the learned sets, so CDN rotation and subdomains work. Packages: `dnsmasq-base`
-  on Debian and Ubuntu (no service scripts), `dnsmasq-dnssec-nftset` on Alpine, `dnsmasq` on Fedora. Rejected: resolving
-  the domains once at start (addresses rotate within minutes on CDNs); an HTTP(S) proxy such as squid (much larger, and
-  only tools that honor proxy variables are covered).
+  every answer for an allowed or denied domain to that verdict's learned sets, so CDN rotation and subdomains work.
+  Packages: `dnsmasq-base` on Debian and Ubuntu (no service scripts), `dnsmasq-dnssec-nftset` on Alpine, `dnsmasq` on
+  Fedora. Rejected: resolving the domains once at start (addresses rotate within minutes on CDNs); an HTTP(S) proxy such
+  as squid (much larger, and only tools that honor proxy variables are covered).
 - **Closed table, then fetch, then full table** (maintainer decision). The GitHub ranges are fetched under the closed
   table and validated before the full table is built. Rejected: fetching before any rule is loaded, which leaves egress
   open during the fetch; loading the full table without the ranges and adding them later, which makes "applied" mean two
   different rule sets.
+- **An explicit `defaultAction`** (maintainer decision). One option decides what no entry matches, so the mode is
+  visible in the configuration, the start record, and the check's summary, and a later mode is a new `enum` value.
+  Rejected: `*` in `allowedDomains` as the switch, which hides a mode inside a list, makes one domain entry open literal
+  addresses too, and needs an exception to the domain validation.
+- **The longest match decides, a tie refuses** (maintainer decision). The same rule as a routing table, applied to
+  allowed and denied CIDRs, preset ranges, and learned addresses (each a single address), and to overlapping allowed and
+  denied domains through dnsmasq. Rejected: denied always winning, which cannot open one address inside a denied range,
+  such as a Compose service inside a DMZ; allowed always winning, which cannot carve an address out of an allowed range.
+- **Denied domains through learned sets.** A denied name resolves, and its addresses are refused, so it fails as a
+  refused connection like every other refusal. Rejected: an NXDOMAIN answer (dnsmasq `--address=/name/`), which makes a
+  denied name look like a typo and contradicts "every name resolves"; resolving denied names once at start (addresses
+  rotate on CDNs).
+- **No GitHub fetch with `defaultAction` `allow`.** The fetched ranges only allow, and with `allow` they would matter
+  only against a shorter denied entry; the preset's domains still take part. Rejected: fetching anyway, which spends the
+  rate limit and can fail a start for rules that change nothing in the usual case.
 - **GitHub ranges from `web`, `api`, `git`.** They cover the web UI, the REST API, and Git over HTTPS and SSH. Rejected:
   `actions`, `codespaces`, and `copilot`, which are large cloud-provider ranges; `packages` (GHCR), left to
   `allowedDomains`.
-- **DNS only to the recorded resolvers and `127.0.0.11`** (maintainer decision). Rejected: port 53 to any address (prior
-  art), which lets any process pick an arbitrary resolver.
+- **DNS only to the recorded resolvers and `127.0.0.11`** (maintainer decision), under both default actions and whatever
+  the allowed entries say, so asking another resolver cannot sidestep dnsmasq's learned sets. Rejected: port 53 to any
+  address (prior art), which lets any process pick an arbitrary resolver.
 - **Failure modes.** `closed` keeps the closed table (without `api.github.com`) and makes the check fail; `warn` deletes
   the table and makes the check warn. `closed` keeps DNS to the recorded resolvers: it is the table every start already
   runs under, so a failure adds no third rule set, and DNS is equally reachable in the applied state, so a failed start
@@ -210,11 +245,12 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   diagnosis.
 - **Start check probes a documentation address.** The unprivileged check connects to `192.0.2.1` (TEST-NET-1) on port
   443 and expects an immediate refusal, which only the firewall's reset produces; without the firewall the attempt times
-  out or finds no route, and no real host is contacted either way. `allowedCidrs` therefore rejects ranges containing
-  that address. The check cannot list the ruleset because it runs without `NET_ADMIN`. Rejected: probing `example.com`
-  (prior art), a real third party that a user may allowlist; also probing an allowed host, which would fail container
-  start on transient network errors.
-- **Nested Docker.** With `filterForward`, forwarded traffic meets the same sets; output to `docker0` and `br-*` is
+  out or finds no route, and no real host is contacted either way. The table rejects that address before any allowed
+  entry, so the probe proves the rules under both default actions, and `allowedCidrs` rejects ranges containing it
+  because such an entry could not take effect as written. The check cannot list the ruleset because it runs without
+  `NET_ADMIN`. Rejected: probing `example.com` (prior art), a real third party that a user may allowlist; also probing
+  an allowed host, which would fail container start on transient network errors.
+- **Nested Docker.** With `filterForward`, forwarded traffic meets the same rules; output to `docker0` and `br-*` is
   accepted because anything leaving those bridges for the outside is forwarded and filtered, and forwarding into those
   bridges is accepted so published ports of nested containers and traffic between nested networks work. Nested
   containers on a user-defined network resolve through the nested daemon's embedded DNS, which forwards to the dev
@@ -230,14 +266,19 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
 
   | Option           | Type    | Default    | Enum or proposals                                                  | Meaning                                                                                                                                                 |
   | ---------------- | ------- | ---------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `defaultAction`  | string  | `"deny"`   | enum `"deny"`, `"allow"`                                           | What happens to traffic no allowed or denied entry matches                                                                                              |
   | `presets`        | string  | `"github"` | proposals `"github"`, `"npm"`, `"pypi"`, `"anthropic"`, `"vscode"` | Comma-separated named destination sets to allow                                                                                                         |
   | `allowedDomains` | string  | `""`       | none                                                               | Comma-separated domains to allow, each with every subdomain                                                                                             |
   | `allowedCidrs`   | string  | `""`       | none                                                               | Comma-separated IPv4 or IPv6 addresses or CIDRs to allow                                                                                                |
+  | `deniedDomains`  | string  | `""`       | none                                                               | Comma-separated domains to refuse, each with every subdomain                                                                                            |
+  | `deniedCidrs`    | string  | `""`       | none                                                               | Comma-separated IPv4 or IPv6 addresses or CIDRs to refuse                                                                                               |
   | `failureMode`    | string  | `"closed"` | enum `"closed"`, `"warn"`                                          | When the rules cannot be applied in full: closed keeps only loopback and DNS reachable and fails the start check; warn removes the rules and only warns |
-  | `filterForward`  | boolean | `true`     | none                                                               | Apply the allowlist to traffic the container forwards, such as that of nested containers                                                                |
+  | `filterForward`  | boolean | `true`     | none                                                               | Apply the rules to traffic the container forwards, such as that of nested containers                                                                    |
 
-  Defaults: `presets` is `"github"` by the maintainer's decision (Open Questions 2). `allowedDomains` and `allowedCidrs`
-  are empty, so nothing beyond the presets is allowed unless named. `failureMode` is `"closed"` so a start that cannot
+  Defaults: `defaultAction` is `"deny"`, so the feature is an allowlist unless a user opts out, which is what surfaces
+  unexpected egress. `presets` is `"github"` by the maintainer's decision (Open Questions 2). `allowedDomains` and
+  `allowedCidrs` are empty, so nothing beyond the presets is allowed unless named; `deniedDomains` and `deniedCidrs` are
+  empty, so nothing the allowed entries name is refused unless named. `failureMode` is `"closed"` so a start that cannot
   apply the rules stays restricted and fails loudly, which is what surfaces a firewall that is not in force; `warn` is
   for containers that must start anyway (Risks). `filterForward` is `true` so nested containers' traffic is filtered by
   default, as the proposal states, instead of leaving a nested Docker daemon as an unfiltered way out. Rejected: one
@@ -248,11 +289,11 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
 
 - **Downloads at build:** none. Packages come from the image's configured repositories, verified by apt, apk, or dnf
   signatures (the package-manager download rule in `feature-authoring.md`); the feature adds no repository and no key.
-- **Fetch at start:** `https://api.github.com/meta`, only with the `github` preset. GitHub publishes no checksum or
-  signature for it, so under the direct-download rule in `feature-authoring.md` it relies on TLS alone, verified against
-  the image's CA bundle, and the spec states this (Requirement: GitHub ranges). Bounded time and size, connection pinned
-  to the addresses in the closed table, every entry parsed as an IPv4 or IPv6 CIDR before use, whole response rejected
-  on any invalid entry. It is data, never executed.
+- **Fetch at start:** `https://api.github.com/meta`, only with the `github` preset and `defaultAction` `deny`. GitHub
+  publishes no checksum or signature for it, so under the direct-download rule in `feature-authoring.md` it relies on
+  TLS alone, verified against the image's CA bundle, and the spec states this (Requirement: GitHub ranges). Bounded time
+  and size, connection pinned to the addresses in the closed table, every entry parsed as an IPv4 or IPv6 CIDR before
+  use, whole response rejected on any invalid entry. It is data, never executed.
 - **Keys:** none.
 - **Metadata:**
 
@@ -288,50 +329,67 @@ The harness cannot stop and start a container, reach it from outside, pass a bui
 on the runners has none by default), and a failing `postStartCommand` fails the container's start. Scenarios therefore
 start with a configuration that succeeds and then, as root, re-run the start-time script under the condition to test.
 Planned scenarios, all on `debian:12` (amd64) where the test runs as root: `domains` (`presets` empty, `allowedDomains`
-`githubusercontent.com`), `cidrs` (`presets` empty, `allowedCidrs` `185.199.108.0/22,2606:50c0::/32`), `github-npm`,
-`rerun` (defaults), `fetch-fails` (defaults), `warn` (`failureMode` `warn`), `dind` (with docker-in-docker), and
-`dind-no-forward` (with docker-in-docker, `filterForward` false, `presets` `npm`). `rerun` re-runs the script once,
-after stopping dnsmasq, deleting the feature's table, leaving `resolv.conf` naming dnsmasq, adding a table of its own,
-and setting variables named like the options. A "Validation" entry is a run recorded in the PR's Validation section.
+`githubusercontent.com`), `cidrs` (`presets` empty, `allowedCidrs` `185.199.108.0/22,2606:50c0::/32`, `deniedCidrs`
+`185.199.108.133/32`), `github-npm`, `rerun` (defaults), `fetch-fails` (defaults), `warn` (`failureMode` `warn`), `dind`
+(with docker-in-docker), `dind-no-forward` (with docker-in-docker, `filterForward` false, `presets` `npm`), `allow-all`
+(`defaultAction` `allow`, `deniedCidrs`
+`10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10`), `denied-cidrs`
+(`defaultAction` `allow`, `presets` empty, `allowedCidrs` `185.199.109.133/32,185.199.110.0/24`, `deniedCidrs`
+`185.199.108.0/22,185.199.110.0/24`), `denied-domains` (`defaultAction` `allow`, `presets` empty, `allowedDomains`
+`raw.githubusercontent.com`, `deniedDomains` `githubusercontent.com,registry.npmjs.org`, `deniedCidrs`
+`185.199.108.0/22`), and `denied-in-range` (`deniedDomains` `raw.githubusercontent.com`). `rerun` re-runs the script
+once, after stopping dnsmasq, deleting the feature's table, leaving `resolv.conf` naming dnsmasq, adding a table of its
+own, and setting variables named like the options. A "Validation" entry is a run recorded in the PR's Validation
+section.
 
-| Scenario of the spec                                                                      | Covered by                                                                                                              |
-| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Supported image                                                                           | `test.sh` on every image                                                                                                |
-| Unsupported distribution                                                                  | Validation: `devcontainer build` on an image of an unsupported distribution                                             |
-| Package verification fails                                                                | Validation: `devcontainer build` from a Dockerfile that removes the image's archive keys                                |
-| No repository added                                                                       | Review of `install.sh`; `test.sh` asserts no repository or key file names the feature                                   |
-| Unknown preset, Malformed CIDR, CIDR that cannot be applied                               | Validation: `devcontainer build` runs (Goals: Validated options, twice)                                                 |
-| First start                                                                               | `test.sh` (record of the current start is `applied`); ordering by review of the entrypoint                              |
-| Restart re-applies the same rules                                                         | `rerun`; Validation: `docker restart`, then the check as the remote user                                                |
-| Allowed domain is reachable, GitHub preset, Omitted presets                               | `test.sh` (`github.com`, `api.github.com`)                                                                              |
-| Unlisted domain is refused, Omitted allowedDomains, Omitted allowedCidrs                  | `test.sh` (`registry.npmjs.org`)                                                                                        |
-| IPv6 default deny                                                                         | `rerun` asserts the IPv6 rules and the reject in the ruleset; Validation: a container on an IPv6-enabled Docker network |
-| Inbound connection still answered                                                         | Validation: a published port reached from the host; `rerun` asserts that the table has no `input` chain                 |
-| Subdomain of an allowed domain, No preset                                                 | `domains`                                                                                                               |
-| Address not obtained through the resolver                                                 | `domains` (a literal address of `github.com`)                                                                           |
-| IPv4 and IPv6 ranges                                                                      | `cidrs` (IPv4 by connection, IPv6 by ruleset); Validation: IPv6 on an IPv6-enabled Docker network                       |
-| Presets combine                                                                           | `github-npm`                                                                                                            |
-| Ranges loaded                                                                             | `test.sh` (learned sets flushed as root, then a literal `github.com` address)                                           |
-| Fetch fails                                                                               | `fetch-fails` (a table of its own drops traffic to `api.github.com`, script re-run)                                     |
-| GitHub preset not selected                                                                | `domains` (the record names no fetch)                                                                                   |
-| Other DNS server refused                                                                  | `test.sh` (TCP to `8.8.8.8` port 53 is refused at once)                                                                 |
-| Unlisted name still resolves                                                              | `test.sh` (`registry.npmjs.org` resolves and is refused)                                                                |
-| Nested container filtered, user-defined network, Omitted filterForward                    | `dind`                                                                                                                  |
-| Forwarded traffic not filtered                                                            | `dind-no-forward`                                                                                                       |
-| Omitted failureMode, Failed start leaves only the resolvers, Failure reported as an error | `fetch-fails` (check exits non-zero)                                                                                    |
-| Failed start removes the rules, Failure reported as a warning                             | `warn`                                                                                                                  |
-| Rules cannot be loaded                                                                    | `fetch-fails` (table deleted, script re-run under `setpriv` without `CAP_NET_ADMIN`)                                    |
-| Firewall in force                                                                         | `test.sh` (the check as the remote user)                                                                                |
-| Stale record                                                                              | `rerun` (record's start time set to an earlier one, check run)                                                          |
-| Remote user reads the record                                                              | `test.sh` on `base:ubuntu-24.04` as `vscode`                                                                            |
-| No sudoers entry                                                                          | `test.sh`                                                                                                               |
-| Environment does not change the rules                                                     | `rerun`                                                                                                                 |
-| Other rules untouched                                                                     | `rerun`                                                                                                                 |
-| With docker-in-docker                                                                     | `dind`                                                                                                                  |
-| Metadata of a built container                                                             | `test.sh` (bounding set is Docker's default plus `NET_ADMIN`)                                                           |
-| Root removes the firewall                                                                 | `rerun` (`registry.npmjs.org` reachable after the table is deleted, before the re-run)                                  |
-| Different options the second time                                                         | `duplicate.sh`                                                                                                          |
-| Same options twice                                                                        | Validation: `install.sh` run twice with the same options in a plain container of each image                             |
+| Scenario of the spec                                                                                                                        | Covered by                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Supported image                                                                                                                             | `test.sh` on every image                                                                                                           |
+| Unsupported distribution                                                                                                                    | Validation: `devcontainer build` on an image of an unsupported distribution                                                        |
+| Package verification fails                                                                                                                  | Validation: `devcontainer build` from a Dockerfile that removes the image's archive keys                                           |
+| No repository added                                                                                                                         | Review of `install.sh`; `test.sh` asserts no repository or key file names the feature                                              |
+| Unknown preset, Malformed CIDR, CIDR that cannot be applied, Malformed denied domain, Malformed denied CIDR                                 | Validation: `devcontainer build` runs (Goals: Validated options, twice)                                                            |
+| First start                                                                                                                                 | `test.sh` (record of the current start is `applied`); ordering by review of the entrypoint                                         |
+| Restart re-applies the same rules                                                                                                           | `rerun`; Validation: `docker restart`, then the check as the remote user                                                           |
+| Allowed domain is reachable, GitHub preset, Omitted presets                                                                                 | `test.sh` (`github.com`, `api.github.com`)                                                                                         |
+| Unlisted domain is refused, Omitted defaultAction, Omitted allowedDomains, Omitted allowedCidrs, Omitted deniedDomains, Omitted deniedCidrs | `test.sh` (`registry.npmjs.org`; the ruleset holds no denied entry)                                                                |
+| IPv6 default deny                                                                                                                           | `rerun` asserts the IPv6 rules and the reject in the ruleset; Validation: a container on an IPv6-enabled Docker network            |
+| Inbound connection still answered                                                                                                           | Validation: a published port reached from the host; `rerun` asserts that the table has no `input` chain                            |
+| Subdomain of an allowed domain, No preset                                                                                                   | `domains`                                                                                                                          |
+| Address not obtained through the resolver                                                                                                   | `domains` (a literal address of `github.com`)                                                                                      |
+| IPv4 and IPv6 ranges                                                                                                                        | `cidrs` (IPv4 by connection, IPv6 by ruleset); Validation: IPv6 on an IPv6-enabled Docker network                                  |
+| Denied range inside an allowed range                                                                                                        | `cidrs` (`185.199.108.133` refused, `185.199.109.133` reachable)                                                                   |
+| Presets combine                                                                                                                             | `github-npm`                                                                                                                       |
+| Ranges loaded                                                                                                                               | `test.sh` (learned sets flushed as root, then a literal `github.com` address)                                                      |
+| Fetch fails                                                                                                                                 | `fetch-fails` (a table of its own drops traffic to `api.github.com`, script re-run)                                                |
+| GitHub preset not selected                                                                                                                  | `domains` (the record names no fetch)                                                                                              |
+| Unlisted traffic already let through                                                                                                        | `allow-all` (the record names no fetch)                                                                                            |
+| Other DNS server refused                                                                                                                    | `test.sh` and `allow-all` (TCP to `8.8.8.8` port 53 is refused at once)                                                            |
+| Unlisted name still resolves                                                                                                                | `test.sh` (`registry.npmjs.org` resolves and is refused)                                                                           |
+| Nested container filtered, user-defined network, Omitted filterForward                                                                      | `dind`                                                                                                                             |
+| Forwarded traffic not filtered                                                                                                              | `dind-no-forward`                                                                                                                  |
+| Omitted failureMode, Failed start leaves only the resolvers, Failure reported as an error                                                   | `fetch-fails` (check exits non-zero)                                                                                               |
+| Failed start removes the rules, Failure reported as a warning                                                                               | `warn`                                                                                                                             |
+| Unlisted destination let through                                                                                                            | `allow-all` (`registry.npmjs.org`), `denied-cidrs` and `denied-domains` (`github.com`)                                             |
+| Denied range under open egress                                                                                                              | `denied-cidrs` (`185.199.108.133` refused, `github.com` reachable); `allow-all` asserts the private ranges' rejects in the ruleset |
+| Allowed address inside a denied range                                                                                                       | `denied-cidrs` (`185.199.109.133` reachable, `185.199.111.133` refused)                                                            |
+| Same range allowed and denied                                                                                                               | `denied-cidrs` (`185.199.110.133` refused)                                                                                         |
+| Resolvers inside a denied range                                                                                                             | Validation: a container whose `deniedCidrs` contains its recorded resolver                                                         |
+| Allowed name inside a denied range, Allowed subdomain of a denied domain                                                                    | `denied-domains` (`raw.githubusercontent.com`)                                                                                     |
+| Denied domain refused                                                                                                                       | `denied-domains` (`registry.npmjs.org` resolves and is refused)                                                                    |
+| Denied subdomain of an allowed domain, Denied name inside an allowed range                                                                  | `denied-in-range` (`raw.githubusercontent.com` refused, `github.com` reachable)                                                    |
+| Rules cannot be loaded                                                                                                                      | `fetch-fails` (table deleted, script re-run under `setpriv` without `CAP_NET_ADMIN`)                                               |
+| Firewall in force                                                                                                                           | `test.sh` (the check as the remote user)                                                                                           |
+| Stale record                                                                                                                                | `rerun` (record's start time set to an earlier one, check run)                                                                     |
+| Remote user reads the record                                                                                                                | `test.sh` on `base:ubuntu-24.04` as `vscode`                                                                                       |
+| No sudoers entry                                                                                                                            | `test.sh`                                                                                                                          |
+| Environment does not change the rules                                                                                                       | `rerun`                                                                                                                            |
+| Other rules untouched                                                                                                                       | `rerun`                                                                                                                            |
+| With docker-in-docker                                                                                                                       | `dind`                                                                                                                             |
+| Metadata of a built container                                                                                                               | `test.sh` (bounding set is Docker's default plus `NET_ADMIN`)                                                                      |
+| Root removes the firewall                                                                                                                   | `rerun` (`registry.npmjs.org` reachable after the table is deleted, before the re-run)                                             |
+| Different options the second time                                                                                                           | `duplicate.sh`                                                                                                                     |
+| Same options twice                                                                                                                          | Validation: `install.sh` run twice with the same options in a plain container of each image                                        |
 
 ## URL inventory
 
@@ -341,26 +399,26 @@ the presets allow and the feature never contacts itself, or an ordering referenc
 hosts the tests connect to (Goals: Test destinations). Verified column: a read-only `curl -sSIL` (or name resolution) on
 2026-09-30; HTTP status and observed final host.
 
-| URL / template                                    | Purpose                                                   | When                                 | Integrity / authenticity                                         | Official source evidence                                                                                                                             | Verified                                                                                             |
-| ------------------------------------------------- | --------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `https://api.github.com/meta`                     | GitHub `web`, `api`, `git` ranges for the `github` preset | start (fetched); test                | TLS against the image's CA bundle; every entry validated as CIDR | https://docs.github.com/en/rest/meta/meta, https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses | 2026-09-30: 200, final host `api.github.com`, JSON 201,132 bytes                                     |
-| `github.com` (and subdomains)                     | `github` preset                                           | start (allowed only); test           | TLS of the client                                                | `domains.website` of https://api.github.com/meta lists `*.github.com`                                                                                | 2026-09-30: 200, final host `github.com`                                                             |
-| `githubusercontent.com` (subdomains)              | `github` preset                                           | start (allowed only); test           | TLS of the client                                                | `domains.website` of https://api.github.com/meta lists `*.githubusercontent.com`                                                                     | 2026-09-30: apex has no address; `raw.githubusercontent.com` 200, redirects to `github.com`          |
-| `registry.npmjs.org`                              | `npm` preset                                              | start (allowed only); test           | TLS of the client                                                | https://docs.npmjs.com/cli/v11/using-npm/config (`registry` default)                                                                                 | 2026-09-30: 200, final host `registry.npmjs.org`                                                     |
-| `pypi.org`                                        | `pypi` preset                                             | start (allowed only)                 | TLS of the client                                                | https://docs.pypi.org/api/                                                                                                                           | 2026-09-30: 200, final host `pypi.org`                                                               |
-| `files.pythonhosted.org`                          | `pypi` preset                                             | start (allowed only)                 | TLS of the client                                                | https://docs.pypi.org/api/ (file host)                                                                                                               | 2026-09-30: 404 at `/`, final host `files.pythonhosted.org`                                          |
-| `api.anthropic.com`                               | `anthropic` preset                                        | start (allowed only)                 | TLS of the client                                                | https://code.claude.com/docs/en/network-config                                                                                                       | 2026-09-30: 404 at `/`, final host `api.anthropic.com`                                               |
-| `claude.ai`                                       | `anthropic` preset                                        | start (allowed only)                 | TLS of the client                                                | https://code.claude.com/docs/en/network-config                                                                                                       | 2026-09-30: 403 at `/`, final host `claude.ai`                                                       |
-| `platform.claude.com`                             | `anthropic` preset                                        | start (allowed only)                 | TLS of the client                                                | https://code.claude.com/docs/en/network-config                                                                                                       | 2026-09-30: 200, final host `platform.claude.com`                                                    |
-| `update.code.visualstudio.com`                    | `vscode` preset                                           | start (allowed only)                 | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network                                                                                                     | 2026-09-30: 200; `/latest/server-linux-x64/stable` redirects to `vscode.download.prss.microsoft.com` |
-| `vscode.download.prss.microsoft.com`              | `vscode` preset (redirect target of the update server)    | start (allowed only)                 | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network                                                                                                     | 2026-09-30: 403 at `/`, final host `vscode.download.prss.microsoft.com`                              |
-| `vscode-cdn.net` (subdomains)                     | `vscode` preset                                           | start (allowed only)                 | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network (`*.vscode-cdn.net`)                                                                                | 2026-09-30: apex has no address; `main.vscode-cdn.net` 400, final host unchanged                     |
-| `marketplace.visualstudio.com`                    | `vscode` preset                                           | start (allowed only)                 | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network                                                                                                     | 2026-09-30: 404 at `/`, final host `marketplace.visualstudio.com`                                    |
-| `gallery.vsassets.io` (subdomains)                | `vscode` preset                                           | start (allowed only)                 | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network (`*.gallery.vsassets.io`)                                                                           | 2026-09-30: apex has no address; `ms-python.gallery.vsassets.io` 404, final host unchanged           |
-| `gallerycdn.vsassets.io` (subdomains)             | `vscode` preset                                           | start (allowed only)                 | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network (`*.gallerycdn.vsassets.io`)                                                                        | 2026-09-30: apex has no address; `ms-python.gallerycdn.vsassets.io` 403, final host unchanged        |
-| `192.0.2.1:443`                                   | Start check's refusal probe                               | start (never reached)                | Not applicable: reserved documentation address                   | https://www.rfc-editor.org/rfc/rfc5737                                                                                                               | 2026-09-30: RFC 200 (final `www.rfc-editor.org/info/rfc5737/`)                                       |
-| `ghcr.io/devcontainers/features/docker-in-docker` | `installsAfter` ordering; `dind` scenarios                | build (only if the user installs it) | OCI digest, resolved by the dev container CLI                    | https://github.com/devcontainers/features/tree/main/src/docker-in-docker                                                                             | 2026-09-30: GHCR manifest `latest` 200; major tags 1–4                                               |
-| `ghcr.io/devcontainers/features/common-utils`     | `installsAfter` ordering                                  | build (only if the user installs it) | OCI digest, resolved by the dev container CLI                    | https://github.com/devcontainers/features/tree/main/src/common-utils                                                                                 | 2026-09-30: GHCR manifest `latest` 200; major tags 1–2                                               |
+| URL / template                                    | Purpose                                                   | When                                              | Integrity / authenticity                                         | Official source evidence                                                                                                                             | Verified                                                                                             |
+| ------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `https://api.github.com/meta`                     | GitHub `web`, `api`, `git` ranges for the `github` preset | start (fetched with `defaultAction` `deny`); test | TLS against the image's CA bundle; every entry validated as CIDR | https://docs.github.com/en/rest/meta/meta, https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses | 2026-09-30: 200, final host `api.github.com`, JSON 201,132 bytes                                     |
+| `github.com` (and subdomains)                     | `github` preset                                           | start (allowed only); test                        | TLS of the client                                                | `domains.website` of https://api.github.com/meta lists `*.github.com`                                                                                | 2026-09-30: 200, final host `github.com`                                                             |
+| `githubusercontent.com` (subdomains)              | `github` preset                                           | start (allowed only); test                        | TLS of the client                                                | `domains.website` of https://api.github.com/meta lists `*.githubusercontent.com`                                                                     | 2026-09-30: apex has no address; `raw.githubusercontent.com` 200, redirects to `github.com`          |
+| `registry.npmjs.org`                              | `npm` preset                                              | start (allowed only); test                        | TLS of the client                                                | https://docs.npmjs.com/cli/v11/using-npm/config (`registry` default)                                                                                 | 2026-09-30: 200, final host `registry.npmjs.org`                                                     |
+| `pypi.org`                                        | `pypi` preset                                             | start (allowed only)                              | TLS of the client                                                | https://docs.pypi.org/api/                                                                                                                           | 2026-09-30: 200, final host `pypi.org`                                                               |
+| `files.pythonhosted.org`                          | `pypi` preset                                             | start (allowed only)                              | TLS of the client                                                | https://docs.pypi.org/api/ (file host)                                                                                                               | 2026-09-30: 404 at `/`, final host `files.pythonhosted.org`                                          |
+| `api.anthropic.com`                               | `anthropic` preset                                        | start (allowed only)                              | TLS of the client                                                | https://code.claude.com/docs/en/network-config                                                                                                       | 2026-09-30: 404 at `/`, final host `api.anthropic.com`                                               |
+| `claude.ai`                                       | `anthropic` preset                                        | start (allowed only)                              | TLS of the client                                                | https://code.claude.com/docs/en/network-config                                                                                                       | 2026-09-30: 403 at `/`, final host `claude.ai`                                                       |
+| `platform.claude.com`                             | `anthropic` preset                                        | start (allowed only)                              | TLS of the client                                                | https://code.claude.com/docs/en/network-config                                                                                                       | 2026-09-30: 200, final host `platform.claude.com`                                                    |
+| `update.code.visualstudio.com`                    | `vscode` preset                                           | start (allowed only)                              | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network                                                                                                     | 2026-09-30: 200; `/latest/server-linux-x64/stable` redirects to `vscode.download.prss.microsoft.com` |
+| `vscode.download.prss.microsoft.com`              | `vscode` preset (redirect target of the update server)    | start (allowed only)                              | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network                                                                                                     | 2026-09-30: 403 at `/`, final host `vscode.download.prss.microsoft.com`                              |
+| `vscode-cdn.net` (subdomains)                     | `vscode` preset                                           | start (allowed only)                              | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network (`*.vscode-cdn.net`)                                                                                | 2026-09-30: apex has no address; `main.vscode-cdn.net` 400, final host unchanged                     |
+| `marketplace.visualstudio.com`                    | `vscode` preset                                           | start (allowed only)                              | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network                                                                                                     | 2026-09-30: 404 at `/`, final host `marketplace.visualstudio.com`                                    |
+| `gallery.vsassets.io` (subdomains)                | `vscode` preset                                           | start (allowed only)                              | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network (`*.gallery.vsassets.io`)                                                                           | 2026-09-30: apex has no address; `ms-python.gallery.vsassets.io` 404, final host unchanged           |
+| `gallerycdn.vsassets.io` (subdomains)             | `vscode` preset                                           | start (allowed only)                              | TLS of the client                                                | https://code.visualstudio.com/docs/setup/network (`*.gallerycdn.vsassets.io`)                                                                        | 2026-09-30: apex has no address; `ms-python.gallerycdn.vsassets.io` 403, final host unchanged        |
+| `192.0.2.1:443`                                   | Start check's refusal probe                               | start (never reached)                             | Not applicable: reserved documentation address                   | https://www.rfc-editor.org/rfc/rfc5737                                                                                                               | 2026-09-30: RFC 200 (final `www.rfc-editor.org/info/rfc5737/`)                                       |
+| `ghcr.io/devcontainers/features/docker-in-docker` | `installsAfter` ordering; `dind` scenarios                | build (only if the user installs it)              | OCI digest, resolved by the dev container CLI                    | https://github.com/devcontainers/features/tree/main/src/docker-in-docker                                                                             | 2026-09-30: GHCR manifest `latest` 200; major tags 1–4                                               |
+| `ghcr.io/devcontainers/features/common-utils`     | `installsAfter` ordering                                  | build (only if the user installs it)              | OCI digest, resolved by the dev container CLI                    | https://github.com/devcontainers/features/tree/main/src/common-utils                                                                                 | 2026-09-30: GHCR manifest `latest` 200; major tags 1–2                                               |
 
 ## Risks / Trade-offs
 
@@ -391,6 +449,16 @@ hosts the tests connect to (Goals: Test destinations). Verified column: a read-o
   recorded resolvers are re-recorded whenever Docker has regenerated the file; otherwise a rebuild resets them.
 - [The fetched ranges change between starts] → Intended: each start uses the current list (spec, Requirement: Firewall
   applied at every start).
+- [With `defaultAction` `allow`, the feature refuses only what the denied entries name, and a process can avoid a denied
+  name through a literal address, DNS over HTTPS, or a name that is not denied] → Non-Goals; `NOTES.md` states it where
+  it introduces `defaultAction`, and recommends `deniedCidrs` for ranges that must stay out of reach.
+- [Denying a name refuses every name that shares its addresses, and addresses it once had stay refused until the next
+  start] → Documented in `NOTES.md`; a narrower name or `deniedCidrs` is the remedy.
+- [A name of an allowed domain that an outsider controls can resolve into a denied range (DNS rebinding) and open that
+  address, since a learned address is more specific than any range] → `NOTES.md` recommends `allowedCidrs`, not
+  `allowedDomains`, for openings into a denied range.
+- [dnsmasq's longest match between `--nftset` entries is in its code, not its manual] → Context records the code read;
+  the `denied-domains` and `denied-in-range` scenarios check it on the packaged dnsmasq.
 
 ## Open Questions
 
