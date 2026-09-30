@@ -136,9 +136,6 @@ carry the same repository files and zypper version (checked by running both), un
 - **POSIX `sh`, shared skeleton.** One skeleton keeps the five installers auditable side by side, and `alpine`, an image
   of the `apk-packages` sibling, ships no bash. This deviates from `feature-authoring.md` (Deviations). Rejected: bash
   with `set -euo pipefail`, which the convention calls for here because both openSUSE images ship bash.
-- **One option, `packages`, a comma-separated string defaulting to empty.** `proposals` hold two lists installed on
-  neither image: `bc` and `bc,file`. Whitespace around entries and empty entries are dropped. Rejected: an array
-  (feature options are only `string` or `boolean`); options for repositories or package types (out of scope).
 - **Validate, then the empty check, then the `zypper` check.** As in `apt-packages`: a refused entry fails first on
   every image, and the default options succeed on any image, including one without `zypper`. Rejected: failing on an
   image without `zypper` even for an empty list.
@@ -185,6 +182,20 @@ carry the same repository files and zypper version (checked by running both), un
   Rejected (harness limits in Context): a `build` scenario that carries a first install, which cannot reach `src/` from
   its context; two scenario keys for the feature, which the CLI installs once; extending `scripts/test_feature.ts` with
   expected-failure scenarios, a test-infrastructure change outside this change (Open question 6).
+
+### Options
+
+The feature's only option; the delta spec's Option requirement states its contract.
+
+| Name       | Type     | Default | Enum or proposals              | Meaning                                                                                                                                                                            |
+| ---------- | -------- | ------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages` | `string` | `""`    | proposals: `"bc"`, `"bc,file"` | Comma-separated entries (`name`, `name=edition`, `name.architecture`, `name.architecture=edition`) that `zypper` installs; whitespace around entries and empty entries are dropped |
+
+- **Default `""`.** An empty list installs nothing and, because the empty check runs before the `zypper` check, succeeds
+  on any image, including one without `zypper` (decision "Validate, then the empty check, then the `zypper` check"). The
+  proposals are two lists installed on neither image, so the install-twice test installs real packages (Goals).
+- **Rejected shapes:** an array (feature options are only `string` or `boolean`); options for repositories or package
+  types (out of scope); options for recommended packages, capabilities, or keeping the metadata cache (Non-Goals).
 
 ### Deviations from `feature-authoring.md`
 
@@ -241,7 +252,7 @@ duplicate.sh.
 | Listed packages are installed                                                      | Scenario on each image; duplicate.sh with the `proposals` list                                                                                                                                                                                                                                                   |
 | Recommended packages are left out; Spaces and empty entries are ignored            | Scenario                                                                                                                                                                                                                                                                                                         |
 | Listed package already installed at its newest version                             | Direct: installs a package, lists it again, and compares the version                                                                                                                                                                                                                                             |
-| Empty list is a no-op                                                              | test.sh; Direct on an image without `zypper`                                                                                                                                                                                                                                                                     |
+| Omitted packages; Empty list is a no-op                                            | test.sh; Direct on an image without `zypper`                                                                                                                                                                                                                                                                     |
 | Pinned version is installed                                                        | Direct: the runner reads the offered editions at run time and pins an older one where two are offered (Leap) and the only one otherwise (Tumbleweed), so no fixed version goes stale                                                                                                                             |
 | Unavailable pinned version fails; Architecture the repositories do not offer fails | Direct                                                                                                                                                                                                                                                                                                           |
 | Native architecture qualifier is installed                                         | Scenario with `.x86_64`                                                                                                                                                                                                                                                                                          |
