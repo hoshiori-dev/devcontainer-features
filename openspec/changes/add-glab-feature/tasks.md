@@ -35,19 +35,21 @@
       removed, unsupported distribution on `archlinux:latest`, missing package manager on `amazonlinux:2`, failed second
       install, same `version` twice (log message, unchanged inode and modification time), unreadable installed version;
       after each, verify no `${TMPDIR:-/tmp}/glab-feature.*` or `/usr/local/bin/.glab-feature.*` remains and, for the
-      checks that fail before installing, that `git` is still missing; record each result for the PR's Validation
-      section
+      checks that fail before installing, that `git` is still missing; the results are recorded under 5.4
 
 ## 3. Tests
 
 - [x] 3.1 Write `test/glab/test.sh`: first the "Nothing configured after install" assertions (no glab configuration
       directory in the remote user's or root's home, no `GITLAB_TOKEN`, `GITLAB_ACCESS_TOKEN`, or `OAUTH_TOKEN`), then
-      `command -v glab` is `/usr/local/bin/glab`, `glab --version` and `git --version` exit 0, the version equals the
-      one the latest-release permanent link names at test time, and no file remains under `/var/lib/apt/lists`,
-      `/var/cache/libdnf5`, or `/var/cache/apk`; verify by `just test glab`
-- [x] 3.2 Write `test/glab/duplicate.sh`: after `1.47.0` then the defaults, `glab --version` reports the permanent
-      link's version, which differs from `1.47.0`, `command -v glab` is `/usr/local/bin/glab`, and `/usr/local/bin`
-      holds no other file whose name contains `glab`; verify by `just test glab`
+      `command -v glab` resolves to `/usr/local/bin/glab` (on `fedora:44` it prints `/usr/local/sbin/glab`, a directory
+      symlink to `bin` that comes first on `PATH`; the spec's literal "prints" wording awaits the maintainer),
+      `glab --version` and `git --version` exit 0, the version equals the one the latest-release permanent link names at
+      test time, and no file remains under `/var/lib/apt/lists`, `/var/cache/libdnf5`, or `/var/cache/apk`; verify by
+      `just test glab`
+- [x] 3.2 Write `test/glab/duplicate.sh`: the first install used `VERSION` `1.47.0` and the second `VERSION__DEFAULT`
+      `latest`; after both, `glab --version` reports the permanent link's version, which differs from `1.47.0`,
+      `command -v glab` resolves to `/usr/local/bin/glab` (as in 3.1), and `/usr/local/bin` holds no other file whose
+      name contains `glab`; verify by `just test glab`
 - [x] 3.3 Write `test/glab/scenarios.json` with scenarios for an explicit version (`1.119.0`) and a leading `v`
       (`v1.119.0`) on images of the compatibility list, and their scripts asserting `glab --version` reports `1.119.0`;
       verify by `just test-scenarios glab`
