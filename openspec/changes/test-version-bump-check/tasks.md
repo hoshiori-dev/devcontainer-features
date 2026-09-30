@@ -25,5 +25,5 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Run `just check`, push, and confirm every required check passes on this PR; record each Acceptance item of
+- [x] 3.1 Run `just check`, push, and confirm every required check passes on this PR; record each Acceptance item of
       proposal.md with its result in the PR's Validation section
