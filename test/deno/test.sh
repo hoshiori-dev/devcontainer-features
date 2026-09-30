@@ -7,7 +7,7 @@ set -e
 source dev-container-features-test-lib
 
 # The version the latest-release pointer names now; a release between build and test fails once.
-latest="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
+latest="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 \
     https://dl.deno.land/release-latest.txt | tr -d '[:space:]')"
 latest="${latest#v}"
 user="$(id -un)"
@@ -18,12 +18,23 @@ check "deno reports the latest version ${latest}" bash -c "deno --version | head
 check "deno runs code" bash -c "[ \"\$(deno eval 'console.log(1 + 1)')\" = 2 ]"
 check "DENO_NO_UPDATE_CHECK is 1" test "${DENO_NO_UPDATE_CHECK}" = 1
 check "DENO_INSTALL_ROOT is /usr/local/share/deno" test "${DENO_INSTALL_ROOT}" = /usr/local/share/deno
-tools_dir_after_usr_bin() { case ":${PATH}:" in *:/usr/bin:*:/usr/local/share/deno/bin:*) ;; *) return 1 ;; esac; }
+# The metadata appends the directory, so it follows every entry of the image's own PATH (the
+# six system directories on both images); a user's shell startup files may append more after it.
+tools_dir_after_image_entries() {
+    local tools=/usr/local/share/deno/bin path=":${PATH}:" before after entry
+    case "${path}" in *":${tools}:"*) ;; *) return 1 ;; esac
+    before="${path%%":${tools}:"*}:"
+    after=":${path#*":${tools}:"}"
+    for entry in /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin; do
+        case "${before}" in *":${entry}:"*) ;; *) return 1 ;; esac
+        case "${after}" in *":${entry}:"*) return 1 ;; esac
+    done
+}
 prerequisites_installed() {
     command -v curl && command -v unzip &&
         [ "$(dpkg-query -W -f='${Status}' ca-certificates)" = "install ok installed" ]
 }
-check "the tools directory is on PATH after /usr/bin" tools_dir_after_usr_bin
+check "the tools directory follows the image's PATH entries" tools_dir_after_image_entries
 check "curl, unzip, and ca-certificates are installed" prerequisites_installed
 check "the tools tree is owned by ${owner}" bash -c \
     "[ -d /usr/local/share/deno/bin ] && [ -z \"\$(find /usr/local/share/deno ! -user ${owner})\" ]"

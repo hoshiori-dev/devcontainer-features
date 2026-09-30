@@ -1,5 +1,6 @@
 # A stub deno that reports 2.8.0, as an earlier install would, and a tool already in the global
-# tools directory. The reinstall_same_version and reinstall_latest scenarios share this file.
+# tools directory. reinstall_same_version and reinstall_latest each hold an identical copy of
+# this file; change both together.
 FROM debian:12
 RUN printf '#!/bin/sh\necho "deno 2.8.0 (stable, release, x86_64-unknown-linux-gnu)"\n' >/usr/local/bin/deno \
     && chmod 0755 /usr/local/bin/deno \

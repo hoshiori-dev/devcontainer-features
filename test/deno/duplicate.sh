@@ -6,7 +6,7 @@ set -e
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
 
-latest="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
+latest="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 \
     https://dl.deno.land/release-latest.txt | tr -d '[:space:]')"
 latest="${latest#v}"
 if [ "$(id -u)" = 0 ]; then owner=root; else owner="$(id -un)"; fi
