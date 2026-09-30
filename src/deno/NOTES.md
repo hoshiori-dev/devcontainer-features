@@ -9,8 +9,8 @@ The archive comes from the Deno GitHub release. Its SHA-256 is checked against t
 installed. Only releases that publish both files install: `2.7.14`, and `2.8.0` and later. Other releases fail with a
 message naming the missing checksum file.
 
-Installing the feature again with the version already installed keeps `/usr/local/bin/deno` and downloads nothing;
-another version replaces it. A failed installation leaves the previous `deno` in place.
+Installing the feature again with the version already installed keeps `/usr/local/bin/deno` and does not download Deno
+again; another version replaces it. A failed installation leaves the previous `deno` in place.
 
 ## Global tools
 

@@ -13,8 +13,10 @@ readonly RELEASES_URL=https://github.com/denoland/deno/releases/download
 readonly ARCHIVE="deno-${TARGET}.zip"
 readonly ARCHIVE_SUM="${ARCHIVE}.sha256sum"
 readonly EXE_SUM="deno-${TARGET}.sha256sum"
-# HTTPS on every hop, redirects included; an HTTP error status fails the request.
-readonly CURL=(curl --proto '=https' --proto-redir '=https' --fail --silent --location --retry 3)
+# HTTPS on every hop, redirects included; an HTTP error status fails the request. A connection
+# that does not open in 30 s, or stalls below 1 KiB/s for 60 s, fails instead of hanging the build.
+readonly CURL=(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3
+    --connect-timeout 30 --speed-limit 1024 --speed-time 60)
 
 log() { echo "deno feature: $*"; }
 fail() {
@@ -30,15 +32,18 @@ fi
 
 tmp="$(mktemp -d)"
 staged=""
+apt_ran=0
+# Removes the downloads, the staging file, and the apt lists, on success and on failure alike.
 cleanup() {
     rm -rf "${tmp}"
     if [[ -n "${staged}" ]]; then rm -f "${staged}"; fi
+    if ((apt_ran)); then rm -rf /var/lib/apt/lists/*; fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# --- Prerequisites: apt only when one is missing, lists removed afterwards. ---
+# --- Prerequisites: apt only when one is missing, lists removed by cleanup. ---
 missing_packages=()
 command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
 ca_status="$(dpkg-query -W -f='${Status}' ca-certificates 2>/dev/null)" || ca_status=""
@@ -47,9 +52,9 @@ command -v unzip >/dev/null 2>&1 || missing_packages+=(unzip)
 if ((${#missing_packages[@]} > 0)); then
     log "installing ${missing_packages[*]} with apt"
     export DEBIAN_FRONTEND=noninteractive
+    apt_ran=1
     apt-get update
     apt-get install -y --no-install-recommends "${missing_packages[@]}"
-    rm -rf /var/lib/apt/lists/*
 fi
 
 # fetch <url> <file>: 0 when downloaded, 4 when the server answered 404; any other failure exits.
@@ -81,12 +86,12 @@ fi
 setup_tools_root() {
     local owner=root uid
     if [[ -n "${_REMOTE_USER:-}" && "${_REMOTE_USER}" != root ]] &&
-        uid="$(id -u "${_REMOTE_USER}" 2>/dev/null)" && [[ "${uid}" != 0 ]]; then
+        uid="$(id -u -- "${_REMOTE_USER}" 2>/dev/null)" && [[ "${uid}" != 0 ]]; then
         owner="${_REMOTE_USER}"
     fi
     mkdir -p "${TOOLS_ROOT}/bin"
     # -h: never follow a symlink someone placed in the tree.
-    chown -hR "${owner}:" "${TOOLS_ROOT}"
+    chown -hR -- "${owner}:" "${TOOLS_ROOT}"
     log "global tools go to ${TOOLS_ROOT}/bin, owned by ${owner}"
 }
 
@@ -156,7 +161,8 @@ if [[ "${archive_actual}" != "${archive_expected}" ]]; then
 fi
 
 mkdir "${tmp}/extract"
-unzip -q "${tmp}/${ARCHIVE}" deno -d "${tmp}/extract"
+unzip -q "${tmp}/${ARCHIVE}" deno -d "${tmp}/extract" ||
+    fail "${ARCHIVE} holds no file named deno, or unzip failed. Nothing was installed."
 if [[ ! -f "${tmp}/extract/deno" || -L "${tmp}/extract/deno" ]]; then
     fail "${ARCHIVE} holds no regular file named deno. Nothing was installed."
 fi
@@ -166,7 +172,8 @@ if [[ "${exe_actual}" != "${exe_expected}" ]]; then
         "got ${exe_actual}. It was not installed."
 fi
 
-# --- Install: stage next to the target, check it runs, then rename over it. ---
+# --- Install: stage next to the target, check it runs, set up the tools tree, then rename. ---
+# Every step that can fail comes before the rename, so a failure keeps the previous executable.
 mkdir -p "${BIN_DIR}"
 staged="$(mktemp "${BIN_DIR}/.deno.XXXXXX")"
 cp "${tmp}/extract/deno" "${staged}"
@@ -175,8 +182,7 @@ staged_version="$(reported_version "${staged}")"
 if [[ "${staged_version}" != "${version}" ]]; then
     fail "the verified executable reports version \"${staged_version}\", not ${version}. It was not installed."
 fi
+setup_tools_root
 mv -fT "${staged}" "${BIN_DIR}/deno"
 staged=""
 log "installed Deno ${version} at ${BIN_DIR}/deno"
-
-setup_tools_root
