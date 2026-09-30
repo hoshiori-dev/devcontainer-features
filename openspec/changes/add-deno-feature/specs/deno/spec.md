@@ -1,0 +1,196 @@
+# Spec Delta
+
+## Purpose
+
+Installs the Deno CLI, a JavaScript, TypeScript, and WebAssembly runtime, as a system-wide `deno` executable at a chosen
+or the latest release, with a shared location on `PATH` for tools installed with `deno install --global`.
+
+Upstream sources:
+
+- Home: https://github.com/denoland/deno
+- Releases and changelog: https://github.com/denoland/deno/releases
+- Documentation: https://docs.deno.com/runtime/
+- Installation guide: https://docs.deno.com/runtime/getting_started/installation/
+- Environment variables: https://docs.deno.com/runtime/reference/env_variables/
+- Stability and release channels: https://docs.deno.com/runtime/fundamentals/stability_and_releases/
+
+## ADDED Requirements
+
+### Requirement: Deno on PATH for every user
+
+The feature SHALL install the Deno CLI as `/usr/local/bin/deno`, executable by every user, so that `deno` runs by name
+for the remote user and for root.
+
+#### Scenario: Latest version
+
+- **WHEN** the feature is installed with `version` set to `latest`
+- **THEN** `deno --version`, run as the remote user, reports the version the latest-release pointer named at build time
+
+#### Scenario: Exact version
+
+- **WHEN** the feature is installed with `version` set to an exact release version such as `2.9.7`
+- **THEN** `deno --version` reports that version when run as the remote user and when run as root
+
+### Requirement: Version selection
+
+The `version` option SHALL accept `latest` or an exact `MAJOR.MINOR.PATCH` release version. The feature SHALL resolve
+`latest` by reading `https://dl.deno.land/release-latest.txt` over HTTPS and SHALL use its content only when it has the
+form `v<MAJOR>.<MINOR>.<PATCH>` once surrounding whitespace is removed. Any other `version` value SHALL fail the
+installation before anything is downloaded, with a message naming the option and the accepted forms.
+
+#### Scenario: Partial version rejected
+
+- **WHEN** the feature is installed with `version` set to `2.9`
+- **THEN** the installation fails with a message naming `version` and the accepted forms, and nothing is downloaded or
+  installed
+
+#### Scenario: Malformed latest-release pointer
+
+- **WHEN** the feature is installed with `version` set to `latest` and the latest-release pointer returns content that
+  is not of the form `v<MAJOR>.<MINOR>.<PATCH>`
+- **THEN** the installation fails with a message showing the content it received, and no release archive is downloaded
+
+### Requirement: Verified download from GitHub releases
+
+The feature SHALL download the release archive only from
+`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.zip` over HTTPS, where `<target>` is
+`x86_64-unknown-linux-gnu` on amd64 and `aarch64-unknown-linux-gnu` on arm64. Before extracting it, the feature SHALL
+verify the archive against the SHA-256 checksum published at
+`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.zip.sha256sum`. Before installing the
+extracted `deno` executable, the feature SHALL verify it against the SHA-256 checksum published at
+`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.sha256sum`. The feature SHALL NOT install a
+release that does not publish both checksum files.
+
+#### Scenario: Archive checksum mismatch
+
+- **WHEN** the downloaded archive does not match the checksum in its `.zip.sha256sum` file
+- **THEN** the installation fails with a message naming the archive, and nothing is extracted or installed
+
+#### Scenario: Executable checksum mismatch
+
+- **WHEN** the extracted `deno` executable does not match the checksum in the release's `deno-<target>.sha256sum` file
+- **THEN** the installation fails with a message naming the executable, and it is not installed
+
+#### Scenario: Release without both checksum files
+
+- **WHEN** the feature is installed with `version` set to a release whose archive exists but which lacks one or both
+  checksum files, such as `2.5.0`, `2.0.0`, or `1.46.3`
+- **THEN** the installation fails with a message naming each missing checksum file, and nothing is installed
+
+#### Scenario: Unknown version
+
+- **WHEN** the feature is installed with `version` set to a version for which Deno published no archive for the image's
+  architecture, such as `9.9.9`
+- **THEN** the installation fails with a message naming the requested version, and nothing is installed
+
+### Requirement: Failed installation leaves the previous Deno
+
+When an installation fails, the feature SHALL leave any `/usr/local/bin/deno` that existed before it unchanged, and
+SHALL leave behind no partially written executable and no file it downloaded itself. Prerequisite packages installed
+before the failure MAY remain.
+
+#### Scenario: Failure over an existing installation
+
+- **WHEN** Deno is already installed by this feature and a later installation of the feature fails at any point
+- **THEN** `deno --version` still reports the earlier version, and no file from the failed attempt remains in
+  `/usr/local/bin` or in a temporary directory
+
+### Requirement: Shared location for global tools
+
+The feature SHALL set `DENO_INSTALL_ROOT` to `/usr/local/share/deno` in the container environment and SHALL put
+`/usr/local/share/deno/bin` on `PATH` there, so that executables created with `deno install --global` land in that
+directory and run by name in every shell. `/usr/local/share/deno/bin` SHALL come after the image's own `PATH` entries.
+The feature SHALL make `/usr/local/share/deno` and everything below it, `bin` included, owned by the remote user when
+that user exists at build time and is not root, and SHALL leave them owned by root otherwise.
+
+#### Scenario: Non-root remote user installs a global tool
+
+- **WHEN** the remote user is a non-root user that exists at build time and runs `deno install --global` on a local
+  script
+- **THEN** the command succeeds without elevated privileges, the executable appears in `/usr/local/share/deno/bin`, and
+  it runs by name from a new shell
+
+#### Scenario: Root or absent remote user
+
+- **WHEN** the remote user is root, or does not exist when the feature is installed
+- **THEN** the installation succeeds and `/usr/local/share/deno` is owned by root
+
+### Requirement: Update check disabled
+
+The feature SHALL set `DENO_NO_UPDATE_CHECK` to `1` in the container environment, because the feature, not Deno, manages
+the installed version.
+
+#### Scenario: Update check off in the container
+
+- **WHEN** a shell starts in a container with the feature installed
+- **THEN** `DENO_NO_UPDATE_CHECK` is `1` in its environment
+
+### Requirement: Prerequisite packages
+
+On an image that lacks `curl`, `ca-certificates`, or `unzip`, the feature SHALL install the missing packages with apt
+and SHALL leave them installed. On an image that has all three, the feature SHALL install and remove no package.
+
+#### Scenario: Image without the prerequisites
+
+- **WHEN** the feature is installed on a supported image that has none of `curl`, `ca-certificates`, and `unzip`
+- **THEN** the installation succeeds and all three are installed afterwards
+
+#### Scenario: Image with the prerequisites
+
+- **WHEN** the feature is installed on a supported image that already has `curl`, `ca-certificates`, and `unzip`
+- **THEN** the set of installed packages is unchanged
+
+### Requirement: Supported platforms
+
+The feature SHALL support the images listed in `test/deno/compatibility.json`, and SHALL install only on Debian- or
+Ubuntu-based images with glibc 2.27 or newer on amd64 or arm64. On any other image it SHALL fail before downloading
+anything, with a message naming what is unsupported.
+
+#### Scenario: musl-based image
+
+- **WHEN** the feature is installed on an image whose C library is musl
+- **THEN** the installation fails with a message stating that Deno publishes glibc builds only, and nothing is
+  downloaded
+
+#### Scenario: Distribution outside the Debian family
+
+- **WHEN** the feature is installed on a glibc-based image whose distribution is neither Debian, Ubuntu, nor derived
+  from them
+- **THEN** the installation fails with a message naming the distribution, and nothing is downloaded
+
+#### Scenario: glibc older than 2.27
+
+- **WHEN** the feature is installed on a Debian- or Ubuntu-based image whose glibc is older than 2.27
+- **THEN** the installation fails with a message naming the glibc version found and the minimum, and nothing is
+  downloaded
+
+#### Scenario: Unsupported architecture
+
+- **WHEN** the feature is installed on an image whose architecture is neither amd64 nor arm64
+- **THEN** the installation fails with a message naming the architecture, and nothing is downloaded
+
+### Requirement: Installing twice
+
+Installing the feature a second time on the same image SHALL succeed. When the installed Deno already reports the
+version the second installation resolves, the feature SHALL keep it without downloading it again. When the second
+installation resolves a different version, that version SHALL replace the earlier one. In both cases the feature SHALL
+keep `/usr/local/share/deno` and every tool installed there.
+
+#### Scenario: Same version the second time
+
+- **WHEN** `/usr/local/bin/deno` already reports an exact version and the feature is installed with `version` set to
+  that version
+- **THEN** the installation succeeds, leaves `/usr/local/bin/deno` unchanged, and reports that the version is already
+  installed
+
+#### Scenario: Different version the second time
+
+- **WHEN** the feature is installed with `version` set to an exact version and then again with `version` set to
+  `latest`, which resolves to a different version
+- **THEN** both installations succeed and `deno --version` reports the version `latest` resolved to
+
+#### Scenario: Global tools survive a reinstall
+
+- **WHEN** `/usr/local/share/deno/bin` holds a tool, such as one created with `deno install --global`, and the feature
+  is installed again, with the same or a different `version`
+- **THEN** the tool is still in `/usr/local/share/deno/bin` and runs by name
