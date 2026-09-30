@@ -1,0 +1,109 @@
+{
+  "domains": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {
+        "presets": "",
+        "allowedDomains": "githubusercontent.com"
+      }
+    }
+  },
+  "cidrs": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {
+        "presets": "",
+        "allowedCidrs": "185.199.108.0/22,2606:50c0::/32",
+        "deniedCidrs": "185.199.108.133/32"
+      }
+    }
+  },
+  "github-npm": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {
+        "presets": "github,npm"
+      }
+    }
+  },
+  "rerun": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {}
+    }
+  },
+  "fetch-fails": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {}
+    }
+  },
+  "warn": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {
+        "presets": "npm",
+        "failureMode": "warn"
+      }
+    }
+  },
+  "dind": {
+    "image": "debian:12",
+    "features": {
+      "ghcr.io/devcontainers/features/docker-in-docker:4": {},
+      "firewall": {
+        "presets": "npm"
+      }
+    }
+  },
+  "dind-no-forward": {
+    "image": "debian:12",
+    "features": {
+      "ghcr.io/devcontainers/features/docker-in-docker:4": {},
+      "firewall": {
+        "presets": "npm",
+        "filterForward": false
+      }
+    }
+  },
+  "allow-all": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {
+        "defaultAction": "allow",
+        "deniedCidrs": "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10"
+      }
+    }
+  },
+  "denied-cidrs": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {
+        "defaultAction": "allow",
+        "presets": "",
+        "allowedCidrs": "185.199.109.133/32,185.199.110.0/24",
+        "deniedCidrs": "185.199.108.0/22,185.199.110.0/24"
+      }
+    }
+  },
+  "denied-domains": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {
+        "defaultAction": "allow",
+        "presets": "",
+        "allowedDomains": "raw.githubusercontent.com",
+        "deniedDomains": "githubusercontent.com,registry.npmjs.org",
+        "deniedCidrs": "185.199.108.0/22"
+      }
+    }
+  },
+  "denied-in-range": {
+    "image": "debian:12",
+    "features": {
+      "firewall": {
+        "deniedDomains": "raw.githubusercontent.com"
+      }
+    }
+  }
+}
