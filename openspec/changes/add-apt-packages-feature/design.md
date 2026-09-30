@@ -92,8 +92,6 @@ through the AWS ECR mirror of the Docker official image because Docker Hub rate-
 - An option for recommended packages, target releases, or keeping the index lists; users list extra packages explicitly.
 - Checking the architecture: the feature downloads nothing architecture-specific, and `apt-get` resolves packages for
   the image's architecture; the compatibility list names the architectures that are tested.
-- Registering the feature as a CI canary in `test/canary.json`: the file is test infrastructure (`INFRA_PATHS`), and
-  Open question 5 asks whether it belongs in this change.
 
 ## Decisions
 
@@ -151,11 +149,6 @@ Each follows from a binding decision for the five installers and needs the maint
 - **Shell.** The convention calls for bash with `set -euo pipefail` when every image in the compatibility list ships
   bash, which both apt images do. The feature uses POSIX `sh` with `set -eu` so that all five installers share one
   skeleton (decision "POSIX `sh`, shared skeleton").
-- **Downloads.** The convention says to download only from sources listed in the spec, over HTTPS, and to verify every
-  download by a published checksum or a key pinned by fingerprint. The feature downloads nothing itself. `apt-get`
-  fetches from the image's own sources, over plain HTTP where the image configures it (URL inventory), and the spec
-  lists no source because the feature chooses none. The trust root is the keyring each source names in `Signed-By`, as
-  the image ships it; the feature pins no fingerprint because it neither adds nor chooses a key.
 - **Distribution detection.** The convention says to detect the distribution from `/etc/os-release`. The feature detects
   `apt-get` on the `PATH` and reads `/etc/os-release` only for its message (decision "Detect by binary").
 - **Skipping installed versions.** The convention says to skip an install when the requested version is already present.
@@ -165,8 +158,14 @@ Each follows from a binding decision for the five installers and needs the maint
 ### Security review surface
 
 - **Downloads:** the feature downloads nothing itself; `install.sh` holds no URL and calls no download tool. `apt-get`
-  fetches index files and packages only from the repositories in the image's sources (URL inventory; Deviations,
-  Downloads).
+  fetches index files and packages only from the repositories in the image's sources (URL inventory). Under the download
+  rules of `feature-authoring.md`, those repositories fall under the package-manager rule: `apt-get` verifies what it
+  fetches from a signed repository, so the feature adds no check of its own, and the sources rule (named in the spec,
+  HTTPS on every hop) covers only URLs the feature requests itself, of which there are none; the images' plain-HTTP
+  sources are therefore not a deviation. The feature adds no repository, so the rule on pinning an added repository's
+  key does not apply; the trust root is the keyring each source names in `Signed-By`, as the image ships it. The
+  no-weakening rule is the requirement "Repository authentication stays in effect". No download relies on TLS alone, so
+  the spec needs no Requirement stating one.
 - **Verification and keys:** APT verifies each repository's `InRelease` signature against the keyring named by the
   image's `Signed-By` and each package against the hashes in the verified index (requirement "Repository authentication
   stays in effect"). The feature pins, adds, and changes no key; the keys are the images' own
@@ -291,7 +290,3 @@ Decisions for the maintainer at the package gate; each notes whether it changes 
 4. **Direct checks in CI.** The direct checks run by hand, because the scenario harness cannot assert an expected
    failure. Recommendation: accept that for this change and propose a separate test-infrastructure change that lets a
    feature's tests assert expected failures in CI, which all five installers would use. Does not change the spec.
-5. **Repository-level listings.** The root `README.md` still says "No features have been published yet", and
-   `test/canary.json` is empty although `testing.md` fills it once the first features land. Recommendation: update both
-   in a follow-up once the first installers merge, keeping this change inside `src/apt-packages/`, `test/apt-packages/`,
-   and `openspec/`; the alternative widens the proposal's "Stays true" file list. Does not change the spec.
