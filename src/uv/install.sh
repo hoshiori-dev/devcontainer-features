@@ -19,10 +19,13 @@ SHARE_DIR="/usr/local/share/uv"
 PROFILE_SNIPPET="/etc/profile.d/uv.sh"
 
 RELEASE_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
-# A package name, at most one bracketed extra, at most one version constraint: nothing that uv
-# could read as an option, a URL, or a path, and no whitespace.
+# A package name, at most one bracketed extra, at most one version constraint, and no whitespace;
+# with ARCHIVE_RE, nothing that uv could read as an option, a URL, or a path.
 NAME_RE='[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?'
 TOOL_RE="^${NAME_RE}(\\[${NAME_RE}\\])?((==|~=|!=|>=|<=|>|<|@)[A-Za-z0-9][A-Za-z0-9.*+!_-]*)?\$"
+# A package name that ends in a wheel or source-archive suffix, which uv reads as a path to a local
+# file (checked lower-cased, on the name without extra or constraint).
+ARCHIVE_RE='\.(whl|zip|tgz|tbz|txz|tar|tar\.(gz|bz2|xz|lz|lzma|zst))$'
 NL='
 '
 
@@ -94,6 +97,11 @@ for raw in $TOOLSTOINSTALL; do
     if ! matches "$TRIMMED" "$TOOL_RE"; then
         fail "toolsToInstall entry '$TRIMMED' is not a package name with at most one bracketed extra and one" \
             "version constraint (==, ~=, !=, >=, <=, >, <, or @ followed by a version)."
+    fi
+    tool_name=$(printf '%s\n' "$TRIMMED" | sed 's/[^A-Za-z0-9._-].*//' | tr '[:upper:]' '[:lower:]')
+    if matches "$tool_name" "$ARCHIVE_RE"; then
+        fail "toolsToInstall entry '$TRIMMED' ends in an archive or wheel suffix, which uv reads as a local" \
+            "path, not a package name."
     fi
     TOOLS="${TOOLS}${TRIMMED}${NL}"
 done
