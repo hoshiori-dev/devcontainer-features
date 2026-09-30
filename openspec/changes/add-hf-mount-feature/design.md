@@ -92,12 +92,17 @@ Research for this change, re-checked against upstream on 2026-09-30:
 ## Decisions
 
 - **Source: raw release assets from `github.com/huggingface/hf-mount`, verified against the Releases API `digest`.**
-  Approved by the maintainer. The spec states the trade-off: the digest is computed by GitHub and served from the same
-  origin as the binary, so it proves integrity (the file is the one uploaded to the release), not who built it.
-  Rejected: Homebrew on Linux (brings a whole package manager into the image); `cargo build` (Rust 1.89 or later and
-  minutes per build); the upstream image `ghcr.io/huggingface/hf-mount-fuse` (holds only the FUSE backend and the
-  sidecar); checksums pinned in the feature for an allow-list of versions (stronger against a compromised release, but
-  no `latest` and a feature release for every upstream release, which comes several times a month).
+  Approved by the maintainer. Anchored in the download rules of `.agents/knowledge/feature-authoring.md`: upstream
+  publishes no checksum or signature for any release, so the feature may install relying on TLS alone, stated as a spec
+  Requirement, and a digest computed by the hosting platform (GitHub's asset digest) "may be used, never required". The
+  maintainer chose to use it. The spec states the trade-off: the digest is computed by GitHub and served from the same
+  origin as the binary, so beyond TLS it proves integrity (the file is the one uploaded to the release), not who built
+  it. Whether to keep it now that the rule no longer requires it is Open Question 2. Rejected: Homebrew on Linux (brings
+  a whole package manager into the image); `cargo build` (Rust 1.89 or later and minutes per build); the upstream image
+  `ghcr.io/huggingface/hf-mount-fuse` (holds only the FUSE backend and the sidecar); checksums pinned in the feature for
+  an allow-list of versions (stronger against a compromised release, but the download rules forbid per-version hashes
+  without a change to the rule, and it would mean no `latest` and a feature release for every upstream release, which
+  comes several times a month).
 - **Options.** `version` (string, default `latest`, proposals `latest` and the current release; accepts `latest` or
   `MAJOR.MINOR.PATCH` only), `backend` (enum in the order `nfs`, `fuse`, `both`, default `both`, so either backend can
   be chosen at run time without a rebuild at a cost of about 27 MB per backend), `installMountDependencies` (boolean,
@@ -200,25 +205,26 @@ start or run time (a mount started later by the user talks to Hugging Face, whic
 has no `dependsOn` or `installsAfter`. A renamed or transferred upstream repository would answer the API requests with a
 301 to `api.github.com/repositories/<id>/…`, on the same host.
 
-| URL / template                                                                   | Purpose                                                  | When  | Integrity / authenticity                                                                                                   | Official source evidence                                                                                                                                         | Verified                                                                                                                                                      |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `https://api.github.com/repos/huggingface/hf-mount/releases/latest`              | Resolve `version=latest`: tag and every asset's `digest` | build | HTTPS to GitHub; its `digest` is the trust anchor for the download; tag checked against `v<MAJOR.MINOR.PATCH>`             | "Get the latest release" in https://docs.github.com/en/rest/releases/releases; `digest` in the asset object in https://docs.github.com/en/rest/releases/assets   | 2026-09-30: 200, final host `api.github.com`, `tag_name` `v0.13.1`, all Linux assets with `sha256:` digests                                                   |
-| `https://api.github.com/repos/huggingface/hf-mount/releases/tags/v<version>`     | Pinned `version`: every asset's `digest`                 | build | As above                                                                                                                   | "Get a release by tag name" in https://docs.github.com/en/rest/releases/releases                                                                                 | 2026-09-30: 200 for `v0.13.1`, final host `api.github.com`; 404 for `v9.9.9`                                                                                  |
-| `https://github.com/huggingface/hf-mount/releases/download/v<version>/<asset>`   | Download `hf-mount`, `hf-mount-nfs`, `hf-mount-fuse`     | build | SHA-256 compared with the API `digest` for the exact asset name (integrity only; no upstream checksum or signature exists) | Upstream README "Manual download" (https://github.com/huggingface/hf-mount) links GitHub Releases and lists the asset names; upstream `release.yml` uploads them | 2026-09-30: 302 then 200 for all six `v0.13.1` Linux assets of the three binaries on both architectures                                                       |
-| `https://release-assets.githubusercontent.com/github-production-release-asset/…` | Redirect target of the download (not requested directly) | build | Same as the download: the content is verified after it arrives                                                             | Listed among GitHub's hosts in https://docs.github.com/en/actions/reference/runners/self-hosted-runners, which also lists `objects.githubusercontent.com`        | 2026-09-30: the only redirect host of all six downloads; `objects.githubusercontent.com` was not observed but is allowed, since redirects are not host-pinned |
+| URL / template                                                                   | Purpose                                                  | When  | Integrity / authenticity                                                                                                                                       | Official source evidence                                                                                                                                         | Verified                                                                                                                                                      |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://api.github.com/repos/huggingface/hf-mount/releases/latest`              | Resolve `version=latest`: tag and every asset's `digest` | build | HTTPS to GitHub; its `digest` is an integrity check beyond TLS; tag checked against `v<MAJOR.MINOR.PATCH>`                                                     | "Get the latest release" in https://docs.github.com/en/rest/releases/releases; `digest` in the asset object in https://docs.github.com/en/rest/releases/assets   | 2026-09-30: 200, final host `api.github.com`, `tag_name` `v0.13.1`, all Linux assets with `sha256:` digests                                                   |
+| `https://api.github.com/repos/huggingface/hf-mount/releases/tags/v<version>`     | Pinned `version`: every asset's `digest`                 | build | As above                                                                                                                                                       | "Get a release by tag name" in https://docs.github.com/en/rest/releases/releases                                                                                 | 2026-09-30: 200 for `v0.13.1`, final host `api.github.com`; 404 for `v9.9.9`                                                                                  |
+| `https://github.com/huggingface/hf-mount/releases/download/v<version>/<asset>`   | Download `hf-mount`, `hf-mount-nfs`, `hf-mount-fuse`     | build | SHA-256 compared with the API `digest` for the exact asset name (integrity only; no upstream checksum or signature exists, so authenticity rests on TLS alone) | Upstream README "Manual download" (https://github.com/huggingface/hf-mount) links GitHub Releases and lists the asset names; upstream `release.yml` uploads them | 2026-09-30: 302 then 200 for all six `v0.13.1` Linux assets of the three binaries on both architectures                                                       |
+| `https://release-assets.githubusercontent.com/github-production-release-asset/…` | Redirect target of the download (not requested directly) | build | Same as the download: the content is verified after it arrives                                                                                                 | Listed among GitHub's hosts in https://docs.github.com/en/actions/reference/runners/self-hosted-runners, which also lists `objects.githubusercontent.com`        | 2026-09-30: the only redirect host of all six downloads; `objects.githubusercontent.com` was not observed but is allowed, since redirects are not host-pinned |
 
 ## Risks / Trade-offs
 
 - [The digest proves integrity, not provenance: whoever can upload to the upstream release can replace a binary and its
   digest changes with it] → Accepted by the maintainer and stated in the spec and `NOTES.md`; a pinned `version` limits
-  exposure to the chosen release; pinned checksums remain the stronger fallback (Decisions).
+  exposure to the chosen release; pinned checksums would be stronger but need a change to the download rules
+  (Decisions).
 - [Anonymous rate limit of 60 API requests per hour per address; `GITHUB_TOKEN` rarely reaches a feature's build
   environment, and CI never has one] → One request per install and none from test scripts: a container job makes three
   (the default install and the duplicate test's two) and the scenario job four. GitHub-hosted runners share and reuse
   addresses, so a job can still meet an exhausted limit; it then fails with the message of the spec's "Rate limit
   reached", and a required check that failed this way is re-run after the reset. This design accepts that flakiness in
-  exchange for `latest` without pinned checksums. A full local `just test hf-mount` plus `just test-scenarios hf-mount`
-  makes 13 to 16 requests, so four runs in an hour can exhaust the limit.
+  exchange for the digest check; Open Question 2 weighs dropping it. A full local `just test hf-mount` plus
+  `just test-scenarios hf-mount` makes 13 to 16 requests, so four runs in an hour can exhaust the limit.
 - [`latest` moves several times a month, so a rebuild can bring a new upstream version or a new glibc floor] → The glibc
   check fails clearly; users who need stability pin `version`.
 - [A backend left from an earlier install at an older version sits next to a newer daemon] → Stated in the spec as the
@@ -239,6 +245,12 @@ has no `dependsOn` or `installsAfter`. A renamed or transferred upstream reposit
    `nfs-utils` name are tested; it adds two test jobs. The answer is needed before the spec is approved: if declined,
    the spec drops Fedora from the supported distributions and the mount-dependency requirement first, and Fedora fails
    as unsupported.
-2. **Add `hf-mount` to `test/canary.json`?** It would be the first feature in the list. Recommendation: no. `testing.md`
-   asks for one or two fast, stable features, and `hf-mount` downloads about 60 MB and depends on the anonymous API
-   limit, so infrastructure PRs would inherit its rate-limit failures. The list stays empty until such a feature lands.
+2. **Keep the API digest, or drop it and rely on TLS alone?** The download rules now allow either (Decisions, Source).
+   Keeping it adds an integrity check against a corrupted or truncated download, at the cost of one API request per
+   install, the anonymous limit of 60 per hour with its CI flakiness (Risks), and the `GITHUB_TOKEN` handling. Dropping
+   it removes all three: `latest` would be resolved from the redirect of
+   `https://github.com/huggingface/hf-mount/releases/latest` (302 to `…/releases/tag/v0.13.1` on 2026-09-30), not an API
+   request; the spec's digest requirement would become a TLS-alone download requirement, and its token requirement and
+   the digest and rate-limit scenarios would go. Recommendation: drop it: the digest comes from the same origin as the
+   binary, so beyond TLS it protects only against corruption, and it adds a failure mode. The answer is needed before
+   the spec is approved; until then the package keeps the approved digest.

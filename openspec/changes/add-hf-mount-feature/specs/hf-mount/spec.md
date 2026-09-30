@@ -83,9 +83,10 @@ Releases API reports for the asset with that exact name, read from
 `https://api.github.com/repos/huggingface/hf-mount/releases/tags/v<version>`, or from
 `https://api.github.com/repos/huggingface/hf-mount/releases/latest` when following the latest release. The digest MUST
 be `sha256:` followed by 64 hexadecimal characters; a missing or differently shaped digest SHALL fail the install.
-Upstream publishes no checksum file and no signature: this digest is computed by GitHub when the asset is uploaded and
-is served by the same origin as the binary, so it proves the installed file is the one uploaded to the release, not who
-built it or that upstream vouches for it.
+Upstream publishes no checksum file and no signature, so the authenticity of every download and of the digest rests on
+TLS alone: every request SHALL use HTTPS, including every redirect. The digest is computed by GitHub when the asset is
+uploaded and is served by the same origin as the binary, so it proves the installed file is the one uploaded to the
+release, not who built it or that upstream vouches for it.
 
 #### Scenario: Digest matches
 
