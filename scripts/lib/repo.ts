@@ -186,7 +186,8 @@ export async function exists(path: string): Promise<boolean> {
     }
 }
 
-async function listDirs(path: string): Promise<string[]> {
+/** Names of the directories directly under `path`, sorted; none when `path` does not exist. */
+export async function listDirs(path: string): Promise<string[]> {
     if (!(await exists(path))) return [];
     const names: string[] = [];
     for await (const entry of Deno.readDir(path)) if (entry.isDirectory) names.push(entry.name);
