@@ -1,5 +1,5 @@
 
-# GitLab CLI (glab) (glab)
+# GitLab CLI (glab)
 
 Installs the GitLab CLI (glab) from its checksum-verified GitLab release archive and configures no authentication.
 
