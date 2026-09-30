@@ -94,8 +94,8 @@ checked on 2026-09-30 to choose it.
   counts as set). Checked by the option scenarios with the environment probe under Decisions - Tests, and by a scenario
   that switches nvm's default after the build.
 - Every install replaces the prefix and rewrites the wrapper; there is no skip for an already installed version. Checked
-  by `duplicate.sh`: the `version` proposals are `latest` and `1.13.1`, so the first install is always 1.13.1 and the
-  second the newer `latest`, which exercises the replacement on every run.
+  by `duplicate.sh`: with the `version` proposals under Options, the first install is always 1.13.1 and the second the
+  newer `latest`, which exercises the replacement on every run.
 - `install.sh` uses `#!/usr/bin/env bash` with `set -euo pipefail` (bash is in every listed image) and checks, in this
   order, the distribution and architecture, the `version` format, and the presence of Node.js, all before any network
   access; the found Node.js is compared with the resolved version's `engines.node` before npm runs. Checked by
@@ -114,6 +114,39 @@ checked on 2026-09-30 to choose it.
 - Following new OpenSpec releases after the build; `openspec update` or a self-upgrade inside the container.
 - Pinning dependency versions below `@fission-ai/openspec` (upstream ships no shrinkwrap).
 - Running any `openspec` command at build or start time other than `--version` for verification.
+
+## Options
+
+All three options are new; the delta spec's Option requirements are normative.
+
+| Name                 | Type      | Default    | Enum or proposals               | Meaning                                                                    |
+| -------------------- | --------- | ---------- | ------------------------------- | -------------------------------------------------------------------------- |
+| `version`            | `string`  | `"latest"` | proposals `["latest","1.13.1"]` | OpenSpec version to install: `latest` or one exact published version       |
+| `disableUpdateCheck` | `boolean` | `true`     | none                            | Run `openspec` with `OPENSPEC_NO_UPDATE_CHECK=1` unless the caller sets it |
+| `disableTelemetry`   | `boolean` | `false`    | none                            | Run `openspec` with `OPENSPEC_TELEMETRY=0` unless the caller sets it       |
+
+Defaults:
+
+- **`version` `"latest"`.** Follows upstream's install command (`npm install -g @fission-ai/openspec@latest`) and the
+  proposal's "following the latest release"; a consumer who needs a reproducible build names an exact version. The
+  proposal `1.13.1` is a published version older than `latest`, so `duplicate.sh` replaces one version with another
+  (Goals).
+- **`disableUpdateCheck` `true`.** Inside `openspec update`, the check prints `npm install -g …@latest` for this install
+  (Context); following it lands a second copy in nvm's global prefix, earlier on `PATH` than `/usr/local/bin`, which
+  shadows the verified installation.
+- **`disableTelemetry` `false`.** Telemetry keeps upstream's opt-out default; the option makes opting out one line.
+
+Rejected option shapes:
+
+- `version` accepting ranges (`^1.7.0`) — the installed version would depend on the build date without the consumer
+  seeing it.
+- `version` accepting partial versions (`1`) or dist-tags other than `latest` (`beta`) — npm reads a partial version as
+  a range; `latest` is the one moving target the feature accepts on purpose, and the other tags are not kept current
+  (`next=0.3.0` is stale, `beta=1.6.0-beta.1` is older than `latest`; Context).
+- `version` as an `enum` — every OpenSpec release after the feature's would need a feature release before it could be
+  installed.
+- A registry or mirror option — the source is pinned to the one the spec names (Non-Goals, Risks).
+- A Node.js version option — the Node.js feature chooses it (Non-Goals).
 
 ## Decisions
 
@@ -151,15 +184,10 @@ checked on 2026-09-30 to choose it.
   re-implements what npm already does for all.
 - **Version resolution.** `latest` reads `.version` from the registry's `latest` endpoint; an exact version is checked
   against `/{package}/{version}` so a 404 fails with a clear message before npm runs. The format check comes first
-  because the endpoint also answers dist-tags. Rejected: ranges (`^1.7.0`) — the installed version would depend on the
-  build date without the consumer seeing it; `npm view` — returns the full packument and hides the 404 behind npm's own
-  error text.
+  because the endpoint also answers dist-tags. Rejected: ranges — see Options; `npm view` — returns the full packument
+  and hides the 404 behind npm's own error text.
 - **Options applied in the wrapper, not `containerEnv` or `/etc/profile.d`.** `containerEnv` cannot depend on options,
   and a profile script misses non-login shells and agent tools; the wrapper applies them to every invocation.
-- **`disableUpdateCheck` defaults to true, `disableTelemetry` to false.** Inside `openspec update`, the check prints
-  `npm install -g …@latest` for this install (Context); following it lands a second copy in nvm's global prefix, earlier
-  on `PATH` than `/usr/local/bin`, which shadows the verified installation. Telemetry keeps upstream's opt-out default;
-  the option makes opting out one line.
 - **Platform gate: Debian and Ubuntu, amd64 and arm64.** These are the images tested
   (`test/openspec/compatibility.json`, planned below); the package itself would run on any distribution the Node.js
   feature supports, including RHEL-family images, and adding one later with tests is a MINOR bump. On an image the

@@ -18,22 +18,9 @@ Upstream sources:
 The feature SHALL install the npm package `@fission-ai/openspec` at the version the `version` option names, downloading
 it and every one of its dependencies from the public npm registry at https://registry.npmjs.org/, regardless of any
 registry configured in the image, and SHALL make `openspec` runnable from `PATH` by every user of the container, the
-remote user included. The `version` option SHALL accept `latest` or one exact published version (`MAJOR.MINOR.PATCH`
-with an optional pre-release suffix); `latest` SHALL resolve to the version the registry names as latest at build time.
-The feature SHALL look the version up at https://registry.npmjs.org/@fission-ai/openspec/latest, or at
-`https://registry.npmjs.org/@fission-ai/openspec/<version>` for an exact version, relying on TLS alone; the lookup only
-selects the version, whose packages are then verified as "Verify every installed package" requires.
-
-#### Scenario: Latest version
-
-- **WHEN** the feature is installed with `version` set to `latest`
-- **THEN** `openspec --version`, run as the remote user, prints the version that
-  https://registry.npmjs.org/@fission-ai/openspec/latest named when the image was built
-
-#### Scenario: Exact version
-
-- **WHEN** the feature is installed with `version` set to a published version such as `1.13.2`
-- **THEN** `openspec --version`, run as the remote user, prints exactly that version
+remote user included. The feature SHALL look the version up at https://registry.npmjs.org/@fission-ai/openspec/latest,
+or at `https://registry.npmjs.org/@fission-ai/openspec/<version>` for an exact version, relying on TLS alone; the lookup
+only selects the version, whose packages are then verified as "Verify every installed package" requires.
 
 #### Scenario: Registry configured in the image
 
@@ -42,12 +29,34 @@ selects the version, whose packages are then verified as "Verify every installed
 - **THEN** every package the feature installs is downloaded from https://registry.npmjs.org/, or the build fails with a
   message naming the package that came from elsewhere
 
+### Requirement: Option version
+
+The feature SHALL accept the option `version` as declared here, holding either `latest`, which resolves to the version
+the registry names as latest at build time, or one exact published version (`MAJOR.MINOR.PATCH` with an optional
+pre-release suffix).
+
+| Field   | Value      |
+| ------- | ---------- |
+| Type    | `string`   |
+| Default | `"latest"` |
+
+#### Scenario: Omitted version
+
+- **WHEN** the feature is installed without `version`, or with `version` set to `latest`
+- **THEN** `openspec --version`, run as the remote user, prints the version that
+  https://registry.npmjs.org/@fission-ai/openspec/latest named when the image was built
+
+#### Scenario: Exact version
+
+- **WHEN** the feature is installed with `version` set to a published version such as `1.13.2`
+- **THEN** `openspec --version`, run as the remote user, prints exactly that version
+
 #### Scenario: Unknown version
 
 - **WHEN** the feature is installed with `version` set to a well-formed version the registry does not publish
 - **THEN** the build fails with a message naming the requested version, before the feature changes any installed file
 
-#### Scenario: Version that is neither latest nor exact
+#### Scenario: Malformed version
 
 - **WHEN** the feature is installed with `version` set to a range, a partial version, or a dist-tag other than `latest`
   (for example `^1.7.0`, `1`, or `beta`)
@@ -100,13 +109,24 @@ the Node.js that `openspec` runs on.
 - **WHEN** the remote user makes a different installed Node.js the current one after the build
 - **THEN** `openspec --version` still prints the installed version, running on the Node.js it was installed with
 
-### Requirement: Update check option
+### Requirement: Option disableUpdateCheck
 
-`OPENSPEC_NO_UPDATE_CHECK` and `OPENSPEC_TELEMETRY` are the environment variables upstream's CLI reference defines
-(https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md). When the `disableUpdateCheck` option is true, the
-feature SHALL run `openspec` with `OPENSPEC_NO_UPDATE_CHECK=1` unless `OPENSPEC_NO_UPDATE_CHECK` is already set in the
-caller's environment, in which case the caller's value SHALL be kept. When the option is false, the feature SHALL NOT
+The feature SHALL accept the option `disableUpdateCheck` as declared here and, while it is true, SHALL run `openspec`
+with `OPENSPEC_NO_UPDATE_CHECK=1`, the variable upstream's CLI reference
+(https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md) defines, unless `OPENSPEC_NO_UPDATE_CHECK` is already set
+in the caller's environment, in which case the caller's value SHALL be kept; while it is false, the feature SHALL NOT
 set `OPENSPEC_NO_UPDATE_CHECK`.
+
+| Field   | Value     |
+| ------- | --------- |
+| Type    | `boolean` |
+| Default | `true`    |
+
+#### Scenario: Omitted disableUpdateCheck
+
+- **WHEN** the feature is installed without `disableUpdateCheck` and `openspec` runs with `OPENSPEC_NO_UPDATE_CHECK`
+  unset
+- **THEN** the `openspec` process sees `OPENSPEC_NO_UPDATE_CHECK=1`
 
 #### Scenario: Update check disabled
 
@@ -126,11 +146,24 @@ set `OPENSPEC_NO_UPDATE_CHECK`.
 - **THEN** the `openspec` process sees `OPENSPEC_NO_UPDATE_CHECK` exactly as the caller's environment has it, unset when
   the caller has not set it
 
-### Requirement: Telemetry option
+### Requirement: Option disableTelemetry
 
-When the `disableTelemetry` option is true, the feature SHALL run `openspec` with `OPENSPEC_TELEMETRY=0` unless
-`OPENSPEC_TELEMETRY` is already set in the caller's environment, in which case the caller's value SHALL be kept. When
-the option is false, the feature SHALL NOT set `OPENSPEC_TELEMETRY`.
+The feature SHALL accept the option `disableTelemetry` as declared here and, while it is true, SHALL run `openspec` with
+`OPENSPEC_TELEMETRY=0`, the variable upstream's CLI reference
+(https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md) defines, unless `OPENSPEC_TELEMETRY` is already set in
+the caller's environment, in which case the caller's value SHALL be kept; while it is false, the feature SHALL NOT set
+`OPENSPEC_TELEMETRY`.
+
+| Field   | Value     |
+| ------- | --------- |
+| Type    | `boolean` |
+| Default | `false`   |
+
+#### Scenario: Omitted disableTelemetry
+
+- **WHEN** the feature is installed without `disableTelemetry`
+- **THEN** the `openspec` process sees `OPENSPEC_TELEMETRY` exactly as the caller's environment has it, unset when the
+  caller has not set it
 
 #### Scenario: Telemetry disabled
 
