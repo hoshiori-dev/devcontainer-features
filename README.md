@@ -19,7 +19,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+| Feature                   | Description                                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [firewall](src/firewall/) | Restricts a dev container's outbound traffic to an allowlist of presets, domains, and CIDRs (or keeps it from a denylist), re-applied at every start. |
 
 ## Development
 
