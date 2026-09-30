@@ -116,7 +116,9 @@ esac
 
 libc=gnu
 for loader in /lib/ld-musl-*.so.1; do
-    [ -e "$loader" ] && libc=musl
+    if [ -e "$loader" ]; then
+        libc=musl
+    fi
 done
 
 [ -r /etc/os-release ] || fail "cannot read /etc/os-release to detect the distribution."
@@ -247,7 +249,9 @@ installed=""
 if [ -x "$BIN_DIR/uv" ] && [ -x "$BIN_DIR/uvx" ]; then
     uv_version=$("$BIN_DIR/uv" --version 2>/dev/null | cut -d' ' -f2) || uv_version=""
     uvx_version=$("$BIN_DIR/uvx" --version 2>/dev/null | cut -d' ' -f2) || uvx_version=""
-    [ "$uv_version" = "$uvx_version" ] && installed=$uv_version
+    if [ "$uv_version" = "$uvx_version" ]; then
+        installed=$uv_version
+    fi
 fi
 
 if [ "$installed" = "$release" ]; then
