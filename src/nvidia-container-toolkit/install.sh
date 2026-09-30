@@ -219,6 +219,10 @@ install_packages() {
       ;;
     dnf)
       dnf install -y "${specs[@]}" || failed=1
+      # dnf install leaves an installed package alone, so latest after an older version needs an upgrade.
+      if [[ -z "$failed" && "$VERSION" == "latest" ]]; then
+        dnf upgrade -y "${specs[@]}" || failed=1
+      fi
       ;;
     zypper)
       zypper --non-interactive refresh "$REPO_ID"
