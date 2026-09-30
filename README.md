@@ -19,7 +19,8 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+- [`deno`](src/deno/) — Installs the Deno CLI, verified against its published checksums, with global tools on `PATH` for
+  every user.
 
 ## Development
 
