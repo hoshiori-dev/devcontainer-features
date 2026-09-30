@@ -191,14 +191,15 @@ the union of their destinations; an empty `presets` SHALL select none.
 
 ### Requirement: GitHub ranges
 
-When `presets` contains `github`, each start SHALL fetch https://api.github.com/meta over HTTPS, verified against the
-image's CA certificates, with a bounded time and response size, and SHALL allow every IPv4 and IPv6 range in its `web`,
-`api`, and `git` lists. Every entry of those lists SHALL be validated as an IPv4 or IPv6 CIDR; an invalid entry, an
-error status, a timeout, or a malformed response SHALL make the whole fetch a failure handled by Requirement: Failure
-mode, and a response that reports GitHub's rate limit SHALL be recorded with that reason. Until the ranges are loaded,
-the only destinations reachable beyond loopback and the DNS resolvers SHALL be the addresses that one lookup of
-`api.github.com` through those resolvers returned at that start, on the HTTPS port, and the fetch SHALL connect only to
-those addresses.
+When `presets` contains `github`, each start SHALL fetch https://api.github.com/meta over HTTPS, with a bounded time and
+response size. GitHub publishes no checksum or signature for this response, so the fetch SHALL rely on TLS alone,
+verified against the image's CA certificates, and SHALL NOT disable or weaken that verification. The start SHALL allow
+every IPv4 and IPv6 range in the response's `web`, `api`, and `git` lists. Every entry of those lists SHALL be validated
+as an IPv4 or IPv6 CIDR; an invalid entry, an error status, a timeout, or a malformed response SHALL make the whole
+fetch a failure handled by Requirement: Failure mode, and a response that reports GitHub's rate limit SHALL be recorded
+with that reason. Until the ranges are loaded, the only destinations reachable beyond loopback and the DNS resolvers
+SHALL be the addresses that one lookup of `api.github.com` through those resolvers returned at that start, on the HTTPS
+port, and the fetch SHALL connect only to those addresses.
 
 #### Scenario: Ranges loaded
 

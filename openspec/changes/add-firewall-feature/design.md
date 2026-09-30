@@ -237,17 +237,16 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
 
   Rejected: one boolean per preset (`w3cj`), which turns every new preset into a new option.
 - **POSIX `sh`.** Alpine ships no bash, so `install.sh` and the start-time scripts use `#!/bin/sh` with `set -eu`.
-- **`test/canary.json` stays empty.** Canaries should be fast and stable (`testing.md`); this feature depends on
-  `api.github.com` and its rate limit, so it would make infrastructure changes flaky. The first stable feature without
-  network dependencies becomes the canary.
 
 ### Security review surface
 
 - **Downloads at build:** none. Packages come from the image's configured repositories, verified by apt, apk, or dnf
-  signatures; the feature adds no repository and no key.
-- **Fetch at start:** `https://api.github.com/meta`, only with the `github` preset: TLS verified against the image's CA
-  bundle, bounded time and size, connection pinned to the addresses in the closed table, every entry parsed as an IPv4
-  or IPv6 CIDR before use, whole response rejected on any invalid entry. It is data, never executed.
+  signatures (the package-manager download rule in `feature-authoring.md`); the feature adds no repository and no key.
+- **Fetch at start:** `https://api.github.com/meta`, only with the `github` preset. GitHub publishes no checksum or
+  signature for it, so under the direct-download rule in `feature-authoring.md` it relies on TLS alone, verified against
+  the image's CA bundle, and the spec states this (Requirement: GitHub ranges). Bounded time and size, connection pinned
+  to the addresses in the closed table, every entry parsed as an IPv4 or IPv6 CIDR before use, whole response rejected
+  on any invalid entry. It is data, never executed.
 - **Keys:** none.
 - **Metadata:**
 
@@ -412,8 +411,5 @@ answer changes the named part before approval.
 6. **`--network=host`.** As written: documented as unsupported, without detection (Non-Goals), since no reliable
    in-container test distinguishes the host's network namespace. Alternative: refuse when a `docker0` interface exists
    at start, which misfires with docker-in-docker.
-7. **Root `README.md` and `test/canary.json`.** As written: neither changes (proposal, Stays true); the canary stays
-   empty for the reason in Decisions. The root `README.md` still says "No features have been published yet." and goes
-   stale once `firewall` is released. Alternative: list `firewall` in the README's Features section in this change.
-8. **Alpine tag.** As written: `alpine:3.24`, the current release, pinned so a new Alpine release does not change the
+7. **Alpine tag.** As written: `alpine:3.24`, the current release, pinned so a new Alpine release does not change the
    tested image unannounced. Alternative: `alpine:latest`.

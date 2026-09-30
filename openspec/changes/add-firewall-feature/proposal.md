@@ -21,6 +21,8 @@ refused connection instead of a silent success.
   user gains no privilege.
 - The feature's documentation states that it is a guardrail, not a security boundary: root, `sudo`, or access to a
   Docker daemon inside the container can remove or bypass the rules, and DNS lookups remain possible.
+- The repository's root `README.md` lists `firewall` under "Features", linked to `src/firewall/` with a one-sentence
+  description, in place of "No features have been published yet."
 
 ## Capabilities
 
@@ -38,7 +40,9 @@ None.
 - Feature id `firewall`: new, at version `1.0.0`. No other feature is touched.
 - Files: `src/firewall/` (`devcontainer-feature.json`, `install.sh`, the start-time scripts, `NOTES.md`, and the
   `README.md` that `just docs` generates); `test/firewall/` (`compatibility.json`, `test.sh`, `duplicate.sh`,
-  `scenarios.json` with its scenario scripts); `openspec/specs/firewall/spec.md`, created by the archive.
+  `scenarios.json` with its scenario scripts); `openspec/specs/firewall/spec.md`, created by the archive; the root
+  `README.md` (one row under "Features").
+- `test/canary.json`: unchanged; canary membership is left to the maintainer.
 - Container metadata that widens what the container may do: `capAdd: ["NET_ADMIN"]` and an `entrypoint`; also a
   `postStartCommand` and `installsAfter` entries. Their justification is in `design.md`.
 - Consumers: a container with the feature refuses every destination outside its allowlist, including services a default
@@ -58,12 +62,15 @@ None.
   scenarios: "Allowed domain is reachable" and "Unlisted domain is refused" (Requirement: Outbound default deny),
   "Restart re-applies the same rules" (Requirement: Firewall applied at every start), and "Same options twice" and
   "Different options the second time" (Requirement: Installing twice).
+- The root `README.md`'s "Features" section has one row for `firewall`, linking to `src/firewall/` with a one-sentence
+  description, and no longer says "No features have been published yet."; this row is written by hand, unlike the
+  generated `src/firewall/README.md`.
 - `NOTES.md` states the guardrail limits named in Requirement: Guardrail, not a security boundary, and the metadata the
   feature adds.
 
 **Stays true:**
 
-- No file outside `src/firewall/`, `test/firewall/`, and `openspec/` changes; `test/canary.json` stays as it is.
+- No file outside `src/firewall/`, `test/firewall/`, `openspec/`, and the root `README.md` changes.
 - The feature grants the remote user no privilege it did not already have (Requirement: No privilege for the remote
   user).
 - Network rules the feature does not own, including Docker's and docker-in-docker's, stay as they were (Requirement:
