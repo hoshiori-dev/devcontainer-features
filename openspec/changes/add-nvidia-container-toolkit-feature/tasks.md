@@ -8,7 +8,7 @@
       descriptions, `installsAfter: ["ghcr.io/devcontainers/features/docker-in-docker"]`, and none of `dependsOn`,
       `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`, `containerEnv`, or lifecycle commands;
       verify `just validate` and `just spec-check` pass
-- [ ] 1.2 Write `test/nvidia-container-toolkit/compatibility.json` with
+- [x] 1.2 Write `test/nvidia-container-toolkit/compatibility.json` with
       `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64, arm64), `debian:12`, `fedora:44`, and
       `registry.opensuse.org/opensuse/leap:16.0` (each amd64), as design.md's supported images list; verify
       `just validate` passes
@@ -37,7 +37,7 @@
       `/etc/apt/sources.list.d/nvidia-container-toolkit.list`, or `nvidia-container-toolkit.repo` under
       `/etc/yum.repos.d/` or `/etc/zypp/repos.d/` with `repo_gpgcheck=1`, `gpgcheck=1`, and a `gpgkey=file://` of the
       verified key, never `--gpg-auto-import-keys` or a remote `gpgkey=`; verify by review of `install.sh`
-- [ ] 3.4 In `test/nvidia-container-toolkit/test.sh`, assert the source file's content, that the key file holds exactly
+- [x] 3.4 In `test/nvidia-container-toolkit/test.sh`, assert the source file's content, that the key file holds exactly
       the pinned primary key, that no remote `gpgkey=` appears, that the package manager lists NVIDIA's stable
       repository for the image's architecture, and that no temporary `GNUPGHOME` remains; verify `shellcheck` passes
       (the container run is task 7.2)
@@ -48,15 +48,15 @@
       with explicit downgrades (apt `--allow-downgrades`, zypper `--oldpackage`, dnf `install` of the pinned versions);
       fail with a message naming the requested version when the install fails or when the four packages do not all
       report the requested version afterwards; clean the package-manager caches at the end; verify `shellcheck` passes
-- [ ] 4.2 In `test.sh`, assert that `nvidia-ctk --version` and `nvidia-container-cli --version` succeed for the remote
+- [x] 4.2 In `test.sh`, assert that `nvidia-ctk --version` and `nvidia-container-cli --version` succeed for the remote
       user and that all four packages and `nvidia-ctk --version` report the package manager's newest candidate from
       NVIDIA's repository (`apt-cache policy`, `dnf repoquery`, `zypper info`), never a hard-coded version; verify
       `shellcheck` passes
-- [ ] 4.3 Write `test/nvidia-container-toolkit/duplicate.sh`: fail when the `version` it received equals the newest
+- [x] 4.3 Write `test/nvidia-container-toolkit/duplicate.sh`: fail when the `version` it received equals the newest
       candidate, assert that all four packages end at the newest candidate after the second (`latest`) install, that
       NVIDIA's repository is defined once, that no `/etc/docker/daemon.json` exists, and that no temporary `GNUPGHOME`
       remains; verify `shellcheck` passes
-- [ ] 4.4 Add scenarios pinning `version` to `1.19.1` on `debian:12`, `fedora:44`, and
+- [x] 4.4 Add scenarios pinning `version` to `1.19.1` on `debian:12`, `fedora:44`, and
       `registry.opensuse.org/opensuse/leap:16.0`, and to `1.14.0` on
       `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`, each asserting all four packages and `nvidia-ctk --version`
       at the pinned version; verify `just validate` and `shellcheck` pass
@@ -67,9 +67,9 @@
       `/etc/docker/daemon.json` as `{}` and run `nvidia-ctk runtime configure --runtime=docker` without
       `--nvidia-set-as-default` or `--cdi.enabled`, failing the build when it fails; otherwise print that the Docker
       configuration was skipped and leave the file alone; verify `shellcheck` passes and by review of `install.sh`
-- [ ] 5.2 In `test.sh`, assert that `/etc/docker/daemon.json` does not exist on the compatibility images (none has
+- [x] 5.2 In `test.sh`, assert that `/etc/docker/daemon.json` does not exist on the compatibility images (none has
       `dockerd`); verify `shellcheck` passes
-- [ ] 5.3 Add scenarios on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`: with
+- [x] 5.3 Add scenarios on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`: with
       `ghcr.io/devcontainers/features/docker-in-docker:4` and `configureDocker` unset (the file holds `runtimes.nvidia`
       with `path` `nvidia-container-runtime`, and after a bounded wait `docker info` lists `nvidia`); with
       `ghcr.io/devcontainers/features/docker-outside-of-docker:1` (no `daemon.json`); and `build` scenarios whose
