@@ -116,7 +116,7 @@ fw_check_cidrs() {
       if (slash) { a = substr($0, 1, slash - 1); p = substr($0, slash + 1) } else { a = $0; p = "" }
       if (index(a, ":")) { fam = 6; max = 128; ok = v6(a, g) } else { fam = 4; max = 32; ok = v4(a, g) }
       if (!ok) bad("is not a valid IPv4 or IPv6 address or CIDR")
-      if (p == "") len = max
+      if (!slash) len = max
       else if ((len = dec(p, max)) < 0) bad("is not a valid IPv4 or IPv6 address or CIDR (prefix length)")
       if (fam == 4) {
         v = ((g[1] * 256 + g[2]) * 256 + g[3]) * 256 + g[4]

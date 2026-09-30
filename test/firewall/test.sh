@@ -52,6 +52,7 @@ printf '%s' '{"web":["10.0.0.0/7"],"api":[],"git":[]}' >"$TMP/short-ipv4.json"
 printf '%s' '{"web":["2a00::/15"],"api":[],"git":[]}' >"$TMP/short-ipv6.json"
 printf '%s' '{"web":["192.0.0.0/16"],"api":[],"git":[]}' >"$TMP/probe-address.json"
 printf '%s' '{"web":["not-a-range"],"api":[],"git":[]}' >"$TMP/malformed-range.json"
+printf '%s' '{"web":["140.82.112.0/"],"api":[],"git":[]}' >"$TMP/empty-prefix.json"
 printf '%s' '{"web":[],"api":[]}' >"$TMP/missing-list.json"
 printf '%s' 'not json' >"$TMP/not-json.json"
 meta_ranges() {
@@ -66,7 +67,7 @@ meta_rejected() {
 }
 check "fixture: a valid response yields its three distinct ranges" \
   test "$(meta_ranges "$TMP/valid.json" | wc -l | tr -d ' ')" = 3
-for fixture in host-bits short-ipv4 short-ipv6 probe-address malformed-range missing-list not-json; do
+for fixture in host-bits short-ipv4 short-ipv6 probe-address malformed-range empty-prefix missing-list not-json; do
   check "fixture: $fixture is rejected" meta_rejected "$TMP/$fixture.json"
 done
 
@@ -88,7 +89,9 @@ check "validator: CIDR with host bits" options_rejected OPT_ALLOWED_CIDRS 10.0.0
 check "validator: 0.0.0.0/0 allowed" options_rejected OPT_ALLOWED_CIDRS 0.0.0.0/0 0.0.0.0/0
 check "validator: wildcard domain" options_rejected OPT_ALLOWED_DOMAINS '*.example.com' '*.example.com'
 check "validator: * alone" options_rejected OPT_ALLOWED_DOMAINS '*' '*'
+check "validator: CIDR with empty prefix" options_rejected OPT_ALLOWED_CIDRS 10.0.0.0/ 10.0.0.0/
 check "validator: malformed denied CIDR" options_rejected OPT_DENIED_CIDRS 10.0.0 10.0.0
+check "validator: denied CIDR with empty prefix" options_rejected OPT_DENIED_CIDRS 2001:db8::/ 2001:db8::/
 check "validator: denied CIDR with host bits" options_rejected OPT_DENIED_CIDRS 10.1.0.0/8 10.1.0.0/8
 check "validator: wildcard denied domain" options_rejected OPT_DENIED_DOMAINS '*.example.com' '*.example.com'
 
