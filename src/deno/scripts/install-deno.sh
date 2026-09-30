@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# Installs the Deno CLI after install.sh passed the platform checks. Runs as root at image build
+# time; the option arrives as VERSION, the release target (x86_64- or aarch64-unknown-linux-gnu)
+# as the first argument. Idempotent: an installed matching version is kept, and the global tools
+# tree is re-created and re-owned without touching its contents.
+set -euo pipefail
+
+readonly TARGET="$1"
+readonly BIN_DIR=/usr/local/bin
+readonly TOOLS_ROOT=/usr/local/share/deno
+readonly LATEST_URL=https://dl.deno.land/release-latest.txt
+readonly RELEASES_URL=https://github.com/denoland/deno/releases/download
+readonly ARCHIVE="deno-${TARGET}.zip"
+readonly ARCHIVE_SUM="${ARCHIVE}.sha256sum"
+readonly EXE_SUM="deno-${TARGET}.sha256sum"
+# HTTPS on every hop, redirects included; an HTTP error status fails the request.
+readonly CURL=(curl --proto '=https' --proto-redir '=https' --fail --silent --location --retry 3)
+
+log() { echo "deno feature: $*"; }
+fail() {
+    echo "deno feature: $*" >&2
+    exit 1
+}
+
+# Option check before any network access, apt included. Unset means the default; empty is invalid.
+requested="${VERSION-latest}"
+if [[ "${requested}" != latest && ! "${requested}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    fail "option version is \"${requested}\"; use \"latest\" or an exact release version MAJOR.MINOR.PATCH such as 2.9.7."
+fi
+
+tmp="$(mktemp -d)"
+staged=""
+cleanup() {
+    rm -rf "${tmp}"
+    if [[ -n "${staged}" ]]; then rm -f "${staged}"; fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# --- Prerequisites: apt only when one is missing, lists removed afterwards. ---
+missing_packages=()
+command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
+ca_status="$(dpkg-query -W -f='${Status}' ca-certificates 2>/dev/null)" || ca_status=""
+[[ "${ca_status}" == "install ok installed" ]] || missing_packages+=(ca-certificates)
+command -v unzip >/dev/null 2>&1 || missing_packages+=(unzip)
+if ((${#missing_packages[@]} > 0)); then
+    log "installing ${missing_packages[*]} with apt"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends "${missing_packages[@]}"
+    rm -rf /var/lib/apt/lists/*
+fi
+
+# fetch <url> <file>: 0 when downloaded, 4 when the server answered 404; any other failure exits.
+fetch() {
+    local url="$1" out="$2" code status=0
+    code="$("${CURL[@]}" --output "${out}" --write-out '%{http_code}' "${url}" 2>"${tmp}/curl.err")" || status=$?
+    if ((status == 0)); then return 0; fi
+    rm -f "${out}"
+    if [[ "${code}" == 404 ]]; then return 4; fi
+    fail "downloading ${url} failed (HTTP ${code:-none}, curl exit ${status}): $(cat "${tmp}/curl.err")"
+}
+
+# --- Resolve the version. ---
+if [[ "${requested}" == latest ]]; then
+    fetch "${LATEST_URL}" "${tmp}/latest" || fail "${LATEST_URL} answered 404; cannot resolve \"latest\"."
+    pointer="$(<"${tmp}/latest")"
+    pointer="${pointer#"${pointer%%[![:space:]]*}"}"
+    pointer="${pointer%"${pointer##*[![:space:]]}"}"
+    if [[ ! "${pointer}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+        fail "the latest-release pointer ${LATEST_URL} returned \"${pointer:0:200}\", which is not v<MAJOR>.<MINOR>.<PATCH>; nothing was installed."
+    fi
+    version="${BASH_REMATCH[1]}"
+    log "latest resolves to ${version}"
+else
+    version="${requested}"
+fi
+
+# Global tools tree: re-created and re-owned on every successful run, its contents kept.
+setup_tools_root() {
+    local owner=root uid
+    if [[ -n "${_REMOTE_USER:-}" && "${_REMOTE_USER}" != root ]] &&
+        uid="$(id -u "${_REMOTE_USER}" 2>/dev/null)" && [[ "${uid}" != 0 ]]; then
+        owner="${_REMOTE_USER}"
+    fi
+    mkdir -p "${TOOLS_ROOT}/bin"
+    # -h: never follow a symlink someone placed in the tree.
+    chown -hR "${owner}:" "${TOOLS_ROOT}"
+    log "global tools go to ${TOOLS_ROOT}/bin, owned by ${owner}"
+}
+
+# Version reported by a deno executable: the second field of the first line of --version.
+reported_version() {
+    local out first _name reported
+    out="$("$1" --version 2>/dev/null)" || return 0
+    first="${out%%$'\n'*}"
+    read -r _name reported _ <<<"${first}" || true
+    echo "${reported:-}"
+}
+
+if [[ -x "${BIN_DIR}/deno" && "$(reported_version "${BIN_DIR}/deno")" == "${version}" ]]; then
+    log "Deno ${version} is already installed at ${BIN_DIR}/deno; skipping the download."
+    setup_tools_root
+    exit 0
+fi
+
+# --- Download: both checksum files first, then the archive. ---
+base="${RELEASES_URL}/v${version}"
+missing_sums=()
+for name in "${ARCHIVE_SUM}" "${EXE_SUM}"; do
+    fetch "${base}/${name}" "${tmp}/${name}" || missing_sums+=("${name}")
+done
+if ((${#missing_sums[@]} > 0)); then
+    status=0
+    code="$("${CURL[@]}" --head --output /dev/null --write-out '%{http_code}' "${base}/${ARCHIVE}" 2>"${tmp}/curl.err")" ||
+        status=$?
+    if ((status == 0)); then
+        missing_list="${missing_sums[0]}${missing_sums[1]:+ and ${missing_sums[1]}}"
+        fail "the Deno ${version} release lacks ${missing_list}; this feature installs only releases that publish both" \
+            "${ARCHIVE_SUM} and ${EXE_SUM} (2.7.14, and 2.8.0 or later). Nothing was installed."
+    elif [[ "${code}" == 404 ]]; then
+        fail "Deno ${version} has no release archive ${ARCHIVE} (unknown version, or none for this architecture)." \
+            "Nothing was installed."
+    fi
+    fail "checking ${base}/${ARCHIVE} failed (HTTP ${code:-none}, curl exit ${status}): $(cat "${tmp}/curl.err")"
+fi
+
+# expected_hash <checksum file> <name>: the hash of its single line, whose name field must be <name>.
+expected_hash() {
+    local file="$1" name="$2" lines line
+    mapfile -t lines <"${tmp}/${file}"
+    ((${#lines[@]} == 1)) || fail "${file} must hold exactly one line; it holds ${#lines[@]}. Nothing was installed."
+    line="${lines[0]%$'\r'}"
+    if [[ ! "${line}" =~ ^([0-9A-Fa-f]{64})\ [\ *](.+)$ || "${BASH_REMATCH[2]}" != "${name}" ]]; then
+        fail "${file} is not a SHA-256 line for ${name}. Nothing was installed."
+    fi
+    echo "${BASH_REMATCH[1],,}"
+}
+
+actual_hash() {
+    local sum
+    sum="$(sha256sum "$1")"
+    echo "${sum%% *}"
+}
+
+archive_expected="$(expected_hash "${ARCHIVE_SUM}" "${ARCHIVE}")"
+exe_expected="$(expected_hash "${EXE_SUM}" deno)"
+
+log "downloading ${base}/${ARCHIVE}"
+fetch "${base}/${ARCHIVE}" "${tmp}/${ARCHIVE}" || fail "${base}/${ARCHIVE} answered 404. Nothing was installed."
+archive_actual="$(actual_hash "${tmp}/${ARCHIVE}")"
+if [[ "${archive_actual}" != "${archive_expected}" ]]; then
+    fail "checksum mismatch for the archive ${ARCHIVE}: expected ${archive_expected}, got ${archive_actual}." \
+        "Nothing was extracted or installed."
+fi
+
+mkdir "${tmp}/extract"
+unzip -q "${tmp}/${ARCHIVE}" deno -d "${tmp}/extract"
+if [[ ! -f "${tmp}/extract/deno" || -L "${tmp}/extract/deno" ]]; then
+    fail "${ARCHIVE} holds no regular file named deno. Nothing was installed."
+fi
+exe_actual="$(actual_hash "${tmp}/extract/deno")"
+if [[ "${exe_actual}" != "${exe_expected}" ]]; then
+    fail "checksum mismatch for the extracted executable deno from ${ARCHIVE}: expected ${exe_expected}," \
+        "got ${exe_actual}. It was not installed."
+fi
+
+# --- Install: stage next to the target, check it runs, then rename over it. ---
+mkdir -p "${BIN_DIR}"
+staged="$(mktemp "${BIN_DIR}/.deno.XXXXXX")"
+cp "${tmp}/extract/deno" "${staged}"
+chmod 0755 "${staged}"
+staged_version="$(reported_version "${staged}")"
+if [[ "${staged_version}" != "${version}" ]]; then
+    fail "the verified executable reports version \"${staged_version}\", not ${version}. It was not installed."
+fi
+mv -fT "${staged}" "${BIN_DIR}/deno"
+staged=""
+log "installed Deno ${version} at ${BIN_DIR}/deno"
+
+setup_tools_root
