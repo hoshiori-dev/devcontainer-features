@@ -25,7 +25,7 @@
 import { dirname, join, relative } from "jsr:@std/path@1.1.6";
 import { walk } from "jsr:@std/fs@1.0.24/walk";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
-import { exists, git, readJsonc } from "./lib/repo.ts";
+import { exists, git, listDirs, readJsonc } from "./lib/repo.ts";
 import { optionDifferences, parseOptionRequirements } from "./lib/options.ts";
 import { activeChanges } from "./check_spec_archived.ts";
 
@@ -110,19 +110,12 @@ export function exitCode(
     return initFailed || generatedProblems.length > 0 || configProblems.length > 0 || optionProblems.length > 0 ? 1 : 0;
 }
 
-async function subdirs(path: string): Promise<string[]> {
-    if (!(await exists(path))) return [];
-    const names: string[] = [];
-    for await (const entry of Deno.readDir(path)) if (entry.isDirectory) names.push(entry.name);
-    return names.sort();
-}
-
 /** Spec files that may hold Option requirements: main specs and the deltas of active changes. */
 async function specFiles(root: string): Promise<string[]> {
     const files: string[] = [];
-    for (const id of await subdirs(join(root, "openspec/specs"))) files.push(`openspec/specs/${id}/spec.md`);
+    for (const id of await listDirs(join(root, "openspec/specs"))) files.push(`openspec/specs/${id}/spec.md`);
     for (const change of await activeChanges(join(root, "openspec/changes"))) {
-        for (const id of await subdirs(join(root, "openspec/changes", change, "specs"))) {
+        for (const id of await listDirs(join(root, "openspec/changes", change, "specs"))) {
             files.push(`openspec/changes/${change}/specs/${id}/spec.md`);
         }
     }
@@ -131,11 +124,29 @@ async function specFiles(root: string): Promise<string[]> {
     return present;
 }
 
+/** Archives `change` in the OpenSpec root `dir`; returns OpenSpec's reason when it refuses, else undefined. */
+export type Archive = (dir: string, change: string) => Promise<string | undefined>;
+
+async function openspecArchive(dir: string, change: string): Promise<string | undefined> {
+    const archive = await new Deno.Command("openspec", {
+        args: ["archive", change, "-y"],
+        cwd: dir,
+        env: { OPENSPEC_NO_UPDATE_CHECK: "1" },
+        stdout: "piped",
+        stderr: "piped",
+    }).output();
+    if (archive.success) return undefined;
+    const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
+    // Task progress is irrelevant here: the copy archives changes whose tasks are still open.
+    return `${decode(archive.stdout)}\n${decode(archive.stderr)}`.split("\n").map((l) => l.trim())
+        .filter((l) => l && !/^(Task status:|Warning: .*incomplete task)/.test(l)).join(" | ");
+}
+
 /**
  * Unreadable Option requirements anywhere, then each difference between a feature's metadata and the spec archive
- * would produce. Every problem starts with the file to fix.
+ * would produce. Every problem starts with the file to fix. `archive` is replaceable so tests need no OpenSpec.
  */
-export async function optionProblems(root = "."): Promise<string[]> {
+export async function optionProblems(root = ".", archive: Archive = openspecArchive): Promise<string[]> {
     const problems: string[] = [];
     const reported = new Map<string, Set<string>>(); // feature id -> problems already reported from its spec files
     for (const file of await specFiles(root)) {
@@ -145,7 +156,7 @@ export async function optionProblems(root = "."): Promise<string[]> {
             reported.set(id, (reported.get(id) ?? new Set()).add(problem));
         }
     }
-    const features = await subdirs(join(root, "src"));
+    const features = await listDirs(join(root, "src"));
 
     // Archive runs even without features, so a change OpenSpec refuses is always reported.
     const temp = await Deno.makeTempDir({ dir: "/tmp", prefix: "openspec-options-" });
@@ -162,23 +173,13 @@ export async function optionProblems(root = "."): Promise<string[]> {
         const refused = new Set<string>(); // feature ids a refused change touches
         for (const change of await activeChanges(join(temp, "openspec/changes"))) {
             const dir = join(temp, "openspec/changes", change);
-            const ids = await subdirs(join(dir, "specs"));
+            const ids = await listDirs(join(dir, "specs"));
             if (ids.length === 0 || !(await exists(join(dir, "tasks.md")))) continue;
-            const archive = await new Deno.Command("openspec", {
-                args: ["archive", change, "-y"],
-                cwd: temp,
-                env: { OPENSPEC_NO_UPDATE_CHECK: "1" },
-                stdout: "piped",
-                stderr: "piped",
-            }).output();
-            if (!archive.success) {
-                const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
-                // Task progress is irrelevant here: the copy archives changes whose tasks are still open.
-                const message = `${decode(archive.stdout)}\n${decode(archive.stderr)}`.split("\n").map((l) => l.trim())
-                    .filter((l) => l && !/^(Task status:|Warning: .*incomplete task)/.test(l)).join(" | ");
+            const refusal = await archive(temp, change);
+            if (refusal !== undefined) {
                 problems.push(
                     `openspec/changes/${change}: OpenSpec refuses to archive it, so its deltas cannot be compared ` +
-                        `with devcontainer-feature.json: ${message}`,
+                        `with devcontainer-feature.json: ${refusal}`,
                 );
                 for (const id of ids) refused.add(id);
                 continue;

@@ -3,7 +3,7 @@ import { parse } from "jsr:@std/semver@1.0.8";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
 import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
-import { CONFIG, configProblems, exitCode, ruleProblems } from "./check_openspec.ts";
+import { type Archive, CONFIG, configProblems, exitCode, optionProblems, ruleProblems } from "./check_openspec.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
 import { compatBumpProblems, inRepoRefProblem, scenarioImageProblems, scenarioImages } from "./validate.ts";
@@ -72,6 +72,8 @@ Deno.test("scaffold produces the required files for a valid id", () => {
 Deno.test("scaffold declares exactly the spec's options and reads each one in install.sh", () => {
     const spec = parseOptionRequirements(
         [
+            "## ADDED Requirements",
+            "",
             "### Requirement: Option version",
             "",
             "The feature SHALL accept the option `version`.",
@@ -241,4 +243,127 @@ Deno.test("exitCode fails on a dropped rule even when the generated files are cu
 
 Deno.test("exitCode fails on an option problem even when everything else passes", () => {
     assertEquals(exitCode([], [], false, ['src/demo/devcontainer-feature.json: option "version": default ...']), 1);
+});
+
+/** An Option requirement for `version` with the given default, inside a section of the given title. */
+function versionSpec(section: string, value: string): string {
+    return `## ${section}\n\n### Requirement: Option version\n\nThe feature SHALL accept the option \`version\`.\n\n` +
+        `| Field | Value |\n| ----- | ----- |\n| Type | \`string\` |\n| Default | \`"${value}"\` |\n\n` +
+        "#### Scenario: Omitted version\n\n- **WHEN** omitted\n- **THEN** installed\n";
+}
+
+/** Writes `files` under a new temporary root, runs optionProblems there with `archive`, and removes the root. */
+async function optionRun(files: Record<string, string>, archive: Archive): Promise<string[]> {
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "option-check-test-" });
+    try {
+        for (const [path, content] of Object.entries(files)) {
+            await Deno.mkdir(`${root}/${path.slice(0, path.lastIndexOf("/"))}`, { recursive: true });
+            await Deno.writeTextFile(`${root}/${path}`, content);
+        }
+        return await optionProblems(root, archive);
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
+}
+
+/**
+ * Stands in for `openspec archive`: refuses changes named `refused-*`, turns a `rename-*` change into an unreadable
+ * Option requirement, and otherwise makes the change's delta the feature's main spec. Records every change it gets.
+ */
+function fakeArchive(calls: string[]): Archive {
+    return async (dir, change) => {
+        calls.push(change);
+        if (change.startsWith("refused-")) return "demo MODIFIED failed | Aborted.";
+        for await (const entry of Deno.readDir(`${dir}/openspec/changes/${change}/specs`)) {
+            const delta = await Deno.readTextFile(`${dir}/openspec/changes/${change}/specs/${entry.name}/spec.md`);
+            const merged = change.startsWith("rename-")
+                ? "## Requirements\n\n### Requirement: Option install\n\nThe feature SHALL install.\n"
+                : delta.replace(/^## (ADDED|MODIFIED) Requirements$/m, "## Requirements");
+            await Deno.mkdir(`${dir}/openspec/specs/${entry.name}`, { recursive: true });
+            await Deno.writeTextFile(`${dir}/openspec/specs/${entry.name}/spec.md`, merged);
+        }
+        await Deno.remove(`${dir}/openspec/changes/${change}`, { recursive: true });
+        return undefined;
+    };
+}
+
+const DEMO_JSON = (value: string) =>
+    JSON.stringify({ id: "demo", options: { version: { type: "string", default: value, proposals: ["1"] } } });
+
+Deno.test("optionProblems archives only changes with specs and tasks.md, and reports refusals without src/", async () => {
+    const calls: string[] = [];
+    const problems = await optionRun({
+        "openspec/changes/refused-a/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1"),
+        "openspec/changes/refused-a/tasks.md": "- [ ] 1.1 x\n",
+        "openspec/changes/b-no-tasks/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1"),
+        "openspec/changes/c-no-specs/tasks.md": "- [ ] 1.1 x\n",
+    }, fakeArchive(calls));
+    assertEquals(calls, ["refused-a"]);
+    assertEquals(problems, [
+        "openspec/changes/refused-a: OpenSpec refuses to archive it, so its deltas cannot be compared with " +
+        "devcontainer-feature.json: demo MODIFIED failed | Aborted.",
+    ]);
+});
+
+Deno.test("optionProblems compares metadata with the main spec until a change has tasks.md", async () => {
+    const base = {
+        "openspec/specs/demo/spec.md": versionSpec("Requirements", "latest"),
+        "openspec/changes/bump/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1.2.3"),
+        "src/demo/devcontainer-feature.json": DEMO_JSON("latest"),
+    };
+    assertEquals(await optionRun(base, fakeArchive([])), []);
+    const withTasks = { ...base, "openspec/changes/bump/tasks.md": "- [ ] 1.1 x\n" };
+    assertEquals(await optionRun(withTasks, fakeArchive([])), [
+        'src/demo/devcontainer-feature.json: option "version": default is "1.2.3" in the spec but "latest" in ' +
+        "devcontainer-feature.json (spec: openspec/specs/demo/spec.md + openspec/changes/bump/specs/demo/spec.md)",
+    ]);
+    const updated = { ...withTasks, "src/demo/devcontainer-feature.json": DEMO_JSON("1.2.3") };
+    assertEquals(await optionRun(updated, fakeArchive([])), []);
+});
+
+Deno.test("optionProblems reports a new feature's delta alone as its spec, and skips a feature without one", async () => {
+    const problems = await optionRun({
+        "openspec/changes/add-demo/specs/demo/spec.md": versionSpec("ADDED Requirements", "latest"),
+        "openspec/changes/add-demo/tasks.md": "- [ ] 1.1 x\n",
+        "src/demo/devcontainer-feature.json": DEMO_JSON("1"),
+        "src/nospec/devcontainer-feature.json": DEMO_JSON("1"),
+    }, fakeArchive([]));
+    assertEquals(problems, [
+        'src/demo/devcontainer-feature.json: option "version": default is "latest" in the spec but "1" in ' +
+        "devcontainer-feature.json (spec: openspec/changes/add-demo/specs/demo/spec.md)",
+    ]);
+});
+
+Deno.test("optionProblems reports problems that exist only once archived, and skips a refused feature", async () => {
+    const main = versionSpec("Requirements", "latest");
+    const renamed = await optionRun({
+        "openspec/specs/demo/spec.md": main,
+        "openspec/changes/rename-x/specs/demo/spec.md": "## RENAMED Requirements\n\n- FROM: `### Requirement: A`\n",
+        "openspec/changes/rename-x/tasks.md": "- [ ] 1.1 x\n",
+        "src/demo/devcontainer-feature.json": DEMO_JSON("1"),
+    }, fakeArchive([]));
+    assertEquals(renamed, [
+        'openspec/specs/demo/spec.md as archiving rename-x would produce it: Option requirement "install": no Type row',
+        'openspec/specs/demo/spec.md as archiving rename-x would produce it: Option requirement "install": no Default row',
+    ]);
+    const refused = await optionRun({
+        "openspec/specs/demo/spec.md": main,
+        "openspec/changes/refused-x/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1"),
+        "openspec/changes/refused-x/tasks.md": "- [ ] 1.1 x\n",
+        "src/demo/devcontainer-feature.json": DEMO_JSON("1"),
+    }, fakeArchive([]));
+    assertEquals(refused.length, 1);
+    assert(refused[0].startsWith("openspec/changes/refused-x: OpenSpec refuses to archive it"), refused[0]);
+});
+
+Deno.test("optionProblems reports an unreadable requirement once, from the file that holds it", async () => {
+    const broken = versionSpec("ADDED Requirements", "x").replace(/\| Default .*\n/, "");
+    const problems = await optionRun({
+        "openspec/changes/add-demo/specs/demo/spec.md": broken,
+        "openspec/changes/add-demo/tasks.md": "- [ ] 1.1 x\n",
+        "src/demo/devcontainer-feature.json": DEMO_JSON("x"),
+    }, fakeArchive([]));
+    assertEquals(problems, [
+        'openspec/changes/add-demo/specs/demo/spec.md: Option requirement "version": no Default row',
+    ]);
 });

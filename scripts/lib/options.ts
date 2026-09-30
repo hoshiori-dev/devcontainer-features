@@ -15,9 +15,12 @@ export interface ParsedOptions {
     problems: string[];
 }
 
-/** Header of an Option requirement; the prefix is reserved for them. */
-const HEADER = /^### Requirement: Option (.*)$/;
-const NAME = /^[A-Za-z0-9_-]+$/;
+/** A requirement header, as OpenSpec matches it. */
+const REQUIREMENT = /^###\s*Requirement:\s*(.+)\s*$/i;
+/** Sections whose requirements OpenSpec reads: a main spec's, and a delta's ADDED and MODIFIED ones. */
+const SECTIONS = /^(ADDED |MODIFIED )?Requirements$/i;
+/** The title of a well-formed Option requirement; the word "Option" is reserved for them. */
+const OPTION = /^Option ([A-Za-z0-9_-]+)$/;
 const FIELDS = ["Type", "Default", "Enum"];
 const EXAMPLES: Record<string, string> = { Type: "`string`", Default: '`"latest"`', Enum: '`["a","b"]`' };
 
@@ -124,28 +127,39 @@ function fencedLines(lines: string[]): boolean[] {
 }
 
 /**
- * Reads every Option requirement of a main spec or a delta spec. Requirements under a REMOVED section carry no table
- * and are skipped; RENAMED sections hold no requirement headers; fenced code blocks are skipped as OpenSpec skips them.
+ * Reads every Option requirement of a main spec or a delta spec, splitting the text as OpenSpec 1.13.2 does
+ * (dist/core/parsers/requirement-blocks.js): requirements live only in a `## Requirements`, `## ADDED Requirements`, or
+ * `## MODIFIED Requirements` section (matched case-insensitively), a header matches `/^###\s*Requirement:\s*(.+)$/i`
+ * with a closing run of `#` dropped, a body runs to the next requirement header or `##` heading, and fenced code is
+ * skipped. A requirement whose name starts with the word "Option" in any case is an Option requirement.
  */
 export function parseOptionRequirements(text: string): ParsedOptions {
     const options = new Map<string, OptionContract>();
+    const variables = new Map<string, string>(); // environment variable -> option name
     const problems: string[] = [];
-    const all = text.split(/\r?\n/);
+    const all = text.replace(/^\uFEFF/, "").split(/\r\n?|\n/);
     const fenced = fencedLines(all);
     const lines = all.filter((_, index) => !fenced[index]);
-    let removed = false;
+    const isRequirement = (line: string) => REQUIREMENT.test(line);
+    let inRequirements = false;
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        // OpenSpec matches delta section headers case-insensitively.
-        if (/^##\s/.test(line)) removed = /^##\s+REMOVED\s+Requirements\s*$/i.test(line);
-        const header = HEADER.exec(line.trimEnd());
-        if (!header || removed) continue;
-        const name = header[1].trim();
+        const section = /^##\s+(.+)$/.exec(line);
+        if (section) inRequirements = SECTIONS.test(section[1].trim());
+        const header = REQUIREMENT.exec(line);
+        if (!header || !inRequirements) continue;
+        const title = header[1].replace(/[ \t]+#+[ \t]*$/, "").trim();
         let end = i + 1;
-        while (end < lines.length && !/^#{1,3} /.test(lines[end])) end++;
-        if (!NAME.test(name)) {
+        while (end < lines.length && !isRequirement(lines[end]) && !/^##\s/.test(lines[end])) end++;
+        const next = end - 1;
+        if (!/^option\b/i.test(title)) {
+            i = next;
+            continue;
+        }
+        const name = OPTION.exec(title)?.[1];
+        if (name === undefined) {
             problems.push(
-                `Option requirement "${name}": the header must be "### Requirement: Option <name>" with the bare ` +
+                `Option requirement "${title}": the header must be "### Requirement: Option <name>" with the bare ` +
                     `option name; the prefix "Option " is reserved for Option requirements`,
             );
         } else if (options.has(name)) {
@@ -153,9 +167,19 @@ export function parseOptionRequirements(text: string): ParsedOptions {
         } else {
             const result = parseBody(name, lines.slice(i + 1, end));
             problems.push(...result.problems);
-            if (result.contract) options.set(name, result.contract);
+            const variable = optionVariable(name);
+            const clash = variables.get(variable);
+            if (clash !== undefined) {
+                problems.push(
+                    `Option requirement "${name}": it arrives in the same environment variable ${variable} as ` +
+                        `"${clash}"; rename one of them`,
+                );
+            } else if (result.contract) {
+                options.set(name, result.contract);
+                variables.set(variable, name);
+            }
         }
-        i = end - 1;
+        i = next;
     }
     return { options, problems };
 }

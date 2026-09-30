@@ -105,7 +105,7 @@ Deno.test("parseOptionRequirements reports each malformed Option requirement", (
         [requirement("a", ["| Type | `string` |", '| Default | `"x"` |']).repeat(2), "appears twice"],
     ];
     for (const [text, expected] of cases) {
-        const { options, problems } = parseOptionRequirements(text);
+        const { options, problems } = parseOptionRequirements(`## Requirements\n\n${text}`);
         assert(problems.some((p) => p.includes(expected)), `${expected}: ${JSON.stringify(problems)}`);
         assert(problems.every((p) => p.startsWith("Option requirement ")), JSON.stringify(problems));
         if (expected !== "appears twice") assertEquals(options.size, 0, expected);
@@ -143,8 +143,51 @@ Deno.test("parseOptionRequirements skips fenced code blocks and matches REMOVED 
     assertEquals(options.get("version"), { type: "string", default: "latest" });
 });
 
+Deno.test("parseOptionRequirements splits requirements the way OpenSpec does", () => {
+    const rows = ["| Type | `string` |", '| Default | `"x"` |'];
+    const text = [
+        "## Purpose",
+        "",
+        requirement("purposeOnly", rows),
+        "## Requirements",
+        "",
+        requirement("plain", rows),
+        requirement("x", rows).replace("### Requirement: Option x", "### requirement:  Option lower"),
+        requirement("x", rows).replace("### Requirement: Option x", "###Requirement: Option tight ###"),
+        requirement("notes", ["### Notes", "", "Background before the table.", "", ...rows]),
+        "## Other",
+        "",
+        requirement("afterSection", rows),
+    ].join("\n");
+    const { options, problems } = parseOptionRequirements(text);
+    assertEquals(problems, []);
+    assertEquals([...options.keys()], ["plain", "lower", "tight", "notes"]);
+});
+
+Deno.test("parseOptionRequirements reserves the word Option in any case and rejects clashing variables", () => {
+    const rows = ["| Type | `string` |", '| Default | `"x"` |'];
+    const reserved = parseOptionRequirements(
+        "## Requirements\n\n### Requirement:option precedence\n\nThe feature SHALL order flags.\n",
+    );
+    assert(reserved.problems[0].includes('the prefix "Option " is reserved'), JSON.stringify(reserved.problems));
+    const clash = parseOptionRequirements(
+        `## Requirements\n\n${requirement("tools-python", rows)}${requirement("tools_python", rows)}`,
+    );
+    assertEquals(clash.problems, [
+        'Option requirement "tools_python": it arrives in the same environment variable TOOLS_PYTHON as ' +
+        '"tools-python"; rename one of them',
+    ]);
+    assertEquals([...clash.options.keys()], ["tools-python"]);
+    const other = parseOptionRequirements(
+        "## Requirements\n\n### Requirement: Options list\n\nThe feature SHALL list.\n",
+    );
+    assertEquals([other.options.size, other.problems], [0, []]);
+});
+
 Deno.test("parseOptionRequirements reports a Type that is not a code span once, with a Type example", () => {
-    const { problems } = parseOptionRequirements(requirement("a", ["| Type | string |", '| Default | `"x"` |']));
+    const { problems } = parseOptionRequirements(
+        `## Requirements\n\n${requirement("a", ["| Type | string |", '| Default | `"x"` |'])}`,
+    );
     assertEquals(problems, [
         'Option requirement "a": the Type value must be one code span, e.g. `string` (got string)',
     ]);

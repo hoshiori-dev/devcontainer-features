@@ -195,8 +195,10 @@ change's `design.md`.
 A feature's spec states each of its options as its own requirement, an Option requirement. `scripts/lib/options.ts`
 reads this format, so the two change together.
 
-- The header is `### Requirement: Option <name>` with the bare option name. The prefix is reserved: no other requirement
-  starts with the word "Option".
+- The header is `### Requirement: Option <name>` with the bare option name, in the sections where OpenSpec reads
+  requirements (a main spec's `## Requirements`, a delta's ADDED and MODIFIED sections). The prefix is reserved: no
+  other requirement starts with the word "Option", in any case. No two options may arrive in the same environment
+  variable (`tools-python` and `tools_python` both become `TOOLS_PYTHON`).
 - The body is one SHALL sentence and a `Field | Value` table with the rows `Type`, `Default`, and, for an `enum`,
   `Enum`. Every value is one code span: `Type` holds the bare keyword `boolean` or `string` (not a JSON string), and
   `Default` and `Enum` hold JSON literals (`"latest"`, `""`, `true`, `["closed","warn"]`). The default has the option's
