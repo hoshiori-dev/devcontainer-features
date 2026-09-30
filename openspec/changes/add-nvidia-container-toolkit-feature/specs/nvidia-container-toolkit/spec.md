@@ -72,7 +72,9 @@ key.
 
 The `version` option SHALL select the toolkit version: `latest` installs the newest version that NVIDIA's stable
 repository offers at build time, and a version of the form `MAJOR.MINOR.PATCH` installs exactly that version of all four
-packages. Any other value, including a version with a package release suffix such as `1.20.1-1`, SHALL fail the build.
+packages. The feature SHALL impose no minimum version: every `MAJOR.MINOR.PATCH` version the repository offers SHALL be
+installed as requested, including releases with known vulnerabilities. Any other value, including a version with a
+package release suffix such as `1.20.1-1`, SHALL fail the build.
 
 #### Scenario: Latest version
 
@@ -83,6 +85,12 @@ packages. Any other value, including a version with a package release suffix suc
 
 - **WHEN** the feature is installed with `version` set to a version the repository offers, for example `1.19.1`
 - **THEN** all four packages are installed at that version and `nvidia-ctk --version` reports it
+
+#### Scenario: Older release with known vulnerabilities
+
+- **WHEN** the feature is installed with `version` set to an older release the repository offers that has known
+  vulnerabilities, for example `1.14.0`
+- **THEN** the build succeeds and all four packages are installed at that version
 
 #### Scenario: Version the repository does not offer
 

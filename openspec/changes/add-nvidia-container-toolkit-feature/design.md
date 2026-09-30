@@ -5,6 +5,18 @@
 See proposal.md - Why. Facts below were checked against live upstream on 2026-09-30 and are needed only for this change;
 the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
 
+- **Review.** This revision answers the maintainer's review of commit `8760af0` on PR #29
+  ([review](https://github.com/hoshiori-dev/devcontainer-features/pull/29#issuecomment-5909322895),
+  [decision on finding 1](https://github.com/hoshiori-dev/devcontainer-features/pull/29#issuecomment-5909346162)):
+  vulnerable releases stay installable (Decisions), the missing `Valid-Until` is a risk (Risks / Trade-offs), the rpm
+  database trust scope was already accepted (Decisions), and the implementation notes are Goals. The one item the review
+  left unverified, that rpm package headers are signed by the pinned key, is supported by the header check in
+  **Signing** and by the Fedora 44 trials, which installed with `gpgcheck=1`.
+- **Known vulnerabilities.** Releases below 1.16.2, 1.17.3, 1.17.4, and 1.17.8 carry the CVEs the decision comment lists
+  (checked by the maintainer against NVD and the GitHub Advisory Database, 2026-09-30), among them container escapes
+  (CVE-2024-0132, CVE-2025-23266). The stable index serves every release from 1.14.0, so all of them can be installed;
+  on 2026-09-30 a `signed-by` source on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64) installed the four
+  packages at `1.14.0-1`.
 - **Releases.** The newest stable release is v1.20.1 (2026-09-19); `-rc.N` tags are GitHub pre-releases and never reach
   the stable repository. The stable apt index offers `nvidia-container-toolkit` from `1.14.0-1` to `1.20.1-1` on amd64
   and at least `1.19.1-1` to `1.20.1-1` on arm64; every toolkit package version carries the release suffix `-1`, and the
@@ -79,12 +91,17 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
 - The package manager enforces the signatures; the feature's part is the configuration above. Refusal of content not
   signed by the pinned key is checked by a manual run on one image per family in which the configured key is replaced by
   another key and the package manager's refresh or install must fail, recorded in the PR.
+- The key is downloaded with `curl --proto '=https' -fsSL`, so neither the request nor a redirect can use another scheme
+  (curl's `--proto-redir` cannot re-allow a scheme `--proto` denies, so it is not needed) — checked by review of
+  `install.sh`.
 - The key is used only when `gpg --show-keys --with-colons` on the downloaded file yields exactly one `pub` record and
-  that record's `fpr` equals the pinned fingerprint. The check runs in a temporary `GNUPGHOME` that is removed
-  afterwards, and only the pinned fingerprint is exported from it (`gpg --export <fingerprint>`) into the apt keyring
-  and the rpm key file, so no other key can ride along and no key lands in root's own keyring — checked by manual runs
-  with a substituted key file and with a file holding the pinned key followed by a second key (each fails the build
-  before NVIDIA's repository is configured), recorded in the PR.
+  that record's `fpr` equals the pinned fingerprint. The check runs in a temporary `GNUPGHOME` created under a
+  feature-specific name and removed by a `trap` on success and on failure, and only the pinned fingerprint is exported
+  from it (`gpg --export <fingerprint>`) into the apt keyring and the rpm key file, so no other key can ride along and
+  no key lands in root's own keyring — checked by manual runs with a substituted key file and with a file holding the
+  pinned key followed by a second key (each fails the build before NVIDIA's repository is configured, and leaves no
+  temporary `GNUPGHOME`), recorded in the PR, and by `test.sh` asserting that no temporary `GNUPGHOME` remains after a
+  successful install.
 - No key reaches the package manager except the verified local copy: apt has `signed-by`, the rpm managers get
   `gpgkey=file://` and the key in the rpm database, and `--gpg-auto-import-keys` or its equivalents never appear —
   checked by the source-file content assertions in `test.sh` (no remote `gpgkey=`) and by review of `install.sh`.
@@ -118,6 +135,10 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
 - The Docker check looks for a `dockerd` executable, not the `docker` CLI — checked by `test.sh` on images without
   Docker and by a scenario with `ghcr.io/devcontainers/features/docker-outside-of-docker:1` (CLI only), each asserting
   that no `daemon.json` exists; the skip message is read from the build log.
+- `version` is either exactly `latest` or matches `^[0-9]+\.[0-9]+\.[0-9]+$` against the whole value (bash `[[ =~ ]]`,
+  not a line-oriented tool such as `grep`, so an embedded newline cannot pass), before it reaches any package-manager
+  argument; there is no lower bound — checked by the manual "Malformed version" run with `1.20.1-1`, `1.20`,
+  `1.20.1;true`, and a value holding a newline, and by the `1.14.0` scenario.
 - Distribution, architecture, and the `version` format are validated before anything changes. Prerequisites (`curl`,
   `ca-certificates`, `gnupg`/`gpg2`) are installed only when missing and before the key check, so a failed key check may
   leave them installed. `/etc/pki/rpm-gpg/` is created when missing. Package-manager caches are cleaned at the end;
@@ -168,6 +189,11 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   without solver surprises. Alternative: also accept `1.20.1-1`, the form of the install guide's
   `NVIDIA_CONTAINER_TOOLKIT_VERSION` — rejected, the release suffix is a packaging detail the feature supplies, and the
   stable index carries only `-1`.
+- **Vulnerable releases stay installable; no minimum version.** `version` accepts every well-formed `MAJOR.MINOR.PATCH`
+  the stable repository offers, as the maintainer decided on PR #29 (Context, **Review**). The user who pins an exact
+  version carries its risk; the default `latest` is not affected. Alternative: a minimum version such as 1.17.8, below
+  which the build fails — rejected, the maintainer accepted the risk for users who pin, and a floor would need a spec
+  change and a feature release after every new NVIDIA advisory to stay meaningful.
 - **Docker configuration through `nvidia-ctk`, only where `dockerd` exists, with no restart.** `nvidia-ctk` keys the
   runtime by name, so a repeat adds nothing, and it keeps other settings. No daemon runs at build time; docker-in-docker
   reads the file when its entrypoint starts `dockerd`. Alternative: edit the JSON with `jq` — rejected, a new dependency
@@ -200,8 +226,9 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   manager from the repositories in the URL inventory. Prerequisites come from the image's preconfigured distribution
   repositories. Against the download rules in `.agents/knowledge/feature-authoring.md`: the key falls under "Added
   repositories" (pinned by full fingerprint, checked before use), NVIDIA's and the image's repositories under "Package
-  managers and registries", every URL is named in the spec and served over HTTPS without redirects, and no download
-  relies on TLS alone, so the spec needs no TLS-only Requirement.
+  managers and registries", every URL is named in the spec and served over HTTPS without redirects (the key download is
+  also restricted to HTTPS by `curl --proto '=https'`), and no download relies on TLS alone, so the spec needs no
+  TLS-only Requirement.
 - **Verification.** Key: exactly one primary key, with the pinned full fingerprint, and only that fingerprint exported.
   apt: `InRelease` signature against the feature-owned keyring, then the index's SHA512 hashes for each `.deb`. dnf and
   zypper: `repomd.xml.asc` signature (`repo_gpgcheck=1`) and each package's header signature (`gpgcheck=1`) against the
@@ -230,9 +257,10 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   - `registry.opensuse.org/opensuse/leap:16.0` — amd64; best effort, Leap 16.0 is not on NVIDIA's list (Open Questions).
   - Scenarios: the docker-in-docker scenario on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64) with
     `ghcr.io/devcontainers/features/docker-in-docker:4`; a docker-outside-of-docker scenario on the same image; one
-    pinned-version scenario on each of `debian:12`, `fedora:44`, and `registry.opensuse.org/opensuse/leap:16.0`; and the
-    `daemon.json` `build` scenarios. No GPU is present in CI; nothing calls `nvidia-container-cli info` or starts a GPU
-    container.
+    pinned-version scenario on each of `debian:12`, `fedora:44`, and `registry.opensuse.org/opensuse/leap:16.0`; one
+    scenario pinning `1.14.0`, the oldest release in the stable index, on
+    `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64); and the `daemon.json` `build` scenarios. No GPU is
+    present in CI; nothing calls `nvidia-container-cli info` or starts a GPU container.
 
 ## URL inventory
 
@@ -251,6 +279,12 @@ none redirected. The image's own distribution repositories, used for prerequisit
 
 - [NVIDIA rotates or adds a signing key] → The key check fails the build loudly; a new fingerprint is a spec change and
   a feature release.
+- [The repository metadata has no freshness protection] → The apt `InRelease` carries
+  `Date: Fri, 27 Apr 2018 21:29:25 +0000` and no `Valid-Until`, so apt cannot detect a replayed older signed index that
+  holds `latest` at a vulnerable release. HTTPS to `nvidia.github.io` mitigates it in practice; the fields are NVIDIA's
+  to set, so this is an upstream limitation the feature cannot close.
+- [A user pins a release with known vulnerabilities, including container escapes] → Accepted, see Decisions; NOTES.md
+  names the known ranges and points to NVIDIA's security bulletins.
 - [NVIDIA publishes a package release other than `-1`] → An exact `version` would fail to resolve; the failure names the
   version, and the stable index shows only `-1` today.
 - [Best-effort platforms (Debian 12, Fedora 44, Leap 16.0) break with a toolkit release] → CI catches it on the next
