@@ -151,6 +151,15 @@ with a temporary `GLAB_CONFIG_DIR`:
   the older version output. Rejected: the current release as the second proposal — it equals what `latest` resolves to,
   so the second install would skip and the replace path would never run in CI; a release between the two — it tests
   nothing `1.47.0` does not.
+- **Tests resolve `command -v glab` instead of comparing its text.** On `fedora:44`, `/usr/local/sbin` is a symbolic
+  link to `bin` and comes first on `PATH`, so `command -v glab` prints `/usr/local/sbin/glab` for the same file; the
+  implementation found this, and the two scenarios were reworded for the maintainer's renewed approval. Rejected:
+  changing `PATH` or installing elsewhere for that image, which the design rules out.
+- **A POSIX test helper instead of `dev-container-features-test-lib`.** The Dev Container CLI's test library needs bash
+  (it declares arrays), and `alpine:3.24` ships none, so `test/glab/checks.sh` provides the same `check` and
+  `reportResults` interface in POSIX `sh` and every test script sources it. `.agents/knowledge/testing.md` names the CLI
+  library; this is a recorded exception for images without bash. Rejected: installing bash in the test image, which
+  would change what the feature is tested against.
 - **Tests check `latest` against the permanent link at test time.** `test.sh` (default options) and `duplicate.sh`
   (second install) read the same permanent link with `curl` and compare its version with `glab --version`;
   `duplicate.sh` also asserts that the version differs from `1.47.0`. Rejected: accepting any valid version at or above

@@ -22,7 +22,7 @@ run time, installing it when the image lacks it.
 #### Scenario: Default install
 
 - **WHEN** the feature is installed with default options on an image listed in `test/glab/compatibility.json`
-- **THEN** `command -v glab` run as the remote user prints `/usr/local/bin/glab`
+- **THEN** `command -v glab` run as the remote user resolves, following symbolic links, to `/usr/local/bin/glab`
 - **AND** `glab --version` run as the remote user exits 0
 - **AND** `git --version` run as the remote user exits 0
 
@@ -161,8 +161,8 @@ options win and exactly one `glab` remains. A second install that fails SHALL le
 - **WHEN** the feature is installed with `version` set to an explicit older release and then with a `version` that
   selects a newer release
 - **THEN** both installs succeed, and `glab --version` reports the version the second install selected
-- **AND** `command -v glab` prints `/usr/local/bin/glab`, and `/usr/local/bin` holds no file other than `glab` whose
-  name contains `glab`
+- **AND** `command -v glab` resolves, following symbolic links, to `/usr/local/bin/glab`, and `/usr/local/bin` holds no
+  file other than `glab` whose name contains `glab`
 
 #### Scenario: Unreadable installed version
 
