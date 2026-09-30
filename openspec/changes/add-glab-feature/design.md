@@ -2,12 +2,14 @@
 
 ## Context
 
-See proposal.md - Why. `glab` is the first feature of the collection: `src/` does not exist yet and `test/canary.json`
-is empty. Upstream facts this change relies on, checked on 2026-09-30 against gitlab.com (the release API of project
-`34675721`, the release files themselves, `.goreleaser.yml` at `v1.120.0`, and `internal/config/config_file.go`,
-`internal/config/schema.go`, and `internal/commands/version/version.go` of `gitlab-org/cli`, plus their `v1.47.0`,
-`v1.53.0`, and `v1.54.0` counterparts where named), and by running the `v1.120.0` and `v1.47.0` amd64 binaries, each
-verified against its `checksums.txt`, with a temporary `GLAB_CONFIG_DIR`:
+See proposal.md - Why. `glab` is the first feature of the collection: `src/` does not exist yet. The Goal that accepts a
+move of GitLab's download redirect to another host answers the maintainer's source-audit comment on PR #28, which notes
+that `--proto-redir =https` restricts the scheme of a redirect but not its host. Upstream facts this change relies on,
+checked on 2026-09-30 against gitlab.com (the release API of project `34675721`, the release files themselves,
+`.goreleaser.yml` at `v1.120.0`, and `internal/config/config_file.go`, `internal/config/schema.go`, and
+`internal/commands/version/version.go` of `gitlab-org/cli`, plus their `v1.47.0`, `v1.53.0`, and `v1.54.0` counterparts
+where named), and by running the `v1.120.0` and `v1.47.0` amd64 binaries, each verified against its `checksums.txt`,
+with a temporary `GLAB_CONFIG_DIR`:
 
 - The latest release is `v1.120.0` (2026-09-29); releases come about weekly. None of the last 100 releases (`v1.40.0` to
   `v1.120.0`, release API with `per_page=100`) has a tag other than `vMAJOR.MINOR.PATCH`, although `.goreleaser.yml`
@@ -54,9 +56,15 @@ verified against its `checksums.txt`, with a temporary `GLAB_CONFIG_DIR`:
 - `install.sh` is POSIX `#!/bin/sh` with `set -eu`, since Alpine ships no bash. Checked by shellcheck in `just check`
   and by the Alpine entries of the compatibility list.
 - Every download `install.sh` itself makes goes through `curl` restricted to HTTPS for the request and every redirect,
-  with failing HTTP statuses treated as errors and TLS verification never disabled, and reaches only the URLs in the URL
-  inventory below; package-manager requests go to the image's configured repositories. Checked by reviewing each `curl`
-  call in `install.sh` against the inventory.
+  with failing HTTP statuses treated as errors and TLS verification never disabled (feature-authoring.md, download rules
+  "Sources" and "No weakening"), and requests only the URLs in the URL inventory below; package-manager requests go to
+  the image's configured repositories. Checked by reviewing each `curl` call in `install.sh` against the inventory.
+- A move of GitLab's download redirect (the generic package URL the release permalinks redirect to) to another host,
+  such as object storage or a CDN, is accepted: `install.sh` restricts every hop to HTTPS but not to a host, because TLS
+  and the published checksum still apply to what it downloads, and the feature should keep working as upstream
+  infrastructure changes. feature-authoring.md's "Sources" rule admits the release platform's download redirects.
+  `install.sh` prints the final URL of each download (`curl`'s `%{url_effective}`) to the build log, so the host in use
+  is visible. Checked by reviewing `install.sh` and one CI build log.
 - The `version` value is validated against `latest` or `v?MAJOR.MINOR.PATCH` (decimal numbers only) before it enters a
   URL, a file name, or a comparison, and the version read from the latest-release redirect passes the same validation
   and minimum. Checked by the manual checks below.
@@ -77,10 +85,10 @@ verified against its `checksums.txt`, with a temporary `GLAB_CONFIG_DIR`:
 - Downloads and the build-time glab configuration directory live in directories made with
   `mktemp -d "${TMPDIR:-/tmp}/glab-feature.XXXXXX"` (a template BusyBox accepts too), and the new binary is staged as
   `/usr/local/bin/.glab-feature.XXXXXX`; one `trap` removes all of them on every exit, success or failure. Every
-  build-time `glab` call runs with `GLAB_CONFIG_DIR` set to such a directory and with both `GLAB_CHECK_UPDATE=false` and
-  `CHECK_UPDATE=false` (older releases read only the latter; Context), and none of these variables is persisted. Checked
-  by the "Nothing configured after install" scenario and, after each manual check, by an empty listing of
-  `${TMPDIR:-/tmp}/glab-feature.*` and `/usr/local/bin/.glab-feature.*`.
+  build-time `glab` call runs with `GLAB_CONFIG_DIR` set to such a directory, with both `GLAB_CHECK_UPDATE=false` and
+  `CHECK_UPDATE=false` (older releases read only the latter; Context), and with `GLAB_SEND_TELEMETRY=false`, and none of
+  these variables is persisted. Checked by the "Nothing configured after install" scenario and, after each manual check,
+  by an empty listing of `${TMPDIR:-/tmp}/glab-feature.*` and `/usr/local/bin/.glab-feature.*`.
 - The staged binary is renamed over `/usr/local/bin/glab`, so a reader sees either the old or the new binary and a
   failed install leaves the old one. Checked by the "Failed second install" manual check.
 - The second-install skip runs the installed binary's `glab --version`, isolated as above, and treats it as the
@@ -100,7 +108,7 @@ verified against its `checksums.txt`, with a temporary `GLAB_CONFIG_DIR`:
   `yum`), a failed second install, the same `version` twice (the second build log says the version is already installed,
   and the binary's inode and modification time are unchanged), and an unreadable installed version (a stub
   `/usr/local/bin/glab` that exits 1 is replaced). Each result goes into the PR's Validation section. `install.sh`
-  itself carries no test hook.
+  itself carries no test hook. The maintainer accepted this manual-only coverage for this change (Non-Goals).
 
 **Non-Goals:**
 
@@ -110,6 +118,8 @@ verified against its `checksums.txt`, with a temporary `GLAB_CONFIG_DIR`:
 - Authenticity of the release beyond what gitlab.com's TLS gives: upstream publishes no signature and no key to pin.
 - Man pages and shell completions: the archive has no man pages, and `glab completion` generates completions on demand.
 - Removing the prerequisites the feature installed.
+- Repeating the manual checks under Goals in CI: a successful container build cannot show a failure, and a test hook in
+  `install.sh` would ship to users. A later change can add `build` scenarios with a Dockerfile if a regression shows up.
 - Images of a supported family that lack its package manager (Amazon Linux 2 and CentOS 7 have only `yum`), and
   distroless images; the feature fails clearly on them.
 
@@ -123,9 +133,12 @@ verified against its `checksums.txt`, with a temporary `GLAB_CONFIG_DIR`:
   long build; copying from upstream's container image — a feature cannot use a base image; the generic package registry
   URL the permalink redirects to — an implementation detail GitLab may move.
 - **Integrity from `checksums.txt`, stated as integrity only.** It is the only verification upstream publishes for
-  Linux, and it meets the repository's "published checksum" rule; the spec says it does not establish authenticity.
-  Rejected: digests pinned in the feature — every upstream release would need a feature release, and `latest` would be
-  impossible; skipping verification — breaks the repository rule.
+  Linux, so feature-authoring.md's "Direct downloads" rule requires fetching it at install time, verifying the archive
+  against it, and failing when it is missing or unreachable; the spec says it does not establish authenticity. The
+  checksum list itself and the latest-release link have nothing upstream publishes to verify them against, so the spec
+  states that they rely on TLS alone, as that rule requires. Rejected: digests pinned in the feature — the "No
+  per-version hashes" rule forbids them, every upstream release would need a feature release, and `latest` would be
+  impossible; skipping verification — the "Direct downloads" rule forbids it once upstream publishes a checksum.
 - **`latest` from the release page's permanent link, read without following it.** The feature requests
   `/-/releases/permalink/latest`, takes the last path segment of the `Location` header (absolute or relative), and
   validates it as a version. Rejected: the API's permanent link — it answers with a relative redirect to a JSON document
@@ -148,8 +161,10 @@ verified against its `checksums.txt`, with a temporary `GLAB_CONFIG_DIR`:
   directory — not on `PATH` for other users.
 - **Build-time glab calls isolated.** A temporary `GLAB_CONFIG_DIR` keeps glab from creating `/root/.config/glab-cli` or
   failing on an unwritable home; `GLAB_CHECK_UPDATE=false` and `CHECK_UPDATE=false` keep those calls from contacting
-  gitlab.com for an update check. Rejected: checking the version by file checksum or a marker file — the binary's own
-  output is what the spec asserts; setting only `GLAB_CHECK_UPDATE=false` — releases up to at least `v1.47.0` ignore it.
+  gitlab.com for an update check; `GLAB_SEND_TELEMETRY=false` keeps them from sending usage data. Whether
+  `glab --version` sends usage data without an authenticated host was not verified; the variable makes the answer
+  irrelevant at no cost. Rejected: checking the version by file checksum or a marker file — the binary's own output is
+  what the spec asserts; setting only `GLAB_CHECK_UPDATE=false` — releases up to at least `v1.47.0` ignore it.
 - **Prerequisites from the image's own repositories, only when missing, left installed.** `git` because glab needs it at
   run time (upstream's packages depend on it); `curl`, `ca-certificates`, and `tar` because the install needs them.
   Rejected: `dependsOn` on another feature — adds an external dependency for four packages; removing them afterwards —
@@ -166,10 +181,11 @@ verified against its `checksums.txt`, with a temporary `GLAB_CONFIG_DIR`:
 ## Security review
 
 - **Downloads:** the release archive and `checksums.txt` for one version and architecture, and one header-only request
-  for `latest`; all on gitlab.com over HTTPS (URL inventory). Nothing is piped to a shell. Build-time `glab` calls make
-  no request (Decisions).
+  for `latest`; all on gitlab.com over HTTPS (URL inventory), a move of the download redirect to another host accepted
+  (Goals). Nothing is piped to a shell. Build-time `glab` calls make no request (Decisions).
 - **Verification:** SHA-256 of the archive against its exact entry in `checksums.txt`; unsigned and same-origin, so it
-  detects corruption and a mismatched file but not a compromised release pipeline (Risks).
+  detects corruption and a mismatched file but not a compromised release pipeline (Risks). `checksums.txt` and the
+  latest-release link rely on TLS alone, stated in the spec.
 - **Keys:** none; upstream signs no Linux artifact, so there is no key or fingerprint to pin.
 - **Metadata:** `mounts`, `capAdd`, `privileged`, `securityOpt`, `init`, and `entrypoint` are not declared — the CLI
   needs no extra privilege or process. `containerEnv` is not declared — `/usr/local/bin` is already on `PATH`, and no
@@ -202,7 +218,8 @@ All four tags publish amd64 and arm64 images (Docker Hub tag API and the MCR man
 Every URL the feature's scripts access. All are fetched at build time by `install.sh`; the feature fetches nothing at
 container start (it declares no lifecycle command or entrypoint). It configures no package repository: `git`, `curl`,
 `ca-certificates`, and `tar` come from the repositories the image already has. It has no `dependsOn` or `installsAfter`,
-so no feature OCI reference. `<version>` has no leading `v`; `<arch>` is `amd64` or `arm64`.
+so no feature OCI reference. `<version>` has no leading `v`; `<arch>` is `amd64` or `arm64`. The host of the redirect
+target in the last row may move (Goals).
 
 | URL / template                                                                                                                                                      | Purpose                                                                       | When                                                                                    | Integrity / authenticity                                                                                                                      | Official source evidence                                                                                                                                                                                                        | Verified                                                                                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -237,17 +254,11 @@ feature.
 - [`latest` makes builds non-reproducible] → Users pin `version`; `NOTES.md` says so.
 - [A distribution derivative accepted through `ID_LIKE` is not in the compatibility list] → It is accepted because its
   package manager matches, but only listed images are supported; `NOTES.md` points to the compatibility list.
+- [GitLab moves its download redirect to another host] → Builds keep working over HTTPS with the checksum check, but the
+  URL inventory and the design's evidence go stale. The move is noticed in the build log, where `install.sh` prints each
+  download's final URL (Goals), and when the next change to the feature re-checks its URLs; that change updates the
+  inventory, and the spec if a named URL changed.
 
 ## Open Questions
 
-- **Canary.** Add `glab` to `test/canary.json`, so changes to the test infrastructure run it? Recommendation: yes; it is
-  the first feature, and a single static binary makes it fast and stable, as `testing.md` asks of a canary.
-- **Root README.** List `glab` under Features in the root `README.md`, replacing "No features have been published yet."?
-  Recommendation: yes, one line linking `src/glab/`.
-- **Manual-only coverage.** Thirteen scenarios and checks under Goals are run by hand once, on amd64, and never again in
-  CI, because a successful container build cannot show a failure and a test hook in `install.sh` would ship to users.
-  Accept that? Recommendation: yes for this change; a later change can add `build` scenarios with a Dockerfile if a
-  regression shows up.
-- **Telemetry at build time.** Also set `GLAB_SEND_TELEMETRY=false` on build-time `glab` calls, next to the update-check
-  variables? Recommendation: yes; it costs nothing and is not persisted. Whether `glab --version` sends usage data
-  without an authenticated host was not verified; the variable makes the answer irrelevant.
+None.

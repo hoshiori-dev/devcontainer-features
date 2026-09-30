@@ -29,11 +29,13 @@ run time, installing it when the image lacks it.
 ### Requirement: Version selection
 
 The `version` option SHALL select the release to install. The value `latest` SHALL mean the release that
-https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest redirects to at build time. Any other value SHALL be a
-release version `MAJOR.MINOR.PATCH` of decimal numbers, with or without a leading `v`. The feature SHALL reject, before
-downloading anything, a value of any other form and a version below `1.47.0`. It SHALL fail before downloading any
-archive when `latest` resolves to anything other than a release version of that form at or above `1.47.0`, such as a
-pre-release tag, and SHALL fail when the requested release has no artifact for the architecture.
+https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest redirects to at build time; the feature SHALL read that
+redirect over HTTPS without following it and SHALL rely on TLS alone for it, since upstream publishes no checksum or
+signature for it. Any other value SHALL be a release version `MAJOR.MINOR.PATCH` of decimal numbers, with or without a
+leading `v`. The feature SHALL reject, before downloading anything, a value of any other form and a version below
+`1.47.0`. It SHALL fail before downloading any archive when `latest` resolves to anything other than a release version
+of that form at or above `1.47.0`, such as a pre-release tag, and SHALL fail when the requested release has no artifact
+for the architecture.
 
 #### Scenario: Explicit version
 
@@ -80,9 +82,9 @@ The feature SHALL download the release archive from
 list from `https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/checksums.txt`, where `<version>` has no
 leading `v` and `<arch>` is `amd64` or `arm64`, over HTTPS only, including every redirect. It SHALL install the
 archive's `glab` only when the checksum list holds exactly one entry whose file name equals the archive's name and the
-archive's SHA-256 digest equals that entry. The checksum list is published unsigned from the same origin as the archive,
-so this verification establishes the archive's integrity against the published release, not the publisher's
-authenticity.
+archive's SHA-256 digest equals that entry. The feature SHALL rely on TLS alone for the checksum list itself, which
+upstream publishes unsigned from the same origin as the archive, so this verification establishes the archive's
+integrity against the published release, not the publisher's authenticity.
 
 #### Scenario: Digest matches
 
