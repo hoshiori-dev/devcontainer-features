@@ -12,14 +12,41 @@ Upstream sources:
 
 ## ADDED Requirements
 
+### Requirement: Option packages
+
+The feature SHALL accept the option `packages` as declared here, a comma-separated list of package entries in which
+whitespace around an entry and empty entries are ignored, and SHALL succeed without changing the image when the list
+names no package.
+
+| Field   | Value    |
+| ------- | -------- |
+| Type    | `string` |
+| Default | `""`     |
+
+#### Scenario: Omitted packages
+
+- **WHEN** the feature is installed without `packages`
+- **THEN** the feature exits with status 0, installs and removes nothing, and fetches no package index, also on an image
+  without `apk`
+
+#### Scenario: Empty list is a no-op
+
+- **WHEN** `packages` is empty or holds only commas and whitespace
+- **THEN** the feature exits with status 0, installs and removes nothing, and fetches no package index, also on an image
+  without `apk`
+
+#### Scenario: Spaces and empty entries are ignored
+
+- **WHEN** `packages` has spaces and tabs around its entries and an empty entry between two commas
+- **THEN** the named packages are installed exactly as if the whitespace and the empty entry were absent
+
 ### Requirement: Install the listed packages
 
 The feature SHALL install, with `apk`, every package named in the comma-separated `packages` option, taking each package
 and its dependencies only from the repositories configured in the image, and SHALL leave each entry recorded in apk's
 world (`/etc/apk/world`). Besides the listed packages and their dependencies, it SHALL install only the packages that
 apk selects automatically because all of their install-if conditions are met. It SHALL NOT change the version of an
-installed package unless an entry's constraint or a package it installs requires another version of it. Whitespace
-around an entry and empty entries SHALL be ignored.
+installed package unless an entry's constraint or a package it installs requires another version of it.
 
 #### Scenario: Listed packages are installed
 
@@ -33,26 +60,11 @@ around an entry and empty entries SHALL be ignored.
   meta package
 - **THEN** the documentation subpackage is installed as well
 
-#### Scenario: Spaces and empty entries are ignored
-
-- **WHEN** `packages` has spaces and tabs around its entries and an empty entry between two commas
-- **THEN** the named packages are installed exactly as if the whitespace and the empty entry were absent
-
 #### Scenario: Listed package already installed stays at its version
 
 - **WHEN** `packages` names, without a constraint, a package that is installed at a version older than the one the
   repositories offer, and no other listed package requires a newer version of it
 - **THEN** the feature succeeds and the package stays at its installed version
-
-### Requirement: Empty package list
-
-The feature SHALL succeed without changing the image when `packages` names no package.
-
-#### Scenario: Empty list is a no-op
-
-- **WHEN** `packages` is empty or holds only commas and whitespace
-- **THEN** the feature exits with status 0, installs and removes nothing, and fetches no package index, also on an image
-  without `apk`
 
 ### Requirement: Version constraints and repository tags
 

@@ -114,10 +114,6 @@ amd64; the arm64 variants were pulled and inspected without running them:
 - **POSIX `sh`, shared skeleton.** One skeleton keeps the five installers auditable side by side; the Alpine images ship
   no bash, so `feature-authoring.md` calls for POSIX `sh` here anyway. Rejected: installing bash first, which would add
   a package the user did not list.
-- **One option, `packages`, a comma-separated string defaulting to empty.** `proposals` hold two lists installed on
-  neither image: `file` and `file,tree`. Whitespace around entries and empty entries are dropped, so a trailing comma is
-  harmless. Rejected: an array (feature options are only `string` or `boolean`); options for upgrading, virtual
-  packages, or extra repositories (out of scope).
 - **Validate, then the empty check, then the `apk` check.** A refused entry fails first on every image, so the same bad
   list gives the same message everywhere; the empty check runs before the `apk` check, so the default options succeed on
   any image, including one without `apk`. Rejected: failing on an image without `apk` even for an empty list, which
@@ -173,6 +169,20 @@ amd64; the arm64 variants were pulled and inspected without running them:
   type-checks and lints only `scripts/`, so the runner's shebang runs it with `deno run --check`, which type-checks it
   on every run, and `deno lint test/apk-packages/` runs before its output is recorded in the Validation section.
 
+### Options
+
+The feature's only option; the delta spec's Option requirement states its contract.
+
+| Name       | Type     | Default | Enum or proposals                  | Meaning                                                                                                                                                                                                                         |
+| ---------- | -------- | ------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages` | `string` | `""`    | proposals: `"file"`, `"file,tree"` | Comma-separated entries (`name`, `name=version`, `name~version`, `name@tag`, or a provided name such as `cmd:jq`) that `apk` installs; whitespace around entries and empty entries are dropped, so a trailing comma is harmless |
+
+- **Default `""`.** An empty list installs nothing and, because the empty check runs before the `apk` check, succeeds on
+  any image, including one without `apk` (decision "Validate, then the empty check, then the `apk` check"). The
+  proposals are two lists installed on neither image, so the install-twice test installs real packages (Goals).
+- **Rejected shapes:** an array (feature options are only `string` or `boolean`); options for upgrading, virtual
+  packages, or extra repositories (out of scope); an option to suppress install-if (Non-Goals).
+
 ### Deviations from `feature-authoring.md`
 
 Each follows from a binding decision for the five installers and needs the maintainer's acceptance at the package gate.
@@ -226,7 +236,7 @@ section. On arm64, CI runs only test.sh and duplicate.sh.
 | Listed packages are installed                                                               | Scenario on each image; duplicate.sh with the `proposals` list                                                                                                                                                                                                                                                                                                       |
 | Install-if packages follow their conditions; Spaces and empty entries are ignored           | Scenario                                                                                                                                                                                                                                                                                                                                                             |
 | Listed package already installed stays at its version                                       | Direct: the runner picks at run time an installed package the repositories offer in a newer version (`apk version -l '<'`), lists it, and compares the version. Runs on `alpine:3.24.0` and `alpine:3.22.0`, pinned by digest (Context) and outside the compatibility list, whose installed packages lag their branches; the check fails if it finds no such package |
-| Empty list is a no-op                                                                       | test.sh; Direct on an image without `apk`                                                                                                                                                                                                                                                                                                                            |
+| Omitted packages; Empty list is a no-op                                                     | test.sh; Direct on an image without `apk`                                                                                                                                                                                                                                                                                                                            |
 | Pinned version is installed; Prefix constraint is installed                                 | Direct: the runner reads the offered version at run time and pins it, so no fixed version goes stale                                                                                                                                                                                                                                                                 |
 | Configured tag selects its repository                                                       | Direct: the runner puts `@t` before the image's `community` line in the test container and lists a package only `community` offers, such as `ripgrep`, as `name@t`; since the untagged name no longer resolves (Context), success proves the tag selected the repository; asserts the package is installed and the world holds `name@t`                              |
 | Unavailable pinned version fails; Tag the image does not configure fails                    | Direct                                                                                                                                                                                                                                                                                                                                                               |
