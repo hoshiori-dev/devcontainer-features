@@ -92,11 +92,12 @@ architecture. The feature SHALL NOT allow a downgrade: a version below the insta
 
 ### Requirement: Entries are validated before anything changes
 
-The feature SHALL accept an entry only when it starts with a letter or a digit, consists only of letters, digits, and
-the characters `.`, `+`, `-`, `:`, `~`, and `=`, and ends in neither `-` nor `+`. When any entry is refused, the feature
-SHALL exit with status 1 and a message naming that entry before it checks for `apt-get`, refreshes the package index, or
-installs anything. The feature SHALL hand every accepted entry to `apt-get` as one argument and SHALL NOT evaluate it as
-shell code.
+The feature SHALL accept an entry only when its package name, the part before the first `:` or `=`, starts with a
+lower-case letter or a digit and consists only of lower-case letters, digits, and the characters `.`, `+`, and `-`; when
+the rest of the entry consists only of letters, digits, and the characters `.`, `+`, `-`, `:`, `~`, and `=`; and when
+the entry does not end in `-`. When any entry is refused, the feature SHALL exit with status 1 and a message naming that
+entry before it checks for `apt-get`, refreshes the package index, or installs anything. The feature SHALL hand every
+accepted entry to `apt-get` as one argument and SHALL NOT evaluate it as shell code.
 
 #### Scenario: URL or path is refused
 
@@ -108,15 +109,25 @@ shell code.
 - **WHEN** `packages` holds an entry starting with `-`
 - **THEN** the feature exits with status 1, names the entry, and installs nothing
 
-#### Scenario: Removal or install marker is refused
+#### Scenario: Removal marker is refused
 
-- **WHEN** `packages` holds an entry ending in `-` or `+`
+- **WHEN** `packages` holds an entry ending in `-`
 - **THEN** the feature exits with status 1, names the entry, and neither removes nor installs any package
+
+#### Scenario: Package name ending in plus is installed
+
+- **WHEN** `packages` names a package whose name ends in `+` and that the image's repositories offer
+- **THEN** that package is installed
+
+#### Scenario: Upper-case package name is refused
+
+- **WHEN** `packages` holds an entry whose package name contains an upper-case letter
+- **THEN** the feature exits with status 1, names the entry, and installs nothing
 
 #### Scenario: Shell metacharacters and inner whitespace are refused
 
-- **WHEN** `packages` holds an entry with whitespace inside it or with a character outside the accepted set, such as
-  `;`, `$`, `` ` ``, `*`, `?`, or `|`
+- **WHEN** the `packages` value the feature receives holds an entry with whitespace inside it or with a character
+  outside the accepted set, such as `;`, `$`, `` ` ``, `*`, `?`, or `|`
 - **THEN** the feature exits with status 1, names the entry, installs nothing, and runs no command contained in the
   entry
 
@@ -162,7 +173,8 @@ The feature SHALL exit with status 1, with a message naming `apt-get` and the di
 ### Requirement: Package index refresh
 
 The feature SHALL refresh the package index before installing only when the image holds no package index, and SHALL fail
-when refreshing the index of any configured repository fails, including a transient download failure.
+when refreshing the index of any configured repository fails, including a transient download failure. An index the image
+already holds SHALL be used as it is, without checking whether it is current or covers every configured repository.
 
 #### Scenario: Missing index is refreshed
 
