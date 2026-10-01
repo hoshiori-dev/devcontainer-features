@@ -19,7 +19,8 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+- [`glab`](src/glab/) — the GitLab CLI, installed from its checksum-verified release archive with no authentication
+  configured.
 
 ## Development
 

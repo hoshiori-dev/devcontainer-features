@@ -14,6 +14,9 @@ after it has reported once.
 
 Every CI job runs a command that also runs locally.
 
+`scenarios (glab, arm64)` additionally runs `just test-scenarios glab` on `ubuntu-24.04-arm` when the plan includes glab
+scenarios. It is a dependency of `ci-gate`; the other feature scenario jobs run on amd64.
+
 | Job (workflow)                           | Command                                                                                                                                                                                                                                                                   | Runs on                                                      |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `lint` (CI)                              | `just lint` — `deno fmt --check` and shellcheck on the tracked `*.sh` files. The pre-commit hooks (these two, file hygiene, gitleaks) run on each commit, not in CI                                                                                                       | PR, push to `main`                                           |

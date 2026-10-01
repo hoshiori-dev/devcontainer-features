@@ -22,9 +22,10 @@ per assertion and `reportResults` last.
 `compatibility.json` is the single source of the images a feature supports; its spec refers to it and never lists
 images. Each entry is `{"image": "…"}` with optional `"arch": ["amd64", "arm64"]` (default amd64; arm64 runs on an arm64
 runner) and `"remoteUser"`. Every scenario `image` must be in the list for amd64, the architecture scenario jobs run on;
-a global scenario's image must be listed so by every feature it installs (`build` scenarios are exempt). Adding an image
-or architecture is a MINOR bump, dropping one MAJOR (`feature-authoring.md`); `just validate` checks the bump against
-the base. `duplicate.sh` is required unless the list sets `idempotencyExemption`, which a maintainer approves.
+a global scenario's image must be listed so by every feature it installs (`build` scenarios are exempt). Glab's version
+scenarios also run on native arm64 in CI; each scenario image must therefore list arm64 for glab too. Adding an image or
+architecture is a MINOR bump, dropping one MAJOR (`feature-authoring.md`); `just validate` checks the bump against the
+base. `duplicate.sh` is required unless the list sets `idempotencyExemption`, which a maintainer approves.
 
 ## Running tests locally
 
