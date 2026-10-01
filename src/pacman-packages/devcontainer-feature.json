@@ -1,0 +1,15 @@
+{
+  "id": "pacman-packages",
+  "version": "1.0.0",
+  "name": "Pacman packages",
+  "description": "Installs a list of system packages with pacman from the repositories the Arch Linux image already configures, as part of a full system upgrade.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/pacman-packages",
+  "options": {
+    "packages": {
+      "type": "string",
+      "default": "",
+      "proposals": ["bc", "bc,tree"],
+      "description": "Comma-separated packages to install: a name, a provided name, or a group, optionally with a version constraint (name>=version). Whitespace around entries and empty entries are ignored; an empty list installs nothing, and a non-empty list also upgrades the whole system."
+    }
+  }
+}

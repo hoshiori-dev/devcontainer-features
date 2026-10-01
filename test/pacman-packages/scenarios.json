@@ -1,0 +1,18 @@
+{
+  "listed_packages": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {
+        "packages": "bc,jq"
+      }
+    }
+  },
+  "optional_dependencies_and_whitespace": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {
+        "packages": " rsync ,\t bc,, "
+      }
+    }
+  }
+}

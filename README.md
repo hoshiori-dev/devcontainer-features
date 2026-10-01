@@ -19,7 +19,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+| Feature                                   | Description                                                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`pacman-packages`](src/pacman-packages/) | Installs a list of system packages with `pacman` from the repositories an Arch Linux image already configures, as part of a full system upgrade. |
 
 ## Development
 
