@@ -43,6 +43,8 @@ None.
 - Network at build time: `gitlab.com` (design.md, URL inventory), plus the image's configured package repositories when
   a prerequisite is missing; nothing at container start.
 - CI: the PR runs `glab`'s container tests on every image and architecture of its compatibility list.
+  `.github/workflows/ci.yml` also runs the version scenarios on a native arm64 runner; the job map in
+  `.agents/knowledge/github/checks.md` and the architecture guidance in `.agents/knowledge/testing.md` follow it.
 
 ## Acceptance
 
@@ -63,5 +65,6 @@ None.
 
 - The feature has no option that takes a credential, token, or GitLab host, and no build step logs one.
 - The feature declares no `mounts`, `capAdd`, `privileged`, `securityOpt`, `init`, `entrypoint`, or lifecycle command.
-- No file outside `src/glab/`, `test/glab/`, the root `README.md`, and this change changes.
+- No file outside `src/glab/`, `test/glab/`, the root `README.md`, this change, `.github/workflows/ci.yml`,
+  `.agents/knowledge/github/checks.md`, and `.agents/knowledge/testing.md` changes.
 - `just check` passes, and every required check passes on this PR.

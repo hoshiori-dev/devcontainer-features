@@ -143,6 +143,14 @@ The feature has one option, new in this change; the spec's Option requirement st
 
 ## Decisions
 
+- **Version scenarios on every compatibility image, on native amd64 and arm64 runners.** Both explicit `1.119.0` and
+  leading-`v` `v1.119.0` scenarios assert the installed version on all four images; the Ubuntu base uses its
+  compatibility entry's remote user. The existing scenario job runs them on amd64. A glab-only arm64 scenario job reuses
+  the same test action and command, runs only when the plan includes glab scenarios, and joins `ci-gate`'s dependencies.
+  Checked by the local scenario run on amd64 and both CI scenario jobs. Rejected: inferring the first installed version
+  from the duplicate test's final version, which only verifies the later install; emulating arm64 on amd64 when a native
+  runner is already available; widening every feature's scenario architectures without checking their compatibility
+  lists.
 - **Release archive from the GitLab release permalinks.** The feature downloads
   `/-/releases/v<version>/downloads/<file>` on gitlab.com, which GitLab documents as a stable link that keeps working
   when the file's physical location moves. Rejected: upstream's deb, rpm, and apk packages — three code paths that mix

@@ -64,6 +64,10 @@
 - [x] 3.4 Write `test/glab/scenarios.json` with scenarios for an explicit version (`1.119.0`) and a leading `v`
       (`v1.119.0`) on images of the compatibility list, and their scripts asserting `glab --version` reports `1.119.0`;
       verify by `just validate` and shellcheck in `just check` (behavior: 5.3)
+- [ ] 3.5 Extend both version scenarios to every compatibility image, using the listed remote user on Ubuntu; reuse the
+      existing version assertion scripts. Add a glab-only native arm64 scenario job using the existing test action,
+      include it in `ci-gate`, and synchronize the job map and architecture guidance. Verify the eight scenario
+      configurations against the compatibility list, `just check`, and `just test-scenarios glab` on amd64
 
 ## 4. Documentation
 
@@ -85,3 +89,5 @@
       amd64 and arm64, and read one job's build log for the final download URLs (design.md, Goals)
 - [x] 5.5 Record the results of 2.5 and 5.1 to 5.4, each Acceptance item, and each spec scenario with its result in the
       PR's Validation section
+- [ ] 5.6 Push the expanded coverage, verify both CI scenario jobs pass all eight scenarios (16 builds across amd64 and
+      arm64), and update the PR's Validation section with the run and coverage results

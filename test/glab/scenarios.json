@@ -1,4 +1,13 @@
 {
+  "version_explicit_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "glab": {
+        "version": "1.119.0"
+      }
+    }
+  },
   "version_explicit": {
     "image": "debian:12",
     "features": {
@@ -7,8 +16,49 @@
       }
     }
   },
+  "version_explicit_alpine": {
+    "image": "alpine:3.24",
+    "features": {
+      "glab": {
+        "version": "1.119.0"
+      }
+    }
+  },
+  "version_explicit_fedora": {
+    "image": "fedora:44",
+    "features": {
+      "glab": {
+        "version": "1.119.0"
+      }
+    }
+  },
+  "version_leading_v_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "glab": {
+        "version": "v1.119.0"
+      }
+    }
+  },
+  "version_leading_v_debian": {
+    "image": "debian:12",
+    "features": {
+      "glab": {
+        "version": "v1.119.0"
+      }
+    }
+  },
   "version_leading_v": {
     "image": "alpine:3.24",
+    "features": {
+      "glab": {
+        "version": "v1.119.0"
+      }
+    }
+  },
+  "version_leading_v_fedora": {
+    "image": "fedora:44",
     "features": {
       "glab": {
         "version": "v1.119.0"

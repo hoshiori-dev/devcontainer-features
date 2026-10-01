@@ -1,5 +1,5 @@
 #!/bin/sh
-# Scenario: glab installed with version "1.119.0" on debian:12. POSIX sh, because alpine:3.24 ships no bash.
+# Scenario: glab installed with version "1.119.0". POSIX sh, because alpine:3.24 ships no bash.
 set -e
 
 # shellcheck source=/dev/null
