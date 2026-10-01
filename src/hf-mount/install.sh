@@ -234,7 +234,8 @@ fi
 
 # --- Binaries, once those packages are in place ---------------------------------------------------
 
-install -d -m 0755 "${BIN_DIR}"
+# Created only when missing: `install -d -m` would also change the mode of an existing directory.
+[ -d "${BIN_DIR}" ] || install -d -m 0755 "${BIN_DIR}"
 for binary in ${binaries}; do
   install -o root -g root -m 0755 "${work_dir}/${binary}" "${BIN_DIR}/${binary}"
 done
