@@ -26,8 +26,8 @@ Research for this change, re-checked against upstream on 2026-09-30; items marke
 - The daemon starts `hf-mount-nfs` (default) or `hf-mount-fuse` (`--fuse`) from its own directory first, then from
   `PATH`.
 - `hf-mount --version` prints `hf-mount 0.13.1`; `hf-mount status` with no daemon prints `No running daemons` to stderr,
-  exits 0, and creates nothing. Both were run with no network in `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`, as
-  root and as `vscode`, with the `v0.13.1` x86_64 daemon after its SHA-256 matched the API digest.
+  exits 0, and creates nothing. Both were run with no network in `mcr.microsoft.com/devcontainers/base:ubuntu24.04`, as
+  root and as `vscode`, with the `v0.13.1` x86_64 daemon (2026-10-01).
 - Runtime needs, from upstream source: the NFS backend calls `mount.nfs` (`nfs-common` on Debian and Ubuntu, `nfs-utils`
   on Fedora; the README's "no system dependencies" is wrong on Linux) and, as non-root, runs it and `umount` through
   `sudo -n`. The FUSE backend tries `mount(2)` on `/dev/fuse` for every user and falls back to `fusermount3` from
@@ -39,9 +39,11 @@ Research for this change, re-checked against upstream on 2026-09-30; items marke
   each `enum` and `proposals` list that is not the default and with every boolean negated, then with no options (the
   defaults). With the options below that is `backend=nfs`, `installMountDependencies=false`, `version=0.13.1`, then
   `both`, `true`, `latest`. A scenario cannot install one feature twice.
-- Images: `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (glibc 2.39, ships `curl` and `jq`), `debian:12` (2.36),
+- Images: `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (glibc 2.39, ships `curl`; 2026-10-01), `debian:12` (2.36),
   `ubuntu:22.04` (2.35), `fedora:44` (2.43) have amd64 and arm64 manifests; `debian:11` and `ubuntu:20.04` have 2.31.
   `nfs-common` and `fuse3` (Debian, Ubuntu) and `nfs-utils` and `fuse3` (Fedora) exist for both architectures.
+- The base image tags `ubuntu24.04` and `noble` name one image (version 3.0.8, built 2026-09-10); the hyphenated
+  `ubuntu-24.04` that `scripts/new_feature.ts` writes names another, version 2.0.5, built 2025-10-16 (2026-10-01).
 - `hf-mount` reads `HF_TOKEN` or `--token-file` itself, so the feature needs no credential and no `hf-cli` dependency.
 
 ## Goals / Non-Goals
@@ -170,7 +172,7 @@ How each spec scenario outside the container tests is provoked; results go to th
   `backend` `nfs` then `fuse`; `version` `0.13.1` then `0.13.0`, with each binary's SHA-256 compared by hand to the
   digest the Releases API reports for the older release's asset.
 - Mounts: one mount of a small public repository per backend with the `runArgs` `NOTES.md` names, as root and as
-  `vscode` on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`.
+  `vscode` on `mcr.microsoft.com/devcontainers/base:ubuntu24.04`.
 
 ## Security review surface
 
@@ -199,15 +201,16 @@ How each spec scenario outside the container tests is provoked; results go to th
 
 ## Supported images (planned `test/hf-mount/compatibility.json`)
 
-| Image                                               | Arch         | remoteUser | Why                                            |
-| --------------------------------------------------- | ------------ | ---------- | ---------------------------------------------- |
-| `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` | amd64, arm64 | `vscode`   | The common dev container base; non-root checks |
-| `debian:12`                                         | amd64, arm64 | —          | Debian, glibc 2.36, minimal image; scenarios   |
-| `ubuntu:22.04`                                      | amd64, arm64 | —          | Oldest supported glibc family (2.35)           |
-| `fedora:44`                                         | amd64, arm64 | —          | The dnf path (`nfs-utils`)                     |
+| Image                                              | Arch         | remoteUser | Why                                            |
+| -------------------------------------------------- | ------------ | ---------- | ---------------------------------------------- |
+| `mcr.microsoft.com/devcontainers/base:ubuntu24.04` | amd64, arm64 | `vscode`   | The common dev container base; non-root checks |
+| `debian:12`                                        | amd64, arm64 | —          | Debian, glibc 2.36, minimal image; scenarios   |
+| `ubuntu:22.04`                                     | amd64, arm64 | —          | Oldest supported glibc family (2.35)           |
+| `fedora:44`                                        | amd64, arm64 | —          | The dnf path (`nfs-utils`)                     |
 
 Excluded: `alpine` (musl), `debian:11` and `ubuntu:20.04` (glibc 2.31). `fedora:44` is included by the maintainer's
-decision (2026-10-01).
+decision (2026-10-01). The first entry names the maintained tag `ubuntu24.04`, not the `ubuntu-24.04` that
+`scripts/new_feature.ts` writes into a new `compatibility.json` (Context).
 
 ## URL inventory
 
