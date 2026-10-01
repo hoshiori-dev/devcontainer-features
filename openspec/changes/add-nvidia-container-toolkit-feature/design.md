@@ -15,7 +15,7 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
 - **Known vulnerabilities.** Releases below 1.16.2, 1.17.3, 1.17.4, and 1.17.8 carry the CVEs the decision comment lists
   (checked by the maintainer against NVD and the GitHub Advisory Database, 2026-09-30), among them container escapes
   (CVE-2024-0132, CVE-2025-23266). The stable index serves every release from 1.14.0, so all of them can be installed;
-  on 2026-09-30 a `signed-by` source on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64) installed the four
+  on 2026-09-30 a `signed-by` source on `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (amd64) installed the four
   packages at `1.14.0-1`.
 - **Releases.** The newest stable release is v1.20.1 (2026-09-19); `-rc.N` tags are GitHub pre-releases and never reach
   the stable repository. The stable apt index offers `nvidia-container-toolkit` from `1.14.0-1` to `1.20.1-1` on amd64
@@ -54,7 +54,7 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   - `public.ecr.aws/docker/library/fedora:44` (amd64), whose index digest `sha256:43b29f65…` is the one Docker Hub
     reports for `fedora:44`: with the key exported from the temporary keyring by the pinned fingerprint only, the same
     `.repo` installed the four packages at 1.20.1 and then, pinned at 1.19.1, downgraded all four.
-  - `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64): a `signed-by` source installed 1.20.1 and then 1.19.1
+  - `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (amd64): a `signed-by` source installed 1.20.1 and then 1.19.1
     with `--allow-downgrades`. `nvidia-ctk runtime configure --runtime=docker`, run twice on a `daemon.json` holding
     another runtime and `log-level`, left one `nvidia` entry (`"args": []`, `"path": "nvidia-container-runtime"`), kept
     the other keys, and rewrote the file sorted with 4-space indentation. On a zero-length `daemon.json` it failed with
@@ -78,7 +78,7 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   job passes `--skip-duplicated` and each scenario installs the feature once.
 - **Images.** Docker Hub publishes `fedora:44` and `debian:12` for amd64 and arm64; `registry.opensuse.org` publishes
   `opensuse/leap:16.0` for amd64 and arm64 (Docker Hub's `opensuse/leap:16.0` is a different build, not tried); and
-  `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` is published for both too.
+  `mcr.microsoft.com/devcontainers/base:ubuntu24.04` is published for both too.
 
 ## Goals / Non-Goals
 
@@ -124,10 +124,10 @@ the behavior they shape is in `specs/nvidia-container-toolkit/spec.md`.
   - the docker-in-docker scenario, which leaves `configureDocker` unset so it also checks the spec's "Omitted
     configureDocker" on an image with a Docker daemon: the entry is in the file, and after a bounded wait for
     `docker info` to succeed (the daemon starts with the container, not before the test), `docker info` lists `nvidia`;
-  - `build` scenarios on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` whose Dockerfile installs the
-    distribution's Docker daemon package and seeds `daemon.json`: with another runtime, a `default-runtime`, and
-    `log-level` (all kept, `nvidia` added); zero-length (valid JSON with `nvidia` afterwards); and with
-    `configureDocker` disabled (file byte-identical afterwards);
+  - `build` scenarios on `mcr.microsoft.com/devcontainers/base:ubuntu24.04` whose Dockerfile installs the distribution's
+    Docker daemon package and seeds `daemon.json`: with another runtime, a `default-runtime`, and `log-level` (all kept,
+    `nvidia` added); zero-length (valid JSON with `nvidia` afterwards); and with `configureDocker` disabled (file
+    byte-identical afterwards);
   - a manual run with an invalid `daemon.json` (build fails, file unchanged), recorded in the PR.
 - A second install with `configureDocker` enabled adds no second entry, and one with it disabled leaves the entry —
   checked by a manual run of the feature twice in a container with `dockerd` (enabled then enabled; enabled then
@@ -269,16 +269,16 @@ Both options are new; the spec's Option requirements win where this table differ
   checks fail before the image changes; a key failure fails after prerequisites may have been installed but before
   NVIDIA's repository or any toolkit package is added.
 - **Supported images (planned `test/nvidia-container-toolkit/compatibility.json`).**
-  - `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` — amd64 and arm64; on NVIDIA's list.
+  - `mcr.microsoft.com/devcontainers/base:ubuntu24.04` — amd64 and arm64; on NVIDIA's list.
   - `debian:12` — amd64; best effort, Debian 12 is not on NVIDIA's list.
   - `fedora:44` — amd64; best effort, Fedora is not on NVIDIA's list.
   - `registry.opensuse.org/opensuse/leap:16.0` — amd64; best effort, Leap 16.0 is not on NVIDIA's list (resolved Open
     Question).
-  - Scenarios: the docker-in-docker scenario on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64) with
+  - Scenarios: the docker-in-docker scenario on `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (amd64) with
     `ghcr.io/devcontainers/features/docker-in-docker:4`; a docker-outside-of-docker scenario on the same image; one
     pinned-version scenario on each of `debian:12`, `fedora:44`, and `registry.opensuse.org/opensuse/leap:16.0`; one
     scenario pinning `1.14.0`, the oldest release in the stable index, on
-    `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64); and the `daemon.json` `build` scenarios. No GPU is
+    `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (amd64); and the `daemon.json` `build` scenarios. No GPU is
     present in CI; nothing calls `nvidia-container-cli info` or starts a GPU container.
 
 ## URL inventory

@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+FROM mcr.microsoft.com/devcontainers/base:ubuntu24.04
 
 # The distribution's Docker daemon package, so the feature finds dockerd at build time. policy-rc.d keeps the
 # package from starting the daemon during the image build; it stays, as this image only runs tests.

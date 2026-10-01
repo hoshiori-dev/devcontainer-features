@@ -9,7 +9,7 @@
       `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`, `containerEnv`, or lifecycle commands;
       verify `just validate` and `just spec-check` pass
 - [x] 1.2 Write `test/nvidia-container-toolkit/compatibility.json` with
-      `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (amd64, arm64), `debian:12`, `fedora:44`, and
+      `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (amd64, arm64), `debian:12`, `fedora:44`, and
       `registry.opensuse.org/opensuse/leap:16.0` (each amd64), as design.md's supported images list; verify
       `just validate` passes
 
@@ -58,9 +58,9 @@
       NVIDIA's repository is defined once, that no `/etc/docker/daemon.json` exists, and that no temporary `GNUPGHOME`
       remains; verify `shellcheck` passes
 - [x] 4.4 Add scenarios pinning `version` to `1.19.1` on `debian:12`, `fedora:44`, and
-      `registry.opensuse.org/opensuse/leap:16.0`, and to `1.14.0` on
-      `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`, each asserting all four packages and `nvidia-ctk --version`
-      at the pinned version; verify `just validate` and `shellcheck` pass
+      `registry.opensuse.org/opensuse/leap:16.0`, and to `1.14.0` on `mcr.microsoft.com/devcontainers/base:ubuntu24.04`,
+      each asserting all four packages and `nvidia-ctk --version` at the pinned version; verify `just validate` and
+      `shellcheck` pass
 
 ## 5. Docker runtime registration
 
@@ -70,7 +70,7 @@
       configuration was skipped and leave the file alone; verify `shellcheck` passes and by review of `install.sh`
 - [x] 5.2 In `test.sh`, assert that `/etc/docker/daemon.json` does not exist on the compatibility images (none has
       `dockerd`); verify `shellcheck` passes
-- [x] 5.3 Add scenarios on `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`: with
+- [x] 5.3 Add scenarios on `mcr.microsoft.com/devcontainers/base:ubuntu24.04`: with
       `ghcr.io/devcontainers/features/docker-in-docker:4` and `configureDocker` unset (the file holds `runtimes.nvidia`
       with `path` `nvidia-container-runtime`, and after a bounded wait `docker info` lists `nvidia`); with
       `ghcr.io/devcontainers/features/docker-outside-of-docker:1` (no `daemon.json`); and `build` scenarios whose

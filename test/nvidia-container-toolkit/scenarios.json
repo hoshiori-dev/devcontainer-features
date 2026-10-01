@@ -1,13 +1,13 @@
 {
   "docker_in_docker": {
-    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:4": {},
       "nvidia-container-toolkit": {}
     }
   },
   "docker_outside_of_docker": {
-    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "features": {
       "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
       "nvidia-container-toolkit": {}
@@ -38,7 +38,7 @@
     }
   },
   "oldest_release": {
-    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "features": {
       "nvidia-container-toolkit": {
         "version": "1.14.0"
