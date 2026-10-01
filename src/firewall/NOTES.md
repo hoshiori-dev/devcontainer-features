@@ -111,21 +111,27 @@ the Internet.
 ## Nested containers (docker-in-docker)
 
 The feature protects the dev container's own outbound traffic. Containers nested in it are an exception: the rules apply
-to them too, but **a nested container is not guaranteed to reach an allowed domain**.
+to them too, but **a nested container is not guaranteed to reach an allowed domain, nor to be refused a denied one**.
 
-- With `filterForward` `true`, a nested container is refused every destination no option allows, and it reaches the
-  addresses inside `allowedCidrs` and inside the `github` preset's ranges. Traffic between the container and its nested
+- With `filterForward` `true`, what the options state by address holds for a nested container: it reaches the addresses
+  inside `allowedCidrs` and inside the `github` preset's ranges, is refused those inside `deniedCidrs`, and, with
+  `defaultAction` `deny`, is refused every destination no option allows. Traffic between the container and its nested
   networks is always allowed.
-- A domain is reachable only at the addresses the feature's resolver returned for it, and that resolver sees only
-  lookups made through the dev container's `/etc/resolv.conf`. A nested Docker daemon configured with its own DNS
-  servers sends its containers' lookups elsewhere, so no address is allowed for them. The known case is docker-in-docker
-  on an Azure host: its `azureDnsAutoDetection` option (default `true`) starts the daemon with `--dns 168.63.129.16`,
-  and a nested container then resolves an allowed name but is refused the connection, unless the dev container itself
-  has looked that name up since its start.
-- What you can do today: allow the destination's addresses in `allowedCidrs`; or set docker-in-docker's
-  `azureDnsAutoDetection` to `false` and run nested containers on a user-defined network (`docker network create`),
-  whose lookups then go through the feature's resolver. Nested containers on the default bridge then get `8.8.8.8` and
-  `8.8.4.4` as resolvers, which are refused, so no name resolves there.
+- What the options state by name holds only for lookups the feature's resolver answers: a domain is allowed or denied at
+  the addresses that resolver returned for it, and it sees only lookups made through the dev container's
+  `/etc/resolv.conf`. A nested Docker daemon configured with its own DNS servers sends its containers' lookups
+  elsewhere. The known case is docker-in-docker on an Azure host: its `azureDnsAutoDetection` option (default `true`)
+  starts the daemon with `--dns 168.63.129.16`. A nested container then resolves an allowed name but is refused the
+  connection, and it **reaches a denied name** wherever `defaultAction` `allow` or an allowed range, such as the
+  `github` preset's, lets the address through. A lookup of the name by the dev container itself changes this only for
+  the addresses that lookup returned.
+- A nested daemon without DNS servers of its own, which is docker-in-docker's default away from Azure hosts, gives the
+  containers on its default bridge (`docker run` without `--network`) `8.8.8.8` and `8.8.4.4` as resolvers, which are
+  refused, so no name resolves there. Its containers on a user-defined network (`docker network create`) look names up
+  through the feature's resolver, so allowed and denied domains hold for them.
+- What you can do today: state by address what nested containers need and what they must not reach, in `allowedCidrs`
+  and `deniedCidrs`; or set docker-in-docker's `azureDnsAutoDetection` to `false` and run nested containers on a
+  user-defined network.
 
 ## Limits and failures
 
