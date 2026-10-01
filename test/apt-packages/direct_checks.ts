@@ -400,6 +400,25 @@ const CHECKS: Check[] = [
         },
     },
     {
+        // Without network a refresh that ignores failures fails too, at the install. Here one source beside the
+        // image's own answers nothing, so only a refresh that fails on any repository stops the feature.
+        scenario: "Failed refresh fails the feature (one repository unreachable)",
+        on: "apt",
+        network: "bridge",
+        async run(c, t) {
+            await c.text("echo 'deb http://127.0.0.1:9/ unreachable main' >/etc/apt/sources.list.d/unreachable.list");
+            const result = await c.install("bc");
+            t.exit(result, "nonzero", "refresh with one unreachable repository");
+            t.says(result, "127.0.0.1:9", "refresh with one unreachable repository");
+            t.ok(!(await c.installed("bc")), "bc was installed");
+            // Premise: a refresh that tolerates the failed repository succeeds here, and bc then resolves.
+            const tolerant = await c.sh(
+                "apt-get update -qq >/dev/null 2>&1 && apt-get -s -qq install --no-install-recommends -- bc >/dev/null",
+            );
+            t.ok(tolerant.code === 0, "a tolerant refresh does not leave bc installable, so the check proves nothing");
+        },
+    },
+    {
         scenario: "Unverifiable repository fails the refresh",
         on: "apt",
         network: "bridge",
