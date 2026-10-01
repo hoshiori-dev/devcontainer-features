@@ -17,6 +17,8 @@ the update check and telemetry settable as options.
   (`ghcr.io/devcontainers/features/node`), so a consumer adds only `openspec`.
 - Every package it installs is verified against the npm registry's published integrity hash and registry signature
   before `openspec` becomes reachable; a failed verification fails the build.
+- Its dependencies are the versions published no later than the OpenSpec release being installed, and the image's
+  environment and npm configuration cannot redirect its downloads or weaken their certificate checking.
 - Two boolean options set the CLI's environment defaults: `disableUpdateCheck` and `disableTelemetry`.
 - The feature changes nothing in the workspace or the user's home: it never runs `openspec init` or `openspec update`,
   at build or at start.
@@ -29,8 +31,9 @@ the update check and telemetry settable as options.
 
 ### New Capabilities
 
-- `openspec`: installing the OpenSpec CLI at a chosen or the latest version, verifying what is installed, applying the
-  update-check and telemetry options, installing twice, and failing on unsupported platforms.
+- `openspec`: installing the OpenSpec CLI at a chosen or the latest version, bounding its dependencies to that release,
+  verifying what is installed, ignoring the image's download settings, applying the update-check and telemetry options,
+  installing twice, and failing on unsupported platforms.
 
 ### Modified Capabilities
 
@@ -57,10 +60,10 @@ None.
 - Every scenario of the `openspec` delta spec (`specs/openspec/spec.md`) whose build succeeds, except "Same options
   twice", passes on every image and architecture in `test/openspec/compatibility.json`, through `test.sh`,
   `duplicate.sh`, and the scenarios in `scenarios.json`.
-- Each scenario of the delta spec whose build fails (unknown or malformed version, verification failure, missing or too
-  old Node.js, unsupported distribution or architecture), and "Same options twice", which the dev container CLI cannot
-  run because it merges identical feature entries, is shown with its stated outcome in the PR's Validation section, by
-  the local method design.md - Decisions - Tests names for it.
+- Each scenario of the delta spec whose build fails (unknown or malformed version, verification failure, weakened
+  certificate checking, missing or too old Node.js or npm, unsupported distribution or architecture), and "Same options
+  twice", which the dev container CLI cannot run because it merges identical feature entries, is shown with its stated
+  outcome in the PR's Validation section, by the local method design.md - Decisions - Tests names for it.
 - `devcontainer-feature.json` declares exactly the options the delta spec names and exactly the `dependsOn` the design
   names, and no `mounts`, `capAdd`, `privileged`, `securityOpt`, `init`, `entrypoint`, `containerEnv`, or lifecycle
   command.

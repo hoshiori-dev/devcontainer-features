@@ -18,14 +18,16 @@ Upstream sources:
 The feature SHALL install the npm package `@fission-ai/openspec` at the version the `version` option names, downloading
 it and every one of its dependencies from the public npm registry at https://registry.npmjs.org/, regardless of any
 registry configured in the image, and SHALL make `openspec` runnable from `PATH` by every user of the container, the
-remote user included. The feature SHALL look the version up at https://registry.npmjs.org/@fission-ai/openspec/latest,
-or at `https://registry.npmjs.org/@fission-ai/openspec/<version>` for an exact version, relying on TLS alone; the lookup
-only selects the version, whose packages are then verified as "Verify every installed package" requires.
+remote user included. The feature SHALL read the version to install, its publish time, and the Node.js version it
+requires from the package's registry document at https://registry.npmjs.org/@fission-ai%2fopenspec, relying on TLS alone
+and following no redirect; that document only selects what is installed, and the packages are then verified as "Verify
+every installed package" requires. The build SHALL fail when the registry names anything other than an exact version as
+`latest`, and when the package installed as `@fission-ai/openspec` is not that package at exactly the selected version.
 
 #### Scenario: Registry configured in the image
 
-- **WHEN** the image's npm configuration names another registry, for all packages or for the `@fission-ai` scope, before
-  the feature is installed
+- **WHEN** the image's environment or its user or global npm configuration names another registry, for all packages or
+  for the `@fission-ai` scope, before the feature is installed
 - **THEN** every package the feature installs is downloaded from https://registry.npmjs.org/, or the build fails with a
   message naming the package that came from elsewhere
 
@@ -43,8 +45,8 @@ pre-release suffix).
 #### Scenario: Omitted version
 
 - **WHEN** the feature is installed without `version`, or with `version` set to `latest`
-- **THEN** `openspec --version`, run as the remote user, prints the version that
-  https://registry.npmjs.org/@fission-ai/openspec/latest named when the image was built
+- **THEN** `openspec --version`, run as the remote user, prints the version the registry named as `latest` when the
+  image was built
 
 #### Scenario: Exact version
 
@@ -63,17 +65,34 @@ pre-release suffix).
 - **THEN** the build fails before downloading anything, with a message saying that only `latest` or an exact version is
   accepted
 
+### Requirement: Bound dependencies to the release time
+
+The feature SHALL install each dependency of `@fission-ai/openspec` at a version that satisfies the range upstream
+declares and that the registry published no later than the OpenSpec version being installed. A dependency release
+published after that OpenSpec version SHALL NOT be installed. The publish times come from the registry over TLS alone.
+
+#### Scenario: Dependency released later
+
+- **WHEN** a dependency of the installed OpenSpec version has a release within upstream's range that the registry
+  published after that OpenSpec version
+- **THEN** the installed version of that dependency is one the registry published no later than the OpenSpec version
+
 ### Requirement: Verify every installed package
 
 The feature SHALL verify every package it installs, `@fission-ai/openspec` and each of its dependencies, against the
 `sha512` integrity hash the npm registry publishes for that version, and SHALL verify each package's npm registry
-signature, and its provenance attestations where the registry publishes them, with the registry signing keys and the
-Sigstore trust root served by npm's Sigstore TUF repository at https://tuf-repo-cdn.sigstore.dev. When that TUF
-repository has no target for the npm registry, the registry signing keys SHALL come from
-https://registry.npmjs.org/-/npm/v1/keys, relying on TLS alone. A package whose integrity does not match, whose registry
-signature is missing or invalid, or whose published provenance attestation is invalid SHALL fail the build; a package
-published without a provenance attestation SHALL NOT fail the build for that reason. The command `openspec` SHALL never
-reach a package that did not pass.
+signature, and its provenance attestations where the registry publishes them at
+`https://registry.npmjs.org/-/npm/v1/attestations/<name>@<version>`, with the registry signing keys and the Sigstore
+trust root served at https://tuf-repo-cdn.sigstore.dev by Sigstore's public-good TUF repository, which npm uses. When
+that TUF repository has no target for the npm registry, the registry signing keys SHALL come from
+https://registry.npmjs.org/-/npm/v1/keys, relying on TLS alone. The integrity hashes reach the build from the registry
+over TLS alone; the signature check SHALL run on the npm cache the install filled, so that npm checks the signatures of
+the package documents the install took those hashes from; this holds only while npm reads those documents from that
+cache, which the feature does not enforce, and the feature makes no comparison of its own. A package whose integrity
+does not match, whose registry signature is missing or invalid, or whose published provenance attestation is invalid
+SHALL fail the build; a package published without a provenance attestation SHALL NOT fail the build for that reason. The
+command `openspec` SHALL never reach a package that did not pass. During the build, no install script of a package SHALL
+run, and the only package code that runs SHALL be `openspec --version`, as an unprivileged user and never as root.
 
 #### Scenario: Verified install
 
@@ -86,13 +105,41 @@ reach a package that did not pass.
 - **THEN** the build fails with a message naming the verification that failed, and an `openspec` installed earlier in
   the same image stays as it was
 
+#### Scenario: Package altered during the install only
+
+- **WHEN** the registry document and the tarball of a package are altered while the feature installs it, the registry
+  answers unaltered afterwards, and npm reads that package's document from the cache the install filled
+- **THEN** the build fails on that package's registry signature
+
+### Requirement: Ignore the image's download settings
+
+The feature SHALL make its build-time requests with full certificate checking against the certificate authorities of the
+Node.js found on `PATH`, which it trusts as it is, and nothing else the image holds SHALL change that: no environment
+variable of the build other than `PATH`, and no user, global, or project npm configuration, SHALL reach the feature's
+Node.js and npm calls, and a certificate authority, proxy, or scoped registry set in the npm configuration built into
+the Node.js installation SHALL fail the build before any package is downloaded.
+
+#### Scenario: Certificate checking weakened by the environment
+
+- **WHEN** the build's environment holds settings that weaken or extend certificate checking in Node.js or npm (for
+  example `NODE_TLS_REJECT_UNAUTHORIZED=0`, `NODE_EXTRA_CA_CERTS`, `NODE_OPTIONS`, or `npm_config_strict_ssl=false`)
+- **THEN** the feature's requests ignore them, and a registry certificate that only those settings would accept fails
+  the build
+
+#### Scenario: Certificate settings built into npm
+
+- **WHEN** the npm configuration built into the Node.js installation sets a certificate authority, a proxy, or a scoped
+  registry
+- **THEN** the build fails before any package is downloaded, with a message naming the setting
+
 ### Requirement: Run on a supported Node.js
 
 The feature SHALL depend on the first-party Node.js feature `ghcr.io/devcontainers/features/node` and SHALL run
 `openspec` on the Node.js found on `PATH` when the feature was installed. It SHALL fail the build when no Node.js is
-found or when the found one is older than the requested OpenSpec version requires (20.19.0 for the current releases).
-Switching the default or current Node.js afterwards (for example with `nvm use` or `nvm alias default`) SHALL NOT change
-the Node.js that `openspec` runs on.
+found, when no npm is found with it or that npm is older than 10.8.2, the npm that Node.js 20.19.0 ships, or when the
+found Node.js is older than the requested OpenSpec version requires (20.19.0 for the current releases). Switching the
+default or current Node.js afterwards (for example with `nvm use` or `nvm alias default`) SHALL NOT change the Node.js
+that `openspec` runs on.
 
 #### Scenario: No Node.js
 
@@ -102,7 +149,13 @@ the Node.js that `openspec` runs on.
 #### Scenario: Node.js too old
 
 - **WHEN** the feature is installed while the Node.js on `PATH` is older than the requested OpenSpec version requires
+  and its npm is 10.8.2 or newer
 - **THEN** the build fails with a message naming the found and the required Node.js version
+
+#### Scenario: npm missing or too old
+
+- **WHEN** the feature is installed while no npm is on `PATH`, or the npm on `PATH` is older than 10.8.2
+- **THEN** the build fails with a message naming the required npm version and the one found, if any
 
 #### Scenario: Current Node.js switched later
 
