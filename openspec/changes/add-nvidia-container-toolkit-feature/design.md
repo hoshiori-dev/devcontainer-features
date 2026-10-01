@@ -225,7 +225,10 @@ Both options are new; the spec's Option requirements win where this table differ
   `installsAfter` refs, although `feature-authoring.md` says "External features use their full ref with a major tag"
   without excepting `installsAfter`.
 - **Distribution detection from `/etc/os-release` `ID` and `ID_LIKE`.** `debian`/`ubuntu` → apt; `fedora`/`rhel` → dnf,
-  requiring a `dnf` executable so Amazon Linux 2 fails clearly; `opensuse`/`suse` → zypper; anything else fails.
+  requiring a `dnf` executable so Amazon Linux 2 fails clearly; `opensuse`/`suse` → zypper; anything else fails. An
+  image without bash never reaches this check: `install.sh` is a bash script (Goals), so on stock Alpine Linux
+  (`alpine:3.24`, checked 2026-10-01) the build fails with `env: can't execute 'bash': No such file or directory`
+  instead of the feature's message, which is why the spec's unsupported-distribution scenario names only Amazon Linux 2.
   Architecture from the package manager (`dpkg --print-architecture`, `uname -m`), accepting amd64/x86_64 and
   arm64/aarch64. Family members without a compatibility image (RHEL, Rocky, Alma, Amazon Linux 2023, SLES) are attempted
   without a support guarantee. Alternative: accept only the tested `ID`s — rejected, it would refuse the RHEL, Rocky,

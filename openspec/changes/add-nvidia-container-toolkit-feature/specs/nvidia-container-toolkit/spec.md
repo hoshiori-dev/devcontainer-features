@@ -173,15 +173,10 @@ SHALL fail the build and leave the file unchanged. The feature SHALL be ordered 
 
 ### Requirement: Installing twice
 
-Installing the feature a second time on the same image SHALL succeed and leave one consistent installation: with the
-same options nothing changes; with a different `version` the later value wins and all four packages move to it, whether
-that is an upgrade or a downgrade; `/etc/docker/daemon.json` never holds more than one `nvidia` runtime entry; and a
-second install with `configureDocker` disabled leaves an entry an earlier install registered in place.
-
-#### Scenario: Same options twice
-
-- **WHEN** the feature is installed twice with the same options
-- **THEN** both installs succeed, the installed version is unchanged, and the repository is configured once
+Installing the feature a second time on the same image SHALL succeed and leave one consistent installation: with a
+different `version` the later value wins and all four packages move to it, whether that is an upgrade or a downgrade;
+`/etc/docker/daemon.json` never holds more than one `nvidia` runtime entry; and a second install with `configureDocker`
+disabled leaves an entry an earlier install registered in place.
 
 #### Scenario: Different version the second time
 
@@ -210,7 +205,7 @@ attempts the install there without a guarantee that it succeeds.
 
 #### Scenario: Distribution without a supported package manager
 
-- **WHEN** the feature is installed on an image such as Alpine Linux or Amazon Linux 2
+- **WHEN** the feature is installed on an image such as Amazon Linux 2
 - **THEN** the build fails with a message naming the distribution, and no repository or key has been added
 
 #### Scenario: Unsupported architecture

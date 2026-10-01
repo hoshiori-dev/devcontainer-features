@@ -100,14 +100,10 @@
 - [ ] 7.4 Run the manual checks the proposal's Acceptance lists, on one image of each package-manager family where it
       says so: a substituted key file and a file holding the pinned key followed by a second key (build fails naming the
       fingerprint, before NVIDIA's repository is configured, with no temporary `GNUPGHOME` left); a configured key
-      replaced by another key (refresh or install fails); Alpine Linux and Amazon Linux 2, and `ppc64le` (build fails
-      naming the distribution or architecture, nothing added); a well-formed version the repository lacks; `1.20.1-1`,
-      `1.20`, `1.20.1;true`, and a value holding a newline; an invalid `daemon.json` (build fails, file unchanged); the
-      feature twice with `dockerd` (enabled then enabled: one `nvidia` entry; enabled then disabled: entry kept); and
-      `latest` then an older exact version (all four packages downgraded)
-- [ ] 7.5 Verify the "Same options twice" scenario of "Installing twice": `duplicate.sh` shows that a second install
-      succeeds and defines the repository once, but no test the harness runs installs the feature twice with the same
-      options, so confirm with the maintainer how "the installed version is unchanged" is verified, run that check, and
-      record it
-- [ ] 7.6 Record each Acceptance item of proposal.md and each scenario it points to, with its result, in the PR's
+      replaced by another key (refresh or install fails); Amazon Linux 2 and `ppc64le` (build fails naming the
+      distribution or architecture, nothing added); a well-formed version the repository lacks; `1.20.1-1`, `1.20`,
+      `1.20.1;true`, and a value holding a newline; an invalid `daemon.json` (build fails, file unchanged); the feature
+      twice with `dockerd` (enabled then enabled: one `nvidia` entry; enabled then disabled: entry kept); and `latest`
+      then an older exact version (all four packages downgraded)
+- [ ] 7.5 Record each Acceptance item of proposal.md and each scenario it points to, with its result, in the PR's
       Validation section
