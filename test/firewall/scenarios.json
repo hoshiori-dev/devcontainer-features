@@ -52,7 +52,8 @@
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:4": {},
       "firewall": {
-        "presets": "npm"
+        "presets": "npm",
+        "allowedCidrs": "185.199.108.0/22"
       }
     }
   },

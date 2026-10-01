@@ -203,21 +203,28 @@ nested_setup() {
   docker network inspect firewall-test >/dev/null 2>&1 || docker network create firewall-test >/dev/null
 }
 
-# nested_curl URL: curl in a nested container on the user-defined network; prints curl's exit status.
+# nested_curl [CURL ARGS] URL: curl in a nested container on the user-defined network; prints curl's
+# exit status.
 nested_curl() {
   docker run --rm --network firewall-test firewall-test/rootfs \
-    /usr/bin/curl -q -sS -o /dev/null --connect-timeout 10 --max-time 30 "$1"
+    /usr/bin/curl -q -sS -o /dev/null --connect-timeout 10 --max-time 30 "$@"
   nested_status=$?
   echo "nested curl exit status $nested_status"
   return $nested_status
 }
 
-# nested_reachable URL / nested_refused URL: the nested container's request completes, or its
-# connection is refused (curl exit status 7).
+# nested_reachable [CURL ARGS] URL / nested_refused [CURL ARGS] URL: the nested container's request
+# completes, or its connection is refused (curl exit status 7).
 nested_reachable() {
-  nested_curl "$1"
+  nested_curl "$@"
 }
 nested_refused() {
-  nested_curl "$1"
+  nested_curl "$@"
   [ $? -eq 7 ]
+}
+
+# nested_raw_at ADDRESS: a nested container reaches raw.githubusercontent.com on ADDRESS, without a
+# lookup.
+nested_raw_at() {
+  nested_reachable --resolve "raw.githubusercontent.com:443:$1" https://raw.githubusercontent.com/
 }
