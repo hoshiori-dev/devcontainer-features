@@ -12,9 +12,11 @@
 # request is HTTPS only, and nothing here may relax certificate checking.
 set -eu
 
-VERSION="${VERSION:-latest}"
-BACKEND="${BACKEND:-both}"
-INSTALLMOUNTDEPENDENCIES="${INSTALLMOUNTDEPENDENCIES:-true}"
+# A default applies only to an unset option: an option set to the empty string is a value like any
+# other and fails the checks below.
+VERSION="${VERSION-latest}"
+BACKEND="${BACKEND-both}"
+INSTALLMOUNTDEPENDENCIES="${INSTALLMOUNTDEPENDENCIES-true}"
 
 REPOSITORY_URL="https://github.com/huggingface/hf-mount"
 LATEST_URL="${REPOSITORY_URL}/releases/latest"
