@@ -9,8 +9,8 @@ interpreters and its cache inside the container. A rebuild then throws both away
 workspace `.venv/`, which survives in the bind-mounted workspace, keeps interpreter links into the old container that
 point at nothing until the interpreter is downloaded again.
 
-A volume that keeps both across rebuilds also outlives the user who filled it: once the remote user, or its UID,
-changes, uv fails on everything the earlier user wrote there.
+A volume that keeps both across rebuilds also outlives the user who filled it: once the remote user's numeric UID
+changes, every uv command that uses the cache or manages interpreters fails on what the earlier UID wrote there.
 
 ## What Changes
 
@@ -27,7 +27,7 @@ changes, uv fails on everything the earlier user wrote there.
   when the dev container tooling has changed that user's UID to the host user's, as it does by default on a Linux host:
   the write access belongs to a system group `uv`, whose only member is that user, and to the owner the install set; no
   other user but root gets it.
-- A volume that another UID has written, because the remote user or its UID changed or because root wrote into it, is
+- A volume that another UID has written, because the remote user's numeric UID changed or because root wrote into it, is
   given to the remote user when the dev container is created, where that user can run `sudo` without a password;
   elsewhere a warning names the volume and the creation continues.
 - uv's environment points at those locations for every process in the container. Features installed after this one find

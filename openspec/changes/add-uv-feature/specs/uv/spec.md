@@ -264,23 +264,25 @@ volume that no longer fits the remote user" changes.
 
 A volume fits the remote user when that user can create files in `/var/lib/uv` and owns every file and directory below
 it. It stops fitting when another UID has written it: the remote user was changed to an account with another UID, the
-UID of the same account changed, or root wrote into it.
+UID of the same account changed, or root wrote into it. For the remote user root every volume fits.
 
 When a dev container is created, a rebuild included, the feature SHALL check the volume as the remote user, before the
 creation commands of the user's `devcontainer.json` run. When the volume does not fit and the remote user can run `sudo`
-without a password, the feature SHALL make the remote user the owner of the volume and of everything in it, give them
-the group `uv` when the image has that group, and change nothing else, so that uv works on the interpreters and the
-cache the volume already holds. When the volume does not fit and the remote user cannot run `sudo` without a password,
-the feature SHALL leave the volume as it is and print a warning that names `/var/lib/uv` and the reason. In every case
-the creation of the dev container SHALL continue. The feature SHALL change nothing on a volume that fits, nothing when
-the remote user is root, and nothing outside `/var/lib/uv`, and SHALL add no sudo rule.
+without a password, the feature SHALL make the remote user the owner, and `uv` the group where the image has that group,
+of the volume and of everything in it, and change nothing else, so that uv works on the interpreters and the cache the
+volume already holds. When the volume does not fit and the remote user cannot run `sudo` without a password, the feature
+SHALL leave the volume as it is and print a warning that names `/var/lib/uv` and the reason. When the change of owner
+fails, the feature SHALL print a warning that names `/var/lib/uv` and the reason. In every case the creation of the dev
+container SHALL continue. The feature SHALL change nothing on a volume that fits, nothing when the remote user is root,
+and nothing outside `/var/lib/uv`, and SHALL add no sudo rule.
 
 #### Scenario: Volume filled under another UID
 
 - **WHEN** a dev container is created whose volume holds interpreters and a cache that another UID wrote, and the remote
   user can run `sudo` without a password
-- **THEN** after the creation the remote user owns everything in the volume, installs a package from the cache the
-  volume already held without downloading it, and installs a further uv-managed interpreter
+- **THEN** after the creation the remote user owns everything in the volume and all of it has the group `uv`, and the
+  remote user installs a package from the cache the volume already held without downloading it, and installs a further
+  uv-managed interpreter
 
 #### Scenario: Files left by root
 
@@ -292,18 +294,19 @@ the remote user is root, and nothing outside `/var/lib/uv`, and SHALL add no sud
 
 - **WHEN** a dev container is created whose volume another UID filled, and the remote user cannot run `sudo` without a
   password or the image has no `sudo`
-- **THEN** the creation succeeds, a warning names `/var/lib/uv`, and the volume keeps its owner, group, and modes
+- **THEN** the creation succeeds, a warning names `/var/lib/uv` and the reason, and the volume keeps its owner, group,
+  and modes
 
 #### Scenario: Volume that fits
 
-- **WHEN** a dev container is created with a new volume, or with a volume in which the remote user owns everything below
-  `/var/lib/uv`
+- **WHEN** a dev container is created with a new volume, or with a volume in whose root the remote user can create files
+  and in which that user owns everything below `/var/lib/uv`
 - **THEN** nothing in the volume changes, and `sudo` is not run
 
 #### Scenario: Repair skipped for root
 
-- **WHEN** a dev container is created with the remote user root
-- **THEN** nothing in the volume changes
+- **WHEN** a dev container is created with the remote user root and a volume that holds an entry another UID owns
+- **THEN** nothing in the volume changes, and no warning is printed
 
 ### Requirement: Point uv at the feature's locations
 
