@@ -55,10 +55,12 @@
       verify by shellcheck in `just check` and by reading it against the "Default install", "Omitted version", and
       "Nothing configured after install" scenarios (behavior: 5.2)
 - [x] 3.3 Write `test/glab/duplicate.sh`: the first install used `VERSION` `1.47.0` and the second `VERSION__DEFAULT`
-      `latest`; after both, `glab --version` reports the permanent link's version, which differs from `1.47.0`,
-      `command -v glab` resolves to `/usr/local/bin/glab` (as in 3.2), and `/usr/local/bin` holds no other file whose
-      name contains `glab`; verify by shellcheck in `just check` and by reading it against the "Different version the
-      second time" scenario (behavior: 5.2)
+      `latest`; after both, no glab configuration directory exists in the remote user's or root's home (asserted before
+      `glab` runs, as in 3.2: the second install runs the installed `1.47.0` at build time), `glab --version` reports
+      the permanent link's version, which differs from `1.47.0`, `command -v glab` resolves to `/usr/local/bin/glab` (as
+      in 3.2), and `/usr/local/bin` holds no other file whose name contains `glab`; verify by shellcheck in `just check`
+      and by reading it against the "Different version the second time" and "Nothing configured after install" scenarios
+      (behavior: 5.2)
 - [x] 3.4 Write `test/glab/scenarios.json` with scenarios for an explicit version (`1.119.0`) and a leading `v`
       (`v1.119.0`) on images of the compatibility list, and their scripts asserting `glab --version` reports `1.119.0`;
       verify by `just validate` and shellcheck in `just check` (behavior: 5.3)
