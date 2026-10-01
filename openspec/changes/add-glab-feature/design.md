@@ -225,12 +225,12 @@ The planned `test/glab/compatibility.json`, every entry with `"arch": ["amd64", 
 sets `"remoteUser": "vscode"` (the image's non-root user, uid 1000), so the tests run once as a non-root user, and the
 others run as root:
 
-| Image                                               | Why                                                                                |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` | The usual dev container base; `apt-get` path with most prerequisites present       |
-| `debian:12`                                         | Minimal `apt-get` image; the feature installs `curl`, `ca-certificates`, and `git` |
-| `alpine:3.24`                                       | musl and BusyBox; `apk` path, and proves `install.sh` runs without bash            |
-| `fedora:44`                                         | `dnf` path                                                                         |
+| Image                                              | Why                                                                                |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `mcr.microsoft.com/devcontainers/base:ubuntu24.04` | The usual dev container base; `apt-get` path with most prerequisites present       |
+| `debian:12`                                        | Minimal `apt-get` image; the feature installs `curl`, `ca-certificates`, and `git` |
+| `alpine:3.24`                                      | musl and BusyBox; `apk` path, and proves `install.sh` runs without bash            |
+| `fedora:44`                                        | `dnf` path                                                                         |
 
 All four tags publish amd64 and arm64 images (Docker Hub tag API and the MCR manifest, 2026-09-30); `alpine:3.24` and
 `fedora:44` are the current `alpine:3` and `fedora:latest`.
