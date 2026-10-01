@@ -19,7 +19,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+| Feature                     | Description                                                                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`hf-mount`](src/hf-mount/) | Installs the Hugging Face `hf-mount` daemon and its NFS and FUSE backends, to mount Hugging Face Buckets and repositories as local filesystems. |
 
 ## Development
 
