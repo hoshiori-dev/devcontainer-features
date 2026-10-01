@@ -137,7 +137,7 @@ trap cleanup EXIT
 
 # Writes the verified key: binary for apt's signed-by keyring, armored for rpm.
 install_key() {
-  local key_file records primaries fingerprint exported
+  local key_file records primaries first kind fingerprint exported
   GNUPG_TMP="$(mktemp -d /tmp/nvidia-container-toolkit-gnupg.XXXXXXXXXX)"
   export GNUPGHOME="$GNUPG_TMP"
   key_file="$GNUPG_TMP/gpgkey"
@@ -147,12 +147,21 @@ install_key() {
     || fail "could not download NVIDIA's signing key from $KEY_URL (expected fingerprint $NVIDIA_FINGERPRINT)."
   records="$("$GPG" --batch --show-keys --with-colons "$key_file" 2>/dev/null)" \
     || fail "the file at $KEY_URL holds no readable OpenPGP key (expected fingerprint $NVIDIA_FINGERPRINT)."
-  primaries="$(grep -c '^pub:' <<<"$records" || true)"
-  # The first fpr record after the pub record is the primary key's; subkeys follow their own sub records.
-  fingerprint="$(awk -F: '$1 == "pub" { primary = 1; next } primary && $1 == "fpr" { print $10; exit }' <<<"$records")"
-  if [[ "$primaries" != "1" || "$fingerprint" != "$NVIDIA_FINGERPRINT" ]]; then
-    fail "the key at $KEY_URL is not NVIDIA's pinned signing key: expected exactly one primary key with fingerprint" \
-      "$NVIDIA_FINGERPRINT, found $primaries primary key(s), the first with fingerprint '${fingerprint:-none}'."
+  # A primary key is a pub record or, in a secret-key block, a sec record: both count, so that no second
+  # key of either kind passes beside NVIDIA's.
+  primaries="$(grep -cE '^(pub|sec):' <<<"$records" || true)"
+  # The first fpr record after a pub or sec record is that primary key's; subkeys follow their own sub or
+  # ssb records.
+  first="$(
+    awk -F: '$1 == "pub" || $1 == "sec" { kind = $1; next } kind && $1 == "fpr" { print kind, $10; exit }' \
+      <<<"$records"
+  )"
+  kind="${first%% *}"
+  fingerprint="${first#* }"
+  if [[ "$primaries" != "1" || "$kind" != "pub" || "$fingerprint" != "$NVIDIA_FINGERPRINT" ]]; then
+    fail "the key at $KEY_URL is not NVIDIA's pinned signing key: expected exactly one primary key, a public key" \
+      "with fingerprint $NVIDIA_FINGERPRINT, found $primaries primary key(s), public or secret, the first" \
+      "(${kind:-none}) with fingerprint '${fingerprint:-none}'."
   fi
 
   "$GPG" --batch --quiet --import "$key_file"
