@@ -17,9 +17,12 @@ point at nothing until the interpreter is downloaded again.
   the `mcr.microsoft.com/devcontainers/base` images of those distributions, and fails on any other distribution.
 - Python command-line tools listed in the `toolsToInstall` option are installed at build time from uv's default sources,
   verified by uv, and are on `PATH`, together with the interpreters they run on, inside the image.
-- Each dev container gets its own persistent volume, owned by the remote user, that holds the Python interpreters uv
+- Each dev container gets its own persistent volume, writable by the remote user, that holds the Python interpreters uv
   installs at runtime and uv's cache, so both survive a rebuild of that dev container and a workspace `.venv/` keeps
   working.
+- A remote user other than root can write that volume and manage the build-time tools without elevated privileges, also
+  when the dev container tooling has changed that user's UID to the host user's, as it does by default on a Linux host:
+  the user is a member of a system group `uv` that holds the write access, and users outside the group get none.
 - uv's environment points at those locations for every process in the container. Features installed after this one find
   `uv` and that environment during their own install, and the feature's notes tell them to write nothing under the
   volume's path at build time; `hf-cli` (#17) will depend on this feature and write nothing under the volume's path.
@@ -32,7 +35,8 @@ point at nothing until the interpreter is downloaded again.
 ### New Capabilities
 
 - `uv`: installing uv and uvx, installing tools at build time, the persistent per-dev-container volume for interpreters
-  and cache, uv's container environment, repeated installs, and failure behavior.
+  and cache, write access for the remote user through the group `uv`, uv's container environment, repeated installs, and
+  failure behavior.
 
 ### Modified Capabilities
 
@@ -45,7 +49,9 @@ None.
   `just docs`), `test/uv/` (`compatibility.json`, `test.sh`, `duplicate.sh`, scenarios), `openspec/specs/uv/spec.md`
   once this change is archived, and the root `README.md` (one row for `uv` under "## Features").
 - Metadata that widens the container: one named volume per dev container (`mounts`); no `privileged`, `capAdd`,
-  `securityOpt`, `entrypoint`, or `init`.
+  `securityOpt`, `entrypoint`, or `init`, and no lifecycle command.
+- Accounts: the image gains one system group `uv` with the remote user as its member when that user is not root; no
+  user, password, or sudo rule.
 - Dependencies: `installsAfter` the first-party `common-utils` feature; no `dependsOn`.
 - CI: the new feature's compatibility images run its tests on amd64 and arm64, except `archlinux:latest`, which has no
   arm64 image and runs on amd64 only.
@@ -57,10 +63,19 @@ None.
 
 - "Omitted version", "glibc image", "musl image", "Checksum matches", "Omitted toolsToInstall", "New volume", and
   "Environment of the remote user" in `specs/uv/spec.md` pass in `test/uv/test.sh` on each image and architecture in
-  `test/uv/compatibility.json`.
+  `test/uv/compatibility.json`, and with them "Remote user in the group" on the image with a non-root remote user and
+  "Root remote user" on the others. These checks read group, mode, and membership, so they give the same result whether
+  or not the host changes the remote user's UID.
 - "Pinned release", "Minimal image", "Tools on PATH", "Tools survive a replaced volume", "Remote user manages tools",
   "Runtime interpreter on the volume", and "Workspace install across filesystems" pass as scenarios in
   `test/uv/scenarios.json`.
+- "Changed UID" passes as a scenario in `test/uv/scenarios.json` whose remote user has a UID that neither the local dev
+  container's user nor a CI runner's has, so the tooling changes it on both; the scenario asserts that the running user
+  is not the owner of the two locations before it writes them.
+- "Group after a second install" passes in `test/uv/duplicate.sh` on the image with a non-root remote user, and for a
+  second install that adds a tool it is observed with the two installs below.
+- "Existing group" and "User outside the group" are observed with the method the design names for them and recorded in
+  the PR's Validation section.
 - "Default sources" holds by the review and the scenario the design names for it.
 - "Different options" passes in `test/uv/duplicate.sh` on each compatibility image, and "Same options", "Different
   options" with two non-empty `toolsToInstall` lists, and "Tool listed again" are observed by installing the feature
@@ -69,8 +84,9 @@ None.
   options", and every failure scenario of "Option version" and "Option toolsToInstall", that a successful build cannot
   show is observed during implementation with the method the design names for it and recorded in the PR's Validation
   section.
-- "Rebuild keeps a workspace environment" is observed on a real rebuild of one dev container, and "Separate dev
-  containers" on two dev containers on one Docker host, both recorded in the PR's Validation section.
+- "Rebuild keeps a workspace environment" is observed on a real rebuild of one dev container whose remote user's UID the
+  tooling changes, and "Separate dev containers" on two dev containers on one Docker host, both recorded in the PR's
+  Validation section.
 - `test/uv/test.sh` asserts the executable and the environment that "Later feature runs uv" relies on, and the scenario
   itself is observed with the throwaway later feature the design names and recorded in the PR's Validation section. From
   `hf-cli`'s change (#17) on, the first feature that depends on this one, its global scenario `uv_and_hf_cli` checks the
@@ -78,11 +94,14 @@ None.
 - The root `README.md` has one row for `uv` under "## Features", whose id links to `src/uv/` and which describes the
   feature in one sentence, in place of "No features have been published yet."; this is separate from the generated
   `src/uv/README.md`.
-- `just check` passes, and the `uv` jobs on this PR are green.
+- `just check` passes, and the `uv` jobs on this PR are green, including those on the image with a non-root remote user,
+  which failed with the owner-based layout.
 
 **Stays true:**
 
 - No existing feature, test, or script changes behavior; `just check` passes for the rest of the repository.
 - The feature downloads only from the sources its spec names, and installs no uv archive that fails its checksum.
+- Nothing the feature creates is writable by every user, and the feature runs nothing at container start: no
+  `entrypoint`, no lifecycle command.
 - A workspace `.venv/` and the project environment stay where the user's project puts them; the feature creates or syncs
   no project environment and installs no system Python through the distribution's package manager.

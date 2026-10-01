@@ -16,6 +16,8 @@ Upstream sources:
 - Environment variables: https://docs.astral.sh/uv/reference/environment/
 - Changelog: https://github.com/astral-sh/uv/blob/main/CHANGELOG.md
 - GitHub releases: https://github.com/astral-sh/uv/releases
+- Dev Container `updateRemoteUserUID`: https://containers.dev/implementors/json_reference/
+- Docker volumes: https://docs.docker.com/engine/storage/volumes/
 
 ## ADDED Requirements
 
@@ -161,8 +163,8 @@ listed tool.
 ### Requirement: Keep build-time tools in the image
 
 The environments of the tools that `toolsToInstall` installs, and the uv-managed interpreters they run on, SHALL live in
-the image, outside the persistent volume. The remote user SHALL be able to upgrade and add tools with `uv tool` at
-runtime.
+the image, outside the persistent volume. The remote user SHALL be able to upgrade, reinstall, remove, and add tools
+with `uv tool` at runtime, without elevated privileges.
 
 #### Scenario: Tools survive a replaced volume
 
@@ -171,20 +173,63 @@ runtime.
 
 #### Scenario: Remote user manages tools
 
-- **WHEN** the remote user runs `uv tool upgrade` for a tool from `toolsToInstall`, or `uv tool install` for a new tool,
-  in the running container
+- **WHEN** the remote user runs `uv tool upgrade`, `uv tool install --reinstall`, or `uv tool uninstall` for a tool from
+  `toolsToInstall`, or `uv tool install` for a new tool, in the running container
 - **THEN** the command succeeds without elevated privileges
+
+### Requirement: Grant write access through the group uv
+
+When the remote user is not root, the feature SHALL make the remote user a member of a system group named `uv`, creating
+the group when the image has none and otherwise using the existing group, whose ID and other members it leaves
+unchanged. `/usr/local/share/uv`, with everything the install puts there, and a newly created volume at `/var/lib/uv`
+SHALL belong to that group and be writable by its members, so that the remote user writes both without elevated
+privileges also when the dev container tooling has changed that user's UID to the host user's before the container
+starts. Neither location SHALL be writable by every user: besides root, only the members of `uv` and the owner the
+install set, which is the remote user under the UID it had when the image was built, can write. When the remote user is
+root, the feature SHALL create no group, and both locations SHALL be owned by root and writable by root only.
+
+#### Scenario: Remote user in the group
+
+- **WHEN** the feature is installed for a remote user other than root
+- **THEN** the remote user is a member of the group `uv`, and `/usr/local/share/uv` and a newly created volume at
+  `/var/lib/uv` belong to that group and are writable by its members
+
+#### Scenario: Root remote user
+
+- **WHEN** the feature is installed for the remote user root
+- **THEN** the install creates no group, and `/usr/local/share/uv` and a newly created volume at `/var/lib/uv` are owned
+  by root and writable by root only
+
+#### Scenario: Existing group
+
+- **WHEN** the image already has a group named `uv` when the feature is installed for a remote user other than root
+- **THEN** the install succeeds, the group keeps its ID and its members, and the remote user is added to it
+
+#### Scenario: Changed UID
+
+- **WHEN** the dev container tooling has changed the remote user's UID to the host user's, so that the remote user no
+  longer owns `/usr/local/share/uv` or a newly created volume
+- **THEN** the remote user creates a virtual environment with a uv-managed interpreter that is installed under
+  `/var/lib/uv`, and reinstalls, removes, and adds tools with `uv tool`, all without elevated privileges
+
+#### Scenario: User outside the group
+
+- **WHEN** a user that is not root, not a member of `uv`, and not the owner of the two locations tries to create a file
+  in `/usr/local/share/uv` or in `/var/lib/uv`
+- **THEN** the attempt fails, and the tools installed at build time still run for that user
 
 ### Requirement: Persist interpreters and cache per dev container
 
 The feature SHALL mount a named volume `uv-${devcontainerId}`, one per dev container, at `/var/lib/uv`, and SHALL point
-uv's managed-interpreter directory (`python/`) and cache (`cache/`) into it. A newly created volume SHALL be owned by
-the remote user and SHALL hold nothing written at build time.
+uv's managed-interpreter directory (`python/`) and cache (`cache/`) into it. A newly created volume SHALL hold nothing
+written at build time and SHALL be writable by the remote user as "Grant write access through the group uv" states. The
+feature SHALL change nothing on a volume that already holds data: such a volume keeps its owner, group, and modes.
 
 #### Scenario: New volume
 
 - **WHEN** a dev container with this feature is created and its volume does not exist yet
-- **THEN** `/var/lib/uv` is a mount of that volume, owned by the remote user, and holds no files before uv first runs
+- **THEN** `/var/lib/uv` is a mount of that volume, holds no files before uv first runs, and the remote user can create
+  files in it
 
 #### Scenario: Runtime interpreter on the volume
 
@@ -235,7 +280,9 @@ variables this feature sets.
 Installing the feature a second time on the same image SHALL succeed. With the same options, it SHALL download no uv
 release when the requested release is already installed, and leave installed tools as they are. With different options,
 the later `version` SHALL replace the installed `uv` and `uvx`, every tool from both installs SHALL remain installed,
-and a tool listed again SHALL end up satisfying the entry of the later install.
+and a tool listed again SHALL end up satisfying the entry of the later install. A second install SHALL add no second
+group and no second membership, and SHALL leave `/usr/local/share/uv`, including what it adds there, and a newly created
+volume as "Grant write access through the group uv" states.
 
 #### Scenario: Same options
 
@@ -255,14 +302,22 @@ and a tool listed again SHALL end up satisfying the entry of the later install.
   installed version does not satisfy
 - **THEN** after the second install the tool's installed version satisfies that constraint
 
+#### Scenario: Group after a second install
+
+- **WHEN** the feature is installed twice for a remote user other than root
+- **THEN** the image has one group `uv` that lists the remote user once, and the tools of both installs belong to that
+  group and are writable by its members
+
 ### Requirement: Fail on unsupported platforms and invalid options
 
 The feature SHALL fail the build with a message naming the problem, before downloading anything, when the container's
 architecture is neither x86_64 nor aarch64, when the distribution belongs to none of the supported families (Debian- or
 Ubuntu-based, RHEL- or Fedora-based, Arch Linux, Alpine, and openSUSE or SUSE), or when `toolsToInstall` is not empty
-and `version` names a release older than 0.12.16. It SHALL also fail when the remote user it is installed for does not
-exist. The Option requirements state how invalid values of a single option fail. The supported images are those in
-`test/uv/compatibility.json`.
+and `version` names a release older than 0.12.16. It SHALL also fail, with a message naming the problem, when the remote
+user it is installed for does not exist; when the group `uv` is that user's primary group, whose ID the dev container
+tooling changes together with the user's, so that it could not keep the write access; and when the image has no tool to
+create the group or to add the remote user to it. The Option requirements state how invalid values of a single option
+fail. The supported images are those in `test/uv/compatibility.json`.
 
 #### Scenario: Unsupported architecture
 
@@ -283,3 +338,14 @@ exist. The Option requirements state how invalid values of a single option fail.
 
 - **WHEN** the feature is installed for a remote user that does not exist in the image
 - **THEN** the build fails with a message naming the user
+
+#### Scenario: Group is the remote user's primary group
+
+- **WHEN** the feature is installed for a remote user whose primary group is named `uv`
+- **THEN** the build fails with a message naming the user and the group
+
+#### Scenario: Group cannot be created
+
+- **WHEN** the feature is installed for a remote user other than root on an image that has neither a group `uv` nor a
+  tool to create one
+- **THEN** the build fails with a message naming the group
