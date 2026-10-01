@@ -95,14 +95,14 @@ The package revision at `5c2f672` is approved. This list follows its group acces
 
 ## 6. Observations in throwaway containers
 
-- [x] 6.1 Observe the failure scenarios with the methods the design names (a `uname` stub printing `riscv64`,
+- [ ] 6.1 Observe the failure scenarios with the methods the design names (a `uname` stub printing `riscv64`,
       `photon:5.0`, a `curl` wrapper that alters or fails the `.sha256` request, `version` `9.9.9`, `_REMOTE_USER`
       naming no account, an unpublished tool, `version` `0.12.15` with one tool, the four group/account-tool failures,
       and each invalid `version` and `toolsToInstall` form) and record each result in the PR's Validation section
-- [x] 6.2 Observe the `dnf`, `pacman`, and `zypper` prerequisite branches on `almalinux:10`, `archlinux:latest`, and
+- [ ] 6.2 Observe the `dnf`, `pacman`, and `zypper` prerequisite branches on `almalinux:10`, `archlinux:latest`, and
       `opensuse/leap:16.0` with `tar` removed without its dependents, and record that `install.sh` installs `tar` and
       succeeds
-- [x] 6.3 Install the feature twice in one container with identical options, and with two non-empty tool lists that list
+- [ ] 6.3 Install the feature twice in one container with identical options, and with two non-empty tool lists that list
       one tool again with another constraint, for non-root users on Ubuntu and Alpine, and record "Same options",
       "Different options", and "Tool listed again"
 - [x] 6.4 Build a throwaway, uncommitted local feature that installs after `uv`, runs `uv --version`, and fails unless
@@ -110,9 +110,9 @@ The package revision at `5c2f672` is approved. This list follows its group acces
 - [x] 6.5 Observe "Rebuild keeps a workspace environment" on a real rebuild of a changed-UID dev container and "Separate
       dev containers" on two dev containers on one Docker host, and record both
 
-- [x] 6.6 Observe non-root group access after a UID change on Debian, AlmaLinux, Arch and openSUSE; existing-group reuse
+- [ ] 6.6 Observe non-root group access after a UID change on Debian, AlmaLinux, Arch and openSUSE; existing-group reuse
       and outsider denial on Ubuntu and Alpine. Record each result.
-- [x] 6.7 Observe fitting, foreign-owned and deep root-entry volumes as non-root on each other compatibility image,
+- [ ] 6.7 Observe fitting, foreign-owned and deep root-entry volumes as non-root on each other compatibility image,
       including no sudo and the openSUSE listing; observe repair without group uv on Ubuntu. Record status, warning and
       preserved state.
 - [x] 6.8 Observe real container rebuilds changing remoteUser to accounts with and without passwordless sudo, with the
@@ -120,5 +120,5 @@ The package revision at `5c2f672` is approved. This list follows its group acces
 
 ## 7. Integration
 
-- [x] 7.1 Run `just check`, `just test uv`, and `just test-scenarios uv`, and record the results with every Acceptance
+- [ ] 7.1 Run `just check`, `just test uv`, and `just test-scenarios uv`, and record the results with every Acceptance
       item in the PR's Validation section
