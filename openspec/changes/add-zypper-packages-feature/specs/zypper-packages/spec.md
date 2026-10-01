@@ -66,11 +66,12 @@ need.
 
 ### Requirement: Version and architecture qualifiers
 
-The feature SHALL pass an entry of the form `name=edition`, `name.architecture`, or `name.architecture=edition` to
-`zypper` unchanged, so that `zypper` selects that edition (a version, optionally with an epoch and a release) or that
-architecture of the package. The feature SHALL NOT downgrade a package: when an entry pins an edition that the enabled
-repositories offer and that is older than the installed version of that package, the installed version stays and the
-entry does not fail the feature.
+The feature SHALL pass an entry of the form `name=edition`, `name.architecture`, or `name.architecture=edition`, or one
+that puts a range operator in the place of `=` (`name<edition`, `name<=edition`, `name>edition`, `name>=edition`), to
+`zypper` unchanged, so that `zypper` selects that edition (a version, optionally with an epoch and a release), an
+edition in that range, or that architecture of the package. The feature SHALL NOT downgrade a package: when an entry
+pins with `=` an edition that the enabled repositories offer and that is older than the installed version of that
+package, the installed version stays and the entry does not fail the feature.
 
 #### Scenario: Pinned version is installed
 
@@ -81,6 +82,17 @@ entry does not fail the feature.
 #### Scenario: Unavailable pinned version fails
 
 - **WHEN** `packages` holds `name=edition` for an edition the image's repositories do not offer
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+#### Scenario: Range constraint is installed
+
+- **WHEN** `packages` holds `name>=edition` that an edition the image's repositories offer satisfies, and the package is
+  not installed
+- **THEN** an edition of the package that satisfies the constraint is installed
+
+#### Scenario: Unsatisfied range constraint fails
+
+- **WHEN** `packages` holds `name<edition` that no edition the image's repositories offer satisfies
 - **THEN** the feature exits with a non-zero status and installs none of the listed packages
 
 #### Scenario: Native architecture qualifier is installed
@@ -96,12 +108,13 @@ entry does not fail the feature.
 
 ### Requirement: Entries are validated before anything changes
 
-The feature SHALL accept an entry only when it starts with a letter or a digit, its name part consists only of letters,
-digits, and the characters `.`, `_`, `+`, and `-`, it holds at most one `=`, the part after that `=` is not empty and
-consists only of letters, digits, and the characters `.`, `_`, `+`, `~`, `:`, and `-`, and the entry does not end in
-`.rpm`. When any entry is refused, the feature SHALL exit with status 1 and a message naming that entry before it checks
-for `zypper`, refreshes repository metadata, or installs anything. The feature SHALL hand every accepted entry to
-`zypper` as one argument and SHALL NOT evaluate it as shell code.
+The feature SHALL accept an entry only when it starts with an ASCII letter or a digit, its name part consists only of
+ASCII letters, digits, and the characters `.`, `_`, `+`, and `-`, it holds at most one operator (`=`, `<`, `<=`, `>`, or
+`>=`), the part after that operator is not empty and consists only of ASCII letters, digits, and the characters `.`,
+`_`, `+`, `~`, `^`, `:`, and `-`, and the entry does not end in `.rpm`. When any entry is refused, the feature SHALL
+exit with status 1 and a message naming that entry before it checks for `zypper`, refreshes repository metadata, or
+installs anything. The feature SHALL hand every accepted entry to `zypper` as one argument and SHALL NOT evaluate it as
+shell code.
 
 #### Scenario: URL or path is refused
 
@@ -120,22 +133,24 @@ for `zypper`, refreshes repository metadata, or installs anything. The feature S
 
 #### Scenario: Kind or repository prefix is refused
 
-- **WHEN** `packages` holds an entry with `:` before any `=`, such as `pattern:name` or `repository:name`
+- **WHEN** `packages` holds an entry with `:` before any operator, such as `pattern:name` or `repository:name`
 - **THEN** the feature exits with status 1, names the entry, and installs nothing
 
 #### Scenario: Shell metacharacters and inner whitespace are refused
 
-- **WHEN** `packages` holds an entry with whitespace inside it or with a character outside the accepted set, such as
-  `;`, `$`, `` ` ``, `*`, `?`, `|`, `<`, or `>`
+- **WHEN** the `packages` value the feature receives holds an entry with whitespace inside it or with a character
+  outside the accepted set, such as `;`, `$`, `` ` ``, `*`, `?`, `|`, `(`, or a non-ASCII letter
 - **THEN** the feature exits with status 1, names the entry, installs nothing, and runs no command contained in the
   entry
 
-### Requirement: Entries name packages exactly
+### Requirement: Entries select packages as zypper matches them
 
-The feature SHALL install a package for an entry only when the entry's name part, without its architecture and edition,
-is the exact, case-sensitive name of a package that the enabled repositories offer, or is such a name followed by
-`-version` or `-version-release`, which `zypper` reads as an edition of that package. An entry SHALL NOT be matched as a
-capability that a package provides, a glob, a pattern, a patch, or a product.
+The feature SHALL install for each entry the package that `zypper` selects for it from the enabled repositories: a
+package whose name equals the entry's name part, without its architecture and edition, in the same letter case, or
+equals it once a trailing `-version` or `-version-release` is read as an edition of that package; and, when no package
+has that name, a package that provides the name part as a capability, which `zypper` chooses when several provide it. An
+entry SHALL NOT be matched as a glob, a pattern, a patch, or a product. When one entry selects nothing, the feature
+SHALL fail and install none of the listed packages.
 
 #### Scenario: Unknown package fails
 
@@ -148,16 +163,28 @@ capability that a package provides, a glob, a pattern, a patch, or a product.
   offer, and the package is not installed
 - **THEN** exactly that edition of the package is installed
 
-#### Scenario: Capability is not matched
+#### Scenario: Capability selects a providing package
 
-- **WHEN** `packages` names a capability that a package of the image's repositories provides but that is not itself the
-  name of a package the repositories offer
-- **THEN** the feature exits with a non-zero status and installs none of the listed packages
+- **WHEN** `packages` names a capability that a package of the image's repositories provides, that no installed package
+  provides, and that is not itself the name of a package the repositories offer
+- **THEN** the feature succeeds and a package that provides the capability is installed
 
 #### Scenario: Name in another case fails
 
-- **WHEN** `packages` names a package that the repositories offer, written with different letter case
+- **WHEN** `packages` names a package that the repositories offer, written with different letter case, and no package or
+  capability has that spelling
 - **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+### Requirement: Installed packages are not removed
+
+The feature SHALL NOT remove an installed package to resolve a conflict with a listed package or its dependencies; such
+a conflict SHALL fail the feature. An installed package that a newly installed package obsoletes MAY be replaced by it.
+
+#### Scenario: Conflict with an installed package fails
+
+- **WHEN** `packages` names a package that conflicts with an installed package
+- **THEN** the feature exits with a non-zero status, installs none of the listed packages, and the installed package
+  stays
 
 ### Requirement: Image without zypper
 
@@ -198,13 +225,21 @@ The feature SHALL leave libzypp's signature checking (`gpgcheck` in zypp.conf(5)
 https://github.com/openSUSE/libzypp/blob/17.38.16/zypp/doc/zypp.conf.5.txt) in effect: it SHALL NOT pass any option or
 configuration that ignores signature failures, imports or trusts a new signing key, or accepts unsigned repositories or
 packages, and SHALL NOT itself add, remove, or change any repository, service, trusted key, or zypp configuration file
-in the image. Files that the packages it installs ship, and repository definitions that a repository index service the
-image defines rewrites from its own index when `zypper` refreshes it, are not the feature's changes.
+in the image. The keys and the signature settings are the image's: the feature trusts what the image's RPM database
+trusts, and a repository for which the image's configuration turns the check off stays unchecked. Files that the
+packages it installs ship, and repository definitions that a repository index service the image defines rewrites from
+its own index when `zypper` refreshes it, are not the feature's changes.
 
 #### Scenario: Unverifiable repository fails the refresh
 
 - **WHEN** an enabled repository's metadata is signed by a key the image does not trust
 - **THEN** the feature exits with a non-zero status, trusts no new key, and installs none of the listed packages
+
+#### Scenario: Unsigned repository fails the refresh
+
+- **WHEN** an enabled repository's metadata carries no signature, and the image's configuration does not turn the
+  signature check off for it
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
 
 #### Scenario: Zypp configuration is unchanged
 
@@ -236,7 +271,7 @@ After installing, the feature SHALL leave neither downloaded package files nor c
 
 Installing the feature a second time SHALL leave installed every package that either installation listed, and SHALL
 treat the second list as a first installation would. The second installation MAY upgrade an installed package that its
-list names without an edition, or that a package of its list needs.
+list names without an edition or with a range, or that a package of its list needs.
 
 #### Scenario: Same list on the second install
 

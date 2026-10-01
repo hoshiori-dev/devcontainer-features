@@ -39,12 +39,18 @@ carry the same repository files and zypper version (checked by running both), un
 - zypper treats an argument as an RPM file when it is longer than four characters and ends in `.rpm`, or starts with
   `./` or `../` (`looks_like_rpm_file` in `src/utils/misc.cc`); observed: `bogus.rpm`, without any `/`, is read as a
   file ("looks like an RPM file"), also with `--name`.
-- Observed with `zypper --non-interactive install --no-recommends --name --`:
-  - `awk` (provided by `gawk`, no package of that name) and `Tree` fail with 104, while without `--name` `awk` installs
-    `gawk` ("Trying capabilities"). `tree=2.2.1`, `tree=0:2.2.1`, `tree=2.2.1-160000.2.2`, `tree.x86_64=2.2.1`, and
-    `tree-2.2.1` (name-version) select that version; `bc.aarch64` on amd64 fails with 104.
+- Observed with `zypper --non-interactive install --no-recommends --` (on 2026-10-01 on both images, except the
+  `pattern:` and repository prefixes, observed on 2026-09-30):
+  - `awk` (provided by `gawk`, no package of that name) installs `gawk` ("not found in package names. Trying
+    capabilities"), and fails with 104 under `--name`; `Tree` fails with 104 either way ("No provider of 'Tree' found").
+    `tree=2.2.1`, `tree=0:2.2.1`, `tree=2.2.1-160000.2.2`, `tree.x86_64=2.2.1`, and `tree-2.2.1` (name-version) select
+    that version; `bc.aarch64` on amd64 fails with 104.
   - `pattern:base` and `repo-oss:bc` (and `openSUSE:repo-oss:tree`) are accepted, also with `--name`.
   - `bc nosuchpkg-xyz` exits 104 and installs neither.
+  - `tree>=2.0`, `bc>1`, `file<=99`, and `tree<=<offered edition>` install the offered edition; `bc<1` fails with 104
+    ("No provider of 'bc<1' found") and installs nothing, as does `tree<<installed version>` with `tree` installed.
+  - `coreutils-single`, which conflicts with the installed `coreutils`, exits 4 with a solver problem whose solutions
+    are removing `coreutils` or not installing; nothing changes.
   - An installed newer `libfuse3-3` with `libfuse3-3=<older release>` exits 0, prints "has lower version than the
     installed one", and keeps the newer version. An older pin of a package not installed installs that version.
   - An already installed package at its newest version prints "already installed … Nothing to do" and exits 0.
@@ -55,6 +61,8 @@ carry the same repository files and zypper version (checked by running both), un
   - `zypper --non-interactive refresh` exits 4 ("Could not refresh the repositories because of errors") when any enabled
     repository fails: unreachable, offline, or with the signing key removed from the RPM database, where the key prompt
     defaults to reject in non-interactive mode. A second refresh downloads only each index and reports "is up to date".
+    With an added repository that holds a copy of `repo-oss`'s metadata without `repomd.xml.asc` and `repomd.xml.key`,
+    the refresh warns "File 'repomd.xml' from repository … is unsigned" and exits 4 (2026-10-01, both images).
   - On Leap, a hand edit of a service-managed repository file is undone by the service refresh that each zypper command
     runs; a test that breaks a repository adds its own `.repo` file instead.
 - `zypper --non-interactive clean --all` leaves no file under `/var/cache/zypp`; a refresh, an install with
@@ -87,6 +95,11 @@ carry the same repository files and zypper version (checked by running both), un
 - The devcontainer CLI's install-twice test installs the feature first with a non-default value taken from a string
   option's `proposals` (the second entry when the default is not among them), then with the defaults (as recorded for
   `apt-packages`).
+- The devcontainer CLI (0.89.0) writes each option to `devcontainer-features.env` as `NAME="<value>"` without escaping,
+  and its wrapper runs `set -a; . ./devcontainer-features.env` as root before `./install.sh` (observed in the 0.89.0
+  bundle, as recorded in the `apt-packages` design, pull request #33). A `"`, `$`, or backtick in an option value is
+  therefore evaluated by that shell before the feature runs, and `install.sh` receives the result. A `<` or `>` inside
+  the double quotes is not special to that shell.
 - Prior art: no zypper package-list feature exists in `devcontainers-extra` or `rocker-org`.
 
 ## Goals / Non-Goals
@@ -99,18 +112,24 @@ carry the same repository files and zypper version (checked by running both), un
   conformance.
 - Entries reach `zypper` only as separate, quoted arguments after `--`; the script has no `eval`, no `sh -c`, and no
   unquoted expansion of an entry. Checked by review of `install.sh` and by the direct check for "Shell metacharacters
-  and inner whitespace are refused" with an entry such as `x;touch /tmp/pwned` that asserts the file does not exist.
+  and inner whitespace are refused" with an entry such as `x;touch /tmp/pwned` that asserts the file does not exist. The
+  guarantee covers the value `install.sh` receives; what the CLI's shell does to the value before that is outside the
+  feature (Context, Risks).
+- The allowlist matches ASCII only: the check runs with `LC_ALL=C`, so a bracket range cannot admit a non-ASCII letter.
+  Checked by the direct check for "Shell metacharacters and inner whitespace are refused" with an entry that holds a
+  non-ASCII letter.
 - Every entry is validated before the `zypper` check and any `zypper` call, so a refused list leaves the image
   untouched. Checked by the direct refusal checks, which also assert that `/var/cache/zypp` holds no file and that the
   installed package list is unchanged.
-- No `zypper` call carries an option that weakens verification, adds a source, or widens selection: never
-  `--no-gpg-checks`, `--gpg-auto-import-keys`, `--allow-unsigned-rpm`, `--plus-repo`, `--plus-content`, `--repo`,
-  `--from`, `--type`, `--capability`, `--oldpackage`, `--force`, `--force-resolution`, `--replacefiles`,
+- No `zypper` call carries an option that weakens verification, adds a source, or changes how zypper selects packages:
+  never `--no-gpg-checks`, `--gpg-auto-import-keys`, `--allow-unsigned-rpm`, `--plus-repo`, `--plus-content`, `--repo`,
+  `--from`, `--type`, `--capability`, `--name`, `--oldpackage`, `--force`, `--force-resolution`, `--replacefiles`,
   `--auto-agree-with-licenses`, `--ignore-unknown`, or `--root`. The refresh is `zypper --non-interactive refresh`
-  without `--force`; the install is `zypper --non-interactive --no-refresh install --no-recommends --name --` followed
-  by the entries. Checked by review of `install.sh` against this list, and by the checks for "Capability is not
-  matched", "Failed refresh fails the feature", "Unverifiable repository fails the refresh", and "Pin below the
-  installed version on the second install".
+  without `--force`; the install is `zypper --non-interactive --no-refresh install --no-recommends --` followed by the
+  entries. Checked by review of `install.sh` against this list, and by the checks for "Capability selects a providing
+  package", "Conflict with an installed package fails", "Failed refresh fails the feature", "Unverifiable repository
+  fails the refresh", "Unsigned repository fails the refresh", and "Pin below the installed version on the second
+  install".
 - The feature writes nothing itself except what zypper and RPM install and log, and removes only zypper's caches.
   Checked by the direct check for "Zypp configuration is unchanged", which hashes `/etc/zypp` and lists the `gpg-pubkey`
   entries before and after, and by "Caches are removed".
@@ -124,7 +143,7 @@ carry the same repository files and zypper version (checked by running both), un
 
 - Adding repositories, services, or keys, upgrading the whole system, installing patterns, patches, or products, or
   choosing a package manager across distributions (issue #24, Out of scope).
-- An option for recommended packages, repository selection, capabilities, or keeping the metadata cache.
+- An option for recommended packages, repository selection, exact-name matching, or keeping the metadata cache.
 - Checking the architecture: the feature downloads nothing architecture-specific, and zypper resolves packages for the
   image's architecture; the compatibility list names the architectures that are tested.
 - Removing zypper's logs; they are not caches.
@@ -133,24 +152,39 @@ carry the same repository files and zypper version (checked by running both), un
 
 ## Decisions
 
-- **POSIX `sh`, shared skeleton.** One skeleton keeps the five installers auditable side by side, and `alpine`, an image
-  of the `apk-packages` sibling, ships no bash. This deviates from `feature-authoring.md` (Deviations). Rejected: bash
-  with `set -euo pipefail`, which the convention calls for here because both openSUSE images ship bash.
+- **Native behavior first.** The five installers share the option shape and the script skeleton, not identical behavior.
+  Where package managers differ (a pin below the installed version, capability matching, range operators, upgrades of
+  installed packages), the feature keeps zypper's own behavior and the spec states it; the strict refresh is the one
+  deliberate departure (decision "A strict refresh, then an install from that metadata"). An entry passes through in
+  zypper's own syntax for a package, its edition, and its architecture; the allowlist admits the characters that syntax
+  needs, `<` and `>` included, and refuses every other character, so a capability is accepted only when its name
+  consists of those characters. The maintainer decided this for all five installers on 2026-10-01. Rejected: one
+  identical guarantee across managers, which needs a second code path per manager that must agree with the manager's own
+  resolution.
+- **POSIX `sh`, shared skeleton.** Installing packages has to work on as many images as possible, one skeleton keeps the
+  five installers auditable side by side, and `alpine`, an image of the `apk-packages` sibling, ships no bash. This
+  deviates from `feature-authoring.md` (Deviations). Rejected: bash with `set -euo pipefail`, which the convention calls
+  for here because both openSUSE images ship bash.
 - **Validate, then the empty check, then the `zypper` check.** As in `apt-packages`: a refused entry fails first on
   every image, and the default options succeed on any image, including one without `zypper`. Rejected: failing on an
   image without `zypper` even for an empty list.
-- **A strict allowlist per manager.** An entry matches `^[A-Za-z0-9][A-Za-z0-9._+-]*(=[A-Za-z0-9._+~:-]+)?$` and does
-  not end in `.rpm`: RPM name characters, `.` also for an architecture, then an optional `=` edition with `~` and `:`
-  for an epoch. This refuses option and modifier prefixes (`-`, `!`, `+`, `~`), local files and URLs (`/`, and the
-  `.rpm` suffix zypper reads as a file), kind and repository prefixes (`pattern:`, `patch:`, `product:`, `REPOSITORY:`),
-  globs, capability syntax such as `perl(Foo)`, the comparison operators `<` and `>`, the spaced form `name = edition`,
-  whitespace, and every shell metacharacter. Rejected: the shared cross-manager expression from the research brief,
-  whose `/` admits URLs and paths and whose `<`, `>`, and `@` would reach zypper; allowing `:` anywhere, which admits
-  kind and repository prefixes; validating by asking zypper, which would run zypper on unvalidated input.
-- **Exact names through `--name`.** Without it, zypper falls back to capabilities, and the solver picks one provider
-  silently (`awk` installs `gawk`), so a mistyped or generic name can install something other than what was meant.
-  `--name` keeps editions, architectures, and zypper's name-version form. Rejected: zypper's default selection;
-  `--capability`; checking each name with `zypper search` first, a second code path that must agree with zypper's own.
+- **A strict allowlist per manager.** An entry matches `^[A-Za-z0-9][A-Za-z0-9._+-]*((=|<=?|>=?)[A-Za-z0-9._+~^:-]+)?$`
+  under `LC_ALL=C` and does not end in `.rpm`: RPM name characters, `.` also for an architecture, then an optional
+  operator (`=`, `<`, `<=`, `>`, `>=`) and an edition with `~` and `^` from RPM version strings and `:` for an epoch.
+  This refuses option and modifier prefixes (`-`, `!`, `+`, `~`), local files and URLs (`/`, and the `.rpm` suffix
+  zypper reads as a file), kind and repository prefixes (`pattern:`, `patch:`, `product:`, `REPOSITORY:`), globs,
+  capability syntax with parentheses such as `perl(Foo)`, the spaced form `name = edition`, whitespace, and every shell
+  metacharacter except `<` and `>`, which reach zypper only inside one quoted argument (Open question 3). Rejected: an
+  earlier cross-manager expression drafted for all five installers, whose `/` admits URLs and paths and whose `@` would
+  reach zypper; allowing `:` anywhere, which admits kind and repository prefixes; validating by asking zypper, which
+  would run zypper on unvalidated input.
+- **zypper's own matching, capabilities included.** zypper matches an entry by package name first and, when no package
+  has that name, by capability, where the solver picks one provider (`awk` installs `gawk`); the feature keeps that, as
+  `dnf-packages`, `apk-packages`, and `pacman-packages` keep their managers' provider matching (decision "Native
+  behavior first"). The cost is that a mistyped or generic name can install something other than what was meant.
+  Rejected: `--name`, which confines matching to package names and so refuses capabilities zypper would install (Open
+  question 4); `--capability`; checking each name with `zypper search` first, a second code path that must agree with
+  zypper's own.
 - **A strict refresh, then an install from that metadata.** `zypper --non-interactive refresh` brings every enabled
   repository up to date, downloading only indexes when the cache is current, and fails when any repository fails; the
   install then runs with the global `--no-refresh`, so it uses exactly the metadata that refresh verified. Rejected:
@@ -163,7 +197,7 @@ carry the same repository files and zypper version (checked by running both), un
 - **zypper's own answer to a pin below the installed version.** Without `--oldpackage` zypper keeps the installed
   version, says so, and succeeds; the spec states that. Rejected: `--oldpackage`, which lets a second install move a
   package down; a post-install check of every pinned entry, which re-implements zypper's edition matching (Open question
-  2 offers failing instead).
+  2).
 - **No license agreement on the user's behalf.** Without `--auto-agree-with-licenses`, a package that needs a license
   confirmed fails the feature. Rejected: agreeing automatically, which accepts third-party terms the user never saw.
 - **Clean with `zypper clean --all`.** It removes downloaded packages, raw metadata, and the parsed `solv` cache, also
@@ -187,23 +221,24 @@ carry the same repository files and zypper version (checked by running both), un
 
 The feature's only option; the delta spec's Option requirement states its contract.
 
-| Name       | Type     | Default | Enum or proposals              | Meaning                                                                                                                                                                            |
-| ---------- | -------- | ------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages` | `string` | `""`    | proposals: `"bc"`, `"bc,file"` | Comma-separated entries (`name`, `name=edition`, `name.architecture`, `name.architecture=edition`) that `zypper` installs; whitespace around entries and empty entries are dropped |
+| Name       | Type     | Default | Enum or proposals              | Meaning                                                                                                                                                                                                                                                 |
+| ---------- | -------- | ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages` | `string` | `""`    | proposals: `"bc"`, `"bc,file"` | Comma-separated entries (`name`, `name=edition`, a range such as `name>=edition`, `name.architecture`, `name.architecture=edition`, or a capability a package provides) that `zypper` installs; whitespace around entries and empty entries are dropped |
 
 - **Default `""`.** An empty list installs nothing and, because the empty check runs before the `zypper` check, succeeds
   on any image, including one without `zypper` (decision "Validate, then the empty check, then the `zypper` check"). The
   proposals are two lists installed on neither image, so the install-twice test installs real packages (Goals).
 - **Rejected shapes:** an array (feature options are only `string` or `boolean`); options for repositories or package
-  types (out of scope); options for recommended packages, capabilities, or keeping the metadata cache (Non-Goals).
+  types (out of scope); options for recommended packages, exact-name matching, or keeping the metadata cache
+  (Non-Goals).
 
 ### Deviations from `feature-authoring.md`
 
-Each follows from a binding decision for the five installers and needs the maintainer's acceptance at the package gate.
+The maintainer accepted each for the five installers on 2026-10-01.
 
 - **Shell.** The convention calls for bash with `set -euo pipefail` when every image in the compatibility list ships
   bash, which both openSUSE images do. The feature uses POSIX `sh` with `set -eu` (decision "POSIX `sh`, shared
-  skeleton").
+  skeleton"). Issue #49 proposes relaxing the convention for features that need broad image compatibility.
 - **Distribution detection.** The convention says to detect the distribution from `/etc/os-release`. The feature detects
   `zypper` on the `PATH` and reads `/etc/os-release` only for its message (decision "Detect by binary").
 - **Skipping installed versions.** The convention says to skip an install when the requested version is already present.
@@ -222,11 +257,15 @@ Each follows from a binding decision for the five installers and needs the maint
   holds. No download relies on TLS alone. The allowlist keeps zypper from reading an entry as an RPM file or URI, which
   would install a package from outside those repositories.
 - **Verification and keys:** libzypp verifies each repository's `repomd.xml` signature against the keys in the RPM
-  database and every other file against the checksums of the verified index (requirement "Repository authentication
-  stays in effect"). All enabled repositories are signed by the openSUSE Project Signing Key, whose fingerprint openSUSE
-  publishes at https://get.opensuse.org/tumbleweed/ ; the images ship it. zypper downloads a repository's
-  `repomd.xml.key` and `gpg-pubkey-*.asc` files (the latter answer 404 under Leap's `{arch}` directory) while looking
-  for the signing key, but never trusts one on its own in non-interactive mode; the feature passes no option that would.
+  database and every file that index lists against the checksums of the verified index (requirement "Repository
+  authentication stays in effect"). The optional media descriptor `media.1/media`, which libzypp requests from the
+  repository's own host and which the index does not list, is the one file no checksum covers; it holds no package
+  content. The trust root is the image's: the feature does not assert that `gpgcheck` is in effect, so a key or a
+  `gpgcheck=0` that a derived image or an earlier build step configured is inherited, and NOTES.md says so. All enabled
+  repositories are signed by the openSUSE Project Signing Key, whose fingerprint openSUSE publishes at
+  https://get.opensuse.org/tumbleweed/ ; the images ship it. zypper downloads a repository's `repomd.xml.key` and
+  `gpg-pubkey-*.asc` files (the latter answer 404 under Leap's `{arch}` directory) while looking for the signing key,
+  but never trusts one on its own in non-interactive mode; the feature passes no option that would.
 - **Metadata:** none of `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`, `containerEnv`, lifecycle
   commands, `dependsOn`, or `installsAfter`: the feature runs once at build time as root, installs system-wide, and
   needs nothing at container start. The feature does no user-scoped setup and does not read `_REMOTE_USER`.
@@ -234,18 +273,18 @@ Each follows from a binding decision for the five installers and needs the maint
   already installed packages stay; unpinned listed packages and needed dependencies may be upgraded to the newest
   version; a pin below the installed version leaves the package as it is and succeeds. No `idempotencyExemption`.
 - **Failure behavior:** a refused entry and a missing `zypper` exit 1 before anything changes; a failed refresh or
-  signature check exits with zypper's 4 before the install starts; an unknown name, capability, edition, or architecture
-  exits 104, and a dependency problem, a lock the image set, or a license to confirm exits non-zero, all before RPM
-  changes anything; a failing package scriptlet exits 107 after the packages were installed, which still fails the
-  build.
+  signature check exits with zypper's 4 before the install starts; an unknown name, edition, or architecture and an
+  unsatisfied range exit 104, a conflict with an installed package exits 4, and another dependency problem, a lock the
+  image set, or a license to confirm exits non-zero, all before RPM changes anything; a failing package scriptlet exits
+  107 after the packages were installed, which still fails the build.
 
 ### Test plan
 
 Where each scenario of `specs/zypper-packages/spec.md` is checked. "Scenario" means `scenarios.json`, run in CI on amd64
 on the image each entry names; "test.sh" and "duplicate.sh" run in CI on every image and architecture of the
 compatibility list; "Direct" means the host-side runner (decision "Direct checks"), run locally on every amd64 image of
-the compatibility list, with its output recorded in the PR's Validation section. On arm64, CI runs only test.sh and
-duplicate.sh.
+the compatibility list, or on the pinned image outside it that a row names, with its output recorded in the PR's
+Validation section. On arm64, CI runs only test.sh and duplicate.sh.
 
 | Scenario                                                                           | Checked by                                                                                                                                                                                                                                                                                                       |
 | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -257,15 +296,19 @@ duplicate.sh.
 | Unavailable pinned version fails; Architecture the repositories do not offer fails | Direct                                                                                                                                                                                                                                                                                                           |
 | Native architecture qualifier is installed                                         | Scenario with `.x86_64`                                                                                                                                                                                                                                                                                          |
 | The five refusal scenarios                                                         | Direct, each also asserting an empty `/var/cache/zypp` and an unchanged installed package list                                                                                                                                                                                                                   |
-| Unknown package fails; Capability is not matched; Name in another case fails       | Direct (`awk` for the capability)                                                                                                                                                                                                                                                                                |
+| Range constraint is installed; Unsatisfied range constraint fails                  | Direct, with `name>=<offered edition>` and `name<<lowest offered edition>`, the editions read at run time                                                                                                                                                                                                        |
+| Unknown package fails; Name in another case fails                                  | Direct                                                                                                                                                                                                                                                                                                           |
+| Capability selects a providing package                                             | Direct: `awk`, asserting that `gawk` is installed                                                                                                                                                                                                                                                                |
+| Conflict with an installed package fails                                           | Direct: `coreutils-single` against the installed `coreutils`. No check covers the replacement of a package by one that obsoletes it                                                                                                                                                                              |
 | Name-version form selects that edition                                             | Direct: the runner reads an offered edition at run time and installs `name-<version>`                                                                                                                                                                                                                            |
-| Image without zypper fails clearly                                                 | Direct on a pinned image outside the compatibility list that has no `zypper`                                                                                                                                                                                                                                     |
+| Image without zypper fails clearly                                                 | Direct on `debian:12@sha256:f37a335e82bca302e955fa39f9dfe28f1be618f016f8a2b56318e5a5111afc26` (the digest of its multi-architecture index, read on 2026-10-01), outside the compatibility list, which has no `zypper`                                                                                            |
 | Missing metadata is refreshed                                                      | Every scenario and duplicate.sh run with a non-empty list on the plain images, which ship no metadata                                                                                                                                                                                                            |
 | Current metadata is kept                                                           | Direct: a container refreshed beforehand runs the feature, and zypper's log shows only index downloads before the install                                                                                                                                                                                        |
 | Failed refresh fails the feature                                                   | Direct, with an added enabled repository at an unreachable address (a service-managed Leap repository cannot be edited, Context), asserting nothing from the others installs                                                                                                                                     |
 | Unverifiable repository fails the refresh                                          | Direct, with the openSUSE Project Signing Key removed from the RPM database, asserting that no key was added                                                                                                                                                                                                     |
+| Unsigned repository fails the refresh                                              | Direct, with an added enabled repository that holds a copy of a refreshed repository's metadata without its `repomd.xml.asc` and `repomd.xml.key`, asserting nothing installs                                                                                                                                    |
 | Zypp configuration is unchanged                                                    | Direct, hashing `/etc/zypp` and listing `gpg-pubkey` before and after                                                                                                                                                                                                                                            |
-| Installation runs unattended                                                       | Every scenario, test.sh, and duplicate.sh, which run without a terminal. The license clause of "Non-interactive installation" has no test, because no enabled repository carries a license to confirm (Context); it is checked by review of `install.sh` (no `--auto-agree-with-licenses`)                       |
+| Installation runs unattended                                                       | Every scenario, test.sh, and duplicate.sh, which run without a terminal. The license clause of "Non-interactive installation" has no test, because none of the repositories checked carries a license to confirm (Context); it is checked by review of `install.sh` (no `--auto-agree-with-licenses`)            |
 | Caches are removed                                                                 | Scenario; duplicate.sh (shell globs, since the images lack `find`)                                                                                                                                                                                                                                               |
 | Same list on the second install; Different list on the second install              | Direct, running the feature twice in one container                                                                                                                                                                                                                                                               |
 | Pin below the installed version on the second install                              | Direct: the runner picks at run time a package offered in two versions, installs it unpinned, then pins the older one. Leap always offers one; on Tumbleweed it depends on `repo-update` (Context), and when none is offered the runner reports the check as not run there, which the Validation section records |
@@ -288,10 +331,13 @@ feature. The only network access is zypper and libzypp reaching the repositories
 listed here so the review sees the whole build-time surface. The images themselves are pulled by the consumer or the
 test harness, not by the feature. Integrity rests on the signed `repomd.xml` of each repository (key in the RPM
 database, `AD48 5664 E901 B867 051A B15F 35A2 F86E 29B7 00A4`, published at https://get.opensuse.org/tumbleweed/ and
-https://get.opensuse.org/leap/16.0/); every other file, whichever host serves it, is checked against the checksums that
-index lists. Besides the rows, libzypp probes `media.1/media` and `content` under each base URL, which answer 404 and
-are expected to. Verified on 2026-09-30 with `curl -sSIL` (and a GET where the body matters); `{arch}` is `x86_64` or
-`aarch64`.
+https://get.opensuse.org/leap/16.0/); every file that index lists, whichever host serves it, is checked against the
+checksums the index holds. Besides the rows, libzypp probes `content` and `media.1/media` under each base URL, never
+from a mirror. `content` answers 404 everywhere. `media.1/media` answers 404 except for Tumbleweed's `repo/oss` and
+`repo/non-oss`, where `download.opensuse.org` serves a short media descriptor over plain HTTP (found by the independent
+audit posted on this change's pull request on 2026-10-01); `repomd.xml` does not list that file, so no checksum covers
+it, and it holds no package content. Verified on 2026-09-30 with `curl -sSIL` (and a GET where the body matters);
+`{arch}` is `x86_64` or `aarch64`.
 
 | URL / template                                                                                                                                                                                     | Purpose                                                                                            | When  | Integrity / authenticity                                                                                                  | Official source evidence                                                                                                                                                                                                                                                                                                                                                                                                                                  | Verified                                                                                                                                                                                                                                                |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -315,10 +361,28 @@ are expected to. Verified on 2026-09-30 with `curl -sSIL` (and a GET where the b
   list can produce different versions over time; Tumbleweed changes daily] → Stated in the spec; users who need
   stability pin `name=edition`.
 - [A pin below the installed version succeeds without applying the pin, so a user may believe the older version is
-  installed] → zypper prints that it kept the newer version, the spec states it, and NOTES.md explains it; Open question
-  2 offers failing instead.
+  installed] → zypper prints that it kept the newer version, the spec states it, and NOTES.md explains it (Open question
+  2).
 - [Mirrors and `ciscobinary.openh264.org` are hosts openSUSE does not run, some over plain HTTP] → Every file they serve
   is checked against the signed index; the feature adds no host, and a user who distrusts one disables the repository.
+- [Most indexes travel over plain HTTP, and a signed `repomd.xml` carries a revision but no expiry, so an on-path
+  attacker during the build can replay an older, validly signed index with its packages and hold back updates] → The
+  signature protects integrity, not freshness. The `http://` URLs are the images' own, and the feature configures no
+  repository; NOTES.md says that users who need freshness switch the image's repositories to `https://` in their
+  Dockerfile. Leap's `repo-openh264` already uses HTTPS.
+- [An entry that names no package installs a package that provides it as a capability, and zypper picks the provider
+  when several exist, so a generic or mistyped name can install something unexpected] → Stated in the spec; NOTES.md
+  tells users to list package names.
+- [The devcontainer CLI shell-sources option values before `install.sh` runs (Context), so a `$(…)`, backtick, `$VAR`,
+  or `"` in `packages` is evaluated, as root, before validation] → Whoever sets the option already controls the build,
+  so no privilege boundary is crossed. The spec's refusal scenarios cover the value `install.sh` receives; NOTES.md says
+  option values must not carry untrusted `"`, `$`, or backticks.
+- [A listed package, or one it needs, may itself change keys, repositories, or zypp configuration, as
+  `openSUSE-build-key` does] → The spec keeps such files out of the feature's own changes (requirement "Repository
+  authentication stays in effect"); the packages come from the image's signed repositories and the user chooses them.
+  NOTES.md mentions it.
+- [A derived image or an earlier build step trusted another key or turned `gpgcheck` off] → The feature inherits it and
+  the spec says so; the supported images do neither.
 - [Repositories replace versions, so a fixed version in a test stops resolving] → No test fixes a version: the direct
   checks choose editions at run time. Where no package is offered in two versions, which Tumbleweed does not guarantee
   (Context), the pin-below check reports that it did not run, and the PR's Validation section records it.
@@ -326,41 +390,40 @@ are expected to. Verified on 2026-09-30 with `curl -sSIL` (and a GET where the b
   installed] → zypper reports a solver problem in non-interactive mode and the feature fails; the feature never
   overrides a lock the image set.
 - [CI does not run the direct checks, so a later change could break a failure path unnoticed until someone runs them] →
-  The PR's Validation section records their output; Open question 6 offers running them in CI.
+  The PR's Validation section records their output; issue #50 tracks running them in CI (Open question 6).
 - [Leap 16.1 or SUSE Linux Enterprise images are not tested] → They are outside the compatibility list; the feature
-  works or fails with zypper's own error. Leap 16.1 joins the list once openSUSE lists it as released (Open question 5).
+  works or fails with zypper's own error. Leap 16.1 joins the list once openSUSE lists it as released, and SLE in the
+  follow-up change of Open question 5.
 
 ## Open Questions
 
-Decisions for the maintainer at the package gate; each notes whether it changes the spec.
+None open. The maintainer decided these on 2026-10-01, ahead of the package gate, following the decision "Native
+behavior first":
 
-1. **Strict refresh instead of autorefresh alone.** The binding note says the images' `autorefresh=1` makes a refresh
-   heuristic unnecessary; the design adds none, but runs one plain `zypper refresh` before the install, because
-   autorefresh inside `install` skips a failing repository and installs from the others before failing. The refresh
-   downloads only indexes when metadata is current, so it downloads metadata only when needed, as the issue asks: when
-   none is cached (every fresh image and every second install, since the first cleans the cache) or a repository's index
-   changed. Recommendation: keep it, which keeps the shared guarantee "a failed refresh installs nothing" of
-   `apt-packages`. Dropping it changes the requirement "Repository metadata refresh" (the scenario "Failed refresh fails
-   the feature" would then allow installed packages).
+1. **Strict refresh instead of autorefresh alone.** The images' `autorefresh=1` makes a refresh heuristic unnecessary,
+   and the design adds none, but it runs one plain `zypper refresh` before the install, because autorefresh inside
+   `install` skips a failing repository and installs from the others before failing. The refresh downloads only indexes
+   when metadata is current, so it downloads metadata only when needed, as the issue asks: when none is cached (every
+   fresh image and every second install, since the first cleans the cache) or a repository's index changed. Resolved:
+   kept, which keeps "a failed refresh installs nothing", as in `apt-packages`.
 2. **Pin below the installed version.** zypper keeps the newer version and succeeds; `apt-packages` fails in the same
-   case. Recommendation: keep zypper's answer as specified and document it, since matching apt needs a post-install
-   check that re-implements zypper's edition matching. Failing instead changes the requirement "Version and architecture
-   qualifiers" and the scenario "Pin below the installed version on the second install".
-3. **Comparison operators.** zypper accepts `name>=edition` and the other operators, but `<` and `>` are shell
-   metacharacters, which the binding rule refuses. Recommendation: keep refusing them; `=` covers exact pins. Allowing
-   them changes the requirement "Entries are validated before anything changes". The edition characters also leave out
-   the caret `^`, which RPM accepts in versions (Context), so a native pin such as `name=2.0^20250611` is refused
-   although the binding decision passes native pins through. POSIX `sh` does not list `^` among its special characters,
-   and entries reach zypper quoted in any case. Recommendation: leave it out until a package in the supported
-   repositories uses it (none did when checked); allowing it changes the same requirement.
-4. **Exact names through `--name`.** Capabilities such as `awk` or a shared library soname stop working, and
-   `apt-packages` does install a virtual package with one provider. Recommendation: keep `--name`, because zypper picks
-   among several providers silently instead of failing as apt does. Allowing capabilities changes the requirement
-   "Entries name packages exactly".
+   case. Resolved: zypper's answer stays as specified, and NOTES.md says that such a pin is not applied. Rejected:
+   failing instead, which needs a post-install check of every pinned entry.
+3. **Comparison operators and the caret.** zypper accepts `name>=edition` and the other operators, and RPM accepts the
+   caret `^` in versions (Context); an earlier rule for the five installers refused `<` and `>` as shell metacharacters.
+   Entries reach zypper quoted, and POSIX `sh` does not list `^` among its special characters. Resolved: `<`, `<=`, `>`,
+   and `>=` are accepted in the place of `=`, and `^` is accepted in an edition, as in `apk-packages` and
+   `pacman-packages` for their managers' operators (requirements "Version and architecture qualifiers" and "Entries are
+   validated before anything changes").
+4. **Capabilities.** zypper's default installs a provider for a name no package has (`awk` installs `gawk`) and picks
+   among several providers silently, where apt fails. Resolved: zypper's default stays, without `--name`, as the other
+   installers keep their managers' provider matching (requirement "Entries select packages as zypper matches them").
+   Rejected: `--name`, which was the earlier draft and guards against a mistyped name at the price of refusing what
+   zypper itself would install.
 5. **SUSE Linux Enterprise.** The issue's outcome names openSUSE and SLE; the compatibility list holds only openSUSE
-   images, and no SLE image was checked. Recommendation: ship with openSUSE, and add an SLE BCI image in a follow-up
-   MINOR change after checking its repositories without registration. Does not change the spec; adding SLE later extends
-   the failure message's distribution names.
-6. **Direct checks in CI.** As for `apt-packages`: accept the local runner for this change and propose one
-   test-infrastructure change that lets a feature's tests assert expected failures in CI for all five installers. Does
-   not change the spec.
+   images, and no SLE image was checked. Resolved: ship with openSUSE, and add an SLE BCI image in a follow-up MINOR
+   change after checking its repositories without registration. Does not change the spec; adding SLE later extends the
+   failure message's distribution names.
+6. **Direct checks in CI.** As for `apt-packages`: the local runner is accepted for this change, and issue #50 tracks
+   the test-infrastructure change that lets a feature's tests assert expected failures in CI for all five installers.
+   Does not change the spec.
