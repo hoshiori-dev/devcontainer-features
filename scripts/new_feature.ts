@@ -43,7 +43,7 @@ export function scaffold(id: string, name: string, options: Map<string, OptionCo
     const compat = {
         $schema: "../compatibility.schema.json",
         images: [
-            { image: "mcr.microsoft.com/devcontainers/base:ubuntu-24.04" },
+            { image: "mcr.microsoft.com/devcontainers/base:ubuntu24.04" },
             { image: "debian:12" },
         ],
     };
