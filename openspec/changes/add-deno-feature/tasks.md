@@ -32,7 +32,7 @@
 
 ## 3. Tests
 
-- [x] 3.1 Write `test/deno/compatibility.json` with `base:ubuntu-24.04` (`remoteUser` `vscode`) and `debian:12`, each
+- [x] 3.1 Write `test/deno/compatibility.json` with `base:ubuntu24.04` (`remoteUser` `vscode`) and `debian:12`, each
       with `"arch": ["amd64", "arm64"]`; verify with `just validate`
 - [x] 3.2 Write `test/deno/test.sh`: `deno` resolves to `/usr/local/bin/deno` and reports the version the latest pointer
       names, the container environment (`DENO_INSTALL_ROOT`, `DENO_NO_UPDATE_CHECK`, `PATH` with the tools directory
@@ -42,9 +42,9 @@
       version the latest pointer names, no staging file is left, and the tools tree exists with its owner (tools
       surviving a reinstall are the scenarios' part); verify with `just test deno`
 - [x] 3.4 Write `test/deno/scenarios.json` with its scripts and `build` folders: an exact version checked as the remote
-      user and as root on `base:ubuntu-24.04`; a `debian:12` build with a stub `deno` reporting `2.8.0` and a plain tool
+      user and as root on `base:ubuntu24.04`; a `debian:12` build with a stub `deno` reporting `2.8.0` and a plain tool
       in `/usr/local/share/deno/bin`, installed once with `2.8.0` (stub unchanged, tool runs) and once with `latest`
-      (stub replaced, tool runs); and a `base:ubuntu-24.04` build that saves the `dpkg-query -W` listing, compared after
+      (stub replaced, tool runs); and a `base:ubuntu24.04` build that saves the `dpkg-query -W` listing, compared after
       installation; verify with `just test-scenarios deno`
 
 ## 4. Documentation

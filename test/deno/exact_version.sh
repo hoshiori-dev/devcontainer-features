@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario: version 2.8.0 on base:ubuntu-24.04 as vscode; deno reports it for vscode and for root.
+# Scenario: version 2.8.0 on base:ubuntu24.04 as vscode; deno reports it for vscode and for root.
 set -e
 
 # shellcheck source=/dev/null

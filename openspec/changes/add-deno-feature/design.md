@@ -46,7 +46,7 @@ were checked on 2026-09-30 unless marked otherwise.
   is left alone.
 - The Dev Container spec applies `containerEnv` as Dockerfile `ENV` before the feature's `install.sh` runs, so its
   values are in effect during installation and in every process of the container, and `${PATH}` expands.
-- `debian:12` ships bash and `libgcc_s` but no `curl`, `unzip`, or CA bundle; `base:ubuntu-24.04` has all three through
+- `debian:12` ships bash and `libgcc_s` but no `curl`, `unzip`, or CA bundle; `base:ubuntu24.04` has all three through
   the common-utils feature it is built with. `bash` is an Essential package on Debian and Ubuntu; in the Fedora and
   openSUSE families it was present in every image probed (Platform research below), which is evidence, not a guarantee.
   Stock `alpine` has no bash, so a `#!/usr/bin/env bash` script fails there with `env: can't execute 'bash'` before its
@@ -55,7 +55,7 @@ were checked on 2026-09-30 unless marked otherwise.
   not the default, unless `--permit-randomization` is passed, which `scripts/test_feature.ts` does not do.
 - The Dev Container CLI changes the remote user's UID and GID after the features are installed. The maintainer reported
   that PR #30's CI failed: "the tools tree is owned by vscode" (`test.sh`, `duplicate.sh`, and the `exact_version`
-  scenario) failed on `base:ubuntu-24.04`, amd64 and arm64, while the same tests passed locally. The failing containers
+  scenario) failed on `base:ubuntu24.04`, amd64 and arm64, while the same tests passed locally. The failing containers
   ran from images tagged `-features-uid`. CLI 0.89.0 builds that image from its `scripts/updateUID.Dockerfile` when
   `updateRemoteUserUID` is not `false`, on a Linux host, for a remote user other than root: it rewrites that user's UID
   and GID in `/etc/passwd` to the host user's, rewrites the GID of that user's primary group in `/etc/group`, and runs
@@ -82,11 +82,11 @@ neither an arm64 runner nor emulation.
   `cgr.dev/chainguard/wolfi-base`, `amazonlinux:2`, and `archlinux:latest` (each rejected).
 - Supported families, all with bash and `libgcc_s.so.1`, all running Deno 2.9.7 [T]:
 
-  | Family   | Images probed                                                                                                                                                                                                                                                        | glibc     | `ID` / `ID_LIKE`                                                                                                                               | Manager                                                                                     | Missing of `curl`, `unzip`, CA bundle                   | CA bundle paths present                                                                                                                 |
-  | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-  | Debian   | `debian:12`, `debian:13` (and `-slim`), `ubuntu:22.04`, `ubuntu:24.04`, `ubuntu:26.04`; devcontainers `base:ubuntu-24.04`, `noble`, `jammy`, `trixie`, `bookworm`, `ubuntu26.04`, and the `javascript-node`, `typescript-node`, and `python` tags on Debian 12 or 13 | 2.35–2.43 | `debian`; `ubuntu` / `debian`                                                                                                                  | `apt-get`                                                                                   | all three on plain images; none on devcontainers images | `/etc/ssl/certs/ca-certificates.crt` where present                                                                                      |
-  | Fedora   | `fedora:43`, `fedora:44`; `almalinux:8`, `:9`, `:10`; `rockylinux/rockylinux:8`, `:9`, `:10`; `quay.io/centos/centos:stream9`, `stream10`; `oraclelinux:8`, `:9`, `:10`; UBI 8, 9, 10; `amazonlinux:2023`                                                            | 2.28–2.43 | `fedora`; `almalinux`, `rocky` / `rhel centos fedora`; `centos` / `rhel fedora`; `rhel` / `fedora` or `centos fedora`; `ol`, `amzn` / `fedora` | `dnf` (on Fedora, `dnf`, `yum`, and `microdnf` are links to dnf5 [I, dnf-packages Context]) | `unzip` only                                            | EL and Amazon Linux: `/etc/pki/tls/certs/ca-bundle.crt`; `fedora:44`: only `/etc/ssl/certs/ca-certificates.crt` and `/etc/ssl/cert.pem` |
-  | openSUSE | `opensuse/leap:15.6`, `opensuse/leap:16.0`, `opensuse/tumbleweed`                                                                                                                                                                                                    | 2.38–2.44 | `opensuse-leap` / `suse opensuse`; `opensuse-tumbleweed` / `opensuse suse`                                                                     | `zypper`                                                                                    | `unzip` only                                            | `/etc/ssl/ca-bundle.pem`                                                                                                                |
+  | Family   | Images probed                                                                                                                                                                                                                                                       | glibc     | `ID` / `ID_LIKE`                                                                                                                               | Manager                                                                                     | Missing of `curl`, `unzip`, CA bundle                   | CA bundle paths present                                                                                                                 |
+  | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+  | Debian   | `debian:12`, `debian:13` (and `-slim`), `ubuntu:22.04`, `ubuntu:24.04`, `ubuntu:26.04`; devcontainers `base:ubuntu24.04`, `noble`, `jammy`, `trixie`, `bookworm`, `ubuntu26.04`, and the `javascript-node`, `typescript-node`, and `python` tags on Debian 12 or 13 | 2.35–2.43 | `debian`; `ubuntu` / `debian`                                                                                                                  | `apt-get`                                                                                   | all three on plain images; none on devcontainers images | `/etc/ssl/certs/ca-certificates.crt` where present                                                                                      |
+  | Fedora   | `fedora:43`, `fedora:44`; `almalinux:8`, `:9`, `:10`; `rockylinux/rockylinux:8`, `:9`, `:10`; `quay.io/centos/centos:stream9`, `stream10`; `oraclelinux:8`, `:9`, `:10`; UBI 8, 9, 10; `amazonlinux:2023`                                                           | 2.28–2.43 | `fedora`; `almalinux`, `rocky` / `rhel centos fedora`; `centos` / `rhel fedora`; `rhel` / `fedora` or `centos fedora`; `ol`, `amzn` / `fedora` | `dnf` (on Fedora, `dnf`, `yum`, and `microdnf` are links to dnf5 [I, dnf-packages Context]) | `unzip` only                                            | EL and Amazon Linux: `/etc/pki/tls/certs/ca-bundle.crt`; `fedora:44`: only `/etc/ssl/certs/ca-certificates.crt` and `/etc/ssl/cert.pem` |
+  | openSUSE | `opensuse/leap:15.6`, `opensuse/leap:16.0`, `opensuse/tumbleweed`                                                                                                                                                                                                   | 2.38–2.44 | `opensuse-leap` / `suse opensuse`; `opensuse-tumbleweed` / `opensuse suse`                                                                     | `zypper`                                                                                    | `unzip` only                                            | `/etc/ssl/ca-bundle.pem`                                                                                                                |
 
 - Minimal Fedora-family images — `almalinux:10-minimal`, `rockylinux/rockylinux:10-minimal`, `oraclelinux:10-slim`,
   `ubi9/ubi-minimal`, `ubi10/ubi-minimal` — have `curl`, a CA bundle, and `microdnf` but no `dnf`, and lack `unzip` [T].
@@ -119,7 +119,7 @@ neither an arm64 runner nor emulation.
 - Image configuration (`docker buildx imagetools inspect`) [I]: `fedora:44`, `almalinux:9`, and `almalinux:8` set
   `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`; `opensuse/leap:16.0` sets no `Env`, so Docker's
   default `PATH` applies. Its `created` field (2025-08-26) is a fixed timestamp; its labels name a build of 2026-09-28.
-  `base:ubuntu-24.04` was last built on 2025-10-16. All six images of Supported images publish amd64 and arm64.
+  `base:ubuntu24.04` was last built on 2025-10-16. All six images of Supported images publish amd64 and arm64.
 - Arch Linux supports only full upgrades: the Arch Wiki says to never run `pacman -Sy`, and `pacman -Sy <package>` is an
   unsupported partial upgrade (https://wiki.archlinux.org/title/System_maintenance, as cited by the `pacman-packages`
   change, branch `23-add-feature-pacman-packages`) [I here], so installing `unzip` there means `pacman -Syu`.
@@ -175,7 +175,7 @@ neither an arm64 runner nor emulation.
     `lock`, `partial`, and `auxfiles`, and `/var/cache/apt/archives` holds no `*.deb` (a bash glob, not `find`);
     `/var/cache/dnf` and `/var/cache/libdnf5` hold no directory and no `*.rpm`, `*.solv`, or `repomd.xml` (dnf 4 keeps a
     few state files after `dnf clean all`, Context); `/var/cache/zypp` holds no file;
-  - the `build` scenario from `base:ubuntu-24.04` whose Dockerfile saves the `dpkg-query -W` listing; its test compares
+  - the `build` scenario from `base:ubuntu24.04` whose Dockerfile saves the `dpkg-query -W` listing; its test compares
     that listing with the one after installation;
   - review of every package-manager call against Decisions, and the hand run "Package manager missing".
 - `test.sh` and `duplicate.sh` call no `find` (openSUSE images ship none, Context) and no other command whose absence
@@ -255,8 +255,8 @@ neither an arm64 runner nor emulation.
   to the two directories, never recursively, so tools already in `bin` keep their owner; creating the group and adding
   the member happen only when missing. Checked by `test.sh`, `duplicate.sh`, and the `exact_version` scenario asserting
   the owner, group, mode, and membership and installing a global tool as the remote user — on GitHub-hosted runners,
-  where the CLI's own change to UID 1001 applies — and by a scenario on `base:ubuntu-24.04` (`remoteUser` `vscode`)
-  whose test changes `vscode`'s UID and GID with the same `/etc/passwd` and `/etc/group` edits as `updateUID.Dockerfile`
+  where the CLI's own change to UID 1001 applies — and by a scenario on `base:ubuntu24.04` (`remoteUser` `vscode`) whose
+  test changes `vscode`'s UID and GID with the same `/etc/passwd` and `/etc/group` edits as `updateUID.Dockerfile`
   through the image's `sudo`, then installs a global tool as `vscode` in a new process, so the remap is covered on a
   host whose UID is 1000 too; and by a `build` scenario from `almalinux:9` whose Dockerfile adds a user `devuser` with
   `useradd -m` and names it `remoteUser`, asserting group `deno`, mode 2775, the membership, and a global tool installed
@@ -366,14 +366,14 @@ Planned `test/deno/compatibility.json` (the spec never lists images): the two ap
 family or package-manager generation, and the glibc-floor canary; six images on two architectures, twelve CI jobs plus
 the scenario job.
 
-| Image                                               | Arch         | `remoteUser` | Covers                                                                                                    |
-| --------------------------------------------------- | ------------ | ------------ | --------------------------------------------------------------------------------------------------------- |
-| `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` | amd64, arm64 | `vscode`     | Prerequisites present; non-root remote user in group `deno`, its UID changed in CI                        |
-| `debian:12`                                         | amd64, arm64 | (none, root) | apt: `curl`, `unzip`, and the CA bundle missing; root owns the global tools tree                          |
-| `fedora:44`                                         | amd64, arm64 | (none, root) | dnf5, family from `ID`; only `unzip` missing; CA bundle only outside the EL path                          |
-| `almalinux:9`                                       | amd64, arm64 | (none, root) | dnf 4, family from `ID_LIKE`; only `unzip` missing; CA bundle at the EL path                              |
-| `almalinux:8`                                       | amd64, arm64 | (none, root) | glibc floor canary (maintainer decision): glibc 2.28, the lowest in scope; EL8's dnf; only the EL CA path |
-| `opensuse/leap:16.0`                                | amd64, arm64 | (none, root) | zypper; only `unzip` missing; CA bundle at `/etc/ssl/ca-bundle.pem`; no `find`; no `PATH` in its config   |
+| Image                                              | Arch         | `remoteUser` | Covers                                                                                                    |
+| -------------------------------------------------- | ------------ | ------------ | --------------------------------------------------------------------------------------------------------- |
+| `mcr.microsoft.com/devcontainers/base:ubuntu24.04` | amd64, arm64 | `vscode`     | Prerequisites present; non-root remote user in group `deno`, its UID changed in CI                        |
+| `debian:12`                                        | amd64, arm64 | (none, root) | apt: `curl`, `unzip`, and the CA bundle missing; root owns the global tools tree                          |
+| `fedora:44`                                        | amd64, arm64 | (none, root) | dnf5, family from `ID`; only `unzip` missing; CA bundle only outside the EL path                          |
+| `almalinux:9`                                      | amd64, arm64 | (none, root) | dnf 4, family from `ID_LIKE`; only `unzip` missing; CA bundle at the EL path                              |
+| `almalinux:8`                                      | amd64, arm64 | (none, root) | glibc floor canary (maintainer decision): glibc 2.28, the lowest in scope; EL8's dnf; only the EL CA path |
+| `opensuse/leap:16.0`                               | amd64, arm64 | (none, root) | zypper; only `unzip` missing; CA bundle at `/etc/ssl/ca-bundle.pem`; no `find`; no `PATH` in its config   |
 
 The lowest glibc in the list is 2.28 (`almalinux:8`), one minor release above the floor; Deno 2.9.7 ran on 2.27 itself
 only in `ubuntu:18.04` (Context), a release out of standard support. On amd64 the Deno binary ran on all six [T]; the
@@ -390,14 +390,14 @@ has `dnf`, `curl`, and a CA bundle at a path already covered, so none reaches a 
 `dnf` is dnf 4 is inferred from their EL or Amazon Linux base). Rejected: a `microdnf`-only image, which is unsupported
 (Decisions); its failure is a hand run.
 
-Every scenario image is `base:ubuntu-24.04` or `debian:12` on amd64, including the `build` scenarios named in Goals,
+Every scenario image is `base:ubuntu24.04` or `debian:12` on amd64, including the `build` scenarios named in Goals,
 except the `build` scenario from `almalinux:9` for the group rule (Decisions). `test.sh` compares `deno --version` with
 the latest pointer read at test time (Risks).
 
 ## Verification
 
 Maintainer decision (2026-09-30), in place of a full local `just test deno` that `openspec/config.yaml` (`rules.tasks`)
-asks for, for this feature only: `just test deno` runs locally only with `--image` for `base:ubuntu-24.04` and
+asks for, for this feature only: `just test deno` runs locally only with `--image` for `base:ubuntu24.04` and
 `debian:12` on amd64. The four added images and every arm64 job are verified by CI's jobs on the PR, each result
 recorded in the PR's Validation section. Rejected: a full local `just test deno`, which pulls all six images, while CI
 runs the same jobs on both architectures.
@@ -526,7 +526,7 @@ Container CLI, not by the feature's scripts.
 - [The glibc floor of 2.27 comes from Deno's current build (Context), and a later release could raise it] → The current
   script runs the staged executable's `--version` before the rename, so such a release fails the installation and leaves
   the previous binary; a PATCH raises the check.
-- [`base:ubuntu-24.04` has not been rebuilt since 2025-10-16] → Accepted: the maintainer kept it in the list; it tests
+- [`base:ubuntu24.04` has not been rebuilt since 2025-10-16] → Accepted: the maintainer kept it in the list; it tests
   the feature, not the image's currency.
 
 ## Open Questions

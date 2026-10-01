@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario: base:ubuntu-24.04 already has curl, ca-certificates, and unzip, so the feature
+# Scenario: base:ubuntu24.04 already has curl, ca-certificates, and unzip, so the feature
 # installs and removes no package.
 set -e
 
