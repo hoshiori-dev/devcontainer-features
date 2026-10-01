@@ -232,7 +232,7 @@ Rejected option shapes:
   feature needs no privilege beyond the root build step and does nothing at start.
 - **Idempotency:** one prefix, replaced as a whole on every install; the wrapper overwritten; the temporary directory
   removed by a trap. Outcome: spec, Install twice.
-- **Supported images (planned `test/openspec/compatibility.json`):** `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`
+- **Supported images (planned `test/openspec/compatibility.json`):** `mcr.microsoft.com/devcontainers/base:ubuntu24.04`
   (amd64, arm64; `remoteUser` `vscode`) and `debian:12` (amd64, arm64); both publish both architectures, and both are
   within what the Node.js feature supports.
 - **Failure behavior:** spec scenarios; how each is shown: Decisions - Tests.
