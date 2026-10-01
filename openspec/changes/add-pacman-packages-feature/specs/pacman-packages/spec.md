@@ -69,15 +69,17 @@ the repositories offer.
 
 Arch Linux supports only full system upgrades (https://wiki.archlinux.org/title/System_maintenance). When `packages`
 names at least one package, the feature SHALL, together with installing the list, upgrade every installed package for
-which the configured repositories offer a newer version, and SHALL replace an installed package with a package of the
-configured repositories that declares it replaces that package (`replaces`, https://man.archlinux.org/man/PKGBUILD.5),
-removing the replaced package. The feature SHALL NOT downgrade any installed package.
+which the configured repositories offer a newer version and which the image's pacman configuration does not hold back,
+and SHALL replace an installed package with a package of the configured repositories that declares it replaces that
+package (`replaces`, https://man.archlinux.org/man/PKGBUILD.5), removing the replaced package. The feature SHALL NOT
+downgrade any installed package.
 
 #### Scenario: Outdated installed packages are upgraded
 
 - **WHEN** the image has installed packages older than the versions the configured repositories offer and `packages`
   names at least one package
-- **THEN** after the feature succeeds, no installed package is older than the version the repositories offer
+- **THEN** after the feature succeeds, no installed package that the image's pacman configuration does not hold back is
+  older than the version the repositories offer
 
 ### Requirement: Version constraints
 
@@ -99,11 +101,11 @@ SHALL NOT install a version the configured repositories do not offer.
 
 ### Requirement: Entries are validated before anything changes
 
-The feature SHALL accept an entry only when it starts with a letter or a digit and consists only of letters, digits, the
-characters `@`, `.`, `_`, `+`, `-`, and `:`, and the comparison characters `<`, `>`, and `=`. When any entry is refused,
-the feature SHALL exit with status 1 and a message naming that entry before it checks for `pacman`, synchronizes the
-package databases, or installs anything. The feature SHALL hand every accepted entry to `pacman` as one argument and
-SHALL NOT evaluate it as shell code.
+The feature SHALL accept an entry only when it starts with an ASCII letter or a digit and consists only of ASCII
+letters, digits, the characters `@`, `.`, `_`, `+`, `-`, and `:`, and the comparison characters `<`, `>`, and `=`. When
+any entry is refused, the feature SHALL exit with status 1 and a message naming that entry before it checks for
+`pacman`, synchronizes the package databases, or installs anything. The feature SHALL hand every accepted entry to
+`pacman` as one argument and SHALL NOT evaluate it as shell code.
 
 #### Scenario: URL or path is refused
 
@@ -118,12 +120,12 @@ SHALL NOT evaluate it as shell code.
 
 #### Scenario: Shell metacharacters and inner whitespace are refused
 
-- **WHEN** `packages` holds an entry with whitespace inside it or with a character outside the accepted set, such as
-  `;`, `$`, `` ` ``, `*`, `?`, or `|`
+- **WHEN** the `packages` value the feature receives holds an entry with whitespace inside it or with a character
+  outside the accepted set, such as `;`, `$`, `` ` ``, `*`, `?`, `|`, or a non-ASCII letter
 - **THEN** the feature exits with status 1, names the entry, installs nothing, and runs no command contained in the
   entry
 
-### Requirement: Entries name packages exactly
+### Requirement: Entries select packages as pacman matches them
 
 The feature SHALL resolve an entry, without its version constraint, only as `pacman` resolves a sync target: the exact
 name of a package in the configured repositories, otherwise a name that packages there provide, otherwise the name of a
@@ -210,10 +212,10 @@ for an expired key, the address of the key's first user ID in the image's keyrin
 taken from that address, the key is looked up first in the Web Key Directory of `<domain>`, at
 `https://openpgpkey.<domain>/.well-known/openpgpkey/<domain>/hu/<hash>?l=<local part>` or, when that host does not
 exist, at `https://<domain>/.well-known/openpgpkey/hu/<hash>?l=<local part>`, where `<hash>` is the Web Key Directory
-hash of the local part; otherwise by its fingerprint on the default keyserver of the image's GnuPG, which is
-`https://keyserver.ubuntu.com/pks/lookup` from GnuPG 2.2.29 until 2.5.3, which has no default keyserver. A fetched key
-SHALL gain no trust of its own: a package it signs installs only when the keys the image's keyring already trusts
-certify the key.
+hash of the local part; otherwise by its fingerprint, and then by the last eight hexadecimal digits of the fingerprint,
+on the default keyserver of the image's GnuPG, which is `https://keyserver.ubuntu.com/pks/lookup` from GnuPG 2.2.29
+until 2.5.3, which has no default keyserver. A fetched key SHALL gain no trust of its own: a package it signs installs
+only when the keys the image's keyring already trusts certify the key.
 
 #### Scenario: Missing certified key is fetched
 
