@@ -33,16 +33,28 @@ check "the caller's empty OPENSPEC_NO_UPDATE_CHECK is kept" \
 check "the caller's OPENSPEC_TELEMETRY=0 is passed through" \
   [ "$(seen_env -u OPENSPEC_NO_UPDATE_CHECK OPENSPEC_TELEMETRY=0)" = "NO_UPDATE_CHECK=set:1 TELEMETRY=set:0" ]
 
-# Current Node.js switched later.
+# Current Node.js switched later. A shell that loaded nvm before the switch, as the one this script
+# runs in may have, keeps the first Node.js's own directory on PATH, so what is current is read
+# from nvm's `current` link, and openspec also runs with that link's directory first on PATH, as
+# in every shell the remote user starts after the switch.
+current_node() {
+  readlink -f "$NVM_DIR/current/bin/node"
+}
+with_current_node() {
+  env PATH="$NVM_DIR/current/bin:$PATH" "$@"
+}
 installed_node=$(seen_node)
 echo "openspec runs on $installed_node"
-check "openspec runs on the Node.js that is current after the build" \
-  [ "$installed_node" = "$(readlink -f "$(command -v node)")" ]
+check "openspec runs on the Node.js that is current after the build" [ "$installed_node" = "$(current_node)" ]
 check "nvm installs Node.js $OTHER_NODE and makes it the default" switch_node "$OTHER_NODE"
-check "the current Node.js is now $OTHER_NODE" [ "$(node --version | cut -d. -f1)" = "v$OTHER_NODE" ]
-check "the Node.js on PATH is no longer the one openspec was installed with" \
-  [ "$(readlink -f "$(command -v node)")" != "$installed_node" ]
+echo "nvm's current Node.js is now $(current_node)"
+check "nvm's current Node.js is $OTHER_NODE" \
+  [ "$(with_current_node node --version | cut -d. -f1)" = "v$OTHER_NODE" ]
+check "the current Node.js is no longer the one openspec was installed with" \
+  [ "$(current_node)" != "$installed_node" ]
 check "openspec --version still prints $latest" [ "$(openspec --version)" = "$latest" ]
+check "openspec --version prints $latest with the current Node.js first on PATH" \
+  [ "$(with_current_node openspec --version)" = "$latest" ]
 check "openspec still runs on the Node.js it was installed with" [ "$(seen_node)" = "$installed_node" ]
 
 reportResults
