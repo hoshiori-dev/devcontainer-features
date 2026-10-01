@@ -601,6 +601,33 @@ const CHECKS: Check[] = [
         },
     },
     {
+        scenario: "Failed refresh fails the feature (one repository of several)",
+        on: "pacman",
+        network: "bridge",
+        async run(c, t) {
+            // The image's repositories synchronize; one more repository cannot be retrieved. Every repository has a
+            // database from an earlier synchronization, so a run that went on after the failure would install bc
+            // from them; without such databases pacman refuses the transaction by itself.
+            const repository = "pacman-packages-missing";
+            await c.sync();
+            await c.text(
+                'cp /var/lib/pacman/sync/core.db "/var/lib/pacman/sync/$1.db" && ' +
+                    `printf '\\n[%s]\\nServer = file:///nonexistent/$repo\\n' "$1" >> /etc/pacman.conf`,
+                repository,
+            );
+            // Premise: the earlier databases would serve bc.
+            t.ok((await c.sh("pacman -Si bc >/dev/null 2>&1")).code === 0, "the earlier databases do not offer bc");
+            const before = await c.localDb();
+            const what = `synchronization with the repository ${repository} failing`;
+            const result = await c.install("bc");
+            t.exit(result, "nonzero", what);
+            t.says(result, "failed to synchronize", what);
+            // Premise: that repository is the one whose synchronization failed.
+            t.says(result, `'${repository}.db'`, what);
+            t.ok((await c.localDb()) === before, "a package was installed or upgraded");
+        },
+    },
+    {
         scenario: "Untrusted signature fails the install",
         on: "pacman",
         network: "bridge",
