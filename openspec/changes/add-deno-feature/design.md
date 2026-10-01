@@ -55,14 +55,14 @@ were checked on 2026-09-30 unless marked otherwise.
   not the default, unless `--permit-randomization` is passed, which `scripts/test_feature.ts` does not do.
 - The Dev Container CLI changes the remote user's UID and GID after the features are installed. The maintainer reported
   that PR #30's CI failed: "the tools tree is owned by vscode" (`test.sh`, `duplicate.sh`, and the `exact_version`
-  scenario) failed on `base:ubuntu24.04`, amd64 and arm64, while the same tests passed locally. The failing containers
-  ran from images tagged `-features-uid`. CLI 0.89.0 builds that image from its `scripts/updateUID.Dockerfile` when
-  `updateRemoteUserUID` is not `false`, on a Linux host, for a remote user other than root: it rewrites that user's UID
-  and GID in `/etc/passwd` to the host user's, rewrites the GID of that user's primary group in `/etc/group`, and runs
-  `chown -R` on the home folder only. GitHub-hosted runners run as UID 1001, so `vscode` changed from 1000 to 1001 and
-  lost the `/usr/local/share/deno` tree the feature had given to UID 1000; locally the host UID is 1000 and nothing
-  changed. Every user whose host UID is not 1000 gets the same result. Supplementary group members in `/etc/group` are
-  stored by user name, which the rewrite leaves alone.
+  scenario) failed on the Ubuntu base image (then tagged `base:ubuntu-24.04`), amd64 and arm64, while the same tests
+  passed locally. The failing containers ran from images tagged `-features-uid`. CLI 0.89.0 builds that image from its
+  `scripts/updateUID.Dockerfile` when `updateRemoteUserUID` is not `false`, on a Linux host, for a remote user other
+  than root: it rewrites that user's UID and GID in `/etc/passwd` to the host user's, rewrites the GID of that user's
+  primary group in `/etc/group`, and runs `chown -R` on the home folder only. GitHub-hosted runners run as UID 1001, so
+  `vscode` changed from 1000 to 1001 and lost the `/usr/local/share/deno` tree the feature had given to UID 1000;
+  locally the host UID is 1000 and nothing changed. Every user whose host UID is not 1000 gets the same result.
+  Supplementary group members in `/etc/group` are stored by user name, which the rewrite leaves alone.
 - First-party precedent: `devcontainers/features` `src/node/install.sh` (commit `96405515`) creates a system group `nvm`
   when missing ("Create nvm group to the user's UID or GID to change while still allowing access to nvm"), adds the user
   to it, and gives its directory group `nvm` with `g+rws`.
@@ -119,7 +119,9 @@ neither an arm64 runner nor emulation.
 - Image configuration (`docker buildx imagetools inspect`) [I]: `fedora:44`, `almalinux:9`, and `almalinux:8` set
   `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`; `opensuse/leap:16.0` sets no `Env`, so Docker's
   default `PATH` applies. Its `created` field (2025-08-26) is a fixed timestamp; its labels name a build of 2026-09-28.
-  `base:ubuntu24.04` was last built on 2025-10-16. All six images of Supported images publish amd64 and arm64.
+  `base:ubuntu24.04` is image 3.0.8, built on 2026-09-10 (read on 2026-10-01); the tag `base:ubuntu-24.04`, which
+  earlier drafts named, was last built on 2025-10-16 (2.0.5) and is no longer rebuilt. All six images of Supported
+  images publish amd64 and arm64.
 - Arch Linux supports only full upgrades: the Arch Wiki says to never run `pacman -Sy`, and `pacman -Sy <package>` is an
   unsupported partial upgrade (https://wiki.archlinux.org/title/System_maintenance, as cited by the `pacman-packages`
   change, branch `23-add-feature-pacman-packages`) [I here], so installing `unzip` there means `pacman -Syu`.
@@ -526,8 +528,6 @@ Container CLI, not by the feature's scripts.
 - [The glibc floor of 2.27 comes from Deno's current build (Context), and a later release could raise it] → The current
   script runs the staged executable's `--version` before the rename, so such a release fails the installation and leaves
   the previous binary; a PATCH raises the check.
-- [`base:ubuntu24.04` has not been rebuilt since 2025-10-16] → Accepted: the maintainer kept it in the list; it tests
-  the feature, not the image's currency.
 
 ## Open Questions
 
