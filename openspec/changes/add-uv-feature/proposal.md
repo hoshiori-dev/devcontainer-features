@@ -22,7 +22,8 @@ point at nothing until the interpreter is downloaded again.
   working.
 - A remote user other than root can write that volume and manage the build-time tools without elevated privileges, also
   when the dev container tooling has changed that user's UID to the host user's, as it does by default on a Linux host:
-  the user is a member of a system group `uv` that holds the write access, and users outside the group get none.
+  the write access belongs to a system group `uv`, whose only member is that user, and to the owner the install set; no
+  other user but root gets it.
 - uv's environment points at those locations for every process in the container. Features installed after this one find
   `uv` and that environment during their own install, and the feature's notes tell them to write nothing under the
   volume's path at build time; `hf-cli` (#17) will depend on this feature and write nothing under the volume's path.
@@ -50,7 +51,7 @@ None.
   once this change is archived, and the root `README.md` (one row for `uv` under "## Features").
 - Metadata that widens the container: one named volume per dev container (`mounts`); no `privileged`, `capAdd`,
   `securityOpt`, `entrypoint`, or `init`, and no lifecycle command.
-- Accounts: the image gains one system group `uv` with the remote user as its member when that user is not root; no
+- Accounts: the image gains one system group `uv` with the remote user as its only member when that user is not root; no
   user, password, or sudo rule.
 - Dependencies: `installsAfter` the first-party `common-utils` feature; no `dependsOn`.
 - CI: the new feature's compatibility images run its tests on amd64 and arm64, except `archlinux:latest`, which has no
@@ -74,6 +75,8 @@ None.
   is not the owner of the two locations before it writes them.
 - "Group after a second install" passes in `test/uv/duplicate.sh` on the image with a non-root remote user, and for a
   second install that adds a tool it is observed with the two installs below.
+- "Nothing writable by every user" passes in the `tools` scenario for a non-root remote user and in
+  `test/uv/duplicate.sh`, whose first install has a tool, on the images with a root remote user.
 - "Existing group" and "User outside the group" are observed with the method the design names for them and recorded in
   the PR's Validation section.
 - "Default sources" holds by the review and the scenario the design names for it.
@@ -85,8 +88,8 @@ None.
   show is observed during implementation with the method the design names for it and recorded in the PR's Validation
   section.
 - "Rebuild keeps a workspace environment" is observed on a real rebuild of one dev container whose remote user's UID the
-  tooling changes, and "Separate dev containers" on two dev containers on one Docker host, both recorded in the PR's
-  Validation section.
+  tooling changes, with the method the design names, and "Separate dev containers" on two dev containers on one Docker
+  host, both recorded in the PR's Validation section.
 - `test/uv/test.sh` asserts the executable and the environment that "Later feature runs uv" relies on, and the scenario
   itself is observed with the throwaway later feature the design names and recorded in the PR's Validation section. From
   `hf-cli`'s change (#17) on, the first feature that depends on this one, its global scenario `uv_and_hf_cli` checks the
@@ -101,7 +104,7 @@ None.
 
 - No existing feature, test, or script changes behavior; `just check` passes for the rest of the repository.
 - The feature downloads only from the sources its spec names, and installs no uv archive that fails its checksum.
-- Nothing the feature creates is writable by every user, and the feature runs nothing at container start: no
-  `entrypoint`, no lifecycle command.
+- Nothing the feature's install leaves in the image or in a new volume is writable by every user, and the feature runs
+  nothing at container start: no `entrypoint`, no lifecycle command.
 - A workspace `.venv/` and the project environment stay where the user's project puts them; the feature creates or syncs
   no project environment and installs no system Python through the distribution's package manager.

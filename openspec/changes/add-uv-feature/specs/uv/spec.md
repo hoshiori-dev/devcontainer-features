@@ -180,13 +180,17 @@ with `uv tool` at runtime, without elevated privileges.
 ### Requirement: Grant write access through the group uv
 
 When the remote user is not root, the feature SHALL make the remote user a member of a system group named `uv`, creating
-the group when the image has none and otherwise using the existing group, whose ID and other members it leaves
-unchanged. `/usr/local/share/uv`, with everything the install puts there, and a newly created volume at `/var/lib/uv`
-SHALL belong to that group and be writable by its members, so that the remote user writes both without elevated
-privileges also when the dev container tooling has changed that user's UID to the host user's before the container
-starts. Neither location SHALL be writable by every user: besides root, only the members of `uv` and the owner the
-install set, which is the remote user under the UID it had when the image was built, can write. When the remote user is
-root, the feature SHALL create no group, and both locations SHALL be owned by root and writable by root only.
+the group when the image has none. It SHALL use a group `uv` the image already has, leaving its ID unchanged, only when
+no account other than the remote user belongs to that group, as a listed member or through its primary group; otherwise
+the build fails as "Fail on unsupported platforms and invalid options" states. `/usr/local/share/uv`, with everything
+the install puts there, and a newly created volume at `/var/lib/uv` SHALL belong to that group and be writable by its
+members, so that the remote user writes both without elevated privileges also when the dev container tooling has changed
+that user's UID to the host user's before the container starts. The install SHALL leave no file or directory in either
+location writable by every user, so that, besides root, only the members of `uv` and the owner the install set, which is
+the remote user under the UID it had when the image was built, can write what the install left there. What is created
+there at runtime gets the modes that uv and the creating user's umask give it; the feature does not change them. When
+the remote user is root, the feature SHALL create no group, and both locations SHALL be owned by root and, as the
+install leaves them, writable by root only.
 
 #### Scenario: Remote user in the group
 
@@ -202,8 +206,15 @@ root, the feature SHALL create no group, and both locations SHALL be owned by ro
 
 #### Scenario: Existing group
 
-- **WHEN** the image already has a group named `uv` when the feature is installed for a remote user other than root
-- **THEN** the install succeeds, the group keeps its ID and its members, and the remote user is added to it
+- **WHEN** the feature is installed for a remote user other than root on an image that already has a group named `uv` to
+  which no other account belongs
+- **THEN** the install succeeds, the group keeps its ID, and the remote user is a member of it
+
+#### Scenario: Nothing writable by every user
+
+- **WHEN** the feature is installed with a tool in `toolsToInstall`, for a root or a non-root remote user
+- **THEN** no file or directory the install left under `/usr/local/share/uv` is writable by every user, and neither is a
+  newly created volume at `/var/lib/uv`
 
 #### Scenario: Changed UID
 
@@ -280,9 +291,11 @@ variables this feature sets.
 Installing the feature a second time on the same image SHALL succeed. With the same options, it SHALL download no uv
 release when the requested release is already installed, and leave installed tools as they are. With different options,
 the later `version` SHALL replace the installed `uv` and `uvx`, every tool from both installs SHALL remain installed,
-and a tool listed again SHALL end up satisfying the entry of the later install. A second install SHALL add no second
-group and no second membership, and SHALL leave `/usr/local/share/uv`, including what it adds there, and a newly created
-volume as "Grant write access through the group uv" states.
+and a tool listed again SHALL end up satisfying the entry of the later install. A second install for the same remote
+user SHALL add no second group and no second membership, and SHALL leave `/usr/local/share/uv`, including what it adds
+there, and a newly created volume as "Grant write access through the group uv" states. A second install for another
+remote user that is not root finds the first install's remote user in the group and fails as that requirement states for
+a group to which another account belongs.
 
 #### Scenario: Same options
 
@@ -304,7 +317,7 @@ volume as "Grant write access through the group uv" states.
 
 #### Scenario: Group after a second install
 
-- **WHEN** the feature is installed twice for a remote user other than root
+- **WHEN** the feature is installed twice for the same remote user other than root
 - **THEN** the image has one group `uv` that lists the remote user once, and the tools of both installs belong to that
   group and are writable by its members
 
@@ -314,10 +327,12 @@ The feature SHALL fail the build with a message naming the problem, before downl
 architecture is neither x86_64 nor aarch64, when the distribution belongs to none of the supported families (Debian- or
 Ubuntu-based, RHEL- or Fedora-based, Arch Linux, Alpine, and openSUSE or SUSE), or when `toolsToInstall` is not empty
 and `version` names a release older than 0.12.16. It SHALL also fail, with a message naming the problem, when the remote
-user it is installed for does not exist; when the group `uv` is that user's primary group, whose ID the dev container
-tooling changes together with the user's, so that it could not keep the write access; and when the image has no tool to
-create the group or to add the remote user to it. The Option requirements state how invalid values of a single option
-fail. The supported images are those in `test/uv/compatibility.json`.
+user it is installed for does not exist, and, for a remote user other than root: when the group `uv` is that user's
+primary group, whose ID the dev container tooling changes together with the user's, so that it could not keep the write
+access; when an account other than that user belongs to a group `uv` the image already has, as a listed member or
+through its primary group; and when the group has to be created, or the user added to it, and the image has no tool for
+that step. The Option requirements state how invalid values of a single option fail. The supported images are those in
+`test/uv/compatibility.json`.
 
 #### Scenario: Unsupported architecture
 
@@ -344,8 +359,20 @@ fail. The supported images are those in `test/uv/compatibility.json`.
 - **WHEN** the feature is installed for a remote user whose primary group is named `uv`
 - **THEN** the build fails with a message naming the user and the group
 
+#### Scenario: Group has other members
+
+- **WHEN** the feature is installed for a remote user other than root on an image whose group `uv` lists another user as
+  a member or is another account's primary group
+- **THEN** the build fails with a message naming the group and that account
+
 #### Scenario: Group cannot be created
 
 - **WHEN** the feature is installed for a remote user other than root on an image that has neither a group `uv` nor a
   tool to create one
 - **THEN** the build fails with a message naming the group
+
+#### Scenario: Remote user cannot be added to the group
+
+- **WHEN** the feature is installed for a remote user other than root on an image that has a group `uv` without members
+  and no tool to add a member to it
+- **THEN** the build fails with a message naming the user and the group
