@@ -42,7 +42,7 @@
     version.
   - With the cache and the target environment on different filesystems and no `UV_LINK_MODE`, uv prints "Failed to
     hardlink files; falling back to full copy" on every install; with `UV_LINK_MODE=copy` it prints nothing.
-  - `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` ships curl, tar, `sha256sum`, CA certificates, and bash, and no
+  - `mcr.microsoft.com/devcontainers/base:ubuntu24.04` ships curl, tar, `sha256sum`, CA certificates, and bash, and no
     `python3`. `debian:12` and `alpine:3.24`, pulled from the `public.ecr.aws/docker/library` mirror because Docker Hub
     rate-limited the pull: `debian:12` has tar, `sha256sum`, and bash, and lacks curl, wget, and CA certificates;
     `alpine:3.24` has busybox `wget`, tar, `sha256sum`, and CA certificates, and lacks curl and bash; root's login shell
@@ -263,7 +263,7 @@ Planned `test/uv/compatibility.json`:
 {
   "images": [
     {
-      "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+      "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
       "arch": ["amd64", "arm64"],
       "remoteUser": "vscode"
     },
