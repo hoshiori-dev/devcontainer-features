@@ -42,10 +42,14 @@ function newer(a, b) {
     const mainVersion = packages[`node_modules/${MAIN}`].version;
     const bound = new Date((await registryDocument(MAIN)).time[mainVersion]);
     const lines = [`bound: ${MAIN} ${mainVersion}, published ${bound.toISOString()}`];
-    const entries = Object.entries(packages).filter(([entry]) => entry !== "");
+    const entries = Object.entries(packages).filter(([entry]) => entry !== "").map(([entry, value]) => [
+        value.name ?? entry.slice(entry.lastIndexOf("node_modules/") + "node_modules/".length),
+        value,
+    ]);
+    // All documents are requested at once, so the check takes a second or two.
+    await Promise.all(entries.map(([name]) => registryDocument(name)));
     const late = [];
-    for (const [entry, value] of entries) {
-        const name = value.name ?? entry.slice(entry.lastIndexOf("node_modules/") + "node_modules/".length);
+    for (const [name, value] of entries) {
         const document = await registryDocument(name);
         const published = new Date(document.time[value.version]);
         if (!(published.getTime() <= bound.getTime())) {
