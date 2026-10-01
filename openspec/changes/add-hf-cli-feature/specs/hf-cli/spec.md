@@ -96,9 +96,11 @@ The feature SHALL download the installer to a file, over HTTPS, from
 `<version>` is the resolved version, and SHALL run it only from that file; it SHALL NOT pipe a download into a shell. A
 response other than a direct `200` SHALL fail the build with a message naming the tag, before the installer runs.
 Upstream publishes no checksum or signature for the installer, so the installer's content is not verified: the feature
-relies on TLS to that host alone and on the path naming the upstream repository's release tag. The installer downloads
-only the Python packages that "Verify package downloads" names (`huggingface_hub`, its dependencies, and `pip`), from
-the sources named there; its skill step generates the skill locally and downloads nothing.
+relies on TLS to that host alone and on the path naming the upstream repository's release tag. Before running the file,
+the feature SHALL write the tag and the file's SHA-256 digest to the build log; the digest is a record that lets two
+builds be compared, and the feature compares it with nothing. The installer downloads only the Python packages that
+"Verify package downloads" names (`huggingface_hub`, its dependencies, and `pip`), from the sources named there; its
+skill step generates the skill locally and downloads nothing.
 
 #### Scenario: No release tag for the version
 
@@ -108,7 +110,7 @@ the sources named there; its skill step generates the skill locally and download
 #### Scenario: Installer fetched from its tag
 
 - **WHEN** the feature is installed with any `version`
-- **THEN** the build log names the tag the installer was downloaded from
+- **THEN** the build log names the tag the installer was downloaded from and the SHA-256 digest of the downloaded file
 
 ### Requirement: Resolve the latest version
 
@@ -147,7 +149,9 @@ dependencies SHALL be installed with uv and from wheels only. Every downloaded p
 upgrades in the new environment included, SHALL be installed only when its SHA-256 digest matches the one the index
 publishes for it. These index-published digests are the feature's package verification; the feature pins no checksum or
 signature of its own. Package-index configuration files, and uv, pip, or installer environment variables of the build,
-SHALL NOT redirect these sources, weaken these checks, or pass extra arguments to the installer.
+SHALL NOT redirect these sources, weaken these checks, or pass extra arguments to the installer. The build's proxy
+variables (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY`, and their lowercase forms) SHALL reach the installer
+unchanged, so a build behind a proxy installs from the same sources with the same checks.
 
 #### Scenario: Digest mismatch
 
@@ -159,6 +163,11 @@ SHALL NOT redirect these sources, weaken these checks, or pass extra arguments t
 - **WHEN** the build environment sets uv or pip variables, `HF_CLI_PIP_ARGS`, `HF_PIP_ARGS`, or `HF_HOME`, or holds a uv
   or pip configuration file, naming another package index or other options
 - **THEN** the feature still installs from the sources this requirement names, into the remote user's `~/.hf-cli/venv`
+
+#### Scenario: Build behind a proxy
+
+- **WHEN** the build reaches the network only through a proxy that its `http_proxy` and `https_proxy` variables name
+- **THEN** the feature installs the CLI from the sources this requirement names, with the same checks
 
 ### Requirement: Require a verifying uv
 

@@ -17,7 +17,8 @@ and keeping the image's shell files and build inputs under control.
   and root. The installation is the one the installer documents, so the CLI recognizes it as installer-managed.
 - The installer comes from the upstream repository's release tag for that version and runs from a saved file, as the
   repository's rule for installer scripts allows; upstream publishes no checksum or signature for it, so its content is
-  not verified. The version is pinned and checked after installation.
+  not verified, and the build log records the tag and the file's SHA-256. The version is pinned and checked after
+  installation.
 - The feature depends on the `uv` feature, so the installer installs `huggingface_hub` and its dependencies through uv,
   which checks every package file against the digests the Python Package Index publishes; the installer's own upgrade of
   `pip` is checked by pip against the same index digests. The installation writes nothing under the `uv` feature's
@@ -25,7 +26,9 @@ and keeping the image's shell files and build inputs under control.
 - The feature adds the distribution's `python3`, `python3-venv`, and `ca-certificates` when the image lacks them.
 - An `installSkill` option lets the installer add the upstream `hf-cli` agent skill for the remote user.
 - The container runs with the CLI's daily update check turned off, since the CLI is upgraded by rebuilding with another
-  `version`; the design's open questions include whether to keep this.
+  `version`.
+- The package sources are fixed: the build environment's index or mirror settings do not apply, while a build behind a
+  proxy keeps working.
 - The feature has no token, login, or credential option; users authenticate after the container starts, as the issue
   requires.
 - The repository's root `README.md` lists `hf-cli` under "Features": one row whose id links to `src/hf-cli/`, with a
@@ -53,7 +56,8 @@ None.
   waits until the `uv` feature (#14) is merged; from then on, CI re-tests `hf-cli` whenever `uv` changes.
 - Users' images gain a system `python3` with `venv` where they had none, and a virtual environment and `~/.local/bin/hf`
   link in the remote user's home.
-- Network at build time: the hosts in the design's URL inventory; nothing at container start.
+- Network at build time: the hosts in the design's URL inventory, through the build's proxy when it sets one; nothing at
+  container start.
 
 ## Acceptance
 
@@ -75,8 +79,8 @@ None.
   any mounted-volume scenario the test runner cannot mount, is observed with the method the design's "Test fixtures"
   names and recorded in the PR's Validation section.
 - "Installer fetched from its tag" is observed in a build log recorded in the PR's Validation section.
-- Every failure scenario of the spec except "Digest mismatch", and "Same options twice", is observed with the method the
-  design names for it and recorded in the PR's Validation section.
+- Every failure scenario of the spec except "Digest mismatch", and "Same options twice" and "Build behind a proxy", are
+  each observed with the method the design names for it and recorded in the PR's Validation section.
 - "Digest mismatch" holds by the uv and pip behavior the design records and by review that the installer's environment
   carries no source or check setting but the feature's; "Options" holds by review of `devcontainer-feature.json`.
 - Every URL the feature, the installer it runs, the tools they call, and its tests access, other than the pulls of the
