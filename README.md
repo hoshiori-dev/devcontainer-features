@@ -19,7 +19,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+| Feature                     | Description                                                                                                                                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`openspec`](src/openspec/) | Installs the OpenSpec CLI from the npm registry, with every package's integrity hash and registry signature verified, on a Node.js runtime it brings along. |
 
 ## Development
 
