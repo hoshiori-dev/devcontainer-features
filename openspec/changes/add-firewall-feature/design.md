@@ -42,7 +42,17 @@ Research for this change, checked on 2026-09-30; see `proposal.md` for the motiv
   reachable through the fetched ranges. With `azureDnsAutoDetection` `false`, `dockerd` runs without `--dns`: a
   user-defined network's embedded DNS forwards to the dev container's `127.0.0.1`, dnsmasq learns the addresses, and
   `registry.npmjs.org` is reachable (3 of 3 runs of the start-time script); default-bridge containers get `8.8.8.8` and
-  `8.8.4.4`, where no name resolves and `185.199.109.133` is still reachable.
+  `8.8.4.4`, where no name resolves and `185.199.109.133` is still reachable. Denied names follow the same lookups (same
+  host and day, one container per configuration, `presets` empty). With docker-in-docker's defaults, `defaultAction`
+  `allow`, and `deniedDomains` `registry.npmjs.org`, a nested container on either network reaches `registry.npmjs.org`
+  (HTTP 200) while the denied set stays empty and the dev container itself is refused; after the dev container's own
+  lookup the nested container is refused too (2 of 2). With `allowedCidrs` `185.199.108.0/22` and `deniedDomains`
+  `raw.githubusercontent.com`, a nested container on either network reaches `raw.githubusercontent.com` (HTTP 301) and
+  is refused `github.com`. With `defaultAction` `allow` and `deniedCidrs` `185.199.108.0/22`, it is refused
+  `185.199.109.133` and reaches `github.com`. With `azureDnsAutoDetection` `false`, `defaultAction` `allow`, and
+  `deniedDomains` `registry.npmjs.org`, a nested container on a user-defined network is refused `registry.npmjs.org` on
+  its first request and reaches `github.com`; on the default bridge no name resolves. A host other than Azure was not
+  observed: that `dockerd` runs without `--dns` there follows from `docker-init.sh`.
 - **Prior art** (`anthropics/claude-code`, `.devcontainer/`): `runArgs` add `NET_ADMIN` and `NET_RAW`;
   `postStartCommand: sudo /usr/local/bin/init-firewall.sh` with a sudoers line for that script; the script flushes the
   filter, nat, and mangle tables, restores Docker's DNS NAT rules, builds an ipset from GitHub meta `web`, `api`, `git`
@@ -216,8 +226,9 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   this first.
 - Inbound filtering, host firewalling, and filtering traffic between the container and bridges that exist only inside it
   (a nested Docker's `docker0` and `br-*`).
-- A nested container reaching an allowed domain (maintainer decision of 2026-10-01): the feature protects the dev
-  container's own traffic, and nested Docker is an exception `NOTES.md` records (Decisions: Nested Docker).
+- A nested container reaching an allowed domain (maintainer decision of 2026-10-01) or, from the same cause, being
+  refused a denied one (Open Questions): the feature protects the dev container's own traffic, and nested Docker is an
+  exception `NOTES.md` records (Decisions: Nested Docker).
 - Filtering by DNS name (every name resolves), by TLS SNI, or through an HTTP proxy.
 - A denylist that holds against a process avoiding the container's resolver: `deniedDomains` refuses only addresses
   learned from lookups of denied names, so literal addresses, DNS over HTTPS, and names that are not denied pass it
@@ -294,16 +305,20 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   because such an entry could not take effect as written. The check cannot list the ruleset because it runs without
   `NET_ADMIN`. Rejected: probing `example.com` (prior art), a real third party that a user may allowlist; also probing
   an allowed host, which would fail container start on transient network errors.
-- **Nested Docker: filtered, with no guarantee for allowed domains** (maintainer decision of 2026-10-01). With
-  `filterForward`, forwarded traffic meets the same rules; output to `docker0` and `br-*` is accepted because anything
-  leaving those bridges for the outside is forwarded and filtered, and forwarding into those bridges is accepted so
-  published ports of nested containers and traffic between nested networks work. From a nested container, a destination
-  no entry allows is refused and an address inside `allowedCidrs` or a preset's ranges is reachable. An allowed domain
-  is reachable only at the addresses dnsmasq has learned, so only when the nested container's lookup passes through the
-  dev container's dnsmasq; a nested daemon started with its own DNS servers, as docker-in-docker does on Azure hosts
-  (Context), sends lookups past it. The feature protects the dev container's own traffic and `NOTES.md` records nested
-  Docker as an exception; `filterForward` and its default stay as they are. Rejected for now: handling nested lookups in
-  the feature, which the maintainer judged complex.
+- **Nested Docker: filtered, with no guarantee for allowed or denied domains** (maintainer decision of 2026-10-01 for
+  allowed domains; denied domains follow from the same cause, see Open Questions). With `filterForward`, forwarded
+  traffic meets the same rules; output to `docker0` and `br-*` is accepted because anything leaving those bridges for
+  the outside is forwarded and filtered, and forwarding into those bridges is accepted so published ports of nested
+  containers and traffic between nested networks work. From a nested container, what the entries state by address holds:
+  an address inside `allowedCidrs` or a preset's ranges is reachable, one inside `deniedCidrs` is refused, and, with
+  `defaultAction` `deny`, a destination no entry allows is refused. A domain is allowed or denied only at the addresses
+  dnsmasq has learned, so only when the nested container's lookup passes through the dev container's dnsmasq; a nested
+  daemon started with its own DNS servers, as docker-in-docker does on Azure hosts (Context), sends lookups past it.
+  Under such a daemon an allowed domain is refused (fail closed), and a denied domain is reached wherever
+  `defaultAction` `allow` or an allowed range lets its address through (fail open), each until the dev container's own
+  lookup has taught dnsmasq the address. The feature protects the dev container's own traffic and `NOTES.md` records
+  nested Docker as an exception; `filterForward` and its default stay as they are. Rejected for now: handling nested
+  lookups in the feature, which the maintainer judged complex.
 - **`installsAfter` docker-in-docker and common-utils** (maintainer decision). Entrypoint order follows install order,
   so `docker-init.sh` (which switches `iptables` alternatives and starts `dockerd`) has run before the firewall loads.
   `common-utils` declares no entrypoint; ordering after it is install order only, so the feature installs its packages
@@ -494,6 +509,11 @@ hosts the tests connect to (Goals: Test destinations). Verified column: a read-o
   containers otherwise get `8.8.8.8`, which is refused] → Not guaranteed (Decisions: Nested Docker); `NOTES.md` states
   the exception and the two remedies observed to work (Context): `allowedCidrs`, and `azureDnsAutoDetection` `false`
   with a user-defined network. The `dind` scenario asserts only a refusal and an allowed range.
+- [A nested container reaches a denied domain when its lookups do not pass through dnsmasq, wherever `defaultAction`
+  `allow` or an allowed range lets the address through: the denylist fails open for nested containers under a nested
+  daemon with its own DNS servers] → Not guaranteed (Decisions: Nested Docker; Open Questions); `NOTES.md` states it
+  with the two remedies observed to work (Context): `deniedCidrs`, and `azureDnsAutoDetection` `false` with a
+  user-defined network. No scenario asserts it.
 - [VS Code Server and extension downloads inside the container are refused without the `vscode` preset] → `NOTES.md`
   says so first.
 - [The `anthropic` and `vscode` presets cover only part of what their sources list] → `NOTES.md` names the left-out
@@ -556,3 +576,8 @@ answer changes the named part before approval.
    at start, which misfires with docker-in-docker.
 7. **Alpine tag.** As written: `alpine:3.24`, the current release, pinned so a new Alpine release does not change the
    tested image unannounced. Alternative: `alpine:latest`.
+8. **Denied domains and nested containers.** As written: not guaranteed, like allowed domains, and documented in
+   `NOTES.md` (Requirement: Forwarded traffic). The maintainer's decision of 2026-10-01 to record nested Docker as an
+   exception was taken for allowed domains, which fail closed; the same cause makes `deniedDomains` fail open for nested
+   containers (Context), which was found afterwards. Alternative: treat nested lookups in the feature, which that
+   decision set aside as complex.

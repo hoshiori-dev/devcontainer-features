@@ -231,7 +231,8 @@ rule the feature applied is removed, leaving outbound traffic unrestricted by th
 
 The feature SHALL accept the option `filterForward` as declared here: when it is enabled, traffic that the container
 forwards, such as traffic of containers nested in it, is subject to the same rules as its own outbound traffic,
-including the DNS restriction, and when it is disabled, the feature does not filter forwarded traffic.
+including the DNS restriction, with the exception for allowed and denied names that Requirement: Forwarded traffic
+states, and when it is disabled, the feature does not filter forwarded traffic.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -492,9 +493,10 @@ Whatever `filterForward` is, traffic from the container to networks that exist o
 nested Docker daemon, traffic forwarded into those networks, and reply traffic of forwarded connections that were
 allowed SHALL be allowed, whatever the denied entries say; which forwarded traffic the rules filter is stated in
 Requirement: Option filterForward. The feature does not guarantee that a nested container reaches a destination allowed
-only by name: an allowed name is reachable at the addresses the container's resolver returned for it (Requirement:
-Allowed domains), and a nested Docker daemon configured with its own DNS servers sends its containers' lookups to those
-servers instead. `NOTES.md` SHALL state this exception, its cause, and what a user can do.
+only by name, nor that it is refused a destination denied only by name: an allowed or a denied name takes effect at the
+addresses the container's resolver returned for it (Requirement: Allowed domains, Requirement: Denied domains), and a
+nested container's lookups do not always pass through that resolver, for example under a nested Docker daemon configured
+with its own DNS servers. `NOTES.md` SHALL state this exception in both directions, its cause, and what a user can do.
 
 #### Scenario: Nested container reaches an allowed range
 

@@ -82,8 +82,9 @@
       `vscode` preset in the first lines, the metadata the feature adds, the start record's path, the window before the
       first rules load, the hosts each preset's source lists and the preset leaves out, that the `github` preset reaches
       every GitHub Pages site, that a domain entry allows every name under it, Compose services, the nested Docker
-      exception of Requirement: Forwarded traffic (what is protected, what is not guaranteed and why, what a user can
-      do), and the resolver's lifetime; run `just docs` and verify `just docs-check` passes.
+      exception of Requirement: Forwarded traffic (what is protected, what is not guaranteed for allowed and for denied
+      names and why, what a user can do), and the resolver's lifetime; run `just docs` and verify `just docs-check`
+      passes.
 - [x] 3.7 Run `just test-scenarios firewall` and verify every scenario passes, with the GitHub fetches within
       design.md's budget.
 - [ ] 3.8 Record in the PR's Validation section the checks the harness cannot run: `docker restart` followed by the

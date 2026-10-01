@@ -17,8 +17,8 @@ the same rules.
 - A new feature `firewall` (capability `firewall`) exists: from every start on, a container that installs it reaches
   only the destinations its allowlist names, for its own traffic and, by default, for nested containers' traffic. With
   its default action set to allow, it instead reaches every destination except those its denylist names. The feature
-  protects the container's own traffic: that a nested container reaches a destination allowed by name is not guaranteed
-  and is documented as an exception.
+  protects the container's own traffic: that a nested container reaches a destination allowed by name, or is refused one
+  denied by name, is not guaranteed and is documented as an exception.
 - The rules are declared through eight options: `defaultAction` (deny or allow what no entry matches), `presets` (named
   destination sets, such as GitHub), `allowedDomains`, `allowedCidrs`, `deniedDomains`, `deniedCidrs`, `failureMode`
   (fail closed or warn when the rules cannot be applied), and `filterForward`. Where allowed and denied entries overlap,
