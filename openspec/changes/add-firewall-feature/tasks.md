@@ -74,18 +74,18 @@
       the options of design.md (Test coverage), each asserting the spec scenarios design.md maps to it; verify
       `shellcheck` is clean and `just validate` passes.
 - [x] 3.5 Write the `dind` and `dind-no-forward` scenarios with docker-in-docker, running a nested container from an
-      image imported from the dev container's own filesystem on a user-defined network; verify `shellcheck` is clean and
-      `just validate` passes.
+      image imported from the dev container's own filesystem on a user-defined network; `dind` asserts a refused
+      destination and an address inside an allowed range, not an allowed domain (design.md, Decisions: Nested Docker);
+      verify `shellcheck` is clean and `just validate` passes.
 - [x] 3.6 Write `src/firewall/NOTES.md`: the guardrail limits of Requirement: Guardrail, not a security boundary first
       (passwordless `sudo` of the usual base images, Docker access, `defaultAction` `allow`, `failureMode` `warn`), the
       `vscode` preset in the first lines, the metadata the feature adds, the start record's path, the window before the
       first rules load, the hosts each preset's source lists and the preset leaves out, that the `github` preset reaches
-      every GitHub Pages site, that a domain entry allows every name under it, Compose services and nested networks, and
-      the resolver's lifetime; run `just docs` and verify `just docs-check` passes.
-- [ ] 3.7 Run `just test-scenarios firewall` and verify every scenario passes, with the GitHub fetches within
-      design.md's budget. Open, escalated: `dind` fails on Azure hosts, where docker-in-docker's default
-      `azureDnsAutoDetection` starts `dockerd` with `--dns 168.63.129.16`, so the nested embedded DNS bypasses dnsmasq
-      and no address of an allowed domain is learned for the nested container.
+      every GitHub Pages site, that a domain entry allows every name under it, Compose services, the nested Docker
+      exception of Requirement: Forwarded traffic (what is protected, what is not guaranteed and why, what a user can
+      do), and the resolver's lifetime; run `just docs` and verify `just docs-check` passes.
+- [x] 3.7 Run `just test-scenarios firewall` and verify every scenario passes, with the GitHub fetches within
+      design.md's budget.
 - [ ] 3.8 Record in the PR's Validation section the checks the harness cannot run: `docker restart` followed by the
       check as the remote user (Restart re-applies the same rules), a container on an IPv6-enabled Docker network (IPv6
       default deny, IPv4 and IPv6 ranges), a published port reached from the host (Inbound connection still answered),
