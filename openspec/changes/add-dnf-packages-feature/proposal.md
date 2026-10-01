@@ -8,7 +8,7 @@ A dev container on Fedora, RHEL, or one of its rebuilds that needs a few extra s
 or a broader feature that also adds repositories and configures the system. The collection has no feature that only
 installs a list of packages with `dnf`. `dnf-packages` is one of five atomic installers, one per package manager
 (`apt-packages`, `dnf-packages`, `apk-packages`, `pacman-packages`, `zypper-packages`), which share one option shape and
-one set of guarantees.
+one script skeleton, and each of which keeps its package manager's own behavior.
 
 ## What Changes
 
@@ -41,6 +41,9 @@ None.
 - Supported images: the planned compatibility list is in `design.md` (Supported images); `test/dnf-packages/`
   `compatibility.json` becomes its source of truth.
 - No script, workflow, test infrastructure, or knowledge file changes.
+- The issue's outcome names Fedora, RHEL, and its rebuilds. This change supports and tests Fedora and two RHEL 9
+  rebuilds; Red Hat's own images and the RHEL 10 generation are planned as a follow-up MINOR change (`design.md`, Open
+  question 7).
 
 ## Acceptance
 
@@ -69,7 +72,7 @@ None.
 - The feature fetches nothing itself: `install.sh` contains no URL and no download tool, and every package comes from
   the repositories configured and enabled in the image.
 - Signature checking and the image's repositories, keys, and `dnf` configuration: the scenarios under "Package signature
-  checking stays in effect", including the key import `dnf` may perform (`design.md`, Open question 5).
+  checking stays in effect", including the key import `dnf` may perform.
 - `devcontainer-feature.json` declares none of `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`,
   `containerEnv`, or lifecycle commands.
 - No file outside `src/dnf-packages/`, `test/dnf-packages/`, `openspec/`, and the root `README.md`'s "## Features"

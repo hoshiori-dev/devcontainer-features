@@ -20,9 +20,9 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
   `36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6`, AlmaLinux 9 `BF18AC2876178908D6E71267D36CB86CB86B3716`, Rocky Linux 9
   `21CB256AE16FC54C6E652949702D426D350D275D`), so installing from these repositories imports no key. `rpm -q gpg-pubkey`
   lists that key on all three images; Fedora 44's rpm 6.0.2 keeps keys in the rpm database (`%_keyring` is `rpmdb`), and
-  rpm 4.16 has no `rpmkeys --list`. Every enabled repository sets `countme=1`. `gpgkey` takes URLs (dnf `conf_ref`), so
-  a repository a user's image adds can name a remote key, as Docker's
-  `https://download.docker.com/linux/fedora/docker-ce.repo` does
+  rpm 4.16 has no `rpmkeys --list`. Every enabled repository except `fedora-cisco-openh264`, whose repository file has
+  no `countme` line, sets `countme=1`. `gpgkey` takes URLs (dnf `conf_ref`), so a repository a user's image adds can
+  name a remote key, as Docker's `https://download.docker.com/linux/fedora/docker-ce.repo` does
   (`gpgkey=https://download.docker.com/linux/fedora/gpg`).
 - `skip_if_unavailable`: Fedora's `/usr/share/dnf5/libdnf.conf.d/20-fedora-defaults.conf` sets it to True in `[main]`,
   `fedora.repo` and `fedora-updates.repo` set it to False, and `fedora-cisco-openh264.repo` sets it to True. Both EL9
@@ -57,9 +57,12 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
 - An unpinned entry naming an installed package: on Fedora (`best=False`), `curl` and `openssl-libs` stayed at their
   installed versions although `updates` offered newer ones; on Rocky Linux (`best=True`), `openssl-libs` was upgraded
   from `3.5.5-2.el9_8` to `3.5.8-1.el9_8`, as dnf `command_ref` describes for `--best install`. Installing a new package
-  may upgrade installed packages it needs (observed on Fedora). The binding decision for the five installers names only
-  apt, zypper, and pacman as managers that may upgrade an unpinned installed package; dnf 4.14 under `best=True` does
-  too (Open question 6).
+  may upgrade installed packages it needs (observed on Fedora). So dnf 4.14 under `best=True` may upgrade an unpinned
+  installed package, as apt, zypper, and pacman may (Open question 6).
+- The devcontainer CLI (0.89.0) writes each option to `devcontainer-features.env` as `NAME="<value>"` without escaping,
+  and its wrapper runs `set -a; . ./devcontainer-features.env` as root before `./install.sh` (observed in the 0.89.0
+  bundle, as recorded in the `apt-packages` design, pull request #33). A `"`, `$`, or backtick in an option value is
+  therefore evaluated by that shell before the feature runs, and `install.sh` receives the result.
 - `--setopt=install_weak_deps=False` works in both generations (the dnf `command_ref` shows it). `ipcalc` recommends
   `geolite2-city`, `geolite2-country`, and `libmaxminddb` in all three images' repositories; none of the four is
   installed on any of the three images; with the option none of the three is installed, without it `geolite2-city` is
@@ -104,7 +107,8 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
 - Entries reach `dnf` only as separate, quoted arguments after `--`; the script has no `eval`, no `sh -c`, and no
   unquoted expansion of an entry. Checked by review of `install.sh` and by the direct check for "Shell metacharacters,
   globs, and inner whitespace are refused" with an entry such as `x;touch /tmp/pwned` that asserts the file does not
-  exist.
+  exist. The guarantee covers the value `install.sh` receives; what the CLI's shell does to the value before that is
+  outside the feature (Context, Risks).
 - Every entry is validated before the `dnf` check and any `dnf` call, so a refused list leaves the image untouched.
   Checked by the direct refusal checks, which also assert that `dnf`'s cache still holds no repository metadata and that
   `rpm -qa` is unchanged.
@@ -134,15 +138,26 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
   whole system, or choosing a package manager across distributions (issue #21, Out of scope).
 - Supporting images that have `microdnf` but no `dnf`, such as `ubi9/ubi-minimal`: `microdnf` is a different tool with
   different options.
+- Red Hat's own images with `dnf` and the RHEL 10 generation: none was checked or is tested in this change (Open
+  question 7).
 - An option for weak dependencies, repositories, or keeping the cache; users list extra packages explicitly.
 - Checking the architecture: the feature downloads nothing architecture-specific, and `dnf` resolves packages for the
   image's architecture; the compatibility list names the architectures that are tested.
 
 ## Decisions
 
-- **POSIX `sh`, shared skeleton.** One skeleton keeps the five installers auditable side by side, and `alpine`, an image
-  of the `apk-packages` sibling, ships no bash. This deviates from `feature-authoring.md` (Deviations). Rejected: bash
-  with `set -euo pipefail`, which the convention calls for here because all three images ship bash.
+- **Native behavior first.** The five installers share the option shape and the script skeleton, not identical behavior.
+  Where package managers differ (a pin below the installed version, capability matching, a failing repository, upgrades
+  of installed packages), the feature keeps `dnf`'s own behavior and the spec states it. An entry passes through in
+  `dnf`'s own syntax for a package, its version, and its architecture; the allowlist admits the characters that syntax
+  needs and refuses every other character, so `<`, `>`, and `=`, which `dnf` reads only in dependency expressions that
+  need whitespace, stay refused here while the installers whose managers use them for version constraints accept them.
+  The maintainer decided this for all five installers on 2026-10-01. Rejected: one identical guarantee across managers,
+  which needs a second code path per manager that must agree with the manager's own resolution.
+- **POSIX `sh`, shared skeleton.** Installing packages has to work on as many images as possible, one skeleton keeps the
+  five installers auditable side by side, and `alpine`, an image of the `apk-packages` sibling, ships no bash. This
+  deviates from `feature-authoring.md` (Deviations). Rejected: bash with `set -euo pipefail`, which the convention calls
+  for here because all three images ship bash.
 - **Validate, then the empty check, then the `dnf` check.** A refused entry fails first on every image, so the same bad
   list gives the same message everywhere; the empty check runs before the `dnf` check, so the default options succeed on
   any image, including one without `dnf`. Rejected: failing on an image without `dnf` even for an empty list, which
@@ -161,10 +176,10 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
   Rejected: dnf 4's `install-n` and `install-nevra` commands, which have no dnf5 equivalent and would drop either
   version pins or the short forms; checking each entry with `dnf repoquery` first, a second code path that must agree
   with the install resolution on two `dnf` generations.
-- **Pins pass through, and `dnf` may downgrade to them.** Version pins are the manager's own syntax, passed verbatim as
-  decided for all five installers; `dnf` documents that a pinned install moves the package to that version, up or down.
-  Rejected: refusing a pin below the installed version, which needs an RPM version comparison in `sh` for every entry,
-  since dnf5's `allow_downgrade` covers dependencies only and dnf 4 has no such option (Open question 1).
+- **Pins pass through, and `dnf` may downgrade to them.** Version pins are the manager's own syntax, passed verbatim
+  (decision "Native behavior first"); `dnf` documents that a pinned install moves the package to that version, up or
+  down. Rejected: refusing a pin below the installed version, which needs an RPM version comparison in `sh` for every
+  entry, since dnf5's `allow_downgrade` covers dependencies only and dnf 4 has no such option (Open question 1).
 - **Weak dependencies off by `--setopt=install_weak_deps=False`.** The same spelling works in both generations and
   overrides only that option for this call. Rejected: an option to keep them (users list them).
 - **Metadata refresh left to `dnf`, and the image's `skip_if_unavailable` honored.** `dnf` already downloads metadata
@@ -186,11 +201,12 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
 - **`-y` for every confirmation.** It confirms the transaction and, when a package needs a key not yet in the RPM
   keyring, the import of the key its repository's `gpgkey` names, local or remote; no documented option separates the
   two. In the supported images every enabled repository's key is local and already imported. Rejected: running without
-  `-y`, which cannot work unattended. Whether the feature should refuse the key import this allows is Open question 5.
-- **The image's `countme` stays.** Every enabled repository sets `countme=1`, so a build adds a counting flag to the
-  metalink or mirrorlist request of each repository at most once a week, which the three projects use for usage
-  statistics. The feature follows the image's configuration here as elsewhere. Rejected: `--setopt=countme=False`, an
-  override of the image's configuration that the bound on `dnf install` options excludes.
+  `-y`, which cannot work unattended. The maintainer accepted the key import this allows (Open question 5).
+- **The image's `countme` stays.** Every enabled repository except `fedora-cisco-openh264` sets `countme=1`, so a build
+  adds a counting flag to the metalink or mirrorlist request of each of those repositories at most once a week, which
+  the three projects use for usage statistics. The feature follows the image's configuration here as elsewhere.
+  Rejected: `--setopt=countme=False`, an override of the image's configuration that the bound on `dnf install` options
+  excludes.
 - **No feature dependencies.** Nothing this feature does depends on another feature's result. Rejected: `installsAfter`
   on `ghcr.io/devcontainers/features/common-utils`; a user who needs an order sets `overrideFeatureInstallOrder`.
 - **Direct checks for what a scenario cannot assert.** A host-side runner under `test/dnf-packages/`, following the
@@ -219,11 +235,12 @@ The feature's only option; the delta spec's Option requirement states its contra
 
 ### Deviations from `feature-authoring.md`
 
-Each follows from a binding decision for the five installers and needs the maintainer's acceptance at the package gate.
+The maintainer accepted each for the five installers on 2026-10-01.
 
 - **Shell.** The convention calls for bash with `set -euo pipefail` when every image in the compatibility list ships
   bash, which all three do. The feature uses POSIX `sh` with `set -eu` so that all five installers share one skeleton
-  (decision "POSIX `sh`, shared skeleton").
+  (decision "POSIX `sh`, shared skeleton"). Issue #49 proposes relaxing the convention for features that need broad
+  image compatibility.
 - **Distribution detection.** The convention says to detect the distribution from `/etc/os-release`. The feature detects
   `dnf` on the `PATH` and reads `/etc/os-release` only for its message (decision "Detect by binary").
 - **Skipping installed versions.** The convention says to skip an install when the requested version is already present.
@@ -236,22 +253,26 @@ Each follows from a binding decision for the five installers and needs the maint
   URL and calls no download tool, so the rules for sources, direct downloads, per-version hashes, and installer scripts
   have nothing to apply to, and the spec lists no source because the feature chooses none. `dnf` fetches metalinks or
   mirrorlists, repository metadata, and packages only for the repositories the image configures and enables (URL
-  inventory), which the rules place under the package-manager rule: `dnf` verifies each package itself (next bullet),
-  also from mirrors that serve plain HTTP. The feature adds no repository, so the rule to pin an added repository's key
-  by full fingerprint does not apply, and it passes no option that weakens a check (Goals). The one download that
-  neither a signature nor a pinned fingerprint verifies is a key `dnf -y` imports on first use from a remote `gpgkey`
-  location of a user's image, which relies on that location's transport alone (TLS for an HTTPS URL); the requirement
-  "Package signature checking stays in effect" states it, as the rules demand of a download relying on TLS alone. No
-  supported image has such a repository (Open question 5). Refusing `/` and `.rpm` keeps `dnf` from fetching a URL or
-  installing a local file, both of which skip the signature check.
+  inventory), which the rules place under the package-manager rule: where a repository sets `gpgcheck=1`, `dnf` verifies
+  each package itself (next bullet), also from mirrors that serve plain HTTP. The feature adds no repository, so the
+  rule to pin an added repository's key by full fingerprint does not apply, and it passes no option that weakens a check
+  (Goals). The one download that neither a signature nor a pinned fingerprint verifies is a key `dnf -y` imports on
+  first use from a remote `gpgkey` location of a user's image, which relies on that location's transport alone (TLS for
+  an HTTPS URL, nothing for a plain HTTP one); the requirement "Package signature checking stays in effect" states it,
+  as the rules demand of a download relying on TLS alone. No supported image has such a repository (Open question 5).
+  Refusing `/` and `.rpm` keeps `dnf` from fetching a URL or installing a local file, both of which skip the signature
+  check.
 - **Verification and keys:** `dnf` verifies each package's OpenPGP signature against the keys in the RPM keyring, as the
-  repositories' `gpgcheck=1` requires (requirement "Package signature checking stays in effect"). On Fedora, the
-  metalink, fetched over HTTPS from `mirrors.fedoraproject.org`, also carries the checksums of each repository's
-  `repomd.xml`, which chains to the metadata and package checksums. On the EL9 images, repository metadata is neither
-  signed nor pinned by a checksum from the project, so its integrity rests on the mirror's transport (Risks). The
-  feature pins and names no key, but under `-y` `dnf` imports a key that a package needs and the keyring lacks, from the
-  location the repository names (Downloads above; Open question 5). In the supported images the keys are the images'
-  own, already imported, with fingerprints under Context and their publication in the URL inventory.
+  repositories' `gpgcheck=1` requires (requirement "Package signature checking stays in effect"). The guarantee is the
+  image's: the feature runs on any image with `dnf`, and a repository a user's image enables with `gpgcheck=0` installs
+  its packages unchecked and without a warning; the feature neither turns the check on nor refuses such a repository
+  (decision "Native behavior first"), and NOTES.md says so. On Fedora, the metalink, fetched over HTTPS from
+  `mirrors.fedoraproject.org`, also carries the checksums of each repository's `repomd.xml`, which chains to the
+  metadata and package checksums. On the EL9 images, repository metadata is neither signed nor pinned by a checksum from
+  the project, so its integrity rests on the mirror's transport (Risks). The feature pins and names no key, but under
+  `-y` `dnf` imports a key that a package needs and the keyring lacks, from the location the repository names (Downloads
+  above; Open question 5). In the supported images the keys are the images' own, already imported, with fingerprints
+  under Context and their publication in the URL inventory.
 - **Metadata:** none of `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`, `containerEnv`, lifecycle
   commands, `dependsOn`, or `installsAfter`: the feature runs once at build time as root, installs system-wide, and
   needs nothing at container start.
@@ -268,10 +289,10 @@ Each follows from a binding decision for the five installers and needs the maint
 Where each scenario of `specs/dnf-packages/spec.md` is checked. "Scenario" means `scenarios.json`, run in CI on amd64 on
 the image each entry names; "test.sh" and "duplicate.sh" run in CI on every image and architecture of the compatibility
 list; "Direct" means the host-side runner (decision "Direct checks"), run locally on every amd64 image of the
-compatibility list, with its output recorded in the PR's Validation section. On arm64, CI runs only test.sh and
-duplicate.sh. The CLI's install-twice test behind duplicate.sh installs the empty default the second time (Context), so
-"Different list on the second install", like every scenario that expects a failure, runs only as a Direct check (Open
-question 4).
+compatibility list unless a row names its images, some of them outside the list, with its output recorded in the PR's
+Validation section. On arm64, CI runs only test.sh and duplicate.sh. The CLI's install-twice test behind duplicate.sh
+installs the empty default the second time (Context), so "Different list on the second install", like every scenario
+that expects a failure, runs only as a Direct check (Open question 4).
 
 | Scenario                                                                           | Checked by                                                                                                                                                                                                                                                                     |
 | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -329,13 +350,14 @@ The feature itself fetches no URL at build or start time: it has no download, ch
 latest-version endpoint, configures no repository, fetches nothing at start, and names no `dependsOn` or `installsAfter`
 feature. Every key the images' repositories name is a local `file://` path. The only network access is `dnf` reaching
 the repositories that the supported images enable, listed here so the review sees the whole build-time surface. The
-images themselves are pulled by the consumer or the test harness, not by the feature. Because every repository sets
-`countme=1`, `dnf` may append `&countme=<n>` to a metalink or mirrorlist URL once a week. Mirrors are chosen per request
-by the projects' mirror services; the hosts named as observed are those answering from this machine on 2026-09-30.
-Verified with `curl -sSL` (GET to `/dev/null`, following redirects) and by the hosts in `dnf`'s own logs during an
-install on each image. The repository-file links point to the current head of the `f44`, `a9`, and `r9` branches, not to
-the `fedora-repos`, `almalinux-release`, or `rocky-release` versions inside the images; on 2026-09-30 they held the
-settings this design cites.
+images themselves are pulled by the consumer or the test harness, not by the feature: the compatibility images and
+`debian:12` from Docker Hub, `ubi-minimal` from Red Hat's registry, the two test-only images pinned by digest (Test
+plan). Because every repository except `fedora-cisco-openh264` sets `countme=1`, `dnf` may append `&countme=<n>` to a
+metalink or mirrorlist URL once a week. Mirrors are chosen per request by the projects' mirror services; the hosts named
+as observed are those answering from this machine on 2026-09-30. Verified with `curl -sSL` (GET to `/dev/null`,
+following redirects) and by the hosts in `dnf`'s own logs during an install on each image. The repository-file links
+point to the current head of the `f44`, `a9`, and `r9` branches, not to the `fedora-repos`, `almalinux-release`, or
+`rocky-release` versions inside the images; on 2026-09-30 they held the settings this design cites.
 
 | URL / template                                                                                                                           | Purpose                                                                                  | When  | Integrity / authenticity                                                                                                                                                                                                                    | Official source evidence                                                                                                                                                                                                                                                                               | Verified                                                                                                                                                                                                                                     |
 | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -354,10 +376,24 @@ settings this design cites.
 - [EL9 repository metadata is neither signed nor pinned by the project, and AlmaLinux's mirrorlist returned only plain
   HTTP mirrors, so a network attacker can serve an older signed state of the repository or withhold updates] → Packages
   still need a valid signature from the distribution's key, so nothing unsigned installs; the feature does not change
-  repository settings (out of scope), and NOTES.md names the exposure. Fedora's metalink checksums close this gap there.
+  repository settings (out of scope), and NOTES.md names the exposure and points users who need freshness to pinned
+  versions or an HTTPS `baseurl` in their image. Fedora's metalink checksums close this gap there.
 - [A pin below the installed version downgrades that package and the packages that must change with it, for example
-  `openssl-libs`] → Stated in the spec; the user chose the version from the image's signed repositories. Open question 1
-  offers refusing it.
+  `openssl-libs`] → Stated in the spec; the user chose the version from the image's signed repositories, and NOTES.md
+  warns that a pin can downgrade a package and its dependencies (Open question 1).
+- [A repository a user's image enables with `gpgcheck=0` installs its packages without a signature check and without a
+  warning] → The spec states it; the supported images set `gpgcheck=1` on every enabled repository, and NOTES.md says
+  that the signature guarantee is the image's configuration, not the feature's.
+- [On Fedora the Cisco OpenH264 repository is skippable and its packages come over plain HTTP from Cisco's host] →
+  Integrity holds: the HTTPS metalink pins the metadata, and each package is checked against Fedora's key. NOTES.md
+  states that an install continues without that repository when it is unreachable (Open question 2).
+- [The devcontainer CLI shell-sources option values before `install.sh` runs (Context), so a `$(…)`, backtick, `$VAR`,
+  or `"` in `packages` is evaluated, as root, before validation] → Whoever sets the option already controls the build,
+  so no privilege boundary is crossed. The spec's refusal scenarios cover the value `install.sh` receives; NOTES.md says
+  option values must not carry untrusted `"`, `$`, or backticks.
+- [A listed package, or one it needs, may itself add a repository, key, or `dnf` configuration file] → The spec keeps
+  such files out of the feature's own changes (requirement "Package signature checking stays in effect"); the user
+  chooses the packages. NOTES.md mentions it.
 - [The same unpinned list behaves differently per image: EL9's `best=True` upgrades an installed package, Fedora's
   `best=False` leaves it] → Stated in the spec as "MAY upgrade"; the feature follows each image's own `dnf`
   configuration, and users who need stability pin versions.
@@ -365,15 +401,19 @@ settings this design cites.
   than on EL9, or fail only on EL9] → Stated in the spec; NOTES.md tells users to list package names.
 - [`-y` also confirms a key import; if a user's own image adds a repository whose `gpgkey` points at a remote URL and
   the key is not yet imported, `dnf` fetches and trusts that key on first use, and keeps it even when the signature
-  check then fails] → Only repositories the image already configures are used; in the supported images every key is
-  local and already imported. NOTES.md names this. Open question 5 offers refusing it.
+  check then fails; a key location given as plain `http://` has no transport protection at all] → Only repositories the
+  image already configures are used; in the supported images every key is local and already imported. NOTES.md names
+  this and tells users to import a third-party key, checked by its fingerprint, in their Dockerfile (Open question 5).
 - [Repositories drop old versions, so a fixed version in a test stops resolving] → No test fixes a version: the direct
   checks choose versions from the offered ones at run time and fail with a clear message when no package is offered in
   two versions.
 - [An older image, such as the Rocky Linux image built on 2026-05-25, pulls many dependency upgrades into the first
   install] → Expected `dnf` behavior; the layer is larger, not wrong.
 - [CI does not run the direct checks, so a later change could break a failure path unnoticed until someone runs them] →
-  The PR's Validation section records their output; Open question 4 offers running them in CI.
+  The PR's Validation section records their output; issue #50 tracks running them in CI (Open question 4).
+- [Red Hat's own images and the RHEL 10 generation are not tested, although the issue names RHEL and its rebuilds] →
+  They are outside the compatibility list and work or fail with `dnf`'s own error; a follow-up MINOR change adds them
+  (Open question 7).
 - [`fedora:44` is a fixed release: Fedora ships a new release about every six months and ends a release about four weeks
   after the second release that follows it] → The compatibility list names one Fedora release; adding the next one is a
   MINOR bump and dropping `fedora:44` a MAJOR one (`testing.md`), each in its own change.
@@ -382,52 +422,45 @@ settings this design cites.
 
 ## Open Questions
 
-Decisions for the maintainer at the package gate; each notes whether it changes the spec.
+None open. The maintainer decided these on 2026-10-01, ahead of the package gate, following the decision "Native
+behavior first":
 
 1. **Pinned downgrades.** The spec lets a pin move an installed package down, as `dnf` documents, which differs from
-   `apt-packages`, where apt refuses a downgrade. Recommendation: keep it, since pins pass through verbatim as decided
-   and the older version still comes from the image's signed repositories. Alternative: refuse a pin below the installed
-   version, which needs an RPM version comparison in the script and changes the requirements "Version and architecture
-   qualifiers" and "Installing the feature twice" and the scenario "Pin below the installed version on the second
-   install".
+   `apt-packages`, where apt refuses a downgrade. Resolved: kept, since pins pass through verbatim and the older version
+   still comes from the image's signed repositories; NOTES.md warns that a pin can downgrade a package and its
+   dependencies. Rejected: refusing a pin below the installed version, which needs an RPM version comparison in the
+   script.
 2. **Skippable repositories.** The feature honors a repository's `skip_if_unavailable`, which on Fedora lets an install
-   continue without the Cisco OpenH264 repository. Recommendation: keep it, because the image's maintainers chose it and
-   the main repositories are strict. Alternative: fail on any enabled repository, as `apt-packages` does with
-   `--error-on=any`, which changes the requirement "Repository metadata refresh" and drops the scenario "Skippable
-   repository is skipped".
-3. **Program-name matching.** dnf5 installs a package for a program name such as `dig`; dnf 4 does not. Recommendation:
-   accept it as `dnf` behavior and document it in NOTES.md. Alternative: refuse entries that name no package, which
-   needs a `dnf repoquery` call per entry and changes the requirement "Entries select packages as dnf matches them".
+   continue without the Cisco OpenH264 repository. Resolved: kept, because the image's maintainers chose it and the main
+   repositories are strict; NOTES.md states it. Rejected: failing on any enabled repository, as `apt-packages` does with
+   `--error-on=any`.
+3. **Program-name matching.** dnf5 installs a package for a program name such as `dig`; dnf 4 does not. Resolved:
+   accepted as `dnf` behavior and documented in NOTES.md. Rejected: refusing entries that name no package, which needs a
+   `dnf repoquery` call per entry.
 4. **Direct checks in CI.** The direct checks run by hand, because the scenario harness cannot assert an expected
-   failure. Recommendation: accept that for this change and propose a separate test-infrastructure change that lets a
-   feature's tests assert expected failures in CI, which all five installers would use. Until then duplicate.sh never
-   installs a second, different list, so "Different list on the second install" and every refusal scenario have no CI
-   coverage; the same holds for `apt-packages`. The follow-up would also move the runner logic the five installers share
-   under `scripts/`, where `just check` type-checks and lints it. Does not change the spec.
-5. **Key import on first use.** Under `-y`, `dnf` imports without confirmation the key a repository's `gpgkey` names
-   when a package needs a key the RPM keyring lacks, also from a remote URL, and keeps a key it imported for a check
-   that then fails (Context). The download rules of `feature-authoring.md` pin a key by full fingerprint only for a
-   repository the feature adds and place the image's own repositories under the package-manager rule, so option A needs
-   no deviation; whether `-y` confirming that import counts as weakening a signature check under the rules' "No
-   weakening" item is part of this decision. apt never imports a key, so `dnf-packages` gives a weaker guarantee than
-   its sibling on a user's image with such a repository. No supported image has one. The spec states option A. Options:
-   - A. Accept it and document it in NOTES.md, with users importing keys in their Dockerfile when they want a pinned
-     key.
-   - B. Refuse remote keys: before calling `dnf install`, exit 1 when an enabled repository's `gpgkey` is not a local
-     `file://` path. This fails common third-party setups such as Docker's `docker-ce.repo` even when their key is
-     already imported, and reading the enabled repositories' settings has no command common to both generations
-     (`dnf5 --dump-repo-config`; on dnf 4, `config-manager --dump` works on `almalinux:9` but not on
-     `rockylinux/rockylinux:9`), so the script would parse `.repo` files itself.
-   - C. Refuse any import: exit 1 unless every key the enabled repositories name is already in the RPM keyring, the
-     guarantee apt gives. It has B's configuration read, needs a key-file-to-keyring comparison in `sh`, and cannot tell
-     whether a remote key is imported without fetching it, so in practice it also refuses remote keys.
-
-   Recommendation: A, because B and C refuse repositories the image itself trusts and add a second code path that must
-   agree with `dnf`'s own configuration on two generations. B or C changes the requirement "Package signature checking
-   stays in effect" and adds a refusal scenario.
-6. **Upgrades under dnf.** The binding decision names apt, zypper, and pacman as the managers that may upgrade an
-   unpinned installed package; dnf 4.14 does too where the image sets `best=True` (Context), so the spec states "MAY
-   upgrade" for `dnf-packages` as well, also on the first install. Recommendation: accept this correction of the binding
-   decision. Alternative: pass `--setopt=best=False` to keep installed packages, which overrides the image's
-   configuration, is unverified on dnf 4, and changes the requirements "Install the listed packages" and "Installing the
-   feature twice".
+   failure. Resolved: accepted for this change. Issue #50 tracks the test-infrastructure change that lets a feature's
+   tests assert expected failures in CI and replaces the five installers' runners with one under `scripts/`, where
+   `just check` type-checks and lints it. Until then duplicate.sh never installs a second, different list, so "Different
+   list on the second install" and every refusal scenario have no CI coverage; the same holds for `apt-packages`. Does
+   not change the spec.
+5. **Key import on first use, and repositories without a signature check.** Under `-y`, `dnf` imports without
+   confirmation the key a repository's `gpgkey` names when a package needs a key the RPM keyring lacks, also from a
+   remote URL, and keeps a key it imported for a check that then fails (Context). apt never imports a key, so
+   `dnf-packages` gives a weaker guarantee than its sibling on a user's image with such a repository; no supported image
+   has one. Resolved: accepted and documented in NOTES.md, which says that a plain `http://` key location has no
+   transport protection and tells users to import a third-party key, checked by its fingerprint, in their Dockerfile.
+   The import is `dnf`'s own behavior for a repository the image configures, which the download rules of
+   `feature-authoring.md` place under the package-manager rule; the feature passes no option that relaxes a check, so
+   the rules' "No weakening" item is kept. For the same reason a repository the image enables with `gpgcheck=0` is
+   neither refused nor warned about; the spec states both. Rejected: refusing remote keys, or any import, before calling
+   `dnf install`, which refuses repositories the image itself trusts (Docker's `docker-ce.repo`, for example, even when
+   its key is already imported) and needs the script to read `.repo` files itself, because no command that prints the
+   enabled repositories' settings is common to both generations (`dnf5 --dump-repo-config`; on dnf 4,
+   `config-manager --dump` works on `almalinux:9` but not on `rockylinux/rockylinux:9`).
+6. **Upgrades under dnf.** dnf 4.14 upgrades an unpinned installed package where the image sets `best=True` (Context),
+   so the spec states "MAY upgrade" for `dnf-packages`, also on the first install. Resolved: accepted. Rejected:
+   `--setopt=best=False`, which overrides the image's configuration and is unverified on dnf 4.
+7. **RHEL images and the RHEL 10 generation.** The issue's outcome names Fedora, RHEL, and its rebuilds; the
+   compatibility list holds Fedora and two RHEL 9 rebuilds, and neither a Red Hat image with `dnf` nor a RHEL 10 rebuild
+   was checked. Resolved: ship with the three images and add those images in a follow-up MINOR change after checking
+   their repositories. Does not change the spec.

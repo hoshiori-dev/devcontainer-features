@@ -126,8 +126,8 @@ and SHALL NOT evaluate it as shell code.
 
 #### Scenario: Shell metacharacters, globs, and inner whitespace are refused
 
-- **WHEN** `packages` holds an entry with whitespace inside it or with a character outside the accepted set, such as
-  `;`, `$`, `` ` ``, `*`, `?`, `[`, `|`, or a non-ASCII letter
+- **WHEN** the `packages` value the feature receives holds an entry with whitespace inside it or with a character
+  outside the accepted set, such as `;`, `$`, `` ` ``, `*`, `?`, `[`, `|`, or a non-ASCII letter
 - **THEN** the feature exits with status 1, names the entry, installs nothing, and runs no command contained in the
   entry
 
@@ -227,12 +227,14 @@ The feature SHALL leave the signature checks that the image's `dnf` configuratio
 (https://dnf.readthedocs.io/en/latest/conf_ref.html, `gpgcheck`; https://dnf5.readthedocs.io/en/latest/dnf5.conf.5.html,
 `pkg_gpgcheck`): it SHALL NOT pass any option or configuration that disables or relaxes a signature or TLS check, and
 SHALL NOT itself add, remove, enable, disable, or change any repository, signing key, or `dnf` configuration file in the
-image. When a package's signature needs a key that is not yet in the RPM keyring, `dnf` MAY import, without
-confirmation, the key that the package's repository configuration names for it, from a local file or a remote location,
-and that key stays in the keyring even when the signature check then fails. The feature checks such a key against no
-pinned fingerprint or checksum: a key from a remote location relies on that location's transport alone, TLS for an HTTPS
-URL. The feature names no key and passes no key location; every key `dnf` imports is one the image's repository
-configuration names. Files that the packages it installs ship are not the feature's changes.
+image. A repository for which the image's configuration turns the package signature check off stays unchecked: the
+feature neither turns the check on nor refuses the repository. When a package's signature needs a key that is not yet in
+the RPM keyring, `dnf` MAY import, without confirmation, the key that the package's repository configuration names for
+it, from a local file or a remote location, and that key stays in the keyring even when the signature check then fails.
+The feature checks such a key against no pinned fingerprint or checksum: a key from a remote location relies on that
+location's transport alone, which is TLS for an HTTPS URL and no protection for a plain HTTP URL. The feature names no
+key and passes no key location; every key `dnf` imports is one the image's repository configuration names. Files that
+the packages it installs ship are not the feature's changes.
 
 #### Scenario: Unverifiable package fails
 
