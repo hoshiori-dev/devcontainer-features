@@ -43,8 +43,8 @@ removes the downloaded packages and every index list.
   The supported images fetch over plain HTTP, where signatures protect integrity but not freshness: an attacker on the
   network path during the build can replay an older, validly signed index and hold back security updates. If you need
   freshness, switch the image's sources to `https://`, which the Debian and Ubuntu archives serve.
-- The devcontainer CLI evaluates option values in a shell before the feature runs, so a `"`, `$`, or backtick in
-  `packages` is expanded as root at that point. Never put untrusted text into the option.
+- The devcontainer CLI evaluates option values in a shell before the feature runs, so a double quote, dollar sign, or
+  backtick in `packages` is expanded as root at that point. Never put untrusted text into the option.
 - A package you list, or one it needs, may itself add a repository, key, or apt configuration file. The feature does not
   undo that.
 
