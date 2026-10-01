@@ -7,7 +7,8 @@ Implements [#22](https://github.com/hoshiori-dev/devcontainer-features/issues/22
 A dev container on Alpine that needs a few extra system packages today needs a Dockerfile, or a broader feature that
 also adds repositories and configures the system. The collection has no feature that only installs a list of packages
 with `apk`. `apk-packages` is one of five atomic installers, one per package manager (`apt-packages`, `dnf-packages`,
-`apk-packages`, `pacman-packages`, `zypper-packages`), which share one option shape and one set of guarantees.
+`apk-packages`, `pacman-packages`, `zypper-packages`), which share one option shape and one script skeleton, and each of
+which keeps its package manager's own behavior.
 
 ## What Changes
 

@@ -68,12 +68,14 @@ installed package unless an entry's constraint or a package it installs requires
 
 ### Requirement: Version constraints and repository tags
 
-The feature SHALL pass an entry of the form `name=version`, `name~version`, or `name@tag` to `apk` unchanged, so that
-`apk` selects a version that equals the version, starts with it, or comes from the repository the image configures with
-that tag, and keeps the entry as a constraint in its world for later apk operations. A tag selects only a repository the
-image already configures with that tag; the feature SHALL NOT add a repository or a tag. When the installed version of a
-package does not satisfy its constraint, apk replaces it with a version that does, which can be a lower one; when the
-repositories offer none, the feature fails.
+The feature SHALL pass an entry of the form `name=version`, `name~version`, `name@tag`, or a name followed by one of
+apk's range operators and a version (such as `name<version`, `name<=version`, `name>version`, or `name>=version`) to
+`apk` unchanged, so that `apk` selects a version that equals the version, starts with it, lies in that range, or comes
+from the repository the image configures with that tag, and keeps the entry as a constraint in its world for later apk
+operations. An entry whose constraint `apk` cannot read, such as an operator without a version, fails the feature. A tag
+selects only a repository the image already configures with that tag; the feature SHALL NOT add a repository or a tag.
+When the installed version of a package does not satisfy its constraint, apk replaces it with a version that does, which
+can be a lower one; when the repositories offer none, the feature fails.
 
 #### Scenario: Pinned version is installed
 
@@ -84,6 +86,23 @@ repositories offer none, the feature fails.
 
 - **WHEN** `packages` holds `name~prefix` with a prefix of a version the image's repositories offer
 - **THEN** a version of the package that starts with that prefix is installed
+
+#### Scenario: Range constraint is installed
+
+- **WHEN** `packages` holds `name>=version` that a version the image's repositories offer satisfies
+- **THEN** a version of the package that satisfies the constraint is installed and apk's world holds the entry
+  `name>=version`
+
+#### Scenario: Unsatisfied range constraint fails
+
+- **WHEN** `packages` holds `name<version` that no version the image's repositories offer satisfies
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+#### Scenario: Malformed constraint fails
+
+- **WHEN** `packages` holds an entry that ends in a range operator, such as `name>`
+- **THEN** the feature exits with a non-zero status, installs none of the listed packages, and leaves apk's world as it
+  was
 
 #### Scenario: Configured tag selects its repository
 
@@ -104,10 +123,11 @@ repositories offer none, the feature fails.
 
 ### Requirement: Entries are validated before anything changes
 
-The feature SHALL accept an entry only when it starts with a letter or a digit and consists only of letters, digits, and
-the characters `.`, `_`, `+`, `-`, `:`, `~`, `=`, and `@`. When any entry is refused, the feature SHALL exit with status
-1 and a message naming that entry before it checks for `apk`, fetches any package index, or installs anything. The
-feature SHALL hand every accepted entry to `apk` as one argument and SHALL NOT evaluate it as shell code.
+The feature SHALL accept an entry only when it starts with an ASCII letter or a digit and consists only of ASCII
+letters, digits, and the characters `.`, `_`, `+`, `-`, `:`, `~`, `=`, `@`, `<`, and `>`. When any entry is refused, the
+feature SHALL exit with status 1 and a message naming that entry before it checks for `apk`, fetches any package index,
+or installs anything. The feature SHALL hand every accepted entry to `apk` as one argument and SHALL NOT evaluate it as
+shell code.
 
 #### Scenario: URL or path is refused
 
@@ -124,19 +144,14 @@ feature SHALL hand every accepted entry to `apk` as one argument and SHALL NOT e
 - **WHEN** `packages` holds an entry starting with `!`
 - **THEN** the feature exits with status 1, names the entry, and neither removes nor installs any package
 
-#### Scenario: Range operators are refused
-
-- **WHEN** `packages` holds an entry containing `<` or `>`, such as `name>=version`
-- **THEN** the feature exits with status 1, names the entry, and installs nothing
-
 #### Scenario: Shell metacharacters and inner whitespace are refused
 
-- **WHEN** `packages` holds an entry with whitespace inside it or with a character outside the accepted set, such as
-  `;`, `$`, `` ` ``, `*`, `?`, or `|`
+- **WHEN** the `packages` value the feature receives holds an entry with whitespace inside it or with a character
+  outside the accepted set, such as `;`, `$`, `` ` ``, `*`, `?`, `|`, or a non-ASCII letter
 - **THEN** the feature exits with status 1, names the entry, installs nothing, and runs no command contained in the
   entry
 
-### Requirement: Entries name packages exactly
+### Requirement: Entries select packages as apk matches them
 
 The feature SHALL install a package for an entry only when the entry's name, without its constraint or tag, is the exact
 name of a package the image's repositories offer or a name that such a package provides, such as `cmd:jq`; for a
@@ -189,11 +204,12 @@ when fetching or verifying the index of any configured repository fails, includi
 ### Requirement: Repository authentication stays in effect
 
 The feature SHALL leave apk's signature verification against the keys the image trusts
-(https://gitlab.alpinelinux.org/alpine/apk-tools/-/blob/master/doc/apk-keys.5.scd) in effect: it SHALL NOT pass any
+(https://gitlab.alpinelinux.org/alpine/apk-tools/-/blob/v3.0.8/doc/apk-keys.5.scd) in effect: it SHALL NOT pass any
 option or configuration that allows untrusted or unsigned packages or indexes, skips server certificate verification,
 continues without an unavailable repository, or replaces the image's repositories or trusted keys, and SHALL NOT itself
-add, remove, or change any repository, signing key, or apk configuration file in the image. Files that the packages it
-installs ship are not the feature's changes.
+add, remove, or change any repository, signing key, or apk configuration file in the image. Options that the image's own
+apk configuration sets stay the image's decision: the feature neither overrides nor checks them. Files that the packages
+it installs ship are not the feature's changes.
 
 #### Scenario: Unverifiable repository fails the refresh
 
