@@ -97,7 +97,7 @@
       compatibility image of this machine's architecture
 - [x] 7.3 Run `just test-scenarios nvidia-container-toolkit` and verify every scenario passes, and read the
       docker-outside-of-docker scenario's build log for the skipped-Docker-configuration message
-- [ ] 7.4 Run the manual checks the proposal's Acceptance lists, on one image of each package-manager family where it
+- [x] 7.4 Run the manual checks the proposal's Acceptance lists, on one image of each package-manager family where it
       says so: a substituted key file and a file holding the pinned key followed by a second key (build fails naming the
       fingerprint, before NVIDIA's repository is configured, with no temporary `GNUPGHOME` left); a configured key
       replaced by another key (refresh or install fails); Amazon Linux 2 and `ppc64le` (build fails naming the
@@ -105,5 +105,5 @@
       `1.20.1;true`, and a value holding a newline; an invalid `daemon.json` (build fails, file unchanged); the feature
       twice with `dockerd` (enabled then enabled: one `nvidia` entry; enabled then disabled: entry kept); and `latest`
       then an older exact version (all four packages downgraded)
-- [ ] 7.5 Record each Acceptance item of proposal.md and each scenario it points to, with its result, in the PR's
+- [x] 7.5 Record each Acceptance item of proposal.md and each scenario it points to, with its result, in the PR's
       Validation section
