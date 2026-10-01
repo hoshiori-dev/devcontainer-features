@@ -109,38 +109,30 @@ be on `PATH` without any change to the environment. The supported images are tho
 - **WHEN** a container is started from an image with the feature installed and no mount is running
 - **THEN** `hf-mount --version` succeeds and `hf-mount status` exits with status 0, both as root and as the remote user
 
-### Requirement: Downloads are verified against the GitHub release asset digest
+### Requirement: Downloads come from the upstream GitHub release and rely on TLS alone
 
 The feature SHALL download each binary only from
 `https://github.com/huggingface/hf-mount/releases/download/v<version>/<asset>`, where `<asset>` is exactly
 `hf-mount-<arch>-linux`, `hf-mount-nfs-<arch>-linux`, or `hf-mount-fuse-<arch>-linux` and `<arch>` is `x86_64` or
-`aarch64`; an asset is selected only by its exact name, so no other asset, such as `hf-mount-fuse-sidecar-<arch>-linux`,
-is ever installed. Before installing a binary, the feature SHALL verify its SHA-256 against the `digest` that the GitHub
-Releases API reports for the asset with that exact name, read from
-`https://api.github.com/repos/huggingface/hf-mount/releases/tags/v<version>`, or from
-`https://api.github.com/repos/huggingface/hf-mount/releases/latest` when following the latest release. The digest MUST
-be `sha256:` followed by 64 hexadecimal characters; a missing or differently shaped digest SHALL fail the install.
-Upstream publishes no checksum file and no signature, so the authenticity of every download and of the digest rests on
-TLS alone: every request SHALL use HTTPS, including every redirect. The digest is computed by GitHub when the asset is
-uploaded and is served by the same origin as the binary, so it proves the installed file is the one uploaded to the
-release, not who built it or that upstream vouches for it.
+`aarch64`; the feature requests only these exact names, so no other asset, such as `hf-mount-fuse-sidecar-<arch>-linux`,
+is ever installed. When following the latest release, the feature SHALL take `<version>` from the redirect that
+`https://github.com/huggingface/hf-mount/releases/latest` answers with: the redirect MUST lead to
+`https://github.com/huggingface/hf-mount/releases/tag/v<MAJOR.MINOR.PATCH>`, and any other answer SHALL fail the
+install. Upstream publishes no checksum file and no signature for any release, so the feature verifies none, and the
+integrity and authenticity of every download rest on TLS alone: every request SHALL use HTTPS, including every redirect.
+The feature SHALL send no credential with any request and SHALL offer no option that carries a token or any other
+credential.
 
-#### Scenario: Digest matches
+#### Scenario: Downloads succeed
 
-- **WHEN** every selected asset downloads and its SHA-256 equals the digest the Releases API reports for it
+- **WHEN** every selected asset downloads from its release URL
 - **THEN** the binaries are installed
 
-#### Scenario: Digest does not match
+#### Scenario: Latest release cannot be resolved
 
-- **WHEN** the SHA-256 of a downloaded asset differs from the digest the Releases API reports for it
-- **THEN** the install fails with a message naming the asset, and no binary under `/usr/local/bin` is created or
-  replaced by that run
-
-#### Scenario: Digest missing or malformed
-
-- **WHEN** the Releases API reports no digest for a selected asset, or one that is not `sha256:` followed by 64
-  hexadecimal characters
-- **THEN** the install fails with a message naming the asset, and no binary under `/usr/local/bin` is created or
+- **WHEN** the feature follows the latest release and the answer to the latest-release request is not a redirect to
+  `https://github.com/huggingface/hf-mount/releases/tag/v<MAJOR.MINOR.PATCH>`
+- **THEN** the install fails with a message naming the requested URL, and no binary under `/usr/local/bin` is created or
   replaced by that run
 
 #### Scenario: Asset missing from the release
@@ -151,51 +143,16 @@ release, not who built it or that upstream vouches for it.
 
 #### Scenario: HTTP error
 
-- **WHEN** a request to the Releases API or a download answers with an HTTP error status, or a redirect leads to a
-  non-HTTPS URL
+- **WHEN** a request answers with an HTTP error status, or a redirect leads to a non-HTTPS URL
 - **THEN** the install fails with a message naming the URL and the status, and no binary under `/usr/local/bin` is
   created or replaced by that run
-
-### Requirement: GitHub API token handling
-
-The feature SHALL use `GITHUB_TOKEN` only when it is already set in the environment its install runs in; the dev
-container CLI passes no host variable to a feature's install, so in practice that is an `ENV` of the image the feature
-is installed on. When it is set, the feature SHALL authenticate its GitHub Releases API requests with it and SHALL NOT
-send it to any other host, including the download host. The feature SHALL NOT print the token, pass it on a command
-line, or add any file or `ENV` that contains it. Without `GITHUB_TOKEN` the requests SHALL be anonymous. A token the API
-rejects SHALL fail the install rather than fall back to anonymous requests. The feature SHALL offer no option that
-carries a token or any other credential.
-
-#### Scenario: Token present
-
-- **WHEN** the feature is installed on an image whose environment sets `GITHUB_TOKEN`
-- **THEN** the Releases API requests carry the token, the downloads do not, and the build output and every file or `ENV`
-  the feature adds are free of the token
-
-#### Scenario: Token rejected
-
-- **WHEN** the feature is installed with a `GITHUB_TOKEN` that the Releases API rejects
-- **THEN** the install fails with a message naming the HTTP status and `GITHUB_TOKEN`, without printing the token, and
-  no binary under `/usr/local/bin` is created or replaced by that run
-
-#### Scenario: Token absent
-
-- **WHEN** the feature is installed without `GITHUB_TOKEN`
-- **THEN** the Releases API requests are made anonymously, and the install succeeds while the anonymous rate limit
-  allows it
-
-#### Scenario: Rate limit reached
-
-- **WHEN** the Releases API answers that the rate limit for the request is exhausted
-- **THEN** the install fails with a message naming the rate limit, the time it resets if the API reports one, and
-  `GITHUB_TOKEN`, and no binary under `/usr/local/bin` is created or replaced by that run
 
 ### Requirement: Mount dependencies follow the selected backends
 
 When `installMountDependencies` is enabled, the feature SHALL install the distribution packages that provide the mount
 helpers of the selected backends: `nfs-common` on Debian and Ubuntu, or `nfs-utils` on Fedora, when NFS is selected,
 providing `mount.nfs`; and `fuse3` when FUSE is selected, providing `fusermount3`. Apart from these, the feature SHALL
-install only the packages it needs to download and verify the binaries, and only when the image lacks them.
+install only the packages it needs to download the binaries, and only when the image lacks them.
 
 #### Scenario: NFS dependencies
 
