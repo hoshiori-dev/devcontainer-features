@@ -27,7 +27,8 @@
       verify by review of `install.sh` and `shellcheck`
 - [x] 3.2 Download the key with `curl --proto '=https' -fsSL` from `https://nvidia.github.io/libnvidia-container/gpgkey`
       into a temporary `GNUPGHOME` with a feature-specific name that a `trap` removes on success and failure; accept it
-      only when `gpg --show-keys --with-colons` yields exactly one `pub` record whose `fpr` is
+      only when `gpg --show-keys --with-colons` yields exactly one primary-key record, counting `pub` records and the
+      `sec` records of secret-key blocks, and that record is a `pub` record whose `fpr` is
       `C95B321B61E88C1809C4F759DDCAE044F796ECB0`, otherwise fail naming that fingerprint; export only that fingerprint
       to `/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg` (apt) or, armored, to
       `/etc/pki/rpm-gpg/RPM-GPG-KEY-nvidia-container-toolkit` (directory created when missing) followed by
@@ -98,12 +99,13 @@
 - [x] 7.3 Run `just test-scenarios nvidia-container-toolkit` and verify every scenario passes, and read the
       docker-outside-of-docker scenario's build log for the skipped-Docker-configuration message
 - [x] 7.4 Run the manual checks the proposal's Acceptance lists, on one image of each package-manager family where it
-      says so: a substituted key file and a file holding the pinned key followed by a second key (build fails naming the
-      fingerprint, before NVIDIA's repository is configured, with no temporary `GNUPGHOME` left); a configured key
-      replaced by another key (refresh or install fails); Amazon Linux 2 and `ppc64le` (build fails naming the
-      distribution or architecture, nothing added); a well-formed version the repository lacks; `1.20.1-1`, `1.20`,
-      `1.20.1;true`, and a value holding a newline; an invalid `daemon.json` (build fails, file unchanged); the feature
-      twice with `dockerd` (enabled then enabled: one `nvidia` entry; enabled then disabled: entry kept); and `latest`
-      then an older exact version (all four packages downgraded)
+      says so: a substituted key file, a file holding the pinned key followed by a second key, and a file holding the
+      pinned key together with another key's secret-key block, in either order (build fails naming the fingerprint,
+      before NVIDIA's repository is configured, with no temporary `GNUPGHOME` left); a configured key replaced by
+      another key (refresh or install fails); Amazon Linux 2 and `ppc64le` (build fails naming the distribution or
+      architecture, nothing added); a well-formed version the repository lacks; `1.20.1-1`, `1.20`, `1.20.1;true`, and a
+      value holding a newline; an invalid `daemon.json` (build fails, file unchanged); the feature twice with `dockerd`
+      (enabled then enabled: one `nvidia` entry; enabled then disabled: entry kept); and `latest` then an older exact
+      version (all four packages downgraded)
 - [x] 7.5 Record each Acceptance item of proposal.md and each scenario it points to, with its result, in the PR's
       Validation section
