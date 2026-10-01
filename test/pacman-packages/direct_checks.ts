@@ -11,9 +11,11 @@
 // Without --image it checks every image test/pacman-packages/compatibility.json lists for this
 // machine's architecture, plus the pinned alpine image for the image without pacman. --only keeps
 // the checks whose scenario contains <text>; --list prints the checks without running anything.
-// Needs docker and network access to the image's mirrors and, for the checks that need an outdated
-// package, to the Arch Linux Archive; a check that needs no network runs offline. Package names and
-// versions are read from the repositories at run time, so no fixed version goes stale.
+// It fails when no check would run, and without --image when the compatibility list has no image
+// for this architecture. Needs docker and network access to the image's mirrors and, for the checks
+// that need an outdated package, to the Arch Linux Archive; a check that needs no network runs
+// offline. Package names and versions are read from the repositories at run time, so no fixed
+// version goes stale.
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { fromFileUrl } from "jsr:@std/path@1.1.6";
 
@@ -846,9 +848,9 @@ function pacmanImages(): string[] {
 
 if (import.meta.main) {
     const args = parseArgs(Deno.args, { string: ["image", "only"], boolean: ["list"], collect: ["image"] });
-    const images = (args.image as string[]).length > 0
-        ? (args.image as string[])
-        : [...pacmanImages(), NO_PACMAN_IMAGE];
+    const given = args.image as string[];
+    const listed = pacmanImages();
+    const images = given.length > 0 ? given : [...listed, NO_PACMAN_IMAGE];
     const checks = CHECKS.filter((check) => !args.only || check.scenario.includes(args.only));
     const plan = images.flatMap((image) =>
         checks.filter((check) => (check.on === "no-pacman") === (image === NO_PACMAN_IMAGE)).map((check) => ({
@@ -859,6 +861,18 @@ if (import.meta.main) {
     if (args.list) {
         for (const { image, check } of plan) console.log(`${image}  ${check.scenario}  (network: ${check.network})`);
         Deno.exit(0);
+    }
+    // As `just test`: a run that checked nothing, or nothing on an image with pacman, fails instead of passing.
+    if (given.length === 0 && listed.length === 0) {
+        console.error(
+            `error: no image in ${COMPATIBILITY} lists ${HOST_ARCH}, so no check would run against pacman. ` +
+                "Pass --image <ref> to check one anyway.",
+        );
+        Deno.exit(1);
+    }
+    if (plan.length === 0) {
+        console.error("error: no check matches --image and --only, so nothing would run. See --list.");
+        Deno.exit(1);
     }
     const cleanup = async () => {
         await Promise.all([...live].map((name) => docker(["rm", "--force", name])));
