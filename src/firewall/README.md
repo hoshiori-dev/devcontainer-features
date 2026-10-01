@@ -133,10 +133,25 @@ the Internet.
 - Sibling Compose services: allow a service by its name in `allowedDomains` (Docker's embedded DNS answers it through
   the feature's resolver) or its subnet in `allowedCidrs`. The container's own subnets are not allowed automatically,
   since that would also open the Docker host's gateway address.
-- Nested containers (docker-in-docker): with `filterForward` `true`, their traffic meets the same rules. Use
-  user-defined networks (`docker network create`): their embedded DNS forwards to the feature's resolver, while
-  containers on the default bridge get `8.8.8.8` as resolver, which is refused. Traffic between the container and its
-  nested networks is always allowed.
+
+## Nested containers (docker-in-docker)
+
+The feature protects the dev container's own outbound traffic. Containers nested in it are an exception: the rules apply
+to them too, but **a nested container is not guaranteed to reach an allowed domain**.
+
+- With `filterForward` `true`, a nested container is refused every destination no option allows, and it reaches the
+  addresses inside `allowedCidrs` and inside the `github` preset's ranges. Traffic between the container and its nested
+  networks is always allowed.
+- A domain is reachable only at the addresses the feature's resolver returned for it, and that resolver sees only
+  lookups made through the dev container's `/etc/resolv.conf`. A nested Docker daemon configured with its own DNS
+  servers sends its containers' lookups elsewhere, so no address is allowed for them. The known case is docker-in-docker
+  on an Azure host: its `azureDnsAutoDetection` option (default `true`) starts the daemon with `--dns 168.63.129.16`,
+  and a nested container then resolves an allowed name but is refused the connection, unless the dev container itself
+  has looked that name up since its start.
+- What you can do today: allow the destination's addresses in `allowedCidrs`; or set docker-in-docker's
+  `azureDnsAutoDetection` to `false` and run nested containers on a user-defined network (`docker network create`),
+  whose lookups then go through the feature's resolver. Nested containers on the default bridge then get `8.8.8.8` and
+  `8.8.4.4` as resolvers, which are refused, so no name resolves there.
 
 ## Limits and failures
 
