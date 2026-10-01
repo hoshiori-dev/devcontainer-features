@@ -19,7 +19,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-No features have been published yet.
+| Feature                             | Description                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [`apk-packages`](src/apk-packages/) | Installs a list of system packages with `apk` from the repositories an Alpine Linux image already configures. |
 
 ## Development
 
