@@ -1,0 +1,15 @@
+{
+  "id": "apk-packages",
+  "version": "1.0.0",
+  "name": "APK packages",
+  "description": "Installs a list of system packages with apk from the repositories the Alpine Linux image already configures.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apk-packages",
+  "options": {
+    "packages": {
+      "type": "string",
+      "default": "",
+      "proposals": ["file", "file,tree"],
+      "description": "Comma-separated packages to install: name, name=version, name~version, a range such as name>=version, name@tag, or a provided name such as cmd:jq. Whitespace around entries and empty entries are ignored; an empty list installs nothing."
+    }
+  }
+}
