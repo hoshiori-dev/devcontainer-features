@@ -30,5 +30,23 @@
     "features": {
       "uv": {}
     }
+  },
+  "changed_uid": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "remoteUser": "developer",
+    "features": {
+      "uv": {
+        "toolsToInstall": "pycowsay"
+      }
+    }
+  },
+  "repair_volume": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "uv": {}
+    }
   }
 }

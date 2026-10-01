@@ -161,6 +161,29 @@ remote_user="${_REMOTE_USER:-root}"
 id -u "$remote_user" >/dev/null 2>&1 || fail "the remote user '$remote_user' does not exist in the image."
 remote_group=$(id -g "$remote_user")
 
+# Validate the existing group and the account tools before any download or file change.
+if [ "$(id -u "$remote_user")" != 0 ]; then
+    uv_group=$(awk -F: '$1 == "uv" {print $3}' /etc/group)
+    if [ -n "$uv_group" ]; then
+        [ "$uv_group" != "$remote_group" ] || fail "group uv is the primary group of '$remote_user'."
+        other_members=$(awk -F: -v user="$remote_user" '$1 == "uv" {
+            n=split($4, members, ","); for (i=1; i<=n; i++) if (members[i] != "" && members[i] != user) print members[i]
+        }' /etc/group)
+        other_primary=$(awk -F: -v gid="$uv_group" -v user="$remote_user" '$4 == gid && $1 != user {print $1}' /etc/passwd)
+        [ -z "$other_members$other_primary" ] || fail "group uv belongs to another account: $other_members $other_primary."
+    elif ! command -v groupadd >/dev/null 2>&1 && ! command -v addgroup >/dev/null 2>&1; then
+        fail "cannot create group uv: neither groupadd nor addgroup is available."
+    fi
+    case " $(id -G "$remote_user") " in
+        *" $uv_group "*) ;;
+        *)
+            if ! command -v usermod >/dev/null 2>&1 && ! command -v addgroup >/dev/null 2>&1; then
+                fail "cannot add '$remote_user' to group uv: neither usermod nor addgroup is available."
+            fi
+            ;;
+    esac
+fi
+
 # --- Prerequisites from the image's own repositories -------------------------------------------
 
 has_ca_bundle() {
@@ -294,13 +317,47 @@ fi
 
 # --- Directories and login shells --------------------------------------------------------------
 
-# The mount point of the volume: empty and owned by the remote user, so Docker gives a new volume
-# that owner. Nothing is ever written below it at build time.
+# Supplementary membership survives the CLI's change of the user's UID and primary GID.
+if [ "$(id -u "$remote_user")" != 0 ]; then
+    if [ -z "$uv_group" ]; then
+        if command -v groupadd >/dev/null 2>&1; then
+            groupadd --system uv || fail "could not create group uv."
+        else
+            addgroup -S uv || fail "could not create group uv."
+        fi
+        uv_group=$(awk -F: '$1 == "uv" {print $3}' /etc/group)
+    fi
+    case " $(id -G "$remote_user") " in
+        *" $uv_group "*) ;;
+        *)
+            if command -v usermod >/dev/null 2>&1; then
+                usermod -aG uv "$remote_user" || fail "could not add '$remote_user' to group uv."
+            else
+                addgroup "$remote_user" uv || fail "could not add '$remote_user' to group uv."
+            fi
+            ;;
+    esac
+    remote_group=$uv_group
+    dir_mode=2775
+else
+    remote_group=0
+    dir_mode=0755
+fi
+
+# Docker copies the empty mount point's owner, group, and mode into a new volume.
 mkdir -p "$VOLUME_DIR"
 chown "$remote_user:$remote_group" "$VOLUME_DIR"
-chmod 0755 "$VOLUME_DIR"
+chmod "$dir_mode" "$VOLUME_DIR"
 
 mkdir -p "$SHARE_DIR/tools" "$SHARE_DIR/python" "$SHARE_DIR/bin"
+chown "$remote_user:$remote_group" "$SHARE_DIR" "$SHARE_DIR/tools" "$SHARE_DIR/python" "$SHARE_DIR/bin"
+chmod "$dir_mode" "$SHARE_DIR" "$SHARE_DIR/tools" "$SHARE_DIR/python" "$SHARE_DIR/bin"
+
+# Keep the lifecycle script outside the user-writable tool tree.
+mkdir -p /usr/local/share/uv-feature
+cp "$(dirname "$0")/repair-volume.sh" /usr/local/share/uv-feature/repair-volume
+chown root:root /usr/local/share/uv-feature /usr/local/share/uv-feature/repair-volume
+chmod 0755 /usr/local/share/uv-feature /usr/local/share/uv-feature/repair-volume
 
 mkdir -p "$(dirname "$PROFILE_SNIPPET")"
 cat >"$PROFILE_SNIPPET" <<'EOF'
@@ -332,5 +389,10 @@ fi
 
 # The remote user manages tools at runtime with uv tool, without elevated privileges.
 chown -hR "$remote_user:$remote_group" "$SHARE_DIR"
+if [ "$(id -u "$remote_user")" != 0 ]; then
+    chmod -R g+w,o-w "$SHARE_DIR"
+else
+    chmod -R go-w "$SHARE_DIR"
+fi
 
 log "done: $("$BIN_DIR/uv" --version)"

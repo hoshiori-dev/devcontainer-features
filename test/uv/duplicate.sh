@@ -64,6 +64,20 @@ for entry in ${TOOLSTOINSTALL:-} ${TOOLSTOINSTALL__DEFAULT:-}; do
 done
 set +f
 IFS=$old_ifs
+for lock in /usr/local/share/uv/tools/.lock /usr/local/share/uv/python/.lock; do
+    mode=$(stat -c %a "$lock")
+    check "lock $lock has no other-write" [ "$((0$mode & 2))" = 0 ]
+    if [ "$(id -u)" = 0 ]; then
+        check "lock $lock has no group-write for root" [ "$((0$mode & 16))" = 0 ]
+    fi
+done
+if [ "$(id -u)" != 0 ]; then
+    # shellcheck disable=SC2016
+    check "exactly one group lists this user once" awk -F: -v user="$(id -un)" '$1 == "uv" {lines++; n=split($4,a,","); for(i=1;i<=n;i++) if(a[i]==user) members++} END {exit !(lines==1 && members==1)}' /etc/group
+    for tool in $tools; do
+        check "retained tool $tool has group write" [ "$(stat -c '%G %a' "/usr/local/share/uv/tools/$tool")" = "uv 2775" ]
+    done
+fi
 for tool in $tools; do
     check "tool $tool runs by name" sh -c "command -v '$tool' && '$tool' hello >/dev/null"
 done

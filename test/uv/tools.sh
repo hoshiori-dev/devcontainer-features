@@ -38,6 +38,16 @@ interpreter_in_image() {
 check "the volume is mounted at $VOLUME" is_mount "$VOLUME"
 check "the volume is new and empty" is_empty_dir "$VOLUME"
 
+# Assert the image layout before Python writes __pycache__ with the user's umask.
+# shellcheck disable=SC2016
+check "every entry belongs to uv" sh -c 'test -z "$(find /usr/local/share/uv ! -group uv -print -quit)"'
+# shellcheck disable=SC2016
+check "every non-link has group write" sh -c 'test -z "$(find /usr/local/share/uv ! -type l ! -perm -0020 -print -quit)"'
+# shellcheck disable=SC2016
+check "no non-link has other-write" sh -c 'test -z "$(find /usr/local/share/uv ! -type l -perm -0002 -print -quit)"'
+# shellcheck disable=SC2016
+check "every directory has setgid" sh -c 'test -z "$(find /usr/local/share/uv -type d ! -perm -2000 -print -quit)"'
+
 # Tools on PATH.
 check "pycowsay is found by name" [ "$(command -v pycowsay)" = /usr/local/share/uv/bin/pycowsay ]
 check "cowsay is found by name" [ "$(command -v cowsay)" = /usr/local/share/uv/bin/cowsay ]
@@ -56,6 +66,8 @@ check "no user uv.toml" [ ! -e "${XDG_CONFIG_HOME:-$HOME/.config}/uv/uv.toml" ]
 # Remote user manages tools, without elevated privileges.
 check "the remote user is not root" [ "$(id -u)" != 0 ]
 check "the remote user upgrades a build-time tool" uv tool upgrade pycowsay
+check "the remote user reinstalls a build-time tool" uv tool install --reinstall pycowsay
+check "the remote user removes a build-time tool" uv tool uninstall cowsay
 check "the remote user installs a new tool" uv tool install pyjokes
 check "the new tool runs by name" sh -c 'pyjoke >/dev/null'
 

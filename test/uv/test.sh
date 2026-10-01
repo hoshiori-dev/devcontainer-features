@@ -62,7 +62,41 @@ PRINT_ENV='printf "%s|%s|%s|%s|%s" "$UV_PYTHON_INSTALL_DIR" "$UV_CACHE_DIR" "$UV
 # New volume: checked before anything runs uv.
 check "the volume is mounted at $VOLUME" is_mount "$VOLUME"
 check "the volume is empty" is_empty_dir "$VOLUME"
-check "the volume is owned by the remote user" [ "$(stat -c %U "$VOLUME")" = "$(id -un)" ]
+check "the remote user can write the volume" test -w "$VOLUME"
+check "the repair script is root-owned and executable" [ "$(stat -c '%u %g %a' /usr/local/share/uv-feature/repair-volume)" = "0 0 755" ]
+if [ "$(id -u)" = 0 ]; then
+    check "no group uv is created for root" sh -c '! grep -q "^uv:" /etc/group'
+    for dir in "$VOLUME" /usr/local/share/uv /usr/local/share/uv/tools /usr/local/share/uv/python /usr/local/share/uv/bin; do
+        check "root-only write on $dir" [ "$(stat -c '%u %g %a' "$dir")" = "0 0 755" ]
+    done
+else
+    check "the user is a member of uv" sh -c 'id -Gn | tr " " "\n" | grep -qx uv'
+    for dir in "$VOLUME" /usr/local/share/uv /usr/local/share/uv/tools /usr/local/share/uv/python /usr/local/share/uv/bin; do
+        check "group uv and setgid write on $dir" [ "$(stat -c '%G %a' "$dir")" = "uv 2775" ]
+    done
+fi
+
+# The fresh volume fits even when the UID changed; the check must not invoke sudo.
+stubs=$(mktemp -d)
+cat >"$stubs/sudo" <<'EOF'
+#!/bin/sh
+: >"$SUDO_RECORD"
+exit 1
+EOF
+chmod +x "$stubs/sudo"
+check "a fresh volume fits without sudo" env PATH="$stubs:$PATH" SUDO_RECORD="$stubs/called" /usr/local/share/uv-feature/repair-volume
+check "sudo was not called" test ! -e "$stubs/called"
+check "the volume stays empty" is_empty_dir "$VOLUME"
+if [ "$(id -u)" = 0 ]; then
+    touch "$VOLUME/foreign"
+    chown 23456:23456 "$VOLUME/foreign"
+    check "root skips a foreign entry" env PATH="$stubs:$PATH" SUDO_RECORD="$stubs/called" /usr/local/share/uv-feature/repair-volume 2>"$stubs/warning"
+    check "the foreign owner is unchanged" [ "$(stat -c %u "$VOLUME/foreign")" = 23456 ]
+    check "root prints no warning" test ! -s "$stubs/warning"
+    check "root runs no sudo" test ! -e "$stubs/called"
+    rm "$VOLUME/foreign"
+fi
+rm -rf "$stubs"
 
 # Omitted version, glibc image, musl image, Checksum matches.
 release=$(latest_release)
