@@ -10,6 +10,10 @@ set -e
 latest=$(latest_version) || latest=""
 echo "first install: ${VERSION-unset}; second install: ${VERSION__DEFAULT-unset}; latest now: $latest"
 
+# Before glab runs here: the second install ran the installed 1.47.0 as root at build time, and
+# 1.47.0 writes its configuration on every call.
+check "no glab configuration in the remote user's or root's home" no_glab_config
+
 # The replace path runs only when the first install was 1.47.0 and the second selected another release.
 check "the first install used version 1.47.0" equals "${VERSION-}" 1.47.0
 check "the second install used the default latest" equals "${VERSION__DEFAULT-}" latest
