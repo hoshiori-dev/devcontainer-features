@@ -9,7 +9,7 @@
       `dependsOn`, `privileged`, `mounts`, `containerEnv`, `init`, or `securityOpt`; verify `just validate` and
       `just spec-check` pass.
 - [x] 1.2 Write `test/firewall/compatibility.json` with the four images of design.md (Supported images) on `amd64` and
-      `arm64`, `remoteUser` `vscode` on `base:ubuntu-24.04`; verify `just validate` passes.
+      `arm64`, `remoteUser` `vscode` on `base:ubuntu24.04`; verify `just validate` passes.
 - [x] 1.3 Replace the root `README.md`'s "No features have been published yet." with a "Features" row for `firewall`
       linking to `src/firewall/` with a one-sentence description; verify `deno fmt --check` passes.
 

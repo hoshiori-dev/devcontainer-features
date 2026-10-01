@@ -36,7 +36,7 @@ if ! command -v reportResults >/dev/null 2>&1; then
   }
 fi
 
-# as_root CMD...: runs CMD as root (the remote user of base:ubuntu-24.04 has passwordless sudo).
+# as_root CMD...: runs CMD as root (the remote user of base:ubuntu24.04 has passwordless sudo).
 as_root() {
   if [ "$(id -u)" = 0 ]; then "$@"; else sudo -n "$@"; fi
 }

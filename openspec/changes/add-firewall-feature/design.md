@@ -9,8 +9,8 @@ Research for this change, checked on 2026-09-30; see `proposal.md` for the motiv
   prints `Container started`, then runs them in metadata order (base image, then features in install order, then
   `devcontainer.json`), then `exec "$@"`. There is no `set -e`, so a failing entrypoint does not stop the container, and
   a hanging one delays the container's command. The script runs as the image's user unless `containerUser` is set;
-  `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` and the plain distribution images run it as root. The CLI waits
-  for Docker's start event, not for the entrypoints, before it runs lifecycle commands, so `postCreateCommand` and
+  `mcr.microsoft.com/devcontainers/base:ubuntu24.04` and the plain distribution images run it as root. The CLI waits for
+  Docker's start event, not for the entrypoints, before it runs lifecycle commands, so `postCreateCommand` and
   `postStartCommand` can begin while an entrypoint still runs. When a feature's lifecycle command fails, the CLI prints
   "Skipping any further user-provided commands" and runs none of the user's later hooks
   (`src/spec-common/injectHeadless.ts`). The `wslc` CLI variant drops `--cap-add`, `--privileged`, `--init`, and
@@ -76,12 +76,12 @@ Research for this change, checked on 2026-09-30; see `proposal.md` for the motiv
 
 Packages on the planned images, verified on 2026-09-30 for amd64 and arm64:
 
-| Image                                               | nftables          | dnsmasq with nftset support                                                                   | Also installed                  |
-| --------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------- | ------------------------------- |
-| `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` | `1.0.9-1build1`   | `dnsmasq-base` `2.91-0ubuntu0.24.04.1` (`noble-updates`); `debian/rules` adds `-DHAVE_NFTSET` | `curl`, `jq`, `ca-certificates` |
-| `debian:12`                                         | `1.0.6-2+deb12u2` | `dnsmasq-base` `2.90-4~deb12u2`; `debian/rules` adds `-DHAVE_NFTSET`                          | `curl`, `jq`, `ca-certificates` |
-| `alpine:3.24`                                       | `1.1.6-r1`        | `dnsmasq-dnssec-nftset` `2.92_p2-r0`; plain `dnsmasq` lacks `HAVE_NFTSET` (`APKBUILD`)        | `curl`, `jq`, `ca-certificates` |
-| `fedora:44`                                         | `1.1.6-2.fc44`    | `dnsmasq` `2.92rel2-9.fc44`; `dnsmasq.spec` adds `-DHAVE_NFTSET`                              | `curl`, `jq`, `ca-certificates` |
+| Image                                              | nftables          | dnsmasq with nftset support                                                                   | Also installed                  |
+| -------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------- | ------------------------------- |
+| `mcr.microsoft.com/devcontainers/base:ubuntu24.04` | `1.0.9-1build1`   | `dnsmasq-base` `2.91-0ubuntu0.24.04.1` (`noble-updates`); `debian/rules` adds `-DHAVE_NFTSET` | `curl`, `jq`, `ca-certificates` |
+| `debian:12`                                        | `1.0.6-2+deb12u2` | `dnsmasq-base` `2.90-4~deb12u2`; `debian/rules` adds `-DHAVE_NFTSET`                          | `curl`, `jq`, `ca-certificates` |
+| `alpine:3.24`                                      | `1.1.6-r1`        | `dnsmasq-dnssec-nftset` `2.92_p2-r0`; plain `dnsmasq` lacks `HAVE_NFTSET` (`APKBUILD`)        | `curl`, `jq`, `ca-certificates` |
+| `fedora:44`                                        | `1.1.6-2.fc44`    | `dnsmasq` `2.92rel2-9.fc44`; `dnsmasq.spec` adds `-DHAVE_NFTSET`                              | `curl`, `jq`, `ca-certificates` |
 
 Sources: packages.debian.org, packages.ubuntu.com, pkgs.alpinelinux.org (v3.24, x86_64 and aarch64),
 mdapi.fedoraproject.org (f44), and the packaging files on sources.debian.org, git.launchpad.net
@@ -89,7 +89,7 @@ mdapi.fedoraproject.org (f44), and the packaging files on sources.debian.org, gi
 earlier research brief, which had Ubuntu's `2.90-2ubuntu0.4` from an older `noble` pocket, Alpine 3.22, and Fedora 43,
 and left Ubuntu's and Fedora's `HAVE_NFTSET` unverified. `alpine:3.24` is the current Alpine (same digest as `latest`)
 and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:12` publish amd64 and arm64 images
-(docker-library `official-images`), and `base:ubuntu-24.04` publishes both (`docker buildx imagetools inspect`).
+(docker-library `official-images`), and `base:ubuntu24.04` publishes both (`docker buildx imagetools inspect`).
 
 ## Goals / Non-Goals
 
@@ -198,7 +198,7 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
 - A security boundary: root or `sudo` in the container can delete the table; DNS lookups can carry data; allowed CDN and
   GitHub ranges carry other tenants' content; the agent can edit `.devcontainer/` for the next build.
 - Restricting a remote user who has privilege. The guardrail assumes a remote user without root, passwordless `sudo`, or
-  access to a Docker daemon. The `vscode` user of `base:ubuntu-24.04` has passwordless `sudo`, so there the rules are
+  access to a Docker daemon. The `vscode` user of `base:ubuntu24.04` has passwordless `sudo`, so there the rules are
   removable by default; with docker-in-docker, membership in the `docker` group is root-equivalent, and a nested
   `--privileged` container or a `macvlan` network on the dev container's interface bypasses the rules. `NOTES.md` states
   this first.
@@ -348,12 +348,12 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
 
 Planned `test/firewall/compatibility.json`, each on `amd64` and `arm64`:
 
-| Image                                               | `remoteUser` | Why                                                         |
-| --------------------------------------------------- | ------------ | ----------------------------------------------------------- |
-| `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` | `vscode`     | The usual dev container base; tests the check without root  |
-| `debian:12`                                         | (none)       | Plain Debian; the scenarios' image, where tests run as root |
-| `alpine:3.24`                                       | (none)       | musl, BusyBox, and the `dnsmasq-dnssec-nftset` subpackage   |
-| `fedora:44`                                         | (none)       | dnf-based distributions                                     |
+| Image                                              | `remoteUser` | Why                                                         |
+| -------------------------------------------------- | ------------ | ----------------------------------------------------------- |
+| `mcr.microsoft.com/devcontainers/base:ubuntu24.04` | `vscode`     | The usual dev container base; tests the check without root  |
+| `debian:12`                                        | (none)       | Plain Debian; the scenarios' image, where tests run as root |
+| `alpine:3.24`                                      | (none)       | musl, BusyBox, and the `dnsmasq-dnssec-nftset` subpackage   |
+| `fedora:44`                                        | (none)       | dnf-based distributions                                     |
 
 Architecture does not change the rules, which live in the host kernel; the second architecture covers packaging.
 
@@ -420,7 +420,7 @@ own, and setting variables named like the options, then runs the check with a `P
 | Stale record                                                                                                                                | `rerun` (record's start time set to an earlier one, check run)                                                                                |
 | Changed environment                                                                                                                         | `rerun` (the check with a shadowing `PATH`, `ENV`, and `BASH_ENV`)                                                                            |
 | Resolver user                                                                                                                               | `test.sh` (dnsmasq's process runs as `dnsmasq`)                                                                                               |
-| Remote user reads the record                                                                                                                | `test.sh` on `base:ubuntu-24.04` as `vscode`                                                                                                  |
+| Remote user reads the record                                                                                                                | `test.sh` on `base:ubuntu24.04` as `vscode`                                                                                                   |
 | No sudoers entry                                                                                                                            | `test.sh`                                                                                                                                     |
 | Environment does not change the rules                                                                                                       | `rerun`                                                                                                                                       |
 | Other rules untouched                                                                                                                       | `rerun`                                                                                                                                       |
