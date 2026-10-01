@@ -1,0 +1,62 @@
+{
+  "non_default_options_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "openspec": {
+        "version": "1.13.2",
+        "disableUpdateCheck": false,
+        "disableTelemetry": true
+      }
+    }
+  },
+  "non_default_options_debian": {
+    "image": "debian:12",
+    "features": {
+      "openspec": {
+        "version": "1.13.2",
+        "disableUpdateCheck": false,
+        "disableTelemetry": true
+      }
+    }
+  },
+  "node_switched_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "openspec": {
+        "version": "latest",
+        "disableUpdateCheck": true,
+        "disableTelemetry": false
+      }
+    }
+  },
+  "node_switched_debian": {
+    "image": "debian:12",
+    "features": {
+      "openspec": {
+        "version": "latest",
+        "disableUpdateCheck": true,
+        "disableTelemetry": false
+      }
+    }
+  },
+  "image_registry_ubuntu": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "remoteUser": "root",
+    "features": {
+      "openspec": {}
+    }
+  },
+  "image_registry_debian": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "remoteUser": "root",
+    "features": {
+      "openspec": {}
+    }
+  }
+}
