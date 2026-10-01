@@ -166,10 +166,11 @@ key_is_pinned() {
   home="$(mktemp -d)"
   records="$(GNUPGHOME="$home" gpg --batch --show-keys --with-colons "$file" 2>/dev/null)"
   rm -rf "$home"
-  primaries="$(grep -c '^pub:' <<<"$records" || true)"
+  # A secret-key block (sec record) is a primary key too; the one key must be the public key (pub record).
+  primaries="$(grep -cE '^(pub|sec):' <<<"$records" || true)"
   fingerprint="$(awk -F: '$1 == "pub" { primary = 1; next } primary && $1 == "fpr" { print $10; exit }' <<<"$records")"
   if [[ "$primaries" != "1" || "$fingerprint" != "$TOOLKIT_NVIDIA_FINGERPRINT" ]]; then
-    echo "$file holds $primaries primary key(s), first fingerprint '$fingerprint'" >&2
+    echo "$file holds $primaries primary key(s), first public fingerprint '$fingerprint'" >&2
     return 1
   fi
 }
