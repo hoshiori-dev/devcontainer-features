@@ -3,7 +3,7 @@
 ## Context
 
 See proposal.md - Why. Facts this change relies on, checked on 2026-09-30 against upstream documents and source, and by
-running `apt-get` in `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` (apt 2.8.3) and `debian:12` (apt 2.6.1; pulled
+running `apt-get` in `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (apt 2.8.3) and `debian:12` (apt 2.6.1; pulled
 as `public.ecr.aws/docker/library/debian:12`, the AWS ECR Public mirror of the Docker official image, because Docker Hub
 rate-limited the check; both registries serve the index digest
 `sha256:f37a335e82bca302e955fa39f9dfe28f1be618f016f8a2b56318e5a5111afc26`):
@@ -252,10 +252,10 @@ duplicate.sh.
 The planned `test/apt-packages/compatibility.json`, both images on `amd64` and `arm64` (arm64 variants pulled and
 inspected on 2026-09-30):
 
-| Image                                               | Architectures | Why                                                              |
-| --------------------------------------------------- | ------------- | ---------------------------------------------------------------- |
-| `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` | amd64, arm64  | Ubuntu LTS as dev containers ship it; apt 2.8.3                  |
-| `debian:12`                                         | amd64, arm64  | Plain Debian 12 (bookworm) with a minimal package set; apt 2.6.1 |
+| Image                                              | Architectures | Why                                                              |
+| -------------------------------------------------- | ------------- | ---------------------------------------------------------------- |
+| `mcr.microsoft.com/devcontainers/base:ubuntu24.04` | amd64, arm64  | Ubuntu LTS as dev containers ship it; apt 2.8.3                  |
+| `debian:12`                                        | amd64, arm64  | Plain Debian 12 (bookworm) with a minimal package set; apt 2.6.1 |
 
 ## URL inventory
 

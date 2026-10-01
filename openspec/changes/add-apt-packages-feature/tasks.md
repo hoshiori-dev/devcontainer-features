@@ -29,7 +29,7 @@
 
 ## 2. Container tests
 
-- [x] 2.1 Write `test/apt-packages/compatibility.json` with `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` and
+- [x] 2.1 Write `test/apt-packages/compatibility.json` with `mcr.microsoft.com/devcontainers/base:ubuntu24.04` and
       `debian:12`, each on `amd64` and `arm64`; verify with `just validate` and against the design's Supported images
 - [x] 2.2 Write `test/apt-packages/test.sh` for the default options (scenario "Omitted packages": none of the
       `proposals` packages installed, no package index left); verify with `shellcheck`
