@@ -24,8 +24,11 @@ for binary in hf-mount hf-mount-nfs hf-mount-fuse; do
   check "$binary is present" test -x "/usr/local/bin/$binary"
 done
 check "hf-mount --version succeeds" hf-mount --version
-check "hf-mount-nfs was replaced by the second install's release" same_release_as_daemon hf-mount-nfs
-check "hf-mount-fuse comes from the second install's release" same_release_as_daemon hf-mount-fuse
+# The second install replaces the daemon and both backends, so all three report one release. For
+# hf-mount-nfs this tells a replaced binary from a kept one only once upstream's latest release is
+# newer than the proposal the first install pinned; until then both installs bring the same release.
+check "hf-mount-nfs reports the daemon's release" same_release_as_daemon hf-mount-nfs
+check "hf-mount-fuse reports the daemon's release" same_release_as_daemon hf-mount-fuse
 check "mount.nfs is present" has_mount_nfs
 check "fusermount3 is on PATH" command -v fusermount3
 
