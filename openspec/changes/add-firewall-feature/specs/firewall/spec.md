@@ -491,11 +491,15 @@ The feature SHALL keep the `search` and `options` lines of `/etc/resolv.conf` in
 Whatever `filterForward` is, traffic from the container to networks that exist only inside it, such as the bridges of a
 nested Docker daemon, traffic forwarded into those networks, and reply traffic of forwarded connections that were
 allowed SHALL be allowed, whatever the denied entries say; which forwarded traffic the rules filter is stated in
-Requirement: Option filterForward.
+Requirement: Option filterForward. The feature does not guarantee that a nested container reaches a destination allowed
+only by name: an allowed name is reachable at the addresses the container's resolver returned for it (Requirement:
+Allowed domains), and a nested Docker daemon configured with its own DNS servers sends its containers' lookups to those
+servers instead. `NOTES.md` SHALL state this exception, its cause, and what a user can do.
 
-#### Scenario: Nested container on a user-defined network reaches an allowed domain
+#### Scenario: Nested container reaches an allowed range
 
-- **WHEN** `filterForward` is enabled and a nested container on a user-defined network connects to an allowed domain
+- **WHEN** `filterForward` is enabled and a nested container connects to an address inside a range that `allowedCidrs`
+  lists
 - **THEN** the connection succeeds
 
 ### Requirement: Failure mode
@@ -608,7 +612,7 @@ installed in the same container, so its entrypoint runs after docker-in-docker's
 #### Scenario: With docker-in-docker
 
 - **WHEN** the feature is installed together with docker-in-docker
-- **THEN** the nested Docker daemon starts, and a nested container can reach an allowed domain
+- **THEN** the nested Docker daemon starts and runs a nested container
 
 ### Requirement: Container metadata
 
