@@ -216,6 +216,14 @@ const SHELL_AND_WHITESPACE = [
     "b\u0107",
 ];
 
+/**
+ * The words that name a refused entry. Not the bare entry: "-" is also in the "pacman-packages:" prefix of every
+ * message, and quoted in the allowlist the refusal spells out.
+ */
+function refusal(entry: string): string {
+    return `refusing the entry '${entry}'`;
+}
+
 /** Each refusal runs with a valid entry beside it, so a validation gap would install something. */
 async function refuses(c: Container, t: Asserter, entries: string[]): Promise<void> {
     const before = await c.localDb();
@@ -223,7 +231,7 @@ async function refuses(c: Container, t: Asserter, entries: string[]): Promise<vo
         const what = `entry ${JSON.stringify(entry)}`;
         const result = await c.install(`tree,${entry}`);
         t.exit(result, 1, what);
-        t.says(result, entry, what);
+        t.says(result, refusal(entry), what);
         t.ok((await c.syncCount()) === 0, `${what}: a sync database was downloaded`);
         t.ok((await c.localDb()) === before, `${what}: the installed packages changed`);
         t.ok((await c.sh("test ! -e /tmp/pwned")).code === 0, `${what}: a command in the entry ran`);
@@ -238,7 +246,7 @@ async function refusesWithoutPacman(c: Container, t: Asserter, entries: string[]
         const what = `entry ${JSON.stringify(entry)}`;
         const result = await c.install(`tree,${entry}`);
         t.exit(result, 1, what);
-        t.says(result, entry, what);
+        t.says(result, refusal(entry), what);
         t.ok((await c.sh("test ! -e /tmp/pwned")).code === 0, `${what}: a command in the entry ran`);
     }
 }
@@ -796,7 +804,8 @@ const CHECKS: Check[] = [
             const before = await noPacmanSnapshot(c);
             const result = await c.install("bc");
             t.exit(result, 1, "bc");
-            for (const word of ["pacman", "Arch Linux"]) t.says(result, word, "message");
+            // "pacman" alone is also in the "pacman-packages:" prefix of every message.
+            for (const words of ["pacman was not found", "Arch Linux"]) t.says(result, words, "message");
             t.ok((await noPacmanSnapshot(c)) === before, "the image changed");
         },
     },
