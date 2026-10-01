@@ -82,9 +82,12 @@ TMP=$(mktemp -d)
 mkdir "$TMP/home" "$TMP/config" "$TMP/cache" "$TMP/tmp"
 : >"$TMP/userconfig"
 : >"$TMP/globalconfig"
-# The new tree is built next to the prefix and replaces it only after every check passed.
+# The new tree is built next to the prefix and replaces it only after every check passed. Its
+# directory is named like the prefix's, because npm records that name in package-lock.json.
 STAGING=$(mktemp -d "$PREFIX.staging.XXXXXX")
-chmod 755 "$STAGING"
+TREE="$STAGING/${PREFIX##*/}"
+mkdir "$TREE"
+chmod 755 "$STAGING" "$TREE"
 
 # Node.js and npm see PATH and a HOME in the temporary directory, and nothing else of the build's
 # environment: no NODE_*, npm_config_*, proxy, or certificate variable reaches them. TMPDIR is the
@@ -95,7 +98,7 @@ clean() {
 }
 
 # The user and global npm configuration are two distinct empty files, the project configuration is
-# the empty staging directory's, and the cache with its logs is in the temporary directory.
+# the empty staging tree's, and the cache with its logs is in the temporary directory.
 NPM_FLAGS=(
   "--registry=$REGISTRY"
   --strict-ssl=true
@@ -106,7 +109,7 @@ NPM_FLAGS=(
   --no-audit
   --no-update-notifier
   "--cache=$TMP/cache"
-  "--prefix=$STAGING"
+  "--prefix=$TREE"
 )
 
 if ! command -v node >/dev/null 2>&1; then
@@ -238,7 +241,7 @@ fi
 
 # npm audit signatures skips a package that does not come from a registry, so the source of every
 # entry is checked here, together with what was installed under the package's name.
-clean "$NODE_BIN" - "$STAGING/package-lock.json" "$PACKAGE" "$OPENSPEC_VERSION" "$REGISTRY" <<'EOF'
+clean "$NODE_BIN" - "$TREE/package-lock.json" "$PACKAGE" "$OPENSPEC_VERSION" "$REGISTRY" <<'EOF'
 const [lockfile, name, version, registry] = process.argv.slice(2);
 const packages = JSON.parse(require("node:fs").readFileSync(lockfile, "utf8")).packages ?? {};
 function fail(message) {
@@ -273,7 +276,7 @@ reported=$(
   cd / && env -i PATH="$PATH" HOME="$TMP/home" XDG_CONFIG_HOME="$TMP/config" \
     OPENSPEC_TELEMETRY=0 OPENSPEC_NO_UPDATE_CHECK=1 \
     setpriv --reuid=65534 --regid=65534 --clear-groups --no-new-privs \
-    "$NODE_BIN" "$STAGING/node_modules/$PACKAGE/bin/openspec.js" --version
+    "$NODE_BIN" "$TREE/node_modules/$PACKAGE/bin/openspec.js" --version
 ) || fail "openspec --version of the new installation failed as uid 65534; it is never run as root."
 if [ "$reported" != "$OPENSPEC_VERSION" ]; then
   fail "the new installation reports version \"$reported\", not the selected $OPENSPEC_VERSION."
@@ -317,13 +320,12 @@ if [ -e "$PREFIX" ]; then
   PREVIOUS=$(mktemp -d "$PREFIX.previous.XXXXXX")
   mv "$PREFIX" "$PREVIOUS/tree"
 fi
-if ! mv "$STAGING" "$PREFIX"; then
+if ! mv "$TREE" "$PREFIX"; then
   if [ -n "$PREVIOUS" ]; then
     mv "$PREVIOUS/tree" "$PREFIX"
   fi
   fail "could not move the new installation to $PREFIX."
 fi
-STAGING=""
 mv -f "$WRAPPER.new" "$WRAPPER"
 
 echo "Installed OpenSpec $OPENSPEC_VERSION: $WRAPPER runs it on $NODE_BIN."
