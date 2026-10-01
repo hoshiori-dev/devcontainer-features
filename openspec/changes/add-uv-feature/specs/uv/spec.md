@@ -17,6 +17,7 @@ Upstream sources:
 - Changelog: https://github.com/astral-sh/uv/blob/main/CHANGELOG.md
 - GitHub releases: https://github.com/astral-sh/uv/releases
 - Dev Container `updateRemoteUserUID`: https://containers.dev/implementors/json_reference/
+- Dev Container Feature lifecycle hooks: https://containers.dev/implementors/features/
 - Docker volumes: https://docs.docker.com/engine/storage/volumes/
 
 ## ADDED Requirements
@@ -188,8 +189,8 @@ members, so that the remote user writes both without elevated privileges also wh
 that user's UID to the host user's before the container starts. The install SHALL leave no file or directory in either
 location writable by every user, so that, besides root, only the members of `uv` and the owner the install set, which is
 the remote user under the UID it had when the image was built, can write what the install left there. What is created
-there at runtime gets the modes that uv and the creating user's umask give it; the feature does not change them. When
-the remote user is root, the feature SHALL create no group, and both locations SHALL be owned by root and, as the
+there at runtime gets the modes that uv and the creating user's umask give it; the feature does not change those modes.
+When the remote user is root, the feature SHALL create no group, and both locations SHALL be owned by root and, as the
 install leaves them, writable by root only.
 
 #### Scenario: Remote user in the group
@@ -233,8 +234,9 @@ install leaves them, writable by root only.
 
 The feature SHALL mount a named volume `uv-${devcontainerId}`, one per dev container, at `/var/lib/uv`, and SHALL point
 uv's managed-interpreter directory (`python/`) and cache (`cache/`) into it. A newly created volume SHALL hold nothing
-written at build time and SHALL be writable by the remote user as "Grant write access through the group uv" states. The
-feature SHALL change nothing on a volume that already holds data: such a volume keeps its owner, group, and modes.
+written at build time and SHALL be writable by the remote user as "Grant write access through the group uv" states. A
+volume that already holds data SHALL keep its owner, group, and modes, except for the owner and group that "Repair a
+volume that no longer fits the remote user" changes.
 
 #### Scenario: New volume
 
@@ -257,6 +259,51 @@ feature SHALL change nothing on a volume that already holds data: such a volume 
 
 - **WHEN** two different dev containers install this feature
 - **THEN** each mounts its own volume, and an interpreter installed in one does not appear in the other
+
+### Requirement: Repair a volume that no longer fits the remote user
+
+A volume fits the remote user when that user can create files in `/var/lib/uv` and owns every file and directory below
+it. It stops fitting when another UID has written it: the remote user was changed to an account with another UID, the
+UID of the same account changed, or root wrote into it.
+
+When a dev container is created, a rebuild included, the feature SHALL check the volume as the remote user, before the
+creation commands of the user's `devcontainer.json` run. When the volume does not fit and the remote user can run `sudo`
+without a password, the feature SHALL make the remote user the owner of the volume and of everything in it, give them
+the group `uv` when the image has that group, and change nothing else, so that uv works on the interpreters and the
+cache the volume already holds. When the volume does not fit and the remote user cannot run `sudo` without a password,
+the feature SHALL leave the volume as it is and print a warning that names `/var/lib/uv` and the reason. In every case
+the creation of the dev container SHALL continue. The feature SHALL change nothing on a volume that fits, nothing when
+the remote user is root, and nothing outside `/var/lib/uv`, and SHALL add no sudo rule.
+
+#### Scenario: Volume filled under another UID
+
+- **WHEN** a dev container is created whose volume holds interpreters and a cache that another UID wrote, and the remote
+  user can run `sudo` without a password
+- **THEN** after the creation the remote user owns everything in the volume, installs a package from the cache the
+  volume already held without downloading it, and installs a further uv-managed interpreter
+
+#### Scenario: Files left by root
+
+- **WHEN** a dev container is created whose volume holds files that root wrote among the remote user's own, and the
+  remote user can run `sudo` without a password
+- **THEN** after the creation the remote user owns everything in the volume
+
+#### Scenario: No passwordless sudo
+
+- **WHEN** a dev container is created whose volume another UID filled, and the remote user cannot run `sudo` without a
+  password or the image has no `sudo`
+- **THEN** the creation succeeds, a warning names `/var/lib/uv`, and the volume keeps its owner, group, and modes
+
+#### Scenario: Volume that fits
+
+- **WHEN** a dev container is created with a new volume, or with a volume in which the remote user owns everything below
+  `/var/lib/uv`
+- **THEN** nothing in the volume changes, and `sudo` is not run
+
+#### Scenario: Repair skipped for root
+
+- **WHEN** a dev container is created with the remote user root
+- **THEN** nothing in the volume changes
 
 ### Requirement: Point uv at the feature's locations
 

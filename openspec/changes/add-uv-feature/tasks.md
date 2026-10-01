@@ -1,15 +1,16 @@
 # Tasks
 
-The approval package was revised after these tasks were written: write access now goes through the group `uv`. The
-unticked tasks are those whose verification the revision invalidates. Their wording still follows the package as it was
-approved before the revision; it is rewritten from the revised package, together with the tasks the revision adds, once
+The approval package was revised twice after these tasks were written: write access now goes through the group `uv`, and
+a volume that no longer fits the remote user is repaired when the container is created, by a lifecycle command. The
+unticked tasks are those whose verification the revisions invalidate. Their wording still follows the package as it was
+approved before the revisions; it is rewritten from the revised package, together with the tasks the revisions add, once
 a maintainer approves that package, and nothing is implemented from this list before then.
 
 ## 1. Scaffold, metadata, and supported images
 
 - [x] 1.1 Scaffold `src/uv/` and `test/uv/` with `just new-feature uv --name uv` and verify it creates
       `devcontainer-feature.json`, `install.sh`, `NOTES.md`, `test.sh`, `duplicate.sh`, and `compatibility.json`
-- [x] 1.2 Complete `src/uv/devcontainer-feature.json` at version `1.0.0`: `name`, `description`, `documentationURL`, the
+- [ ] 1.2 Complete `src/uv/devcontainer-feature.json` at version `1.0.0`: `name`, `description`, `documentationURL`, the
       options `version` and `toolsToInstall` with the proposals and descriptions of the design's option table,
       `containerEnv` (the five `UV_*` variables and `PATH` with `/usr/local/share/uv/bin` prepended), the `mounts` entry
       for the volume `uv-${devcontainerId}` at `/var/lib/uv`, and `installsAfter`

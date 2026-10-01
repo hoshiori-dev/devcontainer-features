@@ -119,8 +119,10 @@
     because its ID changes while the directories keep the old one; `docker exec -u <user>:<group>` drops supplementary
     groups, and with them the access.
   - What the remote user creates at runtime under umask 022 gets the group `uv` (setgid on every directory) but no group
-    write. A second, different UID on a volume the first one filled therefore fails where it must write into the first's
-    directories (`uv python install`, 15 of 16), and passes with umask 002 for both.
+    write. A second, different UID therefore cannot use a volume the first one filled, whether or not it is a member of
+    `uv`, and passes with umask 002 for both. This item recorded "15 of 16" operations passing for the second UID
+    before; the facts of 2026-10-01 on a volume that outlives its user, below, replace that count, which came from a
+    second user that began with an empty cache.
   - A tool's first run does the same in the image's directories: Python writes `__pycache__` directories and `.pyc`
     files into the interpreter and the tool environments. On the Ubuntu base image, after the UID change, no entry under
     `/usr/local/share/uv` lacked group write before a tool ran, and 77 did after `pycowsay` and `pyjoke` had each run
@@ -164,6 +166,137 @@
     "Remote user cannot be added to the group"), a rebuild in which the group `uv` gets another ID (Risks), the removal
     of other-write on the four compatibility images other than the Ubuntu base image and `alpine:3.24`, and whether a uv
     release other than 0.12.21 keeps the mode of an existing lock file.
+- Facts verified on 2026-10-01 for a volume that outlives its user and for repairing it, with uv 0.12.21, the Dev
+  Container CLI 0.89.0, and Docker 29.8.1 (containerd image store) on amd64 under WSL2. The runs used prototype features
+  with the layout of Decisions, not this change's `install.sh`; unless an item says otherwise, each fact was observed in
+  one run and reproduced in a second, independent one with its own images, volumes, and scripts, with umask 022 set and
+  printed in every command.
+  - What the volume buys. An environment links its interpreter by absolute path into `UV_PYTHON_INSTALL_DIR`, and uv has
+    no option that copies the interpreter into the environment (https://docs.astral.sh/uv/reference/storage/, "they will
+    keep referring to the old location"; https://github.com/astral-sh/uv/issues/17754, "This is not yet supported").
+    Without persisted interpreters, a rebuild leaves `.venv/bin/python` dangling in a project and in a `uv venv`
+    environment alike, and every direct use fails: the interpreter and console scripts with exit 127, and with them a
+    pre-commit hook and a Makefile target. `uv sync` and `uv run` recover a project by downloading the interpreter again
+    (34.6 MiB for CPython 3.14.7), removing the environment, and recreating it from the lockfile, which drops packages
+    installed outside the lockfile and fails offline; `uv pip` and `uv venv` do not recover a `uv venv` environment, and
+    `uv venv --clear`, which uv suggests, empties it. `uv python install <version>`, with the `version_info` of the
+    environment's `pyvenv.cfg`, restores either kind in place with its packages (2.0 to 3.2 s, the same download);
+    without the version, and without a `.python-version` that names it, uv installs its newest default and repairs
+    nothing unless that is the environment's minor version. With the volume and the group layout, on a real
+    `devcontainer up --remove-existing-container`, both environments worked offline after the rebuild, nothing was
+    recreated, and `uv run` took 20 ms.
+  - The alternatives to the volume, one run each. Interpreters installed into the image at build time keep an
+    environment across a rebuild, also through a patch upgrade of the image's interpreter (the minor-version link
+    follows), but an environment pinned to a patch, or one that needs a version the image lacks, dangles as above. An
+    environment on the image's system Python does not dangle until the base image changes its minor version (3.10 to
+    3.12); then a project cannot recover under `only-system`, and a `uv venv` environment runs without its packages and
+    without an error. With only the cache on the volume, every rebuild downloads each interpreter again. With only the
+    interpreters on the volume and the cache in the container, a second UID runs `uv sync`, `uv run`, `uv pip install`,
+    and `uv venv`, and fails only at `uv python install`; every rebuild then downloads every package again.
+  - The trigger is a changed numeric UID, not a changed name. With the same workspace and volume on a host whose user
+    has UID 1000: a second account beside one that holds the host's UID (`vscode` 1000, then `dev2` 1001; the CLI prints
+    "User with UID exists (vscode=1000)" and changes nothing) fails 8 of 9 uv operations; so does an account built with
+    UID 1234 under `updateRemoteUserUID: false`, and `vscode` on a volume that root created and filled. An account with
+    another name and the same UID, and an account built with UID 1234 that the CLI changes to the host's UID, pass 9 of
+    9; with the host UID faked as 2000 in the real CLI, `vscode` and `dev2` both became 2000 and passed. Root as remote
+    user passes and leaves root-owned entries, on which `vscode` afterwards fails `uv python install`, `uv cache clean`,
+    and, with exit status 0, `uv python uninstall`. The same remote user leaves such entries with `sudo uv` (5,265 of
+    them in one run, with the top-level directories still its own; one run).
+  - What fails for a second UID on a volume the first filled under umask 022 (16,777 entries, of which 13,582 of the
+    13,603 that are not symbolic links lack group write): 21 of 24 uv operations, as a member of `uv`, as a non-member
+    that was given the three top-level directories, and as `vscode` after root. Every command that initializes the cache
+    stops at "Failed to initialize cache at `/var/lib/uv/cache`", because uv opens the existing file
+    `cache/sdists-v9/.git` for writing; `uv cache prune` and `uv cache clean` fail on the first entry they cannot
+    remove, and `uv python uninstall` prints "Failed to uninstall" and exits 0. `uv cache dir` passes, and so does the
+    interpreter of an existing workspace `.venv/` run directly: interpreters stay readable and executable. With
+    `UV_NO_CACHE=1`, or `UV_CACHE_DIR` in the user's home, 17 of 24 pass; managing interpreters still fails. A failing
+    command changed nothing on the volume. "15 of 16" above is this failure after the cache directory was removed: when
+    the first user's last command is `uv cache clean`, the second user recreates `cache/` under the group-writable
+    volume root, and only `uv python install` fails. That the earlier run ended so is inferred from its list of
+    operations.
+  - What makes the volume usable again. `chown -R <uid>` on the volume: 24 of 24, also for a user outside the group, and
+    packages install offline from the cache the first user filled. Group write on every directory and on the 16 files uv
+    rewrites in place (`sdists-v9/.git`, and in each interpreter `EXTERNALLY-MANAGED`, `_sysconfigdata_*.py`,
+    `pkgconfig/*.pc`, `BUILD`): 24 of 24, and nothing less. Neither lasts through the next change of user: after
+    `chown -R` the first user fails as the second did, and after `chmod -R g+w` what the second user creates lacks group
+    write again, so the first user and a third fail on those entries. A default ACL for the group, set on the root of an
+    empty volume by root at runtime, kept three UIDs working in both directions under umask 022, with the limits that it
+    needs the `acl` package for `setfacl`, that an ACL set at build time reaches neither the image nor a new volume,
+    that a file created with a restrictive mode gets an effective `r--` for the group (one wheel a source build left),
+    and that it follows the group's ID: with `uv` given another ID, the member failed at once. A wrapper that runs uv
+    under umask 002 keeps a volume filled through it usable for the cache, not for interpreters that were run directly,
+    whose `__pycache__` Python writes under the user's own umask, and does not repair a volume filled without it.
+  - `chown -R` on a named volume is cheap, and on an image layer it is not. On a volume of 90,144 entries and 8.0 GB
+    (three interpreters and the cache of five projects): 0.2 to 0.5 s with a warm page cache and 2.0 to 2.5 s after
+    dropping it; on 222,561 entries, 2.8 to 2.9 s cold; on a synthetic tree of 1,001,001 entries, 1.7 to 1.9 s warm and
+    6.0 s cold. A walk that only looks (`find ! -user <uid> -print -quit` on a volume in which nothing matches) costs
+    the same as a `chown -R` that changes nothing: 0.2 s warm and 2.7 to 2.9 s cold on 123,567 entries. A single `stat`
+    takes 1 ms. The same 8.0 GB tree in an image layer took 113 to 128 s and grew the container's writable layer by 8.28
+    GB, once per container, because overlayfs copies each file up; that is `/usr/local/share/uv` here, never the volume.
+    GNU coreutils 9.4 and BusyBox 1.37.0 `chown -R` change a symbolic link itself and never its target, visit a
+    directory after its contents, so an interrupted run leaves the top level unchanged, clear set-user-ID and
+    set-group-ID bits on regular files and keep setgid on directories, and descend into mounts below the tree. `chown`
+    refreshes every entry's ctime even when the owner stays, after which uv probes its interpreters again ("Ignoring
+    stale interpreter markers", one run). uv running as the earlier UID while the owner changes fails at once with the
+    cache error (12 of 12), and `chown -R` exits non-zero when uv removes files under it (23 of 1,443 runs); the
+    contents stayed intact.
+  - Lifecycle commands. A feature may declare `onCreateCommand`, `updateContentCommand`, `postCreateCommand`,
+    `postStartCommand`, and `postAttachCommand`; they run before the user's command of the same name
+    (https://containers.dev/implementors/features/, "Commands provided by Features are always executed before any
+    user-provided lifecycle commands"), as the remote user with its supplementary groups, umask 0022, and the volume
+    mounted (https://containers.dev/implementors/spec/, "Remote User: Used to run the lifecycle scripts inside the
+    container"; observed). `onCreateCommand` runs once per container, so again after a rebuild; the CLI keeps its
+    markers in the remote user's home (`~/.devcontainer/.onCreateCommandMarker`), so it also runs when `remoteUser` is
+    edited and `devcontainer up` is run again without a rebuild, as the new user, who is then not in the group `uv`, and
+    not when `remoteUser` is changed back to an account that already has its marker. `devcontainer up` waits for it.
+    When a lifecycle command exits non-zero, `devcontainer up` ends with `"outcome":"error"`, skips the commands after
+    it, the user's included, and does not run it again on the next `up`, because the marker is written first.
+    `devcontainer up --prebuild` stops after `updateContentCommand`. A feature cannot set `waitFor`.
+  - A feature's `entrypoint` runs at every container start as the container user: root on
+    `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (`Config.User` root, `remoteUser` `vscode`), and the image's user
+    when its Dockerfile ends with `USER <account>` or `containerUser` names one. The CLI does not wait for it: it goes
+    on when the container prints "Container started", which the generated command prints before the entrypoints, so with
+    an entrypoint that took 10 s the feature's `onCreateCommand` ran uv, and failed, about 10 s before the entrypoint's
+    `chown` finished. A root entrypoint repaired the volume without sudo (9 to 66 ms), and the race went away when the
+    entrypoint wrote a marker per container start and a lifecycle command waited for it (one run, on `debian:12`).
+  - sudo. `vscode` on the Ubuntu base image passes `sudo -n true`. An account added to that image with `useradd` gets
+    "sudo: a password is required", and without `-n`, "a terminal is required to read the password", after 27 ms and
+    without hanging. `debian:12` with an account made by hand has no `sudo` (exit 127). The specification promises no
+    sudo; the first-party `common-utils` feature writes a `NOPASSWD` rule for the account it creates (read in its
+    `main.sh`, not run).
+  - The repair as a lifecycle command. A prototype that skips root, skips a volume that fits, runs
+    `sudo -n chown -R <uid>:uv /var/lib/uv` only after `sudo -n true` passed, and otherwise prints a warning, always
+    exiting 0, repaired the volume in `onCreateCommand`, `postCreateCommand`, and `postStartCommand` alike (28 to 145 ms
+    on 8,504 entries); afterwards the uv operations on the volume passed, and the one that still failed wrote into a
+    workspace `.venv/` the earlier UID owned. It skipped a volume that fits in 2 to 3 ms with a `stat` of one directory
+    and in 13 to 15 ms with the walk; it left a new volume alone whose root has the build-time UID; it repaired a volume
+    that root created and one with root-owned entries, which a check of one directory's owner missed; and without
+    passwordless sudo `devcontainer up` exited 0 and showed the warning. The same command with a plain `sudo chown` made
+    `devcontainer up` exit 1 where sudo asked for a password or was missing, and for a root remote user, whose image has
+    no group `uv`, it failed on `chown: invalid group: '0:uv'`. On `opensuse/leap:16.0`, which ships no `find`, the
+    prototype's walk found nothing and reported a volume that fits while the user could not write it.
+  - Precedent. VS Code's documentation recommends a `postCreateCommand` with `sudo chown` for a named volume whose owner
+    the UID update left behind (https://code.visualstudio.com/remote/advancedcontainers/persist-bash-history,
+    `sudo chown -R $(whoami): /commandhistory`). The first-party `powershell` feature mounts a `${devcontainerId}`
+    volume and declares an `onCreateCommand` whose script does nothing when the mount point's owner matches, runs
+    `chown -R` as root, runs `sudo chown -R` where `sudo` exists, and otherwise prints a warning
+    (https://github.com/devcontainers/features/blob/9640551520736897481d83e92082186e4d812d50/src/powershell/oncreate.sh);
+    the survey above, of image directories, did not cover it. Of 55 published features with the id `uv` found by a code
+    search, five keep uv's state on a volume or in the home; one runs `chown -R` on its cache volume from an entrypoint
+    at every start, and one makes its volume's mount point writable by every user.
+  - The volume's lifetime. Its name stayed the same through about 30 rebuilds and through changes to `devcontainer.json`
+    (`remoteUser` and `updateRemoteUserUID` among them), to the image, and to the feature. It changed when the workspace
+    folder was renamed or the configuration file moved, and with a custom `--id-label`; renaming the folder back
+    returned the earlier volume. Nothing removed a volume. With `dockerComposeFile`, Compose prefixes the volume's name
+    with its project name and `docker compose down -v` removes it; a Codespaces full rebuild discards volumes (both
+    read, not run). After the volume is removed, every workspace `.venv/` dangles as in the first item.
+  - Not verified: the lifecycle command and the repair through this change's `install.sh` and through
+    `devcontainer features test`; the VS Code extension and Codespaces (when a terminal opens relative to
+    `onCreateCommand`, and where the warning shows); macOS and Windows hosts, on which the CLI changes no UID (read in
+    its source); Podman, rootless Docker, and user-namespace remapping; arm64; `dockerComposeFile` and
+    `overrideCommand: false`; the walk on the compatibility images other than the Ubuntu base image and `debian:12`, and
+    a replacement for `find` on `opensuse/leap:16.0`; that `chown -R <uid>:uv` also repairs a volume whose group number
+    no longer is the ID of `uv` (inferred); a slow or networked disk; a uv release other than 0.12.21.
 
 ## Goals / Non-Goals
 
@@ -290,8 +423,18 @@
   their package managers, pointing to `test/uv/compatibility.json` for the tested images and to the
   `mcr.microsoft.com/devcontainers/base` images of those families; the layout of the volume (`/var/lib/uv`, mounted from
   `uv-${devcontainerId}`, with `python/` as `UV_PYTHON_INSTALL_DIR` and `cache/` as `UV_CACHE_DIR`); the group `uv`, who
-  is in it, and what it may write; the volumes the feature does not repair (Non-Goals), and that the owner and group a
-  kept volume carries are numbers a rebuilt image may give to another account or group (Risks); and the upstream
+  is in it, and what it may write; what stops a volume from fitting its user (a changed numeric UID, not a changed name,
+  and files root wrote, `sudo uv` included), the error uv then prints ("Failed to initialize cache"), and that a change
+  of `remoteUser` is followed by a rebuild; the check at creation, that it repairs only where the remote user has
+  passwordless `sudo`, and its warning; the repair by hand where it cannot (`chown -R` as root in the container, or from
+  the host with a throwaway container that mounts the volume), the bypass until then (`UV_NO_CACHE=1`, or a
+  `UV_CACHE_DIR` in the user's home, with which managing interpreters still fails), and removing the volume as the last
+  resort, after which `uv python install <version>`, with the version in an environment's `pyvenv.cfg`, restores a
+  workspace `.venv/`, while `uv venv --clear` would empty it; that the workspace and the environments in it are outside
+  the volume and keep their owner; that `uv python uninstall` exits 0 when it fails for lack of access; that the
+  volume's name follows the workspace folder and the configuration file's path, so a renamed folder gets a new volume,
+  and what removes a volume (`docker volume rm`, Compose's `down -v`, a Codespaces full rebuild); that the owner and
+  group a kept volume carries are numbers a rebuilt image may give to another account or group (Risks); and the upstream
   references of the spec's Purpose. Checked by review of `NOTES.md` against the spec.
 - Nothing a rebuild replaces holds a path a workspace `.venv/` links to: interpreters uv installs at runtime exist only
   on the volume. Checked by a real rebuild of a dev container built from the `changed_uid` scenario's Dockerfile with
@@ -300,6 +443,53 @@
   then `devcontainer up --remove-existing-container`, which replaces the container and keeps the volume, and the
   `.venv/` used once more. The record shows, before and after the rebuild, the output of `id` and the owner of
   `/var/lib/uv`, which is not the running user.
+- The check and the repair of "Repair a volume that no longer fits the remote user" are one script, which `install.sh`
+  writes to `/usr/local/share/uv-feature/repair-volume` and the feature's `onCreateCommand` names: root-owned, mode
+  0755, outside the group-writable `/usr/local/share/uv`, overwritten whole on every install, POSIX `sh` like
+  `install.sh`, taking no argument and reading no option. Checked by shellcheck, by `test.sh` asserting the file's owner
+  and mode on every image, and by the `repair_volume` scenario below.
+- The script ends with exit status 0 on every path, the failing ones included, because a lifecycle command that exits
+  non-zero ends `devcontainer up` with an error, skips the user's own commands, and is not run again (Context). It has
+  no `set -e`; it calls `sudo` only as `sudo -n`, so that it never waits for a password, and only after `sudo -n true`
+  passed. Checked by the scenario, which asserts the exit status in every case and uses a `sudo` stub earlier on `PATH`
+  for the cases the image cannot show: one that fails `-n true`, one that passes it and fails the `chown`, and one that
+  records whether it was called.
+- "Fits" is decided from the whole volume, not from one directory's owner: the remote user can create files in
+  `/var/lib/uv`, and no entry below it has another owner. A new volume therefore fits, also when its root keeps the
+  build-time UID after a UID change, and a volume in which root left entries among the user's does not (Context). The
+  script sees every entry on every compatibility image, with `find` where the image ships it and with an equivalent
+  listing of the entries' owners where it does not, and it never reports a fit because it could not look (Open
+  Questions, item 13). Checked by the scenario on the Ubuntu base image, and by an observation in a throwaway container
+  of each other compatibility image, with a volume that fits, one that another UID filled, and one with a single
+  root-owned file deep in the cache, recorded in the PR.
+- The repair is one `chown -R` of `/var/lib/uv` to the remote user's UID and to the ID of the group `uv`, or to the UID
+  alone in a container whose image has no such group, as after `remoteUser` was changed from root without a rebuild. It
+  changes owner and group and nothing else: `chown -R` of GNU coreutils and of BusyBox changes a symbolic link, not its
+  target (Context), so nothing outside the volume changes. The script never touches `/usr/local/share/uv`, where the
+  same command would copy every file into the container's writable layer (Context). `sudo` is not run for root or on a
+  volume that fits. Checked by the scenario, which compares a listing of every entry's mode and, for a symbolic link
+  that points outside the volume, the target's owner, before and after the repair, and asserts with the recording stub
+  that a second run calls `sudo` not at all.
+- The warning goes to standard error, starts with `uv feature:` like the messages of `install.sh`, and names
+  `/var/lib/uv`, the reason (no `sudo`, a `sudo` that asks for a password, or the failed `chown` with its message), and
+  the feature's notes. Checked by the scenario.
+- The `repair_volume` scenario runs on the Ubuntu base image as `vscode`, the one compatibility image whose remote user
+  has passwordless sudo. It fills the volume (a managed interpreter, and a package installed into an environment in the
+  workspace), gives the volume to a UID no account has, with `sudo chown -R`, and asserts that `uv venv` now fails with
+  the cache error, so that the state it repairs is the one that breaks uv. Then it runs the script as the lifecycle
+  command would: with the failing stubs ("No passwordless sudo"), with the image's `sudo` ("Volume filled under another
+  UID": the remote user owns every entry, a package installs from the cache with `--offline`, and a further interpreter
+  installs), a second time with the recording stub ("Volume that fits"), and after `sudo` has created a root-owned
+  directory and file in the cache ("Files left by root"). The new-volume half of "Volume that fits" and "Repair skipped
+  for root" are asserted in `test.sh`, which runs the script on the new volume with the recording stub and finds the
+  volume empty afterwards.
+- That the tooling runs the script when the container is created, as the remote user and before the user's own commands,
+  is shown on a real dev container, since a test cannot change the remote user: a Dockerfile adds two accounts to the
+  Ubuntu base image, one with a `NOPASSWD` rule and one without; `devcontainer up` as `vscode`, and uv fills the volume;
+  `remoteUser` set to the first account and `devcontainer up --remove-existing-container`, with an `onCreateCommand` in
+  `devcontainer.json` that runs `uv venv`; then the same with the second account. The record shows `id`, the owners in
+  the volume before and after, that the user's command succeeded for the first account, and for the second that
+  `devcontainer up` exits 0, prints the warning, and leaves uv failing with the cache error.
 
 **Non-Goals:**
 
@@ -309,9 +499,16 @@
 - Persisting tools installed at runtime: their environments live in the image's `UV_TOOL_DIR` and go with a rebuild
   (their interpreters, on the volume, stay).
 - Persisting executables that `uv python install` places in `~/.local/bin`; uv's default stays.
-- Repairing a volume that already holds data (Open Questions, item 2): one filled under one UID and then used under
-  another, because the host user or the remote user changed (what the first UID created has the group `uv` but no group
-  write under the usual umask 022); and one whose group ID no longer is the ID of `uv` in a rebuilt image.
+- Repairing a volume without root: where the remote user has no passwordless `sudo`, the volume stays as it is, and
+  `NOTES.md` gives the repair by hand (Open Questions, item 12).
+- A volume that two UIDs use in turn without a repair in between: the repair hands the volume over, so the earlier user
+  needs it again (Context). A change of `remoteUser` back to an account the container already ran as, without a rebuild,
+  runs no lifecycle command; `NOTES.md` asks for a rebuild after `remoteUser` changes.
+- Entries that root or another UID writes while the container runs: they are repaired when the next container is
+  created, not at the next start (Open Questions, item 14).
+- The bind-mounted workspace and the environments in it: a `.venv/` an earlier UID wrote keeps its owner.
+- A volume whose group number no longer is the ID of `uv` in a rebuilt image, as long as the remote user owns everything
+  below its root and can create files there: it fits, and nothing changes.
 - Sharing the tool directories or the volume among several accounts: a group `uv` to which another account belongs is
   refused (Open Questions, item 10).
 - Group access for a process started without the remote user's supplementary groups, as `docker exec -u <user>:<group>`
@@ -389,7 +586,14 @@ The feature has two options, both new in this change; the spec's Option requirem
 - **A named volume `uv-${devcontainerId}` at `/var/lib/uv`, one per dev container.** `${devcontainerId}` is allowed in a
   feature's `mounts` and stable across rebuilds; the first-party docker-in-docker and powershell features use the same
   pattern. Rejected: one volume shared by all dev containers (owners differ between projects, and one project's cache
-  and interpreters would leak into another); a host bind mount (depends on a host path); no mount (the issue's problem).
+  and interpreters would leak into another); a host bind mount (depends on a host path); no mount (the issue's problem:
+  uv recovers a project only online and by removing and recreating its environment, and does not recover a `uv venv`
+  environment; Context); interpreters installed into the image through an option (an environment pinned to a patch, or
+  needing a version the image lacks, still dangles; it can arrive as a MINOR beside the volume); the image's system
+  Python (the base image decides the version, and a change of its minor version strands every environment); only the
+  cache on the volume (every rebuild downloads each interpreter again, and environments dangle until then); only the
+  interpreters on the volume (uv would keep working for a second UID, because the cache is what fails first, but every
+  rebuild would download every package again, the other half of the issue's problem).
 - **Write access through a group, set in the image, not through the owner and not at runtime** (maintainer decision of
   2026-10-01, replacing "ownership through the mount point"). A non-root remote user is a member of a system group `uv`;
   the image's empty `/var/lib/uv` and all of `/usr/local/share/uv` keep the remote user as owner and get the group `uv`,
@@ -398,17 +602,20 @@ The feature has two options, both new in this change; the spec's Option requirem
   UID change leaves both alone (Context): the remote user then writes as a member where it is no longer the owner. The
   owner stays the remote user for the hosts on which no UID changes. Rejected: ownership alone, the approach this
   replaces (the CLI changes the UID and re-owns only the home folder, so the directories and every new volume belong to
-  a UID the remote user no longer has; it passed locally and failed in CI); an `entrypoint`, `postStartCommand`, or
-  other lifecycle command that runs `chown` (runs as root on every start, widens metadata, and cannot run as root in
-  every setup); a world-writable volume or tool directory (any account in the container could then replace what is first
-  in `PATH`); asking users to set `updateRemoteUserUID` to `false` (it is the user's property, which a feature cannot
-  set, and its default exists so that the bind-mounted workspace matches the host user; the feature would then work only
-  in configurations that give that up); a fixed ID for the group (it can collide with a group of the image, and none of
-  the first-party features read in Context pins one); a group-writable umask for the remote user, which would also cover
-  what uv creates at runtime (it changes the mode of every file the user creates, uv's or not, and only in shells that
-  read the profile); leaving uv's build-time lock files at the mode uv gives them, 0666 (files any account can write and
-  lock, in a tree whose `bin` is first in `PATH`, against the proposal's "Stays true"; removing other-write costs a user
-  outside the group `uv tool list`, Context).
+  a UID the remote user no longer has; it passed locally and failed in CI); an `entrypoint` or a lifecycle command that
+  runs `chown`, as the way a new volume becomes writable (a lifecycle command runs as the remote user and needs
+  passwordless sudo, which the specification does not promise; an entrypoint runs as the container user, which is root
+  only where the image's user is, and the CLI does not wait for it; the group needs neither, so a lifecycle command
+  serves only the volume the group cannot cover, in the decision on repairing a volume below); a world-writable volume
+  or tool directory (any account in the container could then replace what is first in `PATH`); asking users to set
+  `updateRemoteUserUID` to `false` (it is the user's property, which a feature cannot set, and its default exists so
+  that the bind-mounted workspace matches the host user; the feature would then work only in configurations that give
+  that up); a fixed ID for the group (it can collide with a group of the image, and none of the first-party features
+  read in Context pins one); a group-writable umask for the remote user, which would also cover what uv creates at
+  runtime (it changes the mode of every file the user creates, uv's or not, and only in shells that read the profile);
+  leaving uv's build-time lock files at the mode uv gives them, 0666 (files any account can write and lock, in a tree
+  whose `bin` is first in `PATH`, against the proposal's "Stays true"; removing other-write costs a user outside the
+  group `uv tool list`, Context).
 - **The group comes from the image's own account tools, shadow first, BusyBox second.** `groupadd` and `usermod` where
   the image has them, BusyBox `addgroup` otherwise, and a failure with a message when a step is needed and neither
   exists. A group `uv` the image already has is used with its ID when it has no member or only the remote user, which a
@@ -418,6 +625,33 @@ The feature has two options, both new in this change; the spec's Option requirem
   be picked by hand, and on images with `/etc/gshadow` `grpck` then reports the missing entry); creating the group for a
   root remote user as well, as most of the first-party features read in Context do (root needs no group, and an image
   with a root remote user would carry an account entry nothing uses; Open Questions, item 8).
+- **A volume that no longer fits its user is repaired when the container is created, by a lifecycle command, as far as
+  the remote user's own sudo reaches** (maintainer decision of 2026-10-01, replacing the "no runtime fix" of Open
+  Questions item 2). The feature declares an `onCreateCommand` whose script hands the volume to the remote user with one
+  `chown -R` through `sudo -n`, and warns where it cannot. `onCreateCommand` runs once per container, as the remote
+  user, before the user's own creation commands, and `devcontainer up` waits for it (Context); VS Code's documentation
+  and the first-party `powershell` feature use the same means for the same problem. The group stays: it makes a new
+  volume writable after a UID change without any sudo, and the repair covers what the group cannot, a volume whose
+  contents another UID wrote. Rejected: no runtime fix, the earlier recommendation (a second account beside one that
+  holds the host's UID keeps its own UID, and every uv command that uses the cache then fails; the remedy, removing the
+  volume, costs every interpreter and cached package and leaves every workspace `.venv/` dangling); an `entrypoint` that
+  runs the `chown` (it needs no sudo where the container user is root, but it is not root where the image's user is not,
+  the CLI does not wait for it, so a slow repair races the user's own commands, and it adds a script that runs at every
+  start; with a marker that a lifecycle command waits for, it is the alternative of Open Questions item 12);
+  `postStartCommand` (it runs at every start, where the walk costs seconds on a cold page cache, and after the point
+  tools wait for by default; Open Questions, item 14); `postCreateCommand` (it runs after the user's `onCreateCommand`
+  and `updateContentCommand`, in which a `uv sync` would already have failed); a `chown -R` at every creation without
+  the check (it would run `sudo` where nothing needs it and refresh every ctime, after which uv probes its interpreters
+  again); a check of the mount point's owner alone, as `powershell` does (after a UID change a new volume's root has the
+  build-time UID, so it would repair where nothing is wrong, and it misses root-owned entries inside a volume whose root
+  is the user's); `chmod -R g+w` instead of `chown` (what the next user creates lacks group write again, so the change
+  after that fails, and it needs root as well); a default ACL for the group on the volume (the only variant that kept
+  several UIDs working with no repair in between, but it needs the `acl` package and root at runtime once per volume, an
+  ACL set at build time reaches neither the image nor a new volume, and it follows the group's ID); a wrapper that runs
+  uv under umask 002 (it repairs no existing volume and does not cover what Python writes when an interpreter runs
+  directly); a sudo rule for the script (every image would gain a rule, and the remote user a privilege it did not
+  have); failing the creation where the repair is impossible (the container would not come up, and the CLI does not run
+  a failed `onCreateCommand` again).
 - **`UV_LINK_MODE=copy`.** The cache volume and the workspace bind mount are always different filesystems, so the
   default `clone` always falls back to copying and warns on every install. Rejected: the default (the warning);
   `hardlink` (impossible across filesystems); `symlink` (uv discourages it: cleaning the cache breaks environments).
@@ -436,22 +670,23 @@ The feature has two options, both new in this change; the spec's Option requirem
 
 ## Security review surface
 
-| Surface               | Bound                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Downloads             | HTTPS only; exactly the URLs in the URL inventory; no installer script; no URL, path, or option from a user option reaches curl or uv (validation above).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Verification          | uv archive: SHA-256 from the same release's `.sha256`, checked before unpacking. `latest` redirect: TLS alone, stated in the spec's "Verify the uv release before installing it". Managed interpreters: SHA-256 compiled into uv, checked by uv. PyPI packages: SHA-256 supplied by the index, checked by uv 0.12.16 or later; the feature refuses tools with an older release and adds no pin of its own.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Keys                  | None. uv publishes no signing key; the feature installs no repository key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `mounts`              | One named volume `uv-${devcontainerId}` → `/var/lib/uv`, needed so interpreters and cache survive a rebuild; no bind mount, no host path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `containerEnv`        | `UV_PYTHON_INSTALL_DIR`, `UV_CACHE_DIR`, `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_LINK_MODE`, and `PATH` with `/usr/local/share/uv/bin` prepended; nothing secret, nothing that changes an index or a download source.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Shell startup         | `/etc/profile.d/uv.sh` (root-owned, mode 0644) prepends `/usr/local/share/uv/bin` to `PATH` when it is missing; nothing else.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `installsAfter`       | `ghcr.io/devcontainers/features/common-utils` (ordering only).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `dependsOn`           | None.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Not used              | `privileged`, `capAdd`, `securityOpt`, `entrypoint`, `init`, lifecycle commands.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Accounts              | One system group `uv`, created only for a non-root remote user and only when the image has none; no user, no password, no sudo rule. When the install ends its only member is the remote user: a group `uv` the image already has is used only when no other account belongs to it, as a listed member or through its primary group (Open Questions, item 10). An account added to the group later, or given it as primary group, shares the write access below.                                                                                                                                                                                                                                                                                                                                                          |
-| Files owned by a user | When the remote user is not root, `/var/lib/uv` (empty mount point, mode 2775) and `/usr/local/share/uv/` (group write, setgid directories) have that user as owner and `uv` as group; the install leaves nothing writable by others, uv's lock files included, and for root nothing writable by group or others. Writers are root, the members of `uv`, and the build-time UID, which after a UID change belongs to no account until one is given it: that account then owns both locations. BusyBox `adduser` gives the next account that UID when it is the first free one from 1000, observed on `alpine:3.24`; shadow `useradd` on the Ubuntu base image did not (Open Questions, item 11). What is created at runtime has the modes of uv and of the creating user's umask; uv's lock files on the volume are 0666. |
-| `PATH`                | `/usr/local/share/uv/bin`, first in `PATH`, stays writable by a non-root account, as accepted with Open Questions item 1. The group changes how the remote user gets that access, not who has it, while the remote user is the group's only member.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Idempotency           | Same release skips the download; binaries replaced by rename; tool installs are additive; `/etc/profile.d/uv.sh` overwritten whole; directories, the group, and the membership created only if missing; group and modes applied again on every install.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Failure behavior      | As in the spec's "Fail on unsupported platforms and invalid options", "Verify the uv release before installing it", "Option version", and "Option toolsToInstall"; a remote user that does not exist, a group `uv` that is the remote user's primary group or to which another account belongs, and an image without a tool to create the group or to add the member each fail the install.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Surface               | Bound                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Downloads             | HTTPS only; exactly the URLs in the URL inventory; no installer script; no URL, path, or option from a user option reaches curl or uv (validation above).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Verification          | uv archive: SHA-256 from the same release's `.sha256`, checked before unpacking. `latest` redirect: TLS alone, stated in the spec's "Verify the uv release before installing it". Managed interpreters: SHA-256 compiled into uv, checked by uv. PyPI packages: SHA-256 supplied by the index, checked by uv 0.12.16 or later; the feature refuses tools with an older release and adds no pin of its own.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Keys                  | None. uv publishes no signing key; the feature installs no repository key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `mounts`              | One named volume `uv-${devcontainerId}` → `/var/lib/uv`, needed so interpreters and cache survive a rebuild; no bind mount, no host path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `containerEnv`        | `UV_PYTHON_INSTALL_DIR`, `UV_CACHE_DIR`, `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_LINK_MODE`, and `PATH` with `/usr/local/share/uv/bin` prepended; nothing secret, nothing that changes an index or a download source.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Shell startup         | `/etc/profile.d/uv.sh` (root-owned, mode 0644) prepends `/usr/local/share/uv/bin` to `PATH` when it is missing; nothing else.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `installsAfter`       | `ghcr.io/devcontainers/features/common-utils` (ordering only).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `dependsOn`           | None.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Lifecycle command     | `onCreateCommand`: `/usr/local/share/uv-feature/repair-volume`, a root-owned script that takes no argument and reads no option. It runs as the remote user when a container is created, reads the owners of the entries under `/var/lib/uv`, and runs `sudo -n chown -R` on `/var/lib/uv`, to the remote user and the group `uv`, only when the volume does not fit that user and `sudo -n true` passed. It accesses no network, follows no symbolic link, changes nothing outside `/var/lib/uv`, and always exits 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Not used              | `privileged`, `capAdd`, `securityOpt`, `entrypoint`, `init`, and any lifecycle command other than the one above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Accounts              | One system group `uv`, created only for a non-root remote user and only when the image has none; no user, no password, no sudo rule. When the install ends its only member is the remote user: a group `uv` the image already has is used only when no other account belongs to it, as a listed member or through its primary group (Open Questions, item 10). An account added to the group later, or given it as primary group, shares the write access below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Files owned by a user | When the remote user is not root, `/var/lib/uv` (empty mount point, mode 2775) and `/usr/local/share/uv/` (group write, setgid directories) have that user as owner and `uv` as group; the install leaves nothing writable by others, uv's lock files included, and for root nothing writable by group or others. Writers are root, the members of `uv`, and the build-time UID, which after a UID change belongs to no account until one is given it: that account then owns both locations. BusyBox `adduser` gives the next account that UID when it is the first free one from 1000, observed on `alpine:3.24`; shadow `useradd` on the Ubuntu base image did not (Open Questions, item 11). What is created at runtime has the modes of uv and of the creating user's umask; uv's lock files on the volume are 0666. A volume that does not fit the remote user is given to that user at creation, with everything in it, where the user has passwordless sudo (Decisions); the owner is then the remote user under its current UID. |
+| `PATH`                | `/usr/local/share/uv/bin`, first in `PATH`, stays writable by a non-root account, as accepted with Open Questions item 1. The group changes how the remote user gets that access, not who has it, while the remote user is the group's only member.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Idempotency           | Same release skips the download; binaries replaced by rename; tool installs are additive; `/etc/profile.d/uv.sh` overwritten whole; directories, the group, and the membership created only if missing; group and modes applied again on every install. The repair script is overwritten whole, and a second run of it on a volume that fits changes nothing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Failure behavior      | As in the spec's "Fail on unsupported platforms and invalid options", "Verify the uv release before installing it", "Option version", and "Option toolsToInstall"; a remote user that does not exist, a group `uv` that is the remote user's primary group or to which another account belongs, and an image without a tool to create the group or to add the member each fail the install. The repair never fails the creation of a container: where it cannot repair, it warns.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 Planned `test/uv/compatibility.json`:
 
@@ -483,10 +718,11 @@ this revision.
 
 ## URL inventory
 
-Every URL the feature's scripts access. The feature has no start-time script, so nothing is fetched at start. The
-feature configures no package repository: prerequisites come from the repositories the image already has. Rows 5–8 are
-accessed at build time only when `toolsToInstall` is not empty, by uv itself on the feature's behalf; the same hosts
-serve the remote user's own uv commands at runtime.
+Every URL the feature's scripts access. The script the `onCreateCommand` runs accesses no URL, and the feature has no
+start-time script, so nothing is fetched when a container is created or started. The feature configures no package
+repository: prerequisites come from the repositories the image already has. Rows 5–8 are accessed at build time only
+when `toolsToInstall` is not empty, by uv itself on the feature's behalf; the same hosts serve the remote user's own uv
+commands at runtime.
 
 | #  | URL / template                                                                                                                                          | Purpose                                                                         | When                                                 | Integrity / authenticity                                                                               | Official source evidence                                                                                                                                  | Verified                                                                                                                                                                             |
 | -- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -526,17 +762,47 @@ serve the remote user's own uv commands at runtime.
   `uv tool upgrade --all` fails on them] → `NOTES.md` asks dependents to give such environments the group `uv` and group
   write, as this feature does, or to use their own tool directory (Open Questions, item 7).
 - [What the remote user creates at runtime has the group `uv` but, under the usual umask 022, no group write, so a
-  volume or a tool one UID filled is only partly usable by another: a later, different UID fails where it writes into
-  the first's directories (Context)] → Accepted: one dev container's volume is used by one host user, and a rebuild for
-  the same host user keeps the UID. `NOTES.md` names the case and the remedy, removing the volume (Non-Goals).
+  later, different UID cannot use a volume the first one filled, and fails on a tool the first one ran or installed
+  (Context)] → For the volume, the repair at creation hands it to the remote user where that user has passwordless sudo
+  (Decisions). For the tools in the image, accepted: a rebuild installs them again for the remote user it is built for,
+  and a change of `remoteUser` without a rebuild leaves them the earlier user's, which `NOTES.md` names.
+- [The repair needs passwordless sudo. An account added with `useradd`, and an image without `sudo`, have none, so after
+  a change to such an account uv stays unusable on the volume] → The creation continues, and the warning names the
+  volume, the reason, and the notes, which give the repair by hand and the bypass (Goals). A root `entrypoint` would
+  cover these images where the container user is root (Open Questions, item 12).
+- [A lifecycle command that exits non-zero ends `devcontainer up` with an error, skips the user's own commands, and is
+  not run again] → The script exits 0 on every path, which the scenario asserts for each failing one (Goals).
+- [The repair hands the volume over and does not share it: the user it was taken from needs a repair in turn, and a
+  change of `remoteUser` back to an account the container already ran as, without a rebuild, runs no lifecycle command]
+  → Accepted; `NOTES.md` asks for a rebuild after `remoteUser` changes, and a rebuild runs the check.
+- [The check reads every entry of the volume at every creation, and a repair writes every entry once: about 0.2 s per
+  100,000 entries with a warm page cache, and about 3 s for 120,000 to 220,000 entries with a cold one, measured on a
+  WSL2 virtual disk (Context); a slower or networked disk was not measured] → Accepted: it is paid once per container,
+  not per start, and `NOTES.md` names `uv cache prune` for a volume that has grown.
+- [`chown -R` descends into anything a user mounts below `/var/lib/uv`, and fails on a read-only mount there] → The
+  feature mounts nothing below the volume's root; a failing `chown` ends in the warning with its message, not in a
+  failed creation.
+- [uv running as the earlier UID while the owner changes fails at once (Context)] → A feature's `onCreateCommand` runs
+  before the user's own commands, so with the CLI nothing of the user's runs uv yet; whether an editor opens a terminal
+  earlier was not verified (Context).
+- [A second account cannot write the bind-mounted workspace either, and a `.venv/` there keeps the earlier owner, so
+  `uv sync` in it fails after the volume is repaired] → A non-goal: the workspace is not the feature's. `NOTES.md` names
+  it.
+- [Removing the volume, the remedy of last resort, leaves every workspace `.venv/` with a dangling interpreter link, and
+  uv's own hint, `uv venv --clear`, empties the environment] → `NOTES.md` gives `uv python install <version>` with the
+  version from `pyvenv.cfg` (Context).
+- [With `devcontainer up --prebuild`, `onCreateCommand` runs in the prebuild and not again when the container is used] →
+  The volume of such a container is new when the check runs; a later change of user needs a rebuild, as everywhere else.
 - [A volume keeps the numeric owner and group it got when it was created. If a rebuilt image gives `uv` another ID,
   because the base image or a feature installed earlier added a system group, a remote user whose UID was changed can no
   longer create entries directly in `/var/lib/uv`; `python/` and `cache/`, once that user created them, stay usable. The
   numbers the volume keeps may then name another group or account of the rebuilt image, whose members can write the
   volume's top level and so rename and replace `python/` and `cache/`, which the remote user's uv runs from. Inferred
-  from the facts in Context (group semantics and the rename a second member performed), not run] → Accepted and
-  documented in `NOTES.md` with the same remedy, removing the volume after a change of base image, feature set, or
-  remote user; a fixed ID was rejected (Decisions).
+  from the facts in Context (group semantics and the rename a second member performed), not run] → A volume in whose
+  root the remote user can no longer create entries does not fit, so the repair gives it, with everything in it, the
+  remote user and the current ID of `uv` where that user has passwordless sudo (inferred from what `chown` does, not
+  run). Elsewhere, and for a volume that still fits, accepted and documented in `NOTES.md` with the repair by hand or,
+  as the last resort, removing the volume; a fixed ID was rejected (Decisions).
 - [A volume that the owner-based layout created and filled keeps its owner and mode and fails after a UID change, as it
   did before] → No release carried that layout; the volumes exist only on machines that ran this branch's tests, where
   `docker volume rm` removes them.
@@ -598,12 +864,11 @@ Decisions for the maintainer, each with a recommendation:
    an image's older copy of a tool win. The group does not widen that while the remote user is its only member (Security
    review surface). The alternative was root ownership (runtime `uv tool` then needs sudo, and "Remote user manages
    tools" is dropped) or appending.
-2. **A volume that already holds data and no longer fits its user.** The case that was not rare, the CLI changing the
-   remote user's UID before the volume is first created, is now covered by the group. What remains is a volume filled
-   under one UID and used under another (another host user, another remote user) and a rebuilt image in which `uv` has
-   another group ID (Non-Goals, Risks). Recommendation: no runtime fix; `NOTES.md` documents removing the volume. An
-   `entrypoint` that repairs owners or modes would widen metadata, and the spec's "change nothing on a volume that
-   already holds data" encodes this recommendation.
+2. **A volume that already holds data and no longer fits its user.** Decided by the maintainer on 2026-10-01: the
+   feature repairs it when the container is created, with a lifecycle command and the remote user's own passwordless
+   sudo, and warns where it cannot (Decisions). This replaces the earlier recommendation, no runtime fix, which rested
+   on a count of failing operations that held only for an empty cache, and on the belief that a lifecycle command runs
+   as root at every start (Context). What that decision leaves open is in items 12 to 14.
 3. **Distribution families.** Decided by the maintainer: Debian/Ubuntu, RHEL/Fedora, Arch Linux, Alpine, and
    openSUSE/SUSE, each with its image in the compatibility list (Decisions); anything else fails.
 4. **An option for the Python version of build-time tools** (for example `toolsPythonVersion`). Recommendation: not now;
@@ -655,4 +920,22 @@ Decisions for the maintainer, each with a recommendation:
     root as owner. It departs from the outline and from the first-party features, which keep the user as owner, so it is
     the maintainer's call; approving the package as written keeps the remote user as owner. With root as owner, the
     spec's "the owner the install set" becomes root, and the `changed_uid` scenario shows the UID change by the user's
-    UID instead of by the owner.
+    UID instead of by the owner. The repair does not depend on this choice: it looks below the volume's root, and a root
+    the remote user can write through the group fits under either owner.
+12. **Images whose remote user has no passwordless sudo.** The package warns there and leaves the volume as it is.
+    Recommendation: accept that for `1.0.0`, with the repair by hand in `NOTES.md`; the accounts the first-party images
+    and `common-utils` create have passwordless sudo. The alternative is a root `entrypoint` that repairs the volume and
+    writes a marker at each container start, with the lifecycle command waiting for the marker so that the user's
+    commands cannot run ahead of it; one run on `debian:12` without sudo showed it working (Context). It needs a
+    container user that is root, adds an `entrypoint`, which runs at every start, to the feature's metadata, and was not
+    tried with `dockerComposeFile` or `overrideCommand: false`. It can arrive later as a MINOR.
+13. **The check on an image without `find`** (`opensuse/leap:16.0`). Recommendation: read the owners from a listing the
+    image can produce, chosen and observed during implementation on that image (Goals), and come back to the maintainer
+    before implementing if none proves reliable. The alternatives are to install `findutils` as a fifth prerequisite,
+    which changes the spec's "Install download prerequisites only from the image's repositories", or to repair without
+    the check on such an image, which runs `sudo` on a volume that fits, against "Volume that fits". Not prototyped.
+14. **`onCreateCommand` only, or `postStartCommand` as well.** `onCreateCommand` covers a rebuild and the first run as
+    another remote user. `postStartCommand` would also repair, at the next start, what root wrote while the container
+    ran (`sudo uv`), at the price of the walk at every start, seconds on a cold page cache for a large volume, and it
+    runs after the point tools wait for by default. Recommendation: `onCreateCommand` only; the notes name `sudo uv` as
+    a cause and the next rebuild as the repair.
