@@ -16,6 +16,9 @@ fi
 VOLUME=/var/lib/uv
 WORK=$(mktemp -d)
 LOG="$WORK/uv.log"
+# A named volume and a bind-mounted workspace can share the runner's backing filesystem.
+# Exercise UV_LINK_MODE across actual filesystems with a temporary cache on Docker's tmpfs.
+CROSS_FS_CACHE=$(mktemp -d /dev/shm/uv-cross-filesystems.XXXXXX)
 
 is_empty_dir() {
     [ -d "$1" ] && [ -z "$(ls -A "$1")" ]
@@ -37,7 +40,7 @@ install_into() {
     shift
     uv venv "$env_dir" || return
     status=0
-    uv pip install --python "$env_dir/bin/python" "$@" pycowsay >"$LOG" 2>&1 || status=$?
+    UV_CACHE_DIR="$CROSS_FS_CACHE" uv pip install --python "$env_dir/bin/python" "$@" pycowsay >"$LOG" 2>&1 || status=$?
     cat "$LOG"
     return "$status"
 }
@@ -56,13 +59,13 @@ check "the interpreter was installed under $VOLUME/python" [ -n "$(ls -A "$VOLUM
 check "the environment's interpreter link resolves on the volume" resolves_to_volume "$WORK/venv/bin/python"
 
 # Workspace install across filesystems: the working directory is the bind-mounted workspace.
-check "the workspace and the volume are different filesystems" [ "$(stat -c %d .)" != "$(stat -c %d "$VOLUME")" ]
+check "the workspace and the test cache are different filesystems" [ "$(stat -c %d .)" != "$(stat -c %d "$CROSS_FS_CACHE")" ]
 check "a package installs into an environment in the workspace" install_into .venv-uv-first
 check "the install printed no link-mode fallback warning" no_link_warning
 check "a cached package installs offline into another workspace environment" install_into .venv-uv-second --offline
 check "the offline install printed no link-mode fallback warning" no_link_warning
 check "the installed package runs" sh -c './.venv-uv-second/bin/pycowsay hello >/dev/null'
 
-rm -rf .venv-uv-first .venv-uv-second "$WORK"
+rm -rf .venv-uv-first .venv-uv-second "$WORK" "$CROSS_FS_CACHE"
 
 reportResults
