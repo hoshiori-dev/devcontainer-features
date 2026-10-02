@@ -476,14 +476,17 @@
   missing `sudo`, and the volume unchanged.
 - The repair is one `chown -R` of `/var/lib/uv` to the remote user's UID and to the ID of the group `uv`, or to the UID
   alone in a container whose image has no such group, as after `remoteUser` was changed from root without a rebuild. It
-  changes owner and group and nothing else: `chown -R` of GNU coreutils and of BusyBox changes a symbolic link, not its
-  target (Context), so nothing outside the volume changes. The script never touches `/usr/local/share/uv`, where the
-  same command would copy every file into the container's writable layer (Context). `sudo` is not run for root or on a
-  volume that fits. Checked by the scenario, which compares a listing of every entry's mode and, for a symbolic link
-  that points outside the volume, the target's owner, before and after the repair, and asserts with the recording stub
-  that a second run calls `sudo` not at all. The branch without the group is observed once in a throwaway container,
-  recorded in the PR: the feature installed on the Ubuntu base image for the remote user root, which creates no group
-  `uv`, and `vscode` running the script on a volume root filled.
+  changes owner and group, preserving file contents, ordinary permission bits, and directory setgid. The ownership
+  change can clear executable setuid/setgid bits (Context); the script runs no chmod to restore them. A maintainer
+  accepted this exception in conversation on 2026-10-02. `chown -R` of GNU coreutils and of BusyBox changes a symbolic
+  link, not its target (Context), so nothing outside the volume changes. The script never touches `/usr/local/share/uv`,
+  where the same command would copy every file into the container's writable layer (Context). `sudo` is not run for root
+  or on a volume that fits. Checked by the scenario, which compares a listing of every entry's mode and, for a symbolic
+  link that points outside the volume, the target's owner, before and after the repair. A separate fixture checks that
+  an executable goes from 6755 to 0755 with unchanged contents and that its directory keeps 2775. The scenario also
+  asserts with the recording stub that a second run calls `sudo` not at all. The branch without the group is observed
+  once in a throwaway container, recorded in the PR: the feature installed on the Ubuntu base image for the remote user
+  root, which creates no group `uv`, and `vscode` running the script on a volume root filled.
 - The warning goes to standard error, starts with `uv feature:` like the messages of `install.sh`, and names
   `/var/lib/uv`, the reason (no `sudo`, a `sudo` that asks for a password, or the failed `chown` with its message), and
   the feature's notes. Checked by the scenario.
@@ -674,9 +677,11 @@ The feature has two options, both new in this change; the spec's Option requirem
   directly); a sudo rule for the script (every image would gain a rule, and the remote user a privilege it did not
   have); failing the creation where the repair is impossible (`devcontainer up` would end with an error and skip the
   user's own commands, and the CLI does not run a failed `onCreateCommand` again).
-- **`UV_LINK_MODE=copy`.** The cache volume and the workspace bind mount are always different filesystems, so the
-  default `clone` always falls back to copying and warns on every install. Rejected: the default (the warning);
-  `hardlink` (impossible across filesystems); `symlink` (uv discourages it: cleaning the cache breaks environments).
+- **`UV_LINK_MODE=copy`.** The cache volume and the workspace bind mount can be on different filesystems, where the
+  default `clone` falls back to copying and warns. The cross-filesystem test uses a temporary cache on `/dev/shm` and
+  asserts that its device differs from the workspace's; a named volume and a workspace can share the runner's backing
+  filesystem. Rejected: the default (the warning across filesystems); `hardlink` (impossible across filesystems);
+  `symlink` (uv discourages it: cleaning the cache breaks environments).
 - **Distribution families, by `ID` or `ID_LIKE` in `/etc/os-release`: Debian/Ubuntu (`debian`, `ubuntu`) with `apt`,
   RHEL/Fedora (`rhel`, `centos`, `fedora`) with `dnf`, Arch Linux (`arch`) with `pacman`, Alpine (`alpine`) with `apk`,
   and openSUSE/SUSE (`suse`, `opensuse`, or an `ID` starting with `opensuse`) with `zypper`; anything else fails**

@@ -235,8 +235,8 @@ install leaves them, writable by root only.
 The feature SHALL mount a named volume `uv-${devcontainerId}`, one per dev container, at `/var/lib/uv`, and SHALL point
 uv's managed-interpreter directory (`python/`) and cache (`cache/`) into it. A newly created volume SHALL hold nothing
 written at build time and SHALL be writable by the remote user as "Grant write access through the group uv" states. A
-volume that already holds data SHALL keep its owner, group, and modes, except for the owner and group that "Repair a
-volume that no longer fits the remote user" changes.
+volume that already holds data SHALL keep its owner, group, and modes, except for the ownership changes and executable
+setuid/setgid bits cleared by "Repair a volume that no longer fits the remote user".
 
 #### Scenario: New volume
 
@@ -269,10 +269,12 @@ UID of the same account changed, or root wrote into it. For the remote user root
 When a dev container is created, a rebuild included, the feature SHALL check the volume as the remote user, before the
 creation commands of the user's `devcontainer.json` run. When the volume does not fit and the remote user can run `sudo`
 without a password, the feature SHALL make the remote user the owner, and `uv` the group where the image has that group,
-of the volume and of everything in it, and change nothing else, so that uv works on the interpreters and the cache the
-volume already holds. When the volume does not fit and the remote user cannot run `sudo` without a password, the feature
-SHALL leave the volume as it is and print a warning that names `/var/lib/uv` and the reason. When the change of owner
-fails, the feature SHALL print a warning that names `/var/lib/uv` and the reason. In every case the creation of the dev
+of the volume and of everything in it, so that uv works on the interpreters and the cache the volume already holds. The
+repair SHALL preserve file contents, ordinary permission bits, and directory setgid bits. The ownership change MAY clear
+setuid/setgid bits on executable files; the feature SHALL NOT restore those cleared bits or otherwise change modes
+explicitly. When the volume does not fit and the remote user cannot run `sudo` without a password, the feature SHALL
+leave the volume as it is and print a warning that names `/var/lib/uv` and the reason. When the change of owner fails,
+the feature SHALL print a warning that names `/var/lib/uv` and the reason. In every case the creation of the dev
 container SHALL continue. The feature SHALL change nothing on a volume that fits, nothing when the remote user is root,
 and nothing outside `/var/lib/uv`, and SHALL add no sudo rule.
 
@@ -289,6 +291,13 @@ and nothing outside `/var/lib/uv`, and SHALL add no sudo rule.
 - **WHEN** a dev container is created whose volume holds files that root wrote among the remote user's own, and the
   remote user can run `sudo` without a password
 - **THEN** after the creation the remote user owns everything in the volume
+
+#### Scenario: Executable special bits during repair
+
+- **WHEN** a volume that needs repair holds an executable file with mode `6755` in a directory with mode `2775`, and the
+  remote user can run `sudo` without a password
+- **THEN** the ownership change clears the executable's setuid/setgid bits to mode `0755`, the directory stays `2775`,
+  the file's contents are preserved, and the feature does not restore the cleared bits
 
 #### Scenario: No passwordless sudo
 

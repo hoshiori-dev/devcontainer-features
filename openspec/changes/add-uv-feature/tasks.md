@@ -1,6 +1,7 @@
 # Tasks
 
-The package revision at `5c2f672` is approved. This list follows its group access and volume repair decisions.
+The package revision at `5c2f672` is approved. This list follows its group access and volume repair decisions, including
+the executable setuid/setgid clearing exception accepted in conversation on 2026-10-02.
 
 ## 1. Scaffold, metadata, and supported images
 
@@ -72,14 +73,14 @@ The package revision at `5c2f672` is approved. This list follows its group acces
 
 - [ ] 4.2 Install the POSIX repair script outside the tool tree, root-owned 0755, and implement the whole-volume
       ownership check, including a verified listing on openSUSE without find; repair with passwordless sudo only, never
-      follow links, preserve modes, warn and exit 0 on failure. Verify shellcheck, test.sh and repair_volume. Pending
-      decision: recursive chown clears setuid/setgid on executable files; the design records this but the requirement
-      also says that modes are preserved. The ordinary-mode and ownership tests pass.
+      follow links, preserve ordinary permissions and directory setgid, allow executable setuid/setgid clearing without
+      restoring it, warn and exit 0 on failure. Verify shellcheck, test.sh and repair_volume.
 - [x] 4.3 Add changed_uid on Alpine with a remote UID unlike the hosts, asserting ownership changed and group access
       permits interpreter and tool operations. Verify just test-scenarios uv.
-- [x] 4.4 Add repair_volume on Ubuntu, covering foreign UID/cache offline reuse, root entries, fitting volume without
-      sudo, failed sudo and chown, link targets and mode preservation. Extend test.sh for a fresh fitting volume and
-      root skip. Verify just test uv and just test-scenarios uv.
+- [ ] 4.4 Add repair_volume on Ubuntu, covering foreign UID/cache offline reuse, root entries, fitting volume without
+      sudo, failed sudo and chown, link targets, ordinary mode preservation, executable special-bit clearing and
+      directory setgid preservation. Extend test.sh for a fresh fitting volume and root skip. Verify just test uv and
+      just test-scenarios uv.
 
 ## 5. Documentation
 

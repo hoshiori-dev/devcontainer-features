@@ -102,6 +102,8 @@ None.
   scenario in `test/uv/scenarios.json` on the image with a non-root remote user, which runs the feature's check on a
   volume the test has given to another UID, and "Repair skipped for root" passes in `test/uv/test.sh` on the images with
   a root remote user.
+- "Executable special bits during repair" passes in the same non-root repair scenario; it checks the accepted
+  setuid/setgid clearing exception, ordinary permissions, directory setgid, and unchanged file contents.
 - "Volume filled under another UID" and "No passwordless sudo" are also observed on a real dev container that is rebuilt
   with another remote user, once with and once without passwordless `sudo`, with the method the design names; the record
   shows that the tooling runs the check when the container is created, before the user's own creation command, and it
