@@ -3,12 +3,46 @@
   "images": [
     {
       "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
-      "arch": ["amd64", "arm64"],
+      "arch": [
+        "amd64",
+        "arm64"
+      ],
       "remoteUser": "vscode"
     },
     {
       "image": "debian:12",
-      "arch": ["amd64", "arm64"]
+      "arch": [
+        "amd64",
+        "arm64"
+      ]
+    },
+    {
+      "image": "fedora:44",
+      "arch": [
+        "amd64",
+        "arm64"
+      ]
+    },
+    {
+      "image": "almalinux:9",
+      "arch": [
+        "amd64",
+        "arm64"
+      ]
+    },
+    {
+      "image": "almalinux:8",
+      "arch": [
+        "amd64",
+        "arm64"
+      ]
+    },
+    {
+      "image": "opensuse/leap:16.0",
+      "arch": [
+        "amd64",
+        "arm64"
+      ]
     }
   ]
 }

@@ -13,21 +13,33 @@ fail() {
 glibc="$(getconf GNU_LIBC_VERSION 2>/dev/null)" || glibc=""
 case "${glibc}" in
     "glibc "*) ;;
-    *) fail "this image does not use glibc (musl-based images such as Alpine are unsupported); Deno publishes glibc builds only." ;;
+    *)
+        for loader in /lib/ld-musl-*; do
+            [ ! -e "${loader}" ] || fail "this image uses musl; Deno publishes glibc builds only."
+        done
+        fail "the C library could not be identified; Deno needs glibc 2.27 or newer."
+        ;;
 esac
 
 # Read /etc/os-release in subshells: it defines VERSION, which would overwrite the option.
-[ -r /etc/os-release ] || fail "cannot read /etc/os-release; only Debian- and Ubuntu-based images are supported."
+[ -r /etc/os-release ] || fail "cannot read /etc/os-release; supported families are Debian, Fedora, and openSUSE."
 # shellcheck source=/dev/null
 os_id="$(. /etc/os-release && echo "${ID:-}")"
 # shellcheck source=/dev/null
 os_like="$(. /etc/os-release && echo "${ID_LIKE:-}")"
 # shellcheck source=/dev/null
 os_name="$(. /etc/os-release && echo "${PRETTY_NAME:-${ID:-unknown}}")"
-case " ${os_id} ${os_like} " in
-    *" debian "* | *" ubuntu "*) ;;
-    *) fail "unsupported distribution \"${os_name}\" (ID=${os_id}); only Debian- and Ubuntu-based images are supported." ;;
-esac
+family=""
+for word in ${os_id} ${os_like}; do
+    case "${word}" in
+        debian | ubuntu) family=debian ;;
+        fedora | rhel | centos) family=fedora ;;
+        opensuse) family=opensuse ;;
+        *) continue ;;
+    esac
+    break
+done
+[ -n "${family}" ] || fail "unsupported distribution \"${os_name}\" (ID=${os_id}); supported families are Debian, Fedora, and openSUSE."
 
 glibc_version="${glibc#glibc }"
 glibc_major="${glibc_version%%.*}"
@@ -49,5 +61,7 @@ case "${machine}" in
     *) fail "unsupported architecture \"${machine}\"; Deno publishes Linux builds for amd64 (x86_64) and arm64 (aarch64) only." ;;
 esac
 
+command -v bash >/dev/null 2>&1 || fail "bash is required after the platform checks."
+
 script_dir="$(cd "$(dirname "$0")" && pwd)"
-exec bash "${script_dir}/scripts/install-deno.sh" "${target}"
+exec bash "${script_dir}/scripts/install-deno.sh" "${target}" "${family}"

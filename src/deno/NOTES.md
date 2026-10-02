@@ -15,10 +15,13 @@ again; another version replaces it. A failed installation leaves the previous `d
 ## Global tools
 
 `DENO_INSTALL_ROOT` is `/usr/local/share/deno`, and `/usr/local/share/deno/bin` is appended to `PATH`, so tools
-installed with `deno install --global` run by name in every shell. The directory is owned by the remote user when that
-user exists at build time and is not root, so installing a tool needs no `sudo`; otherwise it is owned by root. Because
-the directory comes last on `PATH`, a tool named like a system command runs only by its full path. The feature installs
-after `common-utils` when both are used, so a remote user that feature creates owns the directory.
+installed with `deno install --global` run by name, including in login shells through `/etc/profile.d/deno.sh`. When the
+remote user exists at build time and is not root, the two tools directories are owned by root, group `deno`, and mode
+2775, and the user joins that group. Tools remain writable after the Dev Container CLI changes the user's UID/GID.
+Otherwise the directories are root-owned with mode 0755. Existing tools keep their ownership on reinstall. Because the
+tools directory comes last on `PATH`, a tool named like a system command runs only by its full path. The feature
+installs after `common-utils` when both are used, so a remote user that feature creates can join the group. Non-root
+setup requires `groupadd` and `usermod` in the image.
 
 `DENO_DIR` (Deno's cache) keeps its per-user default.
 
@@ -29,9 +32,12 @@ running `deno upgrade`.
 
 ## Prerequisites
 
-On an image without `curl`, `ca-certificates`, or `unzip`, the missing packages are installed with apt and kept.
+Missing `curl`, a CA certificate bundle, or `unzip` is installed with the family's package manager (`apt-get`, `dnf`, or
+`zypper`) and kept; its package cache is cleaned. Images with all prerequisites install no package. A missing
+prerequisite requires that manager; `microdnf` and `yum` are not fallbacks.
 
 ## OS support
 
-Debian- and Ubuntu-based images with glibc 2.27 or newer, on amd64 and arm64; Deno publishes no musl build, so Alpine is
-unsupported. Tested images: [test/deno/compatibility.json](../../test/deno/compatibility.json).
+Debian, Fedora, and openSUSE families with glibc 2.27 or newer, on amd64 and arm64. Only current distribution releases
+are expected to work; end-of-life repositories may fail. Deno publishes no musl build, so Alpine is unsupported. Tested
+images: [test/deno/compatibility.json](../../test/deno/compatibility.json).

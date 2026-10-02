@@ -36,5 +36,25 @@
     "features": {
       "deno": {}
     }
+  },
+  "uid_remap": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "deno": {
+        "version": "2.8.0"
+      }
+    }
+  },
+  "fedora_remote_user": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "remoteUser": "devuser",
+    "features": {
+      "deno": {
+        "version": "2.8.0"
+      }
+    }
   }
 }

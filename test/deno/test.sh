@@ -11,7 +11,6 @@ latest="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-er
     https://dl.deno.land/release-latest.txt | tr -d '[:space:]')"
 latest="${latest#v}"
 user="$(id -un)"
-if [ "$(id -u)" = 0 ]; then owner=root; else owner="${user}"; fi
 
 check "deno resolves to /usr/local/bin/deno" test "$(command -v deno)" = /usr/local/bin/deno
 check "deno reports the latest version ${latest}" bash -c "deno --version | head -n 1 | grep -qx 'deno ${latest} (.*'"
@@ -31,13 +30,51 @@ tools_dir_after_image_entries() {
     done
 }
 prerequisites_installed() {
-    command -v curl && command -v unzip &&
-        [ "$(dpkg-query -W -f='${Status}' ca-certificates)" = "install ok installed" ]
+    local bundle
+    command -v curl && command -v unzip || return 1
+    for bundle in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem /etc/ssl/cert.pem; do
+        [ ! -s "${bundle}" ] || return 0
+    done
+    return 1
+}
+package_caches_clean() {
+    local entry
+    shopt -s nullglob dotglob
+    for entry in /var/lib/apt/lists/*; do
+        case "${entry##*/}" in lock | partial | auxfiles) ;; *) return 1 ;; esac
+    done
+    for entry in /var/cache/apt/archives/*.deb /var/cache/dnf/* /var/cache/libdnf5/*; do
+        [ ! -d "${entry}" ] || return 1
+        case "${entry}" in *.rpm | *.solv | */repomd.xml) return 1 ;; esac
+    done
+    for entry in /var/cache/zypp/*; do
+        [ ! -f "${entry}" ] || return 1
+        if [ -d "${entry}" ]; then
+            # Bash traversal: openSUSE ships no find.
+            local child
+            for child in "${entry}"/**/* "${entry}"/*; do
+                [ ! -f "${child}" ] || return 1
+            done
+        fi
+    done
 }
 check "the tools directory follows the image's PATH entries" tools_dir_after_image_entries
-check "curl, unzip, and ca-certificates are installed" prerequisites_installed
-check "the tools tree is owned by ${owner}" bash -c \
-    "[ -d /usr/local/share/deno/bin ] && [ -z \"\$(find /usr/local/share/deno ! -user ${owner})\" ]"
+check "curl, unzip, and a CA bundle are present" prerequisites_installed
+shopt -s globstar
+check "package-manager caches contain no repository metadata or packages" package_caches_clean
+tools_access() {
+    local group=root mode=755 dir
+    if [ "$(id -u)" != 0 ]; then
+        group=deno
+        mode=2775
+        case " $(id -nG) " in *" deno "*) ;; *) return 1 ;; esac
+    fi
+    for dir in /usr/local/share/deno /usr/local/share/deno/bin; do
+        [ "$(stat -c '%U:%G:%a' "${dir}")" = "root:${group}:${mode}" ] || return 1
+        [ -w "${dir}" ] || return 1
+    done
+}
+check "tools directories have the expected owner, group, mode, and access" tools_access
 
 # Spec: a non-root remote user installs a global tool without elevated privileges (root on debian:12).
 script="$(mktemp -d)/hello.ts"
@@ -46,5 +83,12 @@ check "deno install --global succeeds as ${user}" deno install --global --name d
 check "the tool lands in /usr/local/share/deno/bin" test -x /usr/local/share/deno/bin/deno-feature-hello
 tool_runs() { [ "$(bash -c deno-feature-hello)" = "hello from a global tool" ]; }
 check "the tool runs by name from a new shell" tool_runs
+login_tool_runs() {
+    [ "$(bash -lc deno-feature-hello)" = "hello from a global tool" ] || return 1
+    local login_path
+    login_path="$(bash -lc 'echo "$PATH"')"
+    [ "$(tr ':' '\n' <<<"${login_path}" | grep -cx /usr/local/share/deno/bin)" = 1 ]
+}
+check "a login shell runs the tool with one tools PATH entry" login_tool_runs
 
 reportResults

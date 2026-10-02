@@ -2,10 +2,11 @@
 # Installs the Deno CLI after install.sh passed the platform checks. Runs as root at image build
 # time; the option arrives as VERSION, the release target (x86_64- or aarch64-unknown-linux-gnu)
 # as the first argument. Idempotent: an installed matching version is kept, and the global tools
-# tree is re-created and re-owned without touching its contents.
+# directories are configured without touching existing tools.
 set -euo pipefail
 
 readonly TARGET="$1"
+readonly FAMILY="$2"
 readonly BIN_DIR=/usr/local/bin
 readonly TOOLS_ROOT=/usr/local/share/deno
 readonly LATEST_URL=https://dl.deno.land/release-latest.txt
@@ -32,29 +33,59 @@ fi
 
 tmp="$(mktemp -d)"
 staged=""
-apt_ran=0
-# Removes the downloads, the staging file, and the apt lists, on success and on failure alike.
+manager_ran=""
+# Remove downloads, staging, and package-manager caches on success and failure alike.
 cleanup() {
+    local status=$?
     rm -rf "${tmp}"
     if [[ -n "${staged}" ]]; then rm -f "${staged}"; fi
-    if ((apt_ran)); then rm -rf /var/lib/apt/lists/*; fi
+    case "${manager_ran}" in
+        apt-get) apt-get clean; rm -rf /var/lib/apt/lists/* ;;
+        dnf) dnf clean all ;;
+        zypper) zypper --non-interactive clean --all ;;
+    esac
+    return "${status}"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# --- Prerequisites: apt only when one is missing, lists removed by cleanup. ---
 missing_packages=()
 command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
-ca_status="$(dpkg-query -W -f='${Status}' ca-certificates 2>/dev/null)" || ca_status=""
-[[ "${ca_status}" == "install ok installed" ]] || missing_packages+=(ca-certificates)
+ca_present=0
+for bundle in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem /etc/ssl/cert.pem; do
+    if [[ -s "${bundle}" ]]; then ca_present=1; break; fi
+done
+if ((!ca_present)); then
+    if [[ "${FAMILY}" == opensuse ]]; then
+        missing_packages+=(ca-certificates-mozilla)
+    else
+        missing_packages+=(ca-certificates)
+    fi
+fi
 command -v unzip >/dev/null 2>&1 || missing_packages+=(unzip)
 if ((${#missing_packages[@]} > 0)); then
-    log "installing ${missing_packages[*]} with apt"
-    export DEBIAN_FRONTEND=noninteractive
-    apt_ran=1
-    apt-get update
-    apt-get install -y --no-install-recommends "${missing_packages[@]}"
+    case "${FAMILY}" in
+        debian) manager=apt-get ;;
+        fedora) manager=dnf ;;
+        opensuse) manager=zypper ;;
+    esac
+    command -v "${manager}" >/dev/null 2>&1 ||
+        fail "missing ${missing_packages[*]}; this family needs ${manager} to install them."
+    log "installing ${missing_packages[*]} with ${manager}"
+    manager_ran="${manager}"
+    case "${manager}" in
+        apt-get)
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y --no-install-recommends "${missing_packages[@]}"
+            ;;
+        dnf) dnf install -y --setopt=install_weak_deps=False "${missing_packages[@]}" ;;
+        zypper)
+            zypper --non-interactive refresh
+            zypper --non-interactive --no-refresh install --no-recommends "${missing_packages[@]}"
+            ;;
+    esac
 fi
 
 # fetch <url> <file>: 0 when downloaded, 4 when the server answered 404; any other failure exits.
@@ -82,17 +113,30 @@ else
     version="${requested}"
 fi
 
-# Global tools tree: re-created and re-owned on every successful run, its contents kept.
+# Re-apply directory access without changing existing tools' ownership.
 setup_tools_root() {
-    local owner=root uid
+    local group=root mode=0755 uid
     if [[ -n "${_REMOTE_USER:-}" && "${_REMOTE_USER}" != root ]] &&
         uid="$(id -u -- "${_REMOTE_USER}" 2>/dev/null)" && [[ "${uid}" != 0 ]]; then
-        owner="${_REMOTE_USER}"
+        getent group deno >/dev/null || groupadd --system deno
+        case " $(id -nG -- "${_REMOTE_USER}") " in
+            *" deno "*) ;;
+            *) usermod -aG deno "${_REMOTE_USER}" ;;
+        esac
+        group=deno
+        mode=2775
     fi
-    mkdir -p "${TOOLS_ROOT}/bin"
-    # -h: never follow a symlink someone placed in the tree.
-    chown -hR -- "${owner}:" "${TOOLS_ROOT}"
-    log "global tools go to ${TOOLS_ROOT}/bin, owned by ${owner}"
+    mkdir -p "${TOOLS_ROOT}/bin" /etc/profile.d
+    chown -h -- "root:${group}" "${TOOLS_ROOT}" "${TOOLS_ROOT}/bin"
+    chmod "${mode}" "${TOOLS_ROOT}" "${TOOLS_ROOT}/bin"
+    cat > /etc/profile.d/deno.sh <<'PROFILE'
+case ":${PATH}:" in
+    *:/usr/local/share/deno/bin:*) ;;
+    *) export PATH="${PATH}:/usr/local/share/deno/bin" ;;
+esac
+PROFILE
+    chmod 0644 /etc/profile.d/deno.sh
+    log "global tools go to ${TOOLS_ROOT}/bin, group ${group}, mode ${mode}"
 }
 
 # Version reported by a deno executable: the second field of the first line of --version.
