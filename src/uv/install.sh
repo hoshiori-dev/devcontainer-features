@@ -365,7 +365,7 @@ cat >"$PROFILE_SNIPPET" <<'EOF'
 # Keeps uv's tool executables on PATH in login shells whose profile resets PATH.
 case ":${PATH}:" in
     *:/usr/local/share/uv/bin:*) ;;
-    *) PATH="/usr/local/share/uv/bin${PATH:+:${PATH}}"; export PATH ;;
+    *) PATH="${PATH:+${PATH}:}/usr/local/share/uv/bin"; export PATH ;;
 esac
 EOF
 chown root:root "$PROFILE_SNIPPET"

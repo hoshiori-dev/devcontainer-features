@@ -321,14 +321,15 @@ and nothing outside `/var/lib/uv`, and SHALL add no sudo rule.
 
 The feature SHALL set, for every process in the container, `UV_PYTHON_INSTALL_DIR` to `/var/lib/uv/python`,
 `UV_CACHE_DIR` to `/var/lib/uv/cache`, `UV_TOOL_DIR` to `/usr/local/share/uv/tools`, `UV_TOOL_BIN_DIR` to
-`/usr/local/share/uv/bin`, `UV_LINK_MODE` to `copy`, and SHALL put `/usr/local/share/uv/bin` in `PATH` ahead of
-`/usr/local/bin` and `/usr/bin`, also in login shells whose system profile resets `PATH`.
+`/usr/local/share/uv/bin`, `UV_LINK_MODE` to `copy`, and SHALL append `/usr/local/share/uv/bin` to `PATH`, after any
+existing `/usr/local/bin` and `/usr/bin` entries, also in login shells whose system profile resets `PATH`. Commands
+already available earlier in `PATH` SHALL take precedence over same-named tools.
 
 #### Scenario: Environment of the remote user
 
 - **WHEN** the remote user opens a shell in the container, a login shell included
-- **THEN** each of these variables has the stated value, and `PATH` contains `/usr/local/share/uv/bin` ahead of
-  `/usr/local/bin` and `/usr/bin`
+- **THEN** each of these variables has the stated value, and `PATH` contains `/usr/local/share/uv/bin` after any
+  existing `/usr/local/bin` and `/usr/bin` entries; system commands take precedence over same-named tools
 
 #### Scenario: Workspace install across filesystems
 

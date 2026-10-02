@@ -75,6 +75,8 @@ None.
   `test/uv/compatibility.json`, and with them "Remote user in the group" on the image with a non-root remote user and
   "Root remote user" on the others. These checks read group, mode, and membership, so they give the same result whether
   or not the host changes the remote user's UID.
+- "Environment of the remote user" also checks that system commands take precedence over same-named tools, following the
+  PATH append decision accepted in conversation on 2026-10-02.
 - "Pinned release", "Minimal image", "Tools on PATH", "Tools survive a replaced volume", "Remote user manages tools",
   "Runtime interpreter on the volume", and "Workspace install across filesystems" pass as scenarios in
   `test/uv/scenarios.json`.

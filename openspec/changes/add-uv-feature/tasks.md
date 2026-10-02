@@ -9,7 +9,7 @@ the executable setuid/setgid clearing exception accepted in conversation on 2026
       `devcontainer-feature.json`, `install.sh`, `NOTES.md`, `test.sh`, `duplicate.sh`, and `compatibility.json`
 - [x] 1.2 Complete `src/uv/devcontainer-feature.json` at version `1.0.0`: `name`, `description`, `documentationURL`, the
       options `version` and `toolsToInstall` with the proposals and descriptions of the design's option table,
-      `containerEnv` (the five `UV_*` variables and `PATH` with `/usr/local/share/uv/bin` prepended), the `mounts` entry
+      `containerEnv` (the five `UV_*` variables and `PATH` with `/usr/local/share/uv/bin` appended), the `mounts` entry
       for the volume `uv-${devcontainerId}` at `/var/lib/uv`, and `installsAfter`
       `ghcr.io/devcontainers/features/common-utils`, and `onCreateCommand` naming the root-owned repair script, with no
       other widening metadata; verify with `just validate` and `just spec-check`
@@ -34,7 +34,7 @@ the executable setuid/setgid clearing exception accepted in conversation on 2026
       ("Omitted version", "glibc image", "musl image", "Checksum matches")
 - [x] 2.4 Create `/var/lib/uv` empty and owned by the remote user, `/usr/local/share/uv/{tools,python,bin}` owned by the
       remote user and group `uv` (root:root for root), with group write and setgid directories for non-root, no
-      other-write, and `/etc/profile.d/uv.sh` (root-owned, 0644, overwritten on every install) that prepends
+      other-write, and `/etc/profile.d/uv.sh` (root-owned, 0644, overwritten on every install) that appends
       `/usr/local/share/uv/bin` to `PATH` only when it is missing; verify with `test/uv/test.sh` ("New volume",
       "Environment of the remote user" in the environment and in login shells)
 - [x] 2.5 Write `test/uv/test.sh` (POSIX `sh` that re-executes with bash, adding bash from `apk` when missing)
@@ -125,3 +125,8 @@ the executable setuid/setgid clearing exception accepted in conversation on 2026
 
 - [x] 7.1 Run `just check`, `just test uv`, and `just test-scenarios uv`, and record the results with every Acceptance
       item in the PR's Validation section
+
+## 8. System commands before tools
+
+- [x] 8.1 Apply the PATH append decision accepted in conversation on 2026-10-02 to metadata, login shells, documentation
+      and tests. Verify system-command precedence, all compatibility images, scenarios and just check.

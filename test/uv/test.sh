@@ -40,18 +40,35 @@ expected_target() {
     echo "$(uname -m)-unknown-linux-$libc"
 }
 
-# Whether /usr/local/share/uv/bin comes before /usr/local/bin and /usr/bin in the PATH value $1.
-uv_bin_first() {
+# Whether the tool directory follows existing system directories in the PATH value $1.
+uv_bin_after_system() {
+    tool_seen=false
     old_ifs=$IFS
     IFS=:
     for dir in $1; do
         case "$dir" in
-            /usr/local/share/uv/bin) IFS=$old_ifs && return 0 ;;
-            /usr/local/bin | /usr/bin) IFS=$old_ifs && return 1 ;;
+            /usr/local/share/uv/bin) tool_seen=true ;;
+            /usr/local/bin | /usr/bin)
+                if [ "$tool_seen" = true ]; then
+                    IFS=$old_ifs
+                    return 1
+                fi
+                ;;
         esac
     done
     IFS=$old_ifs
-    return 1
+    [ "$tool_seen" = true ]
+}
+
+# A writable tool with a system command's name must not shadow that command.
+system_command_wins() {
+    fixture=/usr/local/share/uv/bin/ls
+    printf '#!/bin/sh\nexit 99\n' >"$fixture"
+    chmod 0755 "$fixture"
+    resolved=$(command -v ls)
+    login_resolved=$(sh -lc 'command -v ls')
+    rm -f "$fixture"
+    [ "$resolved" != "$fixture" ] && [ "$login_resolved" != "$fixture" ]
 }
 
 # The feature's variables, as one line, in the order of EXPECTED_ENV.
@@ -117,14 +134,16 @@ check "no interpreter was downloaded at build time" is_empty_dir /usr/local/shar
 
 # Environment of the remote user, a login shell included.
 check "the environment points uv at the feature's locations" [ "$(sh -c "$PRINT_ENV")" = "$EXPECTED_ENV" ]
-check "PATH has the tool directory before /usr/local/bin and /usr/bin" uv_bin_first "$PATH"
+check "PATH has the tool directory after /usr/local/bin and /usr/bin" uv_bin_after_system "$PATH"
 check "the login-shell snippet is root's, mode 644" [ "$(stat -c '%U %a' /etc/profile.d/uv.sh)" = "root 644" ]
 check "a login shell keeps the environment" [ "$(sh -lc "$PRINT_ENV")" = "$EXPECTED_ENV" ]
 # shellcheck disable=SC2016
-check "a login shell has the tool directory first in PATH" uv_bin_first "$(sh -lc 'printf %s "$PATH"')"
+check "a login shell has the tool directory after system directories in PATH" uv_bin_after_system "$(sh -lc 'printf %s "$PATH"')"
 # shellcheck disable=SC2016
-check "a login shell from an empty environment has the tool directory first in PATH" \
-    uv_bin_first "$(env -i HOME="$HOME" sh -lc 'printf %s "$PATH"')"
+check "a login shell from an empty environment has the tool directory after system directories in PATH" \
+    uv_bin_after_system "$(env -i HOME="$HOME" sh -lc 'printf %s "$PATH"')"
+
+check "system commands win over same-named tools" system_command_wins
 
 # Later feature runs uv: what a later feature relies on during its own install.
 check "later features find uv at /usr/local/bin/uv" /usr/local/bin/uv --version

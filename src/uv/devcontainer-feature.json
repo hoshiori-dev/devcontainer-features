@@ -24,7 +24,7 @@
     "UV_TOOL_DIR": "/usr/local/share/uv/tools",
     "UV_TOOL_BIN_DIR": "/usr/local/share/uv/bin",
     "UV_LINK_MODE": "copy",
-    "PATH": "/usr/local/share/uv/bin:${PATH}"
+    "PATH": "${PATH}:/usr/local/share/uv/bin"
   },
   "mounts": [
     {

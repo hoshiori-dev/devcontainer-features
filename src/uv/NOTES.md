@@ -37,8 +37,9 @@ user at build time:
 Both survive a rebuild of the dev container, so a workspace `.venv/` keeps a working interpreter and packages install
 from the cache. The feature also sets `UV_TOOL_DIR=/usr/local/share/uv/tools`,
 `UV_TOOL_BIN_DIR=/usr/local/share/uv/bin`, and `UV_LINK_MODE=copy` (so installs also work when the cache and workspace
-are on different filesystems), and puts `/usr/local/share/uv/bin` at the front of `PATH`, also in login shells through
-`/etc/profile.d/uv.sh`.
+are on different filesystems), and puts `/usr/local/share/uv/bin` at the end of `PATH`, also in login shells through
+`/etc/profile.d/uv.sh`. Existing commands earlier in `PATH` take precedence over same-named uv tools; use
+`/usr/local/share/uv/bin/<command>` to select the uv-installed tool in that case.
 
 - Interpreters installed at build time for tools are not on the volume, so runtime `uv python list` does not show them
   and `uv venv` downloads a matching version to the volume.
@@ -48,8 +49,7 @@ are on different filesystems), and puts `/usr/local/share/uv/bin` at the front o
   setgid directories. This access survives the tooling's UID update. Root gets no group and root-only write access.
 - An existing `uv` group is reused only if no other account belongs to it, including by primary group. The build fails
   if it is the remote user's primary group or has another member. Adding members later gives them write access to tools
-  first in `PATH`. A process started without supplementary groups, such as `docker exec -u user:group`, loses this
-  access.
+  on `PATH`. A process started without supplementary groups, such as `docker exec -u user:group`, loses this access.
 - A kept volume carries numeric IDs; a rebuilt image can give those numbers to another account or group. The build-time
   UID also continues to own the tool tree after a UID update, and a newly created account may receive it (BusyBox
   assigns the first free UID from 1000). The install removes other-write, including on uv's lock files; runtime files
