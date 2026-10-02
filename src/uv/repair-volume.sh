@@ -13,7 +13,7 @@ uid=$(id -u) || { warn "cannot determine the remote user's UID."; exit 0; }
 fits=false
 if [ -w "$volume" ] && [ -x "$volume" ]; then
     if command -v find >/dev/null 2>&1; then
-        if foreign=$(find "$volume" -mindepth 1 ! -uid "$uid" -print -quit 2>&1); then
+        if foreign=$(find "$volume" -mindepth 1 ! -user "$uid" -print -quit 2>&1); then
             [ -n "$foreign" ] || fits=true
         fi
     else

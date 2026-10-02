@@ -17,6 +17,10 @@ check "the UID changed from the build-time UID" [ "$(id -u)" != 23456 ]
 check "the user owns neither location" sh -c 'test "$(stat -c %u /var/lib/uv)" != "$(id -u)" && test "$(stat -c %u /usr/local/share/uv)" != "$(id -u)"'
 check "the user is in uv" sh -c 'id -Gn | tr " " "\n" | grep -qx uv'
 check "the group layout survives the UID change" [ "$(stat -c '%G %a' /var/lib/uv)" = "uv 2775" ]
+warning=$(mktemp)
+check "the new volume fits with BusyBox find" /usr/local/share/uv-feature/repair-volume 2>"$warning"
+check "a fitting volume prints no warning" test ! -s "$warning"
+rm "$warning"
 check "a managed environment can be created" uv venv --managed-python .changed-uid-venv
 # shellcheck disable=SC2016
 check "its interpreter is on the volume" sh -c 'case "$(readlink -f .changed-uid-venv/bin/python)" in /var/lib/uv/python/*) exit 0;; *) exit 1;; esac'
