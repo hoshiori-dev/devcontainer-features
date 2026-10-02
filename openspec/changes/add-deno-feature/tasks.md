@@ -13,8 +13,8 @@
 
 - [x] 2.1 Write `src/deno/install.sh` in POSIX `sh` with `set -eu`, holding only the platform checks (C library first,
       then the first matching family, glibc 2.27, architecture, bash) and handing over with `exec bash` to
-      `src/deno/scripts/`; verify with shellcheck and the hand runs on `alpine`, Wolfi, Arch, `debian:9`, and
-      `linux/s390x` (Verifying failure scenarios)
+      `src/deno/scripts/`; verify with shellcheck and the hand runs on `alpine`, Wolfi, Arch, `debian:9`, and the
+      architecture branch by review when QEMU is absent (Verifying failure scenarios)
 - [x] 2.2 Write the bash script with `set -euo pipefail`: validate `version` before any network access, install missing
       `curl`, a CA bundle, and `unzip` with apt, dnf, or zypper and clean the manager cache, resolve `latest` from the
       pointer with its format check, and skip the download when `/usr/local/bin/deno` already reports the resolved
@@ -33,9 +33,9 @@
 
 ## 3. Tests
 
-- [x] 3.1 Write `test/deno/compatibility.json` with `base:ubuntu24.04` (`remoteUser` `vscode`) `debian:12`, `fedora:44`,
-      `almalinux:9`, `almalinux:8`, and `opensuse/leap:16.0`, each with `"arch": ["amd64", "arm64"]`; verify with
-      `just validate`
+- [x] 3.1 Write `test/deno/compatibility.json` with `base:ubuntu24.04` (`remoteUser` `vscode`), `debian:12`,
+      `fedora:44`, `almalinux:9`, `almalinux:8`, and `opensuse/leap:16.0`, each with `"arch": ["amd64", "arm64"]`;
+      verify with `just validate`
 - [x] 3.2 Write `test/deno/test.sh`: `deno` resolves to `/usr/local/bin/deno` and reports the version the latest pointer
       names, the container environment (`DENO_INSTALL_ROOT`, `DENO_NO_UPDATE_CHECK`, `PATH` with the tools directory
       after the image's entries), the prerequisites installed, the tools directories owned by root with the specified
@@ -60,9 +60,9 @@
 
 ## 5. Integration checks
 
-- [ ] 5.1 Run `just check` and verify it passes
-- [ ] 5.2 Run `just test deno` and verify it passes on the two Debian-family images on amd64 per design.md; the four
+- [x] 5.1 Run `just check` and verify it passes
+- [x] 5.2 Run `just test deno` and verify it passes on the two Debian-family images on amd64 per design.md; the four
       added images and all arm64 images run in CI
-- [ ] 5.3 Run `just test-scenarios deno` and verify every scenario passes
-- [ ] 5.4 Record the results of 5.1 to 5.3, the hand runs of design.md (Verifying failure scenarios), and each
+- [x] 5.3 Run `just test-scenarios deno` and verify every scenario passes
+- [x] 5.4 Record the results of 5.1 to 5.3, the hand runs of design.md (Verifying failure scenarios), and each
       Acceptance item and spec scenario with its result in the PR's Validation section
