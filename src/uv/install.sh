@@ -7,7 +7,7 @@
 # POSIX sh, because Alpine ships no bash.
 set -eu
 
-VERSION="${VERSION:-latest}"
+VERSION="${VERSION-latest}"
 TOOLSTOINSTALL="${TOOLSTOINSTALL:-}"
 
 RELEASES_URL="https://github.com/astral-sh/uv/releases"
