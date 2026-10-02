@@ -60,8 +60,8 @@
 ## 5. Integration checks
 
 - [x] 5.1 Run `just check` and verify it passes
-- [ ] 5.2 Run `just test deno` and verify it passes on the two Debian-family images on amd64 per design.md; the four
+- [x] 5.2 Run `just test deno` and verify it passes on the two Debian-family images on amd64 per design.md; the four
       added images and all arm64 images run in CI
-- [ ] 5.3 Run `just test-scenarios deno` and verify every scenario passes
-- [ ] 5.4 Record the results of 5.1 to 5.3, the hand runs of design.md (Verifying failure scenarios), and each
+- [x] 5.3 Run `just test-scenarios deno` and verify every scenario passes
+- [x] 5.4 Record the results of 5.1 to 5.3, the hand runs of design.md (Verifying failure scenarios), and each
       Acceptance item and spec scenario with its result in the PR's Validation section
