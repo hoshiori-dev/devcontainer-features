@@ -116,6 +116,12 @@ neither an arm64 runner nor emulation.
   106 afterwards; `zypper --non-interactive refresh` exits 4 when any enabled repository fails;
   `zypper --non-interactive clean --all` leaves no file under `/var/cache/zypp`; in non-interactive mode zypper rejects
   a repository key the RPM database does not already hold.
+- Implementation verification on 2026-10-03 (Asia/Tokyo): `dnf clean all` on `almalinux:9` leaves empty repository
+  directories in addition to the four state files above; recursive inspection found no other file. The cache check
+  therefore checks contents, allowing empty directories, rather than rejecting directories themselves. On `fedora:44`,
+  `/usr/local/sbin` is a symlink to `bin`, so `command -v deno` returns `/usr/local/sbin/deno` because that PATH entry
+  comes first; `readlink -f` identifies the same `/usr/local/bin/deno` executable. The tests check the canonical path.
+  These corrections preserve the prerequisite-cache and installation-location contracts.
 - Image configuration (`docker buildx imagetools inspect`) [I]: `fedora:44`, `almalinux:9`, and `almalinux:8` set
   `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`; `opensuse/leap:16.0` sets no `Env`, so Docker's
   default `PATH` applies. Its `created` field (2025-08-26) is a fixed timestamp; its labels name a build of 2026-09-28.
@@ -175,8 +181,8 @@ neither an arm64 runner nor emulation.
   - `test.sh` on every compatibility image and architecture: `curl` and `unzip` through `command -v`, a CA bundle
     through the four paths, and no repository metadata or package file left: `/var/lib/apt/lists` holds nothing but
     `lock`, `partial`, and `auxfiles`, and `/var/cache/apt/archives` holds no `*.deb` (a bash glob, not `find`);
-    `/var/cache/dnf` and `/var/cache/libdnf5` hold no directory and no `*.rpm`, `*.solv`, or `repomd.xml` (dnf 4 keeps a
-    few state files after `dnf clean all`, Context); `/var/cache/zypp` holds no file;
+    `/var/cache/dnf` and `/var/cache/libdnf5` hold no repository metadata or downloaded package: empty directories are
+    allowed, and dnf 4 keeps only the four top-level state files named in Context; `/var/cache/zypp` holds no file;
   - the `build` scenario from `base:ubuntu24.04` whose Dockerfile saves the `dpkg-query -W` listing; its test compares
     that listing with the one after installation;
   - review of every package-manager call against Decisions, and the hand run "Package manager missing".

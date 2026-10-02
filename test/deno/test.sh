@@ -12,7 +12,7 @@ latest="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-er
 latest="${latest#v}"
 user="$(id -un)"
 
-check "deno resolves to /usr/local/bin/deno" test "$(command -v deno)" = /usr/local/bin/deno
+check "deno resolves to the installed /usr/local/bin/deno" test "$(readlink -f "$(command -v deno)")" = /usr/local/bin/deno
 check "deno reports the latest version ${latest}" bash -c "deno --version | head -n 1 | grep -qx 'deno ${latest} (.*'"
 check "deno runs code" bash -c "[ \"\$(deno eval 'console.log(1 + 1)')\" = 2 ]"
 check "DENO_NO_UPDATE_CHECK is 1" test "${DENO_NO_UPDATE_CHECK}" = 1
@@ -43,9 +43,12 @@ package_caches_clean() {
     for entry in /var/lib/apt/lists/*; do
         case "${entry##*/}" in lock | partial | auxfiles) ;; *) return 1 ;; esac
     done
-    for entry in /var/cache/apt/archives/*.deb /var/cache/dnf/* /var/cache/libdnf5/*; do
-        [ ! -d "${entry}" ] || return 1
-        case "${entry}" in *.rpm | *.solv | */repomd.xml) return 1 ;; esac
+    for entry in /var/cache/apt/archives/*.deb /var/cache/dnf/**/* /var/cache/libdnf5/**/*; do
+        [ -f "${entry}" ] || continue
+        case "${entry}" in
+            /var/cache/dnf/packages.db | /var/cache/dnf/expired_repos.json | /var/cache/dnf/tempfiles.json | /var/cache/dnf/.gpgkeyschecked.yum) ;;
+            *) return 1 ;;
+        esac
     done
     for entry in /var/cache/zypp/*; do
         [ ! -f "${entry}" ] || return 1

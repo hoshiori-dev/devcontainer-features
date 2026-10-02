@@ -13,7 +13,7 @@ latest="${latest#v}"
 check "the two installs used different versions" test "${VERSION}" != "${VERSION__DEFAULT}"
 check "deno reports the version latest resolved to (${latest})" bash -c \
     "deno --version | head -n 1 | grep -qx 'deno ${latest} (.*'"
-check "deno resolves to /usr/local/bin/deno" test "$(command -v deno)" = /usr/local/bin/deno
+check "deno resolves to the installed /usr/local/bin/deno" test "$(readlink -f "$(command -v deno)")" = /usr/local/bin/deno
 no_staging_file() {
     local entry
     for entry in /usr/local/bin/.deno.*; do
