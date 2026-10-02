@@ -155,7 +155,9 @@ neither an arm64 runner nor emulation.
 - `install.sh` is a single Bash script with `set -euo pipefail`. Supported images must already have Bash; the feature
   does not install it or provide custom errors on images without it. Platform checks run before option, prerequisite,
   and download handling. Distribution errors name the supported families. Checked by shellcheck, the compatibility
-  matrix, and the hand runs below.
+  matrix, and the hand runs below. A `main` function orders platform and option checks, prerequisites, version
+  resolution, verified downloads, and installation. Each step keeps its working variables local; only platform selection
+  and exit-trap state are shared.
 - `/usr/local/bin/deno` is replaced by a rename within `/usr/local/bin` from a uniquely named staging file there, never
   written in place and never moved across filesystems; downloads live in a `mktemp -d` directory; an `EXIT` trap removes
   both, so a failure leaves no stray file (spec: Failed installation leaves the previous Deno). Packages the package
