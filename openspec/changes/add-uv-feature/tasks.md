@@ -67,12 +67,14 @@ The package revision at `5c2f672` is approved. This list follows its group acces
 - [x] 4.1 Add the `runtime_python` scenario on the Ubuntu base image as `vscode` asserting "Runtime interpreter on the
       volume" (a `uv venv --managed-python` interpreter installed and resolving under `/var/lib/uv/python`) and
       "Workspace install across filesystems" (an install from the cache into an environment in the bind-mounted
-      workspace, on another filesystem than `/var/lib/uv`, prints no link-mode fallback warning); verify with shellcheck
-      and `just validate`
+      workspace, from a temporary cache on another filesystem, prints no link-mode fallback warning); verify with
+      shellcheck and `just validate`
 
-- [x] 4.2 Install the POSIX repair script outside the tool tree, root-owned 0755, and implement the whole-volume
+- [ ] 4.2 Install the POSIX repair script outside the tool tree, root-owned 0755, and implement the whole-volume
       ownership check, including a verified listing on openSUSE without find; repair with passwordless sudo only, never
-      follow links, preserve modes, warn and exit 0 on failure. Verify shellcheck, test.sh and repair_volume.
+      follow links, preserve modes, warn and exit 0 on failure. Verify shellcheck, test.sh and repair_volume. Pending
+      decision: recursive chown clears setuid/setgid on executable files; the design records this but the requirement
+      also says that modes are preserved. The ordinary-mode and ownership tests pass.
 - [x] 4.3 Add changed_uid on Alpine with a remote UID unlike the hosts, asserting ownership changed and group access
       permits interpreter and tool operations. Verify just test-scenarios uv.
 - [x] 4.4 Add repair_volume on Ubuntu, covering foreign UID/cache offline reuse, root entries, fitting volume without
@@ -95,14 +97,14 @@ The package revision at `5c2f672` is approved. This list follows its group acces
 
 ## 6. Observations in throwaway containers
 
-- [ ] 6.1 Observe the failure scenarios with the methods the design names (a `uname` stub printing `riscv64`,
+- [x] 6.1 Observe the failure scenarios with the methods the design names (a `uname` stub printing `riscv64`,
       `photon:5.0`, a `curl` wrapper that alters or fails the `.sha256` request, `version` `9.9.9`, `_REMOTE_USER`
       naming no account, an unpublished tool, `version` `0.12.15` with one tool, the four group/account-tool failures,
       and each invalid `version` and `toolsToInstall` form) and record each result in the PR's Validation section
-- [ ] 6.2 Observe the `dnf`, `pacman`, and `zypper` prerequisite branches on `almalinux:10`, `archlinux:latest`, and
+- [x] 6.2 Observe the `dnf`, `pacman`, and `zypper` prerequisite branches on `almalinux:10`, `archlinux:latest`, and
       `opensuse/leap:16.0` with `tar` removed without its dependents, and record that `install.sh` installs `tar` and
       succeeds
-- [ ] 6.3 Install the feature twice in one container with identical options, and with two non-empty tool lists that list
+- [x] 6.3 Install the feature twice in one container with identical options, and with two non-empty tool lists that list
       one tool again with another constraint, for non-root users on Ubuntu and Alpine, and record "Same options",
       "Different options", and "Tool listed again"
 - [x] 6.4 Build a throwaway, uncommitted local feature that installs after `uv`, runs `uv --version`, and fails unless
@@ -110,9 +112,9 @@ The package revision at `5c2f672` is approved. This list follows its group acces
 - [x] 6.5 Observe "Rebuild keeps a workspace environment" on a real rebuild of a changed-UID dev container and "Separate
       dev containers" on two dev containers on one Docker host, and record both
 
-- [ ] 6.6 Observe non-root group access after a UID change on Debian, AlmaLinux, Arch and openSUSE; existing-group reuse
+- [x] 6.6 Observe non-root group access after a UID change on Debian, AlmaLinux, Arch and openSUSE; existing-group reuse
       and outsider denial on Ubuntu and Alpine. Record each result.
-- [ ] 6.7 Observe fitting, foreign-owned and deep root-entry volumes as non-root on each other compatibility image,
+- [x] 6.7 Observe fitting, foreign-owned and deep root-entry volumes as non-root on each other compatibility image,
       including no sudo and the openSUSE listing; observe repair without group uv on Ubuntu. Record status, warning and
       preserved state.
 - [x] 6.8 Observe real container rebuilds changing remoteUser to accounts with and without passwordless sudo, with the

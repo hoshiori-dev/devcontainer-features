@@ -1,9 +1,10 @@
 ## What it installs
 
-- `uv` and `uvx` of the release `version` names, as `/usr/local/bin/uv` and `/usr/local/bin/uvx`: the glibc build on
-  glibc images and the static musl build on musl images, for x86_64 and aarch64. The release archive comes from GitHub
-  Releases and is checked against the SHA-256 published beside it before anything is installed; `latest` is resolved
-  from the redirect of `https://github.com/astral-sh/uv/releases/latest` at build time. No installer script runs.
+- `uv` and `uvx` from the release specified by `version`, as `/usr/local/bin/uv` and `/usr/local/bin/uvx`: the glibc
+  build on glibc images and the static musl build on musl images, for x86_64 and aarch64. The release archive comes from
+  GitHub Releases and is checked against the SHA-256 published beside it before anything is installed; `latest` is
+  resolved from the redirect of `https://github.com/astral-sh/uv/releases/latest` at build time. No installer script
+  runs.
 - The tools in `toolsToInstall`, with `uv tool install`, from uv's default sources (PyPI, and managed CPython builds
   from Astral), each download checked by uv. Tools need uv 0.12.16 or later, the first release that checks the hashes
   the package index supplies. Their environments live in `/usr/local/share/uv/tools`, their executables in
@@ -35,13 +36,13 @@ user at build time:
 
 Both survive a rebuild of the dev container, so a workspace `.venv/` keeps a working interpreter and packages install
 from the cache. The feature also sets `UV_TOOL_DIR=/usr/local/share/uv/tools`,
-`UV_TOOL_BIN_DIR=/usr/local/share/uv/bin`, and `UV_LINK_MODE=copy` (the cache and the workspace are always different
-filesystems), and puts `/usr/local/share/uv/bin` at the front of `PATH`, also in login shells through
+`UV_TOOL_BIN_DIR=/usr/local/share/uv/bin`, and `UV_LINK_MODE=copy` (so installs also work when the cache and workspace
+are on different filesystems), and puts `/usr/local/share/uv/bin` at the front of `PATH`, also in login shells through
 `/etc/profile.d/uv.sh`.
 
 - Interpreters installed at build time for tools are not on the volume, so runtime `uv python list` does not show them
   and `uv venv` downloads a matching version to the volume.
-- Tools installed at runtime live in the image and go with a rebuild; their interpreters on the volume stay.
+- Tools installed at runtime are lost on rebuild; their interpreters on the volume stay.
 - Docker copies the empty mount point's numeric owner, group, and mode into a new volume. For a non-root remote user,
   the feature creates a system group `uv`, adds only that user, and gives the volume and tool tree group write and
   setgid directories. This access survives the tooling's UID update. Root gets no group and root-only write access.
@@ -57,15 +58,15 @@ filesystems), and puts `/usr/local/share/uv/bin` at the front of `PATH`, also in
 - The volume grows as interpreters and cache entries accumulate. `uv cache prune` and `uv python uninstall <version>`
   shrink it; `docker volume rm uv-<devcontainerId>` removes it, also after the dev container itself is deleted.
 
-## When the volume no longer fits
+## When volume ownership changes
 
 A changed numeric UID or files written by root (`sudo uv` included) can leave uv reporting "Failed to initialize cache".
 Changing an account's name alone does not cause this. Rebuild after changing `remoteUser`: the feature checks the whole
 volume in `onCreateCommand`, before your creation commands. If the user can create files at its root and owns everything
 below it, it leaves the volume unchanged. Root skips the check. Otherwise, where the user already has passwordless sudo,
-it gives the volume and all its entries to that user, with group `uv` when present. It preserves modes and never follows
-symbolic links. It also changes ownership of any filesystem mounted below `/var/lib/uv`; avoid nesting a shared or host
-mount there.
+it gives the volume and all its entries to that user, with group `uv` when present. It never follows symbolic links. The
+recursive `chown` can clear setuid/setgid bits on executable files; setgid directories retain that bit. It also changes
+ownership of any filesystem mounted below `/var/lib/uv`; avoid nesting a shared or host mount there.
 
 Without sudo, with a password prompt, or if changing ownership fails, the feature warns and container creation
 continues. It adds no sudo rule. To repair manually, run `chown -hR <remote-uid>:<uv-gid> /var/lib/uv` as root inside

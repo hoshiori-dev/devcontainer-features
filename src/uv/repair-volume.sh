@@ -43,7 +43,8 @@ group=$(awk -F: '$1 == "uv" {print $3}' /etc/group)
 owner=$uid
 [ -z "$group" ] || owner="$uid:$group"
 # -h prevents even a command-line symlink from changing an external target; recursive chown
-# never follows links inside the volume. Modes and all paths outside the volume stay untouched.
+# never follows links inside the volume. It may clear setuid/setgid on executable files;
+# it changes no path outside the volume and runs no chmod.
 if ! reason=$(sudo -n chown -hR "$owner" "$volume" 2>&1); then
     warn "could not change the volume's owner: $reason"
 fi
