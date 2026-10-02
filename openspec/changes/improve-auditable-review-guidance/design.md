@@ -7,8 +7,9 @@ Copilot code review. The maintainer approved the implementation plan in this con
 
 ## Goals / Non-Goals
 
-- Keep each principle in one knowledge source; verify that AGENTS.md and the skill route to it.
-- Use an instruction-only skill and the existing AGENTS.md review route; verify that no runtime or workflow is added.
+- Keep each principle in one knowledge source; verify that the knowledge file is routed from AGENTS.md and referenced by
+  the skill.
+- Use an instruction-only skill and automatic skill discovery; verify that no runtime or workflow is added.
 - Preserve existing supply-chain rules byte-for-byte; compare the download guidance against the base.
 
 ## Decisions
@@ -29,8 +30,8 @@ https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/c
 
 ## Risks / Trade-offs
 
-Copilot selects skills dynamically; the AGENTS.md route supports discovery but local evaluation does not prove actual
-Copilot invocation. Report this limitation.
+Copilot selects skills dynamically from their descriptions. Local evaluation does not prove actual Copilot invocation.
+Report this limitation.
 
 Independent evaluation uses synthetic, visibly fictitious fixtures outside the repository. Outcome cases cover
 specification mismatch, deterministic tests and human documentation, and hidden execution/log exposure. Every case must

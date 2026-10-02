@@ -50,7 +50,6 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 | Issue → branch → draft PR → approval → ready → archive, any `gh` write, a failing run                  | `github-project-workflow` skill                 |
 | Proposing, applying, updating, or archiving an OpenSpec change                                         | OpenSpec skills (`openspec-*`, `/opsx:*`)       |
 | Reviewing changes or writing administration scripts and Actions                                        | `.agents/knowledge/review-guidance.md`          |
-| Performing Copilot code or pull-request review                                                         | `.github/skills/code-review/SKILL.md`           |
 
 ## Development Environment
 
