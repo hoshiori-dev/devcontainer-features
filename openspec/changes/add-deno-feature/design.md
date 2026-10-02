@@ -152,13 +152,10 @@ neither an arm64 runner nor emulation.
   so each failure scenario of Supported platforms, Option version, and Prerequisite packages downloads nothing; for
   Resolving latest only the pointer is fetched and no release archive is downloaded. Checked by the order in the scripts
   and the hand runs of those scenarios.
-- `install.sh` is POSIX `sh` with `set -eu` and holds only the platform checks, the family detection included; once they
-  pass it checks that `bash` exists, failing with a message naming it otherwise, and `exec`s `bash` on a script in
-  `src/deno/scripts/` that holds the rest with `set -euo pipefail` and receives the family as an argument, so an image
-  without bash still gets the platform message. Every rejection message about the distribution, an unreadable
-  `/etc/os-release` included, names the supported families. Checked by shellcheck in `just check`, review of every
-  message, and the hand runs on `alpine`, `cgr.dev/chainguard/wolfi-base`, `archlinux:latest`, `debian:9`, and
-  `linux/s390x` (Verifying failure scenarios).
+- `install.sh` is a single Bash script with `set -euo pipefail`. Supported images must already have Bash; the feature
+  does not install it or provide custom errors on images without it. Platform checks run before option, prerequisite,
+  and download handling. Distribution errors name the supported families. Checked by shellcheck, the compatibility
+  matrix, and the hand runs below.
 - `/usr/local/bin/deno` is replaced by a rename within `/usr/local/bin` from a uniquely named staging file there, never
   written in place and never moved across filesystems; downloads live in a `mktemp -d` directory; an `EXIT` trap removes
   both, so a failure leaves no stray file (spec: Failed installation leaves the previous Deno). Packages the package
@@ -292,12 +289,11 @@ neither an arm64 runner nor emulation.
   with `apk`, no bash, and no `getconf`. Rejected: matching the word `suse`, which would admit SUSE Linux Enterprise and
   BCI images nobody probed and whose repositories may not carry `unzip`; `opensuse` alone matches Leap (`suse opensuse`)
   and Tumbleweed (`opensuse suse`).
-- **Family from `ID`, then `ID_LIKE`, the first word naming one wins; `install.sh` passes it to the bash script.**
-  `debian` and `ubuntu` name the Debian family; `fedora`, `rhel`, and `centos` the Fedora family, which covers CentOS
-  Stream and UBI through `ID` and AlmaLinux, Rocky Linux, Oracle Linux, and Amazon Linux 2023 through `ID_LIKE`;
-  `opensuse` the openSUSE family. It follows the `glab` change's loop (Context). Rejected: probing for package-manager
-  commands, because images carry several (Fedora links `dnf`, `yum`, and `microdnf` to dnf5) and a manager alone does
-  not name a family (`tdnf`).
+- **Family from `ID`, then `ID_LIKE`, the first word naming one wins.** `debian` and `ubuntu` name the Debian family;
+  `fedora`, `rhel`, and `centos` the Fedora family, which covers CentOS Stream and UBI through `ID` and AlmaLinux, Rocky
+  Linux, Oracle Linux, and Amazon Linux 2023 through `ID_LIKE`; `opensuse` the openSUSE family. It follows the `glab`
+  change's loop (Context). Rejected: probing for package-manager commands, because images carry several (Fedora links
+  `dnf`, `yum`, and `microdnf` to dnf5) and a manager alone does not name a family (`tdnf`).
 - **`dnf` only in the Fedora family; no `microdnf`, no `yum` (maintainer decision, 2026-09-30).** Rejected: falling back
   to `microdnf` on minimal images, a different tool with different options whose `--setopt` support on EL8 to EL10 is
   unverified and which CI would cover in one generation only; the `dnf-packages` change rejects it too. On such an image
@@ -328,10 +324,10 @@ neither an arm64 runner nor emulation.
 - **Prerequisites from the family's package manager, only when missing, kept afterwards.** Rejected: Python's `zipfile`
   or busybox `unzip`, neither guaranteed in the images. Rejected: removing them afterwards, which could remove packages
   the user or another feature relies on.
-- **POSIX `sh` entry point, bash for the rest.** The maintainer chose bash; `install.sh` stays POSIX only so the
-  platform checks run on images that lack bash, and hands over with `exec bash`. Rejected: bash throughout, which fails
-  on stock Alpine before any check. Rejected: POSIX `sh` throughout, which gives up `pipefail` for the download and
-  verification logic.
+- **One Bash installation script; Bash must already exist (maintainer decision, 2026-10-02).** Development images
+  without Bash are outside the support boundary. The earlier POSIX entry point existed only to provide platform errors
+  on those images; removing that guarantee removes the need for a helper script. Bash retains arrays, regular
+  expressions, and `pipefail` for installation and verification.
 - **Platform checks from the system.** The C library check (`getconf GNU_LIBC_VERSION`) precedes every other check, so a
   musl image never gets a distribution or architecture message: no glibc version and a `/lib/ld-musl-*` loader give the
   musl message, no glibc version without one gives the "not identified" message. The other checks each give their own
@@ -411,7 +407,7 @@ recorded in the PR's Validation section. Rejected: a full local `just test deno`
 runs the same jobs on both architectures.
 
 The decision names neither the scenario job, which now also builds from `almalinux:9` (Supported images), nor the hand
-runs of Verifying failure scenarios, which pull `alpine`, `cgr.dev/chainguard/wolfi-base`, `archlinux:latest`,
+runs of Verifying failure scenarios, which use Alpine with Bash, Debian with `getconf` hidden, `archlinux:latest`,
 `debian:9`, and `almalinux:9` locally; both are Open Question 1.
 
 ## Verifying failure scenarios
@@ -432,8 +428,8 @@ environment variable of the feature redirects anything.
 | Release without both checksum files   | `version` `2.5.0`, `2.0.0`, and `1.46.3`                                                                                          |
 | Unknown version                       | `version` `9.9.9`                                                                                                                 |
 | Failure over an existing installation | Every wrapper run starts from an image where the feature already installed `2.8.0`; afterwards `deno --version` and both listings |
-| musl-based image                      | `alpine`                                                                                                                          |
-| C library not identified              | `cgr.dev/chainguard/wolfi-base`                                                                                                   |
+| musl-based image                      | `alpine` with Bash installed                                                                                                      |
+| C library not identified              | `debian:12` with `getconf` hidden                                                                                                 |
 | Unsupported distribution              | `archlinux:latest`                                                                                                                |
 | glibc older than 2.27                 | `debian:9` (glibc 2.24)                                                                                                           |
 | Unsupported architecture              | `almalinux:9` as `linux/s390x` under QEMU user emulation, when the host has it; otherwise recorded as checked by review only      |
@@ -539,9 +535,9 @@ Container CLI, not by the feature's scripts.
 
 1. The maintainer's verification decision names `just test deno` and two local images. Does `just test-scenarios deno`,
    which now includes a `build` scenario from `almalinux:9`, run locally as `rules.tasks` asks, or is it, like the added
-   images, verified by CI's scenario job only? And do the failure hand runs on `alpine`,
-   `cgr.dev/chainguard/wolfi-base`, `archlinux:latest`, `debian:9`, and `almalinux:9` (the last also as `linux/s390x`
-   and with `dnf` removed), which a failing build cannot move to CI, run locally?
+   images, verified by CI's scenario job only? And do the failure hand runs on Alpine with Bash, Debian with `getconf`
+   hidden, `archlinux:latest`, `debian:9`, and `almalinux:9` (the last also as `linux/s390x` and with `dnf` removed),
+   which a failing build cannot move to CI, run locally?
 
 The maintainer decided the other questions (Decisions: `installsAfter`, the three families, `dnf` only; Options: one
 spelling of an exact version; Supported images: `almalinux:8`; Verification).

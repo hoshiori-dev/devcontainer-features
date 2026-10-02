@@ -11,15 +11,14 @@
 
 ## 2. Install scripts
 
-- [x] 2.1 Write `src/deno/install.sh` in POSIX `sh` with `set -eu`, holding only the platform checks (C library first,
-      then the first matching family, glibc 2.27, architecture, bash) and handing over with `exec bash` to
-      `src/deno/scripts/`; verify with shellcheck and the hand runs on `alpine`, Wolfi, Arch, `debian:9`, and the
-      architecture branch by review when QEMU is absent (Verifying failure scenarios)
-- [x] 2.2 Write the bash script with `set -euo pipefail`: validate `version` before any network access, install missing
-      `curl`, a CA bundle, and `unzip` with apt, dnf, or zypper and clean the manager cache, resolve `latest` from the
-      pointer with its format check, and skip the download when `/usr/local/bin/deno` already reports the resolved
-      version; verify with the hand runs "Partial version rejected" and "Malformed latest-release pointer" and with the
-      tests of group 3
+- [x] 2.1 Use one Bash `src/deno/install.sh` with `set -euo pipefail`; require Bash in supported images and keep
+      platform checks before installation. Remove the helper; verify with shellcheck and the hand runs on Alpine with
+      Bash, Debian with `getconf` hidden, Arch, and `debian:9`; review the architecture branch when QEMU is absent
+- [x] 2.2 In the same Bash script with `set -euo pipefail`: validate `version` before any network access, install
+      missing `curl`, a CA bundle, and `unzip` with apt, dnf, or zypper and clean the manager cache, resolve `latest`
+      from the pointer with its format check, and skip the download when `/usr/local/bin/deno` already reports the
+      resolved version; verify with the hand runs "Partial version rejected" and "Malformed latest-release pointer" and
+      with the tests of group 3
 - [x] 2.3 Implement the verified download: both checksum files fetched first, a `HEAD` request telling a missing
       checksum file from an unknown version, the name field checked and the hash compared with the feature's own
       `sha256sum` for the archive before `unzip` and for the executable before staging, atomic rename within
@@ -61,8 +60,8 @@
 ## 5. Integration checks
 
 - [x] 5.1 Run `just check` and verify it passes
-- [x] 5.2 Run `just test deno` and verify it passes on the two Debian-family images on amd64 per design.md; the four
+- [ ] 5.2 Run `just test deno` and verify it passes on the two Debian-family images on amd64 per design.md; the four
       added images and all arm64 images run in CI
-- [x] 5.3 Run `just test-scenarios deno` and verify every scenario passes
-- [x] 5.4 Record the results of 5.1 to 5.3, the hand runs of design.md (Verifying failure scenarios), and each
+- [ ] 5.3 Run `just test-scenarios deno` and verify every scenario passes
+- [ ] 5.4 Record the results of 5.1 to 5.3, the hand runs of design.md (Verifying failure scenarios), and each
       Acceptance item and spec scenario with its result in the PR's Validation section

@@ -34,9 +34,9 @@ None.
 ## Impact
 
 - Feature ids touched: `deno`, new at version `1.0.0`.
-- Files: `src/deno/` (`devcontainer-feature.json`, `install.sh`, `scripts/`, `NOTES.md`, generated `README.md`),
-  `test/deno/` (`compatibility.json`, `test.sh`, `duplicate.sh`, `scenarios.json` with its scripts and `build` scenario
-  folders), and the root `README.md` (one row under "## Features"). `openspec/specs/deno/spec.md` appears at archive.
+- Files: `src/deno/` (`devcontainer-feature.json`, `install.sh`, `NOTES.md`, generated `README.md`), `test/deno/`
+  (`compatibility.json`, `test.sh`, `duplicate.sh`, `scenarios.json` with its scripts and `build` scenario folders), and
+  the root `README.md` (one row under "## Features"). `openspec/specs/deno/spec.md` appears at archive.
 - `test/deno/compatibility.json` lists the six images of design.md (Supported images), each on amd64 and arm64: twelve
   CI test jobs plus the scenario job.
 - Membership of `deno` in `test/canary.json` is left to the maintainer; this change does not touch that file.

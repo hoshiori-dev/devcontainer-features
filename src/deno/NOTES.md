@@ -38,6 +38,7 @@ prerequisites. A missing prerequisite requires that manager; `microdnf` and `yum
 
 ## OS support
 
-Debian, Fedora, and openSUSE families with glibc 2.27 or newer, on amd64 and arm64. Only current distribution releases
-are expected to work; end-of-life repositories may fail. Deno publishes no musl build, so Alpine is unsupported. Tested
-images: [test/deno/compatibility.json](../../test/deno/compatibility.json).
+Debian, Fedora, and openSUSE families with Bash preinstalled and glibc 2.27 or newer, on amd64 and arm64. The feature
+does not install Bash. Only current distribution releases are expected to work; end-of-life repositories may fail. Deno
+publishes no musl build, so Alpine is unsupported. Tested images:
+[test/deno/compatibility.json](../../test/deno/compatibility.json).

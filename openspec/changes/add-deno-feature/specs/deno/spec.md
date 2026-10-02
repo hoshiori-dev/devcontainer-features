@@ -204,21 +204,22 @@ the package manager it needs.
 ### Requirement: Supported platforms
 
 The feature SHALL support the images listed in `test/deno/compatibility.json`, and SHALL install only on images with
-glibc 2.27 or newer, on amd64 or arm64, whose `/etc/os-release` places them in a supported family: the Debian family
-(`debian` or `ubuntu`), the Fedora family (`fedora`, `rhel`, or `centos`), or the openSUSE family (`opensuse`). The
-first word of `ID`, then of `ID_LIKE`, that names a family decides it. On any other image it SHALL fail before
-downloading anything, with a message naming what is unsupported.
+Bash already installed and glibc 2.27 or newer, on amd64 or arm64, whose `/etc/os-release` places them in a supported
+family: the Debian family (`debian` or `ubuntu`), the Fedora family (`fedora`, `rhel`, or `centos`), or the openSUSE
+family (`opensuse`). The first word of `ID`, then of `ID_LIKE`, that names a family decides it. Images without Bash are
+unsupported; the feature SHALL NOT install Bash. On other unsupported images with Bash it SHALL fail before downloading
+anything, with a message naming what is unsupported.
 
 #### Scenario: musl-based image
 
-- **WHEN** the feature is installed on an image whose C library is musl
+- **WHEN** the feature is installed on an image with Bash whose C library is musl
 - **THEN** the installation fails with a message stating that Deno publishes glibc builds only, and nothing is
   downloaded
 
 #### Scenario: C library not identified
 
-- **WHEN** the feature is installed on an image that is not musl-based and on which `getconf GNU_LIBC_VERSION` reports
-  no glibc version, such as an image without `getconf`
+- **WHEN** the feature is installed on an image with Bash that is not musl-based and on which `getconf GNU_LIBC_VERSION`
+  reports no glibc version, such as an image without `getconf`
 - **THEN** the installation fails with a message stating that the C library could not be identified and that Deno needs
   glibc 2.27 or newer, and nothing is downloaded
 
