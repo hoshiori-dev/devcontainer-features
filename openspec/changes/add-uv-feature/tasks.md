@@ -71,13 +71,13 @@ the executable setuid/setgid clearing exception accepted in conversation on 2026
       workspace, from a temporary cache on another filesystem, prints no link-mode fallback warning); verify with
       shellcheck and `just validate`
 
-- [ ] 4.2 Install the POSIX repair script outside the tool tree, root-owned 0755, and implement the whole-volume
+- [x] 4.2 Install the POSIX repair script outside the tool tree, root-owned 0755, and implement the whole-volume
       ownership check, including a verified listing on openSUSE without find; repair with passwordless sudo only, never
       follow links, preserve ordinary permissions and directory setgid, allow executable setuid/setgid clearing without
       restoring it, warn and exit 0 on failure. Verify shellcheck, test.sh and repair_volume.
 - [x] 4.3 Add changed_uid on Alpine with a remote UID unlike the hosts, asserting ownership changed and group access
       permits interpreter and tool operations. Verify just test-scenarios uv.
-- [ ] 4.4 Add repair_volume on Ubuntu, covering foreign UID/cache offline reuse, root entries, fitting volume without
+- [x] 4.4 Add repair_volume on Ubuntu, covering foreign UID/cache offline reuse, root entries, fitting volume without
       sudo, failed sudo and chown, link targets, ordinary mode preservation, executable special-bit clearing and
       directory setgid preservation. Extend test.sh for a fresh fitting volume and root skip. Verify just test uv and
       just test-scenarios uv.
@@ -123,5 +123,5 @@ the executable setuid/setgid clearing exception accepted in conversation on 2026
 
 ## 7. Integration
 
-- [ ] 7.1 Run `just check`, `just test uv`, and `just test-scenarios uv`, and record the results with every Acceptance
+- [x] 7.1 Run `just check`, `just test uv`, and `just test-scenarios uv`, and record the results with every Acceptance
       item in the PR's Validation section

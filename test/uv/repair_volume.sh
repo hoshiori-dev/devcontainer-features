@@ -1,5 +1,5 @@
 #!/bin/sh
-# Scenario: filled-volume repair, failure paths, and preservation of modes and external targets.
+# Scenario: volume repair, failure paths, ordinary modes, special-bit clearing and external targets.
 set -e
 if [ -z "${FEATURE_TEST_BASH:-}" ]; then
     FEATURE_TEST_BASH=1 exec bash "$0" "$@"
@@ -55,16 +55,32 @@ check "failed chown leaves state unchanged" [ "$(sudo find "$volume" -printf '%P
 check "the filled volume is repaired" "$repair"
 # shellcheck disable=SC2016
 check "everything now has the user and group uv" sh -c 'test -z "$(find /var/lib/uv ! -uid "$(id -u)" -print -quit)" && test -z "$(find /var/lib/uv ! -group uv -print -quit)"'
-check "all modes stay unchanged" [ "$(snapshot)" = "$before" ]
+check "ordinary modes stay unchanged" [ "$(snapshot)" = "$before" ]
 check "external link targets stay unchanged" [ "$(stat -c '%u %g %a' /tmp/uv-repair-external-file /tmp/uv-repair-external-dir /tmp/uv-repair-external-dir/file)" = "$external_before" ]
 check "the preserved interpreter creates an offline environment" uv venv --offline --managed-python "$work/offline"
 check "the package installs from the preserved cache offline" uv pip install --offline --python "$work/offline/bin/python" pycowsay
 check "a further interpreter installs" uv python install 3.13
+special_dir="$volume/cache/special-modes"
+special_file="$special_dir/executable"
+mkdir "$special_dir"
+printf '%s\n' 'mode fixture' >"$special_file"
+sudo chown -hR 23457:23457 "$special_dir"
+# Set special bits after assigning the foreign owner, so the repair really encounters them.
+sudo chmod 2775 "$special_dir"
+sudo chmod 6755 "$special_file"
+check "the foreign executable starts with special bits" [ "$(stat -c %a "$special_file")" = 6755 ]
+check "the special-bit fixture is repaired" "$repair"
+check "chown clears executable special bits without restoring them" [ "$(stat -c %a "$special_file")" = 755 ]
+check "the directory retains setgid" [ "$(stat -c %a "$special_dir")" = 2775 ]
+check "the executable contents stay unchanged" [ "$(cat "$special_file")" = 'mode fixture' ]
+check "the executable gets the current user and group uv" [ "$(stat -c '%u %G' "$special_file")" = "$(id -u) uv" ]
 cat >"$work/stubs/sudo" <<'STUB'
 #!/bin/sh
 : >"$SUDO_RECORD"
 exit 1
 STUB
+chmod 6755 "$special_file"
+check "a fitting volume can hold executable special bits" [ "$(stat -c %a "$special_file")" = 6755 ]
 fits_before=$(foreign_snapshot)
 check "a fitting volume exits zero" env PATH="$work/stubs:$PATH" SUDO_RECORD="$work/called" "$repair" 2>"$work/warning"
 check "a fitting volume never runs sudo" test ! -e "$work/called"
