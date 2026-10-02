@@ -1,0 +1,52 @@
+{
+  "pinned_release": {
+    "image": "alpine:3.24",
+    "features": {
+      "uv": {
+        "version": "0.12.16"
+      }
+    }
+  },
+  "minimal_image": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "uv": {}
+    }
+  },
+  "tools": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "uv": {
+        "toolsToInstall": " pycowsay , , cowsay>=6 "
+      }
+    }
+  },
+  "runtime_python": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "uv": {}
+    }
+  },
+  "changed_uid": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "remoteUser": "developer",
+    "features": {
+      "uv": {
+        "toolsToInstall": "pycowsay"
+      }
+    }
+  },
+  "repair_volume": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "uv": {}
+    }
+  }
+}
