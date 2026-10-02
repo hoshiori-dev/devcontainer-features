@@ -21,7 +21,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 | Feature                                                     | Description                                                                                                                                |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [glab](src/glab/)                                           | The GitLab CLI, installed from its checksum-verified release archive with no authentication configured.                                    |
 | [`nvidia-container-toolkit`](src/nvidia-container-toolkit/) | Installs the NVIDIA Container Toolkit from NVIDIA's signed repository and registers its runtime with a Docker daemon in the dev container. |
+| [uv](src/uv/)                                               | Installs Astral's uv and uvx, optionally Python command-line tools, and keeps uv's interpreters and cache on a per-container volume.       |
 
 ## Development
 

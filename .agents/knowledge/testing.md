@@ -17,14 +17,23 @@ something unexpected (or skipped something you expected). CI job map: `.agents/k
 Test scripts run inside the built container: `source dev-container-features-test-lib`, then `check "<label>" <command>`
 per assertion and `reportResults` last.
 
+## Test intent and readability
+
+Tests run known logic in declared environments with expected inputs; they are not public input-processing products. Make
+setup, the action under test, and assertions easy to compare with the intended behavior. Add defensive handling only
+when the expected environment requires it or it clarifies the test's meaning. Invalid input is appropriate when it is
+the explicit subject of a test. Use the block-comment guidance in feature-authoring.md for shell readability. Security
+review of test execution follows review-guidance.md.
+
 ## Compatibility list
 
 `compatibility.json` is the single source of the images a feature supports; its spec refers to it and never lists
 images. Each entry is `{"image": "…"}` with optional `"arch": ["amd64", "arm64"]` (default amd64; arm64 runs on an arm64
 runner) and `"remoteUser"`. Every scenario `image` must be in the list for amd64, the architecture scenario jobs run on;
-a global scenario's image must be listed so by every feature it installs (`build` scenarios are exempt). Adding an image
-or architecture is a MINOR bump, dropping one MAJOR (`feature-authoring.md`); `just validate` checks the bump against
-the base. `duplicate.sh` is required unless the list sets `idempotencyExemption`, which a maintainer approves.
+a global scenario's image must be listed so by every feature it installs (`build` scenarios are exempt). Glab's version
+scenarios also run on native arm64 in CI; each scenario image must therefore list arm64 for glab too. Adding an image or
+architecture is a MINOR bump, dropping one MAJOR (`feature-authoring.md`); `just validate` checks the bump against the
+base. `duplicate.sh` is required unless the list sets `idempotencyExemption`, which a maintainer approves.
 
 ## Running tests locally
 
