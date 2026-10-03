@@ -65,3 +65,12 @@
 - [x] 5.3 Run `just test-scenarios deno` and verify every scenario passes
 - [x] 5.4 Record the results of 5.1 to 5.3, the hand runs of design.md (Verifying failure scenarios), and each
       Acceptance item and spec scenario with its result in the PR's Validation section
+
+## 6. Review fixes: existing tools group
+
+- [x] 6.1 Reject existing `deno` groups with unrelated supplementary or primary-group users, including the remote user's
+      primary group, before prerequisites or downloads; preserve safe group reuse and root/absent-user behavior
+- [x] 6.2 Add and run `test/deno/group_conflicts.sh` against the unmodified installer, verifying all three conflict
+      cases fail without network access or directory/group changes, and safe reuse, reinstall, and UID/GID remapping
+- [x] 6.3 Update the group rule in the design, delta spec, and NOTES.md; regenerate the README and run `just check`, the
+      two local compatibility images, and all scenarios; record the new verification in the PR

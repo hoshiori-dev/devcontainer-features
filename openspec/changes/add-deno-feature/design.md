@@ -254,24 +254,33 @@ neither an arm64 runner nor emulation.
   build time. Rejected: editing users' shell rc files, which non-login and non-interactive processes skip and which
   needs marker guards.
 - **Write access through a `deno` group (maintainer's CI report).** When `id -u` finds `_REMOTE_USER` and it is not
-  root, the feature creates a system group `deno` if it is missing, adds `_REMOTE_USER` to it if not yet a member, and
-  gives `/usr/local/share/deno` and `/usr/local/share/deno/bin` owner root, group `deno`, and mode 2775, so both are
-  group-writable and new entries inherit the group. Membership is recorded by name, so it survives the CLI's UID and GID
-  change (Context), as the node feature's `nvm` group does. When the remote user is root or absent, the feature creates
-  no group and both directories are owned by root with mode 0755. A second install re-applies the group, owner, and mode
-  to the two directories, never recursively, so tools already in `bin` keep their owner; creating the group and adding
-  the member happen only when missing. Checked by `test.sh`, `duplicate.sh`, and the `exact_version` scenario asserting
-  the owner, group, mode, and membership and installing a global tool as the remote user — on GitHub-hosted runners,
-  where the CLI's own change to UID 1001 applies — and by a scenario on `base:ubuntu24.04` (`remoteUser` `vscode`) whose
-  test changes `vscode`'s UID and GID with the same `/etc/passwd` and `/etc/group` edits as `updateUID.Dockerfile`
-  through the image's `sudo`, then installs a global tool as `vscode` in a new process, so the remap is covered on a
-  host whose UID is 1000 too; and by a `build` scenario from `almalinux:9` whose Dockerfile adds a user `devuser` with
-  `useradd -m` and names it `remoteUser`, asserting group `deno`, mode 2775, the membership, and a global tool installed
-  as `devuser`, so the group rule also runs outside Ubuntu, on dnf 4 only (every other added image runs as root; Risks).
-  Rejected: making the tree owned by the remote user, the approved rule, which the CLI's UID change breaks because it
-  chowns the home folder only. Rejected: mode 1777, which lets every user of the container write the directory on
-  `PATH`. Rejected: a lifecycle command that chowns the tree at container start, which runs as the remote user without
-  the privilege to chown a tree it does not own, and adds a lifecycle command to the metadata.
+  root, the feature first checks any existing `deno` group before prerequisites or downloads. It rejects supplementary
+  members other than `_REMOTE_USER` and any account using its GID as a primary group, including `_REMOTE_USER`: the CLI
+  remaps that user's primary GID without updating the tools directories. The error names the account and leaves
+  membership and the directories unchanged. An empty existing group or one containing only the remote user as a
+  supplementary member is reused. The feature creates a system group `deno` if it is missing, adds `_REMOTE_USER` to it
+  if not yet a member, and gives `/usr/local/share/deno` and `/usr/local/share/deno/bin` owner root, group `deno`, and
+  mode 2775, so both are group-writable and new entries inherit the group. Membership is recorded by name, so it
+  survives the CLI's UID and GID change (Context), as the node feature's `nvm` group does. When the remote user is root
+  or absent, the feature creates no group and both directories are owned by root with mode 0755. A second install
+  re-applies the group, owner, and mode to the two directories, never recursively, so tools already in `bin` keep their
+  owner; creating the group and adding the member happen only when missing. Checked by `test.sh`, `duplicate.sh`, and
+  the `exact_version` scenario asserting the owner, group, mode, and membership and installing a global tool as the
+  remote user — on GitHub-hosted runners, where the CLI's own change to UID 1001 applies — and by a scenario on
+  `base:ubuntu24.04` (`remoteUser` `vscode`) whose test changes `vscode`'s UID and GID with the same `/etc/passwd` and
+  `/etc/group` edits as `updateUID.Dockerfile` through the image's `sudo`, then installs a global tool as `vscode` in a
+  new process, so the remap is covered on a host whose UID is 1000 too; and by a `build` scenario from `almalinux:9`
+  whose Dockerfile adds a user `devuser` with `useradd -m` and names it `remoteUser`, asserting group `deno`, mode 2775,
+  the membership, and a global tool installed as `devuser`, so the group rule also runs outside Ubuntu, on dnf 4 only
+  (every other added image runs as root; Risks). Rejected: making the tree owned by the remote user, the approved rule,
+  which the CLI's UID change breaks because it chowns the home folder only. Rejected: mode 1777, which lets every user
+  of the container write the directory on `PATH`. Rejected: a lifecycle command that chowns the tree at container start,
+  which runs as the remote user without the privilege to chown a tree it does not own, and adds a lifecycle command to
+  the metadata. Review fix approved in conversation on 2026-10-04 (Asia/Tokyo): fail on existing-group conflicts instead
+  of granting unrelated accounts access or reusing a primary group. `test/deno/group_conflicts.sh` mounts the unmodified
+  installer into a Debian 12 container and verifies the three conflict cases before any package or download request,
+  safe reuse of an empty group, safe reinstall with supplementary membership after UID/GID remapping, and the
+  root/absent-user paths. It is a host-side test run directly; failing builds cannot be CLI feature scenarios.
 - **A feature-owned `/etc/profile.d/deno.sh` for login shells.** Debian's `/etc/profile` sets `PATH` from scratch, so a
   login shell on `debian:12` (`bash -l`) loses the `containerEnv` entry; the implementation found this while testing,
   and the maintainer chose this fix at the implementation review. The feature writes the whole file on every install
@@ -460,6 +469,8 @@ environment variable of the feature redirects anything.
   (Decisions).
 - **Users and groups:** one new system group, `deno`, created only for a non-root remote user; its only member the
   feature adds is the remote user, and it grants write access to `/usr/local/share/deno` and its `bin` only (Decisions).
+  Before reusing an existing group, its supplementary and primary-group users are checked to reject unrelated accounts
+  and the remote user's primary group; the check precedes package installation and Deno downloads.
 - **Idempotency:** Goals above; the spec's Installing twice requirement is what `duplicate.sh` and the two reinstall
   `build` scenarios assert. The group and the membership are created only when missing, and a second install re-applies
   the group, owner, and mode of the two directories (Decisions).

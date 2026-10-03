@@ -123,6 +123,30 @@ already there. When the remote user exists at build time and is not root, the fe
 and `/usr/local/share/deno/bin` writable by that user without elevated privileges, also after the Dev Container CLI
 changes that user's UID or GID to match the host; otherwise it SHALL leave them owned by root.
 
+For a non-root remote user, an existing `deno` group SHALL be reused only when it has no supplementary members other
+than that user and is not any account's primary group. A conflict SHALL fail before package installation or downloads,
+with a message naming the conflicting account, without changing group membership or the tools directories.
+
+#### Scenario: Existing group belongs to another account
+
+- **WHEN** a non-root remote user exists and another account is a supplementary member of `deno` or uses its GID as its
+  primary group
+- **THEN** installation fails before package installation or downloads, names the conflicting account, and leaves group
+  membership and the tools directories unchanged
+
+#### Scenario: Remote user has deno as its primary group
+
+- **WHEN** a non-root remote user exists and uses the existing `deno` group's GID as its primary group
+- **THEN** installation fails before package installation or downloads, explains the primary-group conflict, and leaves
+  group membership and the tools directories unchanged
+
+#### Scenario: Existing group is reserved for the feature
+
+- **WHEN** an existing `deno` group is no account's primary group and has no supplementary members other than the
+  non-root remote user
+- **THEN** installation succeeds, including when that group is empty, and the user retains tools access after UID/GID
+  remapping and a reinstall
+
 #### Scenario: Non-root remote user installs a global tool
 
 - **WHEN** the remote user is a non-root user that exists at build time and runs `deno install --global` on a local

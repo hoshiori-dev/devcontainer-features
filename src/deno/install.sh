@@ -171,6 +171,28 @@ resolve_version() {
     echo "${version}"
 }
 
+# Reject unrelated or remapped groups before prerequisites or downloads change the image.
+check_tools_group() {
+    local uid entry gid members member account _password _account_uid primary_gid _rest
+    if [[ -z "${_REMOTE_USER:-}" || "${_REMOTE_USER}" == root ]] ||
+        ! uid="$(id -u -- "${_REMOTE_USER}" 2>/dev/null)" || [[ "${uid}" == 0 ]]; then
+        return
+    fi
+    entry="$(getent group deno)" || return 0
+    IFS=: read -r account _password gid members <<<"${entry}"
+    [[ "${gid}" != "$(id -g -- "${_REMOTE_USER}")" ]] ||
+        fail "group deno is the primary group of '${_REMOTE_USER}'; use a separate primary group so UID/GID remapping preserves tools access."
+    local member_list=()
+    IFS=, read -r -a member_list <<<"${members}"
+    for member in "${member_list[@]}"; do
+        [[ "${member}" == "${_REMOTE_USER}" ]] || fail "group deno belongs to another account: ${member}. Use a group reserved for this feature."
+    done
+    while IFS=: read -r account _password _account_uid primary_gid _rest; do
+        [[ "${primary_gid}" != "${gid}" ]] ||
+            fail "group deno is the primary group of another account: ${account}. Use a group reserved for this feature."
+    done < <(getent passwd)
+}
+
 # Re-apply directory access without changing existing tools' ownership.
 setup_tools_root() {
     local group=root mode=0755 uid
@@ -294,6 +316,7 @@ main() {
     local requested="${VERSION-latest}" version
     check_platform
     validate_version "${requested}"
+    check_tools_group
 
     tmp="$(mktemp -d)"
     trap cleanup EXIT
