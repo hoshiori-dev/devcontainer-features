@@ -1,8 +1,8 @@
 # CI for pull requests and main. Static checks run on both. Container tests run only on pull
 # requests and only for the features the change affects (scripts/affected.ts): one job per
-# feature x compatibility image, one scenario job per feature, and the global scenarios when
-# needed. A new push to a pull request cancels its running CI. `ci-gate` is the single required
-# check; job map: .agents/knowledge/github/checks.md.
+# feature x compatibility image, one amd64 scenario job per feature, glab scenarios on arm64,
+# and the global scenarios when needed. A new push to a pull request cancels its running CI.
+# `ci-gate` is the single required CI check; job map: .agents/knowledge/github/checks.md.
 name: CI
 
 on:
@@ -116,6 +116,19 @@ jobs:
           mode: scenarios
           feature: ${{ matrix.feature }}
 
+  test-glab-scenarios-arm64:
+    name: scenarios (glab, arm64)
+    needs: plan
+    if: contains(fromJSON(needs.plan.outputs.scenarios).*.feature, 'glab')
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/feature-test
+        with:
+          mode: scenarios
+          feature: glab
+
   test-global:
     needs: plan
     if: needs.plan.outputs.global == 'true'
@@ -129,7 +142,7 @@ jobs:
 
   ci-gate:
     if: always()
-    needs: [lint, scripts, validate, spec, plan, test, test-scenarios, test-global]
+    needs: [lint, scripts, validate, spec, plan, test, test-scenarios, test-glab-scenarios-arm64, test-global]
     runs-on: ubuntu-24.04
     steps:
       - name: Fail when any job failed or was cancelled
