@@ -1,0 +1,26 @@
+{
+  "id": "deno",
+  "version": "1.0.0",
+  "name": "Deno",
+  "description": "Installs the Deno CLI, verified against its published checksums, with a shared PATH location for tools installed with deno install --global.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/deno",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": [
+        "latest",
+        "2.8.0"
+      ],
+      "default": "latest",
+      "description": "Deno version to install: latest, or an exact release version MAJOR.MINOR.PATCH (2.7.14, or 2.8.0 and later)."
+    }
+  },
+  "containerEnv": {
+    "DENO_INSTALL_ROOT": "/usr/local/share/deno",
+    "DENO_NO_UPDATE_CHECK": "1",
+    "PATH": "${PATH}:/usr/local/share/deno/bin"
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ]
+}
