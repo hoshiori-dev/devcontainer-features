@@ -206,6 +206,18 @@ async function refuses(c: Container, t: Asserter, entries: string[]): Promise<vo
 
 const CHECKS: Check[] = [
     {
+        scenario: "Suggested packages are left out when the image enables them",
+        on: "apt",
+        network: "bridge",
+        async run(c, t) {
+            await c.text("printf 'APT::Install-Suggests \"true\";\\n' >/etc/apt/apt.conf.d/99-test-suggests");
+            const before = await c.installed("readline-doc");
+            t.exit(await c.install("bc"), 0, "bc with suggests enabled in the image");
+            t.ok(await c.installed("bc"), "bc is not installed");
+            t.ok((await c.installed("readline-doc")) === before, "suggested readline-doc was installed");
+        },
+    },
+    {
         scenario: "Omitted packages",
         on: "apt",
         network: "none",
@@ -325,6 +337,43 @@ const CHECKS: Check[] = [
         async run(c, t) {
             t.exit(await c.install("g++"), 0, "g++");
             t.ok(await c.installed("g++"), "g++ is not installed");
+        },
+    },
+    {
+        scenario: "Unknown name ending in plus fails",
+        on: "apt",
+        network: "bridge",
+        async run(c, t) {
+            const status = await c.dpkgStatus();
+            t.exit(await c.install("file,bc+"), "nonzero", "unknown exact name bc+");
+            t.ok(!(await c.installed("bc")), "bc was installed through the plus marker");
+            t.ok((await c.dpkgStatus()) === status, "dpkg's status file changed");
+        },
+    },
+    {
+        scenario: "Unknown version ending in plus fails",
+        on: "apt",
+        network: "bridge",
+        async run(c, t) {
+            await c.text("apt-get update -qq --error-on=any >/dev/null");
+            const candidate = await c.text("apt-cache policy bc | sed -n 's/^  Candidate: //p'");
+            const status = await c.dpkgStatus();
+            const entry = `bc=${candidate}+`;
+            t.ok(
+                (await c.sh(`apt-cache show '${entry}' 2>/dev/null | grep -Fx 'Version: ${candidate}+'`)).code !== 0,
+                "the version with an appended plus exists, so the failure premise is false",
+            );
+            t.exit(await c.install(`file,${entry}`), "nonzero", entry);
+            t.ok((await c.dpkgStatus()) === status, "dpkg's status file changed");
+        },
+    },
+    {
+        scenario: "Virtual package with one provider installs",
+        on: "apt",
+        network: "bridge",
+        async run(c, t) {
+            t.exit(await c.install("libz-dev"), 0, "libz-dev");
+            t.ok(await c.installed("zlib1g-dev"), "the provider zlib1g-dev is not installed");
         },
     },
     {
@@ -478,6 +527,19 @@ grep -c "^Signed-By: $wrong$" /etc/apt/sources.list.d/*.sources | awk -F: '{n +=
             t.exit(await c.install("bc"), 0, "first install of bc");
             t.exit(await c.install("file"), 0, "second install of file");
             t.ok((await c.installed("bc")) && (await c.installed("file")), "bc and file are not both installed");
+        },
+    },
+    {
+        scenario: "Conflicting package fails without removal; Conflicting list on the second install",
+        on: "apt",
+        network: "bridge",
+        async run(c, t) {
+            t.exit(await c.install("chrony"), 0, "first install of chrony");
+            const status = await c.dpkgStatus();
+            t.exit(await c.install("openntpd"), "nonzero", "conflicting second install of openntpd");
+            t.ok(await c.installed("chrony"), "chrony was removed");
+            t.ok(!(await c.installed("openntpd")), "openntpd was installed");
+            t.ok((await c.dpkgStatus()) === status, "dpkg's status file changed");
         },
     },
     {

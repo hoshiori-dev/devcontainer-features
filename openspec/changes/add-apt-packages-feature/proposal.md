@@ -44,6 +44,10 @@ None.
 
 ## Acceptance
 
+The maintainer approved the review corrections in conversation on 2026-10-04: installations may not remove existing
+packages; conflicting lists fail without changing installed packages; exact actual and virtual names and pinned versions
+are checked before installation, including trailing `+`. The first release remains `1.0.0`.
+
 **Becomes true:**
 
 - Every scenario in `specs/apt-packages/spec.md` passes in the test named for it in `design.md` (Test plan), and the

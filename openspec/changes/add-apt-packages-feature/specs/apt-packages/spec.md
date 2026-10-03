@@ -47,6 +47,15 @@ package and its dependencies only from the repositories configured in the image.
 listed package only recommends or suggests, and SHALL NOT upgrade installed packages other than the listed packages and
 what they need.
 
+The feature SHALL NOT remove any installed package to satisfy a listed package or its dependencies. When the requested
+installation requires removal, it SHALL fail before changing any installed package.
+
+#### Scenario: Conflicting package fails without removal
+
+- **WHEN** a listed package conflicts with a package already installed in the image
+- **THEN** the feature exits with a non-zero status, installs none of the listed packages, and leaves the installed
+  packages unchanged
+
 #### Scenario: Listed packages are installed
 
 - **WHEN** `packages` names two packages that the image's repositories offer and that are not installed
@@ -137,6 +146,25 @@ The feature SHALL install a package for an entry only when the entry's package n
 name of a package known to the image's repositories. An entry SHALL NOT be matched as a regular expression, a glob, a
 task, or an APT search pattern. An entry that names a virtual package installs the package that provides it when exactly
 one package does, and fails when several do.
+
+The feature SHALL check every accepted entry's exact package name against APT's known actual and virtual names after the
+index is ready and before installation. A pinned version SHALL match an available version exactly; a trailing `+` SHALL
+NOT be interpreted as an install marker in a name or version.
+
+#### Scenario: Unknown name ending in plus fails
+
+- **WHEN** `packages` contains `bc+`, which is not a known package name, alongside an available package
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages, including `bc`
+
+#### Scenario: Unknown version ending in plus fails
+
+- **WHEN** `packages` pins a package to an available version followed by `+`, and that resulting version is unavailable
+- **THEN** the feature exits with a non-zero status and leaves installed packages unchanged
+
+#### Scenario: Virtual package with one provider installs
+
+- **WHEN** `packages` names a virtual package with exactly one available provider
+- **THEN** the feature succeeds and installs that provider
 
 #### Scenario: Unknown package fails
 
@@ -233,9 +261,10 @@ After installing, the feature SHALL leave neither downloaded package files nor p
 
 ### Requirement: Installing the feature twice
 
-Installing the feature a second time SHALL leave installed every package that either installation listed, and SHALL
-treat the second list as a first installation would. The second installation MAY upgrade an installed package that its
-list names without a version, or that a package of its list needs.
+Installing the feature a second time SHALL treat the second list as a first installation would. When successful, it
+SHALL leave installed every package that either installation listed. If the second list requires removal of an installed
+package, it SHALL fail without changing installed packages. The second installation MAY upgrade an installed package
+that its list names without a version, or that a package of its list needs.
 
 #### Scenario: Same list on the second install
 
@@ -244,8 +273,15 @@ list names without a version, or that a package of its list needs.
 
 #### Scenario: Different list on the second install
 
-- **WHEN** the feature is installed a second time with `packages` naming different packages than the first time
+- **WHEN** the feature is installed a second time with `packages` naming different packages than the first time, and the
+  packages can coexist without removing an installed package
 - **THEN** the second installation succeeds and the packages of both lists are installed
+
+#### Scenario: Conflicting list on the second install
+
+- **WHEN** the feature first installs `chrony` and a second installation lists the conflicting package `openntpd`
+- **THEN** the second installation fails, `chrony` stays installed, `openntpd` is not installed, and installed packages
+  are unchanged
 
 #### Scenario: Pin below the installed version on the second install
 

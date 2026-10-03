@@ -83,10 +83,10 @@ rate-limited the check; both registries serve the index digest
   `--allow-change-held-packages`, `--allow-remove-essential`, `--force-yes`, or an `-o` that sets their configuration
   items, `Acquire::Check-Valid-Until`, `Acquire::AllowWeakRepositories`, or
   `Acquire::AllowDowngradeToInsecureRepositories`. Every `apt-get install` call carries `-y`, `--no-install-recommends`,
-  `-o APT::Cmd::Pattern-Only=true`, and dpkg's `--force-confdef` and `--force-confold`, and runs with
-  `DEBIAN_FRONTEND=noninteractive` in its own environment only. Checked by review of `install.sh` against this list, and
-  by the checks for "Entry is not matched as a regular expression", "Pin below the installed version on the second
-  install", and "Package that asks a question installs unattended".
+  `--no-remove`, `-o APT::Install-Suggests=false`, `-o APT::Cmd::Pattern-Only=true`, and dpkg's `--force-confdef` and
+  `--force-confold`, and runs with `DEBIAN_FRONTEND=noninteractive` in its own environment only. Checked by review of
+  `install.sh` against this list, and by the checks for "Entry is not matched as a regular expression", "Pin below the
+  installed version on the second install", and "Package that asks a question installs unattended".
 - The feature writes nothing itself except what `apt-get` and dpkg install, and removes only the package archive cache
   and the index lists. Checked by the direct check for "Apt configuration is unchanged", which compares `/etc/apt` and
   `/usr/share/keyrings` before and after installing packages that ship no file there, and by "Caches are removed".
@@ -122,18 +122,31 @@ rate-limited the check; both registries serve the index digest
   contain it. This refuses option injection (leading `-`), apt's removal marker (trailing `-`), local files and URLs
   (`/`, and a leading `.`), `name/release`, globs, regular-expression metacharacters other than `.` and `+`, task names
   (`^`), APT search patterns (leading `?` or `~`), upper-case names, whitespace, and every shell metacharacter. A
-  trailing `+` is accepted: APT resolves the whole argument as a name first, so `g++` installs `g++`, and a `+` marker
-  only ever means install. Rejected: the shared cross-manager expression `^[A-Za-z0-9][A-Za-z0-9._+:~=<>@/-]*$` from the
-  research brief, whose `/` admits URLs and paths and whose `<`, `>`, and `@` mean nothing to apt; refusing a trailing
-  `+` as the rule for the five installers first did, which refuses `g++` (Open question 1); letters of either case in
-  the name, which apt's case-insensitive fnmatch fallback resolves to a differently spelled package (Context);
-  validating by asking apt, which would run apt on unvalidated input.
-- **Exact names through `APT::Cmd::Pattern-Only`.** The allowlist cannot drop `.` and `+` (both appear in real names
-  such as `python3.11` and `libstdc++6`), and apt's regex fallback would then install whatever a mistyped name matches.
-  `-o APT::Cmd::Pattern-Only=true` confines that fallback to anchored expressions, which the allowlist already refuses.
-  The fnmatch fallback stays active, but with no wildcard and a lower-case name it can match only the exact name.
-  Virtual packages keep apt's own resolution. Rejected: checking each name with `apt-cache pkgnames` before installing,
-  a second code path that must agree with apt's own resolution; refusing `.`, which would refuse valid packages.
+  trailing `+` passes this syntactic check, but the exact-name and version checks below refuse an install marker, so
+  `g++` installs `g++` and `bc+` fails. Rejected: the shared cross-manager expression
+  `^[A-Za-z0-9][A-Za-z0-9._+:~=<>@/-]*$` from the research brief, whose `/` admits URLs and paths and whose `<`, `>`,
+  and `@` mean nothing to apt; refusing a trailing `+` as the rule for the five installers first did, which refuses
+  `g++` (Open question 1); letters of either case in the name, which apt's case-insensitive fnmatch fallback resolves to
+  a differently spelled package (Context); validating by asking apt, which would run apt on unvalidated input.
+- **Exact names and versions before installation.** After the index is ready, query `apt-cache pkgnames --all-names` for
+  each name and compare whole lines literally. `--all-names` includes virtual packages, whose provider selection remains
+  APT's. For a pinned entry, query `apt-cache show` and require an exact `Version:` field match. Validate the whole list
+  before installation. This preserves real names such as `g++` while refusing `bc+` and an unavailable version followed
+  by `+`, which APT otherwise interprets as an install marker. The maintainer approved this correction on 2026-10-04; it
+  supersedes the earlier rejection of an `apt-cache` pre-check and acceptance of `+` as a marker. Keep
+  `APT::Cmd::Pattern-Only` as an additional restriction on fallback matching. The allowlist cannot drop `.` and `+`
+  (both appear in real names such as `python3.11` and `libstdc++6`), and apt's regex fallback would then install
+  whatever a mistyped name matches. `-o APT::Cmd::Pattern-Only=true` confines that fallback to anchored expressions,
+  which the allowlist already refuses. The fnmatch fallback stays active, but with no wildcard and a lower-case name it
+  can match only the exact name. Virtual packages keep apt's own resolution. Rejected: relying only on `Pattern-Only`,
+  which still permits APT's trailing `+` install marker; refusing `.`, which would refuse valid packages.
+- **Never remove installed packages.** Every installation carries `--no-remove`; a dependency solution that removes any
+  installed package fails before dpkg changes anything. Compatible second lists still succeed; conflicting lists fail
+  while preserving the installed packages. Approved on 2026-10-04 after reproducing `chrony` being removed by a second
+  installation of `openntpd`. Rejected: accepting removals and weakening the installing-twice guarantee.
+- **Disable suggests explicitly.** `APT::Install-Suggests=false` enforces the existing requirement even when the image
+  enables suggests in its APT configuration. A direct check enables that setting and installs `bc`, asserting that its
+  suggested `readline-doc` is not added. `--no-install-recommends` alone leaves suggests enabled.
 - **Refresh only when no index exists, and strictly.** The index counts as present when `/var/lib/apt/lists` holds at
   least one `*_Packages*` file; then no refresh runs, and those lists are trusted even when they are stale or cover only
   some configured repositories (Open question 2). Otherwise `apt-get update --error-on=any` runs once. Rejected:
@@ -209,12 +222,13 @@ Each follows from a binding decision for the five installers and needs the maint
   needs nothing at container start. `DEBIAN_FRONTEND` is set for the `apt-get` processes only and does not persist into
   the container.
 - **Idempotency:** a second run validates, refreshes (the first run removed the lists), and installs its list; already
-  installed packages stay; unpinned listed packages and needed dependencies may be upgraded to their candidate versions;
-  a pin below the installed version fails because downgrades are never allowed. No `idempotencyExemption`.
-- **Failure behavior:** a refused entry and a missing `apt-get` exit 1 before anything changes; an unknown package, an
-  unavailable version, a virtual package with several providers, a failed refresh, a failed signature check, a held
-  package, or a refused downgrade exit with `apt-get`'s status 100, and dependency resolution fails before dpkg changes
-  anything.
+  installed packages stay; a conflicting list fails under `--no-remove`; unpinned listed packages and needed
+  dependencies may be upgraded to their candidate versions; a pin below the installed version fails because downgrades
+  are never allowed. No `idempotencyExemption`.
+- **Failure behavior:** a refused entry and a missing `apt-get` exit 1 before anything changes; a virtual package with
+  several providers, a failed refresh, a failed signature check, a held package, a conflicting package, or a refused
+  downgrade exit with `apt-get`'s status 100, and dependency resolution fails before dpkg changes anything. An
+  exact-name or version pre-check failure exits 1 before installation, after any required index refresh.
 
 ### Test plan
 
@@ -235,6 +249,8 @@ duplicate.sh.
 | Native architecture qualifier is installed                                                                                                                                 | Scenario with `:amd64`                                                                                                                                                                                  |
 | URL or path is refused; Option-like entry is refused; Removal marker is refused; Upper-case package name is refused; Shell metacharacters and inner whitespace are refused | Direct, each also asserting no index and an unchanged dpkg status; the upper-case check uses a real name with one letter upper-cased, such as `Python3.11`                                              |
 | Package name ending in plus is installed                                                                                                                                   | Direct, with `g++`                                                                                                                                                                                      |
+| Unknown name ending in plus fails; Unknown version ending in plus fails; Virtual package with one provider installs                                                        | Direct, checking the complete dpkg status for failures and the installed provider for success                                                                                                           |
+| Conflicting package fails without removal; Conflicting list on the second install                                                                                          | Direct: install `chrony`, request `openntpd`, and compare the complete dpkg status before and after the refused install                                                                                 |
 | Unknown package fails; Entry is not matched as a regular expression; Virtual package with several providers fails; No version for the image's architecture                 | Direct                                                                                                                                                                                                  |
 | Image without apt-get fails clearly                                                                                                                                        | Direct on `alpine:3.22` (Docker Hub official image, outside the compatibility list, no `apt-get`; 3.22.6, `sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8` on 2026-09-30)      |
 | Missing index is refreshed                                                                                                                                                 | Every scenario and duplicate.sh run with a non-empty list on the plain images, which ship no index                                                                                                      |
@@ -326,7 +342,8 @@ None open. The maintainer resolved these at the package gate on 2026-09-30, each
    `+`, although APT resolves the exact name `g++` before it would read `+` as an install marker, and a `+` marker only
    ever means install. Resolved: a trailing `+` is accepted and a trailing `-` stays refused (requirement "Entries are
    validated before anything changes", scenarios "Removal marker is refused" and "Package name ending in plus is
-   installed").
+   installed"). Superseded on 2026-10-04: accept a trailing `+` only as part of an exact known name or available
+   version, never as APT's install marker (decision "Exact names and versions before installation").
 2. **Stale index lists.** Refreshing only when no index exists trusts lists an image already ships, however old or
    partial. Resolved: the rule stays, since the supported images ship none and a refresh on every run costs a download
    for the images that do; the spec states it (requirement "Package index refresh") and NOTES.md documents it. Rejected:

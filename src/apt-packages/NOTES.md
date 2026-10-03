@@ -27,7 +27,9 @@ of only commas, installs nothing and succeeds on any image. Each entry is one of
 The feature refuses, before it changes anything, any entry holding `/` (paths, URLs, `name/release`), an entry starting
 with `-` or ending in `-`, upper case in the package name, whitespace inside an entry, and any character outside those
 above, such as a shell metacharacter, a glob, or an APT search pattern. An entry is never matched as a regular
-expression, glob, or task: a name that is not an exact package name fails.
+expression, glob, or task: a name that is not an exact actual or virtual package name fails. A trailing `+` is accepted
+only as part of an exact name or version, so `g++` works but `bc+` does not mean `bc`. Every name and pinned version is
+checked after the index is ready and before any package is installed.
 
 ## Package index
 
@@ -50,10 +52,12 @@ removes the downloaded packages and every index list.
 
 ## Installing twice
 
-A second installation installs its own list the same way, and every package either list named stays installed. A package
-listed without a version, or one a listed package needs, may be upgraded to the version the repositories now offer; pin
-`name=version` for a stable result. A version below the installed one fails, because the feature never downgrades. The
-feature never overrides a package hold or an APT pin the image set.
+A second installation installs its own list the same way, and every package either list named stays installed on
+success. The feature never removes installed packages: if an installation requires removal to resolve a conflict, it
+fails before changing installed packages. For example, installing `openntpd` after `chrony` fails and leaves `chrony`
+installed. A package listed without a version, or one a listed package needs, may be upgraded to the version the
+repositories now offer; pin `name=version` for a stable result. A version below the installed one fails, because the
+feature never downgrades. The feature never overrides a package hold or an APT pin the image set.
 
 ## OS support
 

@@ -96,8 +96,30 @@ else
   apt-get update --error-on=any
 fi
 
+# APT treats a trailing '+' on an unknown name or version as an install marker. Check exact names
+# (including virtual packages) and version fields before installing any entry; real names such as
+# g++ remain valid. These lookups use the index selected above and never refresh it themselves.
+for entry do
+  name=${entry%%[=:]*}
+  if ! apt-cache pkgnames --all-names "$name" | grep -Fxq -- "$name"; then
+    fail "no exact package name for the entry '$entry'."
+  fi
+  case $entry in
+    *=*)
+      version=${entry#*=}
+      if ! apt-cache show -- "$entry" | awk -v version="$version" '
+        $1 == "Version:" && $2 == version { found = 1 }
+        END { exit !found }
+      '; then
+        fail "no exact package version for the entry '$entry'."
+      fi
+      ;;
+  esac
+done
+
 echo "apt-packages: installing $*"
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --no-remove \
+  -o APT::Install-Suggests=false \
   -o APT::Cmd::Pattern-Only=true \
   -o Dpkg::Options::=--force-confdef \
   -o Dpkg::Options::=--force-confold \
