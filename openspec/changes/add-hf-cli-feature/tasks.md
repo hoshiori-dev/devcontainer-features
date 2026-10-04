@@ -22,5 +22,5 @@
 - [x] 3.1 Keep uv_and_hf_cli as an explicit optional composition; verify `just test-global` and empty/non-empty
       mounted-volume observations.
 - [x] 3.2 Re-run all failure and proxy observations for the revised paths, and record results against Acceptance.
-- [ ] 3.3 Review implementation against the revised spec and URL inventory, run `just check`, verify selected CI jobs,
+- [x] 3.3 Review implementation against the revised spec and URL inventory, run `just check`, verify selected CI jobs,
       and update the PR description for joint specification and implementation review.
