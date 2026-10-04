@@ -544,6 +544,18 @@ chmod +x "/tmp/bin/$1"`,
         },
     },
     {
+        name: "Current metadata is kept during the default native refresh",
+        async run(c) {
+            await c.setup("zypper --non-interactive refresh");
+            const hash =
+                'for f in /var/cache/zypp/raw/*/repodata/*; do [ ! -f "$f" ] || sha256sum "$f"; done | sort | sha256sum';
+            const before = await c.setup(hash);
+            const result = await c.succeeds("bc", { cleanup: "none" });
+            assert(result.text.includes("is up to date"), "native refresh did not report current metadata");
+            assert(await c.setup(hash) === before, "default replaced current raw metadata");
+        },
+    },
+    {
         name: "Recommendations are excluded by default and enabled on a later invocation",
         async run(c) {
             await c.succeeds("less", { cleanup: "none" });
