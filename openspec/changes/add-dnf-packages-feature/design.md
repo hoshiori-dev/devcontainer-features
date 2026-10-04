@@ -112,20 +112,14 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
 - Every entry is validated before the `dnf` check and any `dnf` call, so a refused list leaves the image untouched.
   Checked by the direct refusal checks, which also assert that `dnf`'s cache still holds no repository metadata and that
   `rpm -qa` is unchanged.
-- The `dnf install` call carries `-y`, `--setopt=install_weak_deps=False`, and `--` before the entries, and nothing
-  else. In particular never `--nogpgcheck`, `--no-gpgchecks`, `--allowerasing`, `--skip-broken`, `--skip-unavailable`,
-  `--nobest`, `--best`, `--refresh`, `--enablerepo`, `--disablerepo`, `--repo`, `--repofrompath`, `--releasever`,
-  `--forcearch`, `--installroot`, or another `--setopt` (none of `gpgcheck`, `pkg_gpgcheck`, `repo_gpgcheck`,
-  `localpkg_gpgcheck`, `sslverify`, `skip_if_unavailable`, `strict`, `skip_unavailable`, `best`, `allow_downgrade`, or
-  `keepcache`). The only other `dnf` call is `dnf clean all`. Checked by review of `install.sh` against this list, and
-  by the checks for "Weak dependencies are left out", "Conflict with an installed package fails", and "Unverifiable
-  package fails".
-- The feature writes nothing itself except what `dnf` and rpm install, and removes only what `dnf clean all` removes.
-  Checked by the direct check for "Dnf configuration is unchanged", which compares `/etc/yum.repos.d`, `/etc/dnf`,
-  `/etc/pki/rpm-gpg`, and `rpm -q gpg-pubkey` before and after installing packages that ship no file there, and by
-  "Caches are removed".
-- The refresh decision stays with `dnf`: the script holds no refresh logic and passes no refresh option. Checked by
-  review and by the direct check for "Unexpired metadata is used as is" (Test plan).
+- The package-manager invocation is bounded by the declared phase 1 controls below; all undeclared security, repository,
+  solver, and removal overrides remain forbidden. Checked by review of native arguments and option scenarios.
+- The feature writes nothing itself except what `dnf` and rpm install, and limits explicit removal to the cleanup policy
+  below. Checked by the direct check for "Dnf configuration is unchanged", which compares `/etc/yum.repos.d`,
+  `/etc/dnf`, `/etc/pki/rpm-gpg`, and `rpm -q gpg-pubkey` before and after installing packages that ship no file there,
+  and by "Caches are removed".
+- Refresh default keeps the native decision; explicit policies use only the phase 1 bounds below. Checked by default and
+  explicit-refresh scenarios.
 - The `packages` option's `proposals` are lists installable on every image in the compatibility list and installed on
   none of them, with at least two entries, so the CLI's install-twice test installs real packages. Checked by
   `just test dnf-packages`.
@@ -140,7 +134,8 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
   different options.
 - Red Hat's own images with `dnf` and the RHEL 10 generation: none was checked or is tested in this change (Open
   question 7).
-- An option for weak dependencies, repositories, or keeping the cache; users list extra packages explicitly.
+- Repository selection, best-version policy, retries, download concurrency, erasure, and new downgrade controls; phase 2
+  and phase 3 track these separately.
 - Checking the architecture: the feature downloads nothing architecture-specific, and `dnf` resolves packages for the
   image's architecture; the compatibility list names the architectures that are tested.
 
@@ -180,20 +175,9 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
   (decision "Native behavior first"); `dnf` documents that a pinned install moves the package to that version, up or
   down. Rejected: refusing a pin below the installed version, which needs an RPM version comparison in `sh` for every
   entry, since dnf5's `allow_downgrade` covers dependencies only and dnf 4 has no such option (Open question 1).
-- **Weak dependencies off by `--setopt=install_weak_deps=False`.** The same spelling works in both generations and
-  overrides only that option for this call. Rejected: an option to keep them (users list them).
-- **Metadata refresh left to `dnf`, and the image's `skip_if_unavailable` honored.** `dnf` already downloads metadata
-  only when its configuration considers it missing or expired (`metadata_expire` and `check_config_file_age`, Context),
-  which is the "only when needed" rule; the images hold none, so a first run always downloads. Repositories the image
-  marks skippable stay skippable. Rejected: `--refresh` or `dnf makecache` on every run, which re-downloads metadata
-  `dnf` would reuse; forcing `skip_if_unavailable=False` for every repository, which overrides Fedora's own choice for
-  its Cisco OpenH264 repository (Open question 2).
 - **No erasing to resolve conflicts.** Without `--allowerasing`, a listed package that conflicts with an installed one
   fails instead of silently removing, for example, `curl-minimal` or `coreutils`. Rejected: `--allowerasing`, which lets
   an install remove packages the image relies on.
-- **Clean with `dnf clean all`.** It removes the metadata and packages of the cache directory each generation uses
-  (`/var/cache/libdnf5`, `/var/cache/dnf`). Rejected: deleting cache paths by hand, which must track two layouts;
-  keeping the metadata, which a later feature would reuse without the feature's knowledge.
 - **Detect by binary, describe by `/etc/os-release`.** Support means `dnf` is on the `PATH`; `/etc/os-release` is read
   only to name the detected distribution in the failure message. This deviates from `feature-authoring.md` (Deviations).
   Rejected: an `ID` allowlist, which would refuse CentOS Stream, Oracle Linux, or Amazon Linux with a working `dnf`
@@ -219,21 +203,71 @@ running `dnf` as root in throwaway containers of `fedora:44` (image built 2026-0
   that carries a first install, which cannot reach `src/` from its context; extending `scripts/test_feature.ts` with
   expected-failure scenarios, a test infrastructure change outside this change (Open question 4).
 
-### Options
+### Phase 1 installation controls
 
-The feature's only option; the delta spec's Option requirement states its contract.
+The option requirements are the source of truth. Defaults retain the existing installation behavior; declared controls
+override only their matching native setting for this invocation. Undeclared settings remain inherited. All inputs are
+validated before a package-manager call. An empty package list is a no-op with valid controls, including a non-default
+cleanup value. Numeric controls use string options because Features support boolean and string types.
 
-| Name       | Type     | Default | Enum or proposals              | Meaning                                                                                                                                                                                               |
-| ---------- | -------- | ------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages` | `string` | `""`    | proposals: `"bc"`, `"bc,file"` | Comma-separated entries (`name`, `name-[epoch:]version[-release]`, `name.architecture`) that `dnf` installs; whitespace around entries and empty entries are dropped, so a trailing comma is harmless |
+| Name              | Type      | Default     | Enum or proposals              | Meaning                                                                                              |
+| ----------------- | --------- | ----------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `packages`        | `string`  | `""`        | existing proposals             | Existing comma-separated native package entries; empty installs nothing.                             |
+| `installWeakDeps` | `boolean` | `false`     | none                           | Whether weak Recommends and Supplements are considered during dependency resolution.                 |
+| `refreshPolicy`   | `string`  | `"default"` | `["default","always","never"]` | Metadata refresh policy; default preserves this installer's existing behavior.                       |
+| `cleanup`         | `string`  | `"all"`     | `["all","packages","none"]`    | Feature cleanup after successful installation; retention by the package manager remains independent. |
+| `networkTimeout`  | `string`  | `""`        | none                           | Empty inherits native timeouts; otherwise a canonical decimal number of seconds from 1 through 3600. |
 
-- **Default `""`.** An empty list installs nothing and, because the empty check runs before the `dnf` check, succeeds on
-  any image, including one without `dnf` (decision "Validate, then the empty check, then the `dnf` check"). The
-  proposals are two lists installed on no supported image, so the install-twice test installs real packages (Goals).
-- **Rejected shapes:** an array (feature options are only `string` or `boolean`); options for repositories, groups, or
-  upgrades (out of scope); options for weak dependencies or keeping the cache (Non-Goals).
+Defaults: dependency and upgrade switches are false, refresh is default, cleanup is all, and timeout is empty. These
+retain the baseline resolution, cache size, and native timeout. Rejected: changing defaults, one cross-manager
+dependency/downgrade abstraction, arbitrary extraArgs/setopt/environment dictionaries, permanently editing
+configuration, or treating cleanup=none as a guarantee that downloads are retained.
+
+- Dependency selection uses `--setopt=install_weak_deps=True|False`, supported by DNF4 and DNF5.
+- Refresh default passes no refresh override. Always uses --refresh and a per-repository `*.skip_if_unavailable=False`
+  override so every enabled repository must load before a transaction. Never uses --cacheonly with the same strict
+  repository override; it needs cached packages as well as metadata. Reject a metadata-only never implementation based
+  only on metadata_expire: missing metadata would still be fetched.
+- Cleanup all uses `dnf clean all`; packages uses `dnf clean packages`; none skips explicit cleaning. Do not set
+  keepcache: native retention and feature cleanup are separate policies. Never plus all can consume a populated cache
+  once and remove it; a later never invocation can then fail.
+- Non-empty timeout uses `--setopt=timeout=N` and `--setopt=*.timeout=N` on the applicable network commands so
+  repository settings cannot silently mask the explicit value. Preserve minrate, best, countme, native pin downgrades,
+  and default skippable-repository decisions outside always/never. No arbitrary setopt, retries, repository selection,
+  or erasure is added.
+
+#### Verification bounds
+
+New controls need option scenarios on every supported package-manager generation, direct failure checks for invalid
+values and unavailable repositories, and two consecutive invocations with different control values. Test metadata
+retention separately from package retention, preserve sentinel files in unrelated caches, and assert that
+trust/configuration files are unchanged. Timeout tests inspect native arguments and exercise a stalled local test
+endpoint; they do not rely on a public mirror being slow. Existing scenarios apply to default controls and remain
+regression coverage.
+
+Package-manager settings and upstream source were checked against the official documents and, for DNF4 cache-only
+package behavior, its CLI/base source. New option paths have not been run in containers; their acceptance depends on the
+implementation checks. APK2/APK3 index reuse without refresh and Zypper's missing-cache refusal need explicit container
+checks before implementation is considered complete.
+
+Official references:
+
+https://dnf.readthedocs.io/en/latest/command_ref.html https://dnf.readthedocs.io/en/latest/conf_ref.html
+https://dnf5.readthedocs.io/en/latest/dnf5.8.html https://dnf5.readthedocs.io/en/latest/dnf5.conf.5.html
+
+#### Risks and deferred controls
+
+Keeping metadata increases image size and can expose stale candidates. Disabling refresh does not guarantee
+reproducibility or package availability; DNF cache-only additionally requires package files. Feature cleanup cannot undo
+native image hooks. New controls do not weaken signatures or TLS, override package holds, add repositories or keys, or
+permit conflict-driven removal. Refresh always is deliberately stricter than DNF's default for repositories the image
+marks skippable.
 
 ### Deviations from `feature-authoring.md`
+
+Phase 1 proposes a further deviation: selectable cleanup permits retaining metadata or skipping feature cleanup, whereas
+the baseline convention requires cleaning. The expanded package needs approval; no previous approval is claimed for
+these new controls.
 
 The maintainer accepted each for the five installers on 2026-10-01.
 
@@ -276,8 +310,8 @@ The maintainer accepted each for the five installers on 2026-10-01.
 - **Metadata:** none of `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`, `containerEnv`, lifecycle
   commands, `dependsOn`, or `installsAfter`: the feature runs once at build time as root, installs system-wide, and
   needs nothing at container start.
-- **Idempotency:** a second run validates, downloads metadata again (the first run cleaned it), and installs its list;
-  installed packages stay; unpinned listed packages are upgraded where the image sets `best=True`, and needed
+- **Idempotency:** a second run validates its own controls, selects metadata under its own refresh policy, and installs
+  its list; installed packages stay; unpinned listed packages are upgraded where the image sets `best=True`, and needed
   dependencies may be upgraded anywhere; a pinned version is installed up or down. No `idempotencyExemption`.
 - **Failure behavior:** a refused entry and a missing `dnf` exit 1 before anything changes; an unknown entry, an
   unavailable version or architecture, a conflict, a failed metadata download of a non-skippable repository, and a
@@ -285,6 +319,9 @@ The maintainer accepted each for the five installers on 2026-10-01.
   failed signature check can leave the key `dnf` imported for it in the keyring.
 
 ### Test plan
+
+The existing rows cover default-control regressions; the phase 1 verification bounds above add the new option and
+interaction checks.
 
 Where each scenario of `specs/dnf-packages/spec.md` is checked. "Scenario" means `scenarios.json`, run in CI on amd64 on
 the image each entry names; "test.sh" and "duplicate.sh" run in CI on every image and architecture of the compatibility
@@ -430,10 +467,10 @@ behavior first":
    still comes from the image's signed repositories; NOTES.md warns that a pin can downgrade a package and its
    dependencies. Rejected: refusing a pin below the installed version, which needs an RPM version comparison in the
    script.
-2. **Skippable repositories.** The feature honors a repository's `skip_if_unavailable`, which on Fedora lets an install
-   continue without the Cisco OpenH264 repository. Resolved: kept, because the image's maintainers chose it and the main
-   repositories are strict; NOTES.md states it. Rejected: failing on any enabled repository, as `apt-packages` does with
-   `--error-on=any`.
+2. **Skippable repositories (default policy).** The feature honors a repository's `skip_if_unavailable`, which on Fedora
+   lets an install continue without the Cisco OpenH264 repository. Resolved for refreshPolicy=default: kept, because the
+   image's maintainers chose it and the main repositories are strict; NOTES.md states it. Rejected as the default:
+   failing on any enabled repository, as `apt-packages` does with `--error-on=any`.
 3. **Program-name matching.** dnf5 installs a package for a program name such as `dig`; dnf 4 does not. Resolved:
    accepted as `dnf` behavior and documented in NOTES.md. Rejected: refusing entries that name no package, which needs a
    `dnf repoquery` call per entry.
@@ -464,3 +501,9 @@ behavior first":
    compatibility list holds Fedora and two RHEL 9 rebuilds, and neither a Red Hat image with `dnf` nor a RHEL 10 rebuild
    was checked. Resolved: ship with the three images and add those images in a follow-up MINOR change after checking
    their repositories. Does not change the spec.
+
+## Follow-up work
+
+Phase 2 is tracked in [#57](https://github.com/hoshiori-dev/devcontainer-features/issues/57). Phase 3 is tracked in
+[#62](https://github.com/hoshiori-dev/devcontainer-features/issues/62). These issues carry later requirements, outside
+this approval package.

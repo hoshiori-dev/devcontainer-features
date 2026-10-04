@@ -14,6 +14,106 @@ Upstream sources:
 
 ## ADDED Requirements
 
+### Requirement: Option installWeakDeps
+
+The feature SHALL accept the option `installWeakDeps` as declared here.
+
+| Field   | Value     |
+| ------- | --------- |
+| Type    | `boolean` |
+| Default | `false`   |
+
+#### Scenario: Omitted installWeakDeps
+
+- **WHEN** `installWeakDeps` is omitted
+- **THEN** the feature uses `false` as specified by the requirements below
+
+### Requirement: Option refreshPolicy
+
+The feature SHALL accept the option `refreshPolicy` as declared here.
+
+| Field   | Value                          |
+| ------- | ------------------------------ |
+| Type    | `string`                       |
+| Default | `"default"`                    |
+| Enum    | `["default","always","never"]` |
+
+#### Scenario: Omitted refreshPolicy
+
+- **WHEN** `refreshPolicy` is omitted
+- **THEN** the feature uses `"default"` as specified by the requirements below
+
+### Requirement: Option cleanup
+
+The feature SHALL accept the option `cleanup` as declared here.
+
+| Field   | Value                       |
+| ------- | --------------------------- |
+| Type    | `string`                    |
+| Default | `"all"`                     |
+| Enum    | `["all","packages","none"]` |
+
+#### Scenario: Omitted cleanup
+
+- **WHEN** `cleanup` is omitted
+- **THEN** the feature uses `"all"` as specified by the requirements below
+
+### Requirement: Option networkTimeout
+
+The feature SHALL accept the option `networkTimeout` as declared here.
+
+| Field   | Value    |
+| ------- | -------- |
+| Type    | `string` |
+| Default | `""`     |
+
+#### Scenario: Omitted networkTimeout
+
+- **WHEN** `networkTimeout` is omitted
+- **THEN** the feature uses `""` as specified by the requirements below
+
+### Requirement: Installation controls are validated before changes
+
+The feature SHALL validate `installWeakDeps`, `refreshPolicy`, `cleanup`, `networkTimeout` and all package entries
+before invoking any package-manager command or creating any cache. Boolean options SHALL accept only `true` or `false`;
+enum options SHALL accept only their declared values. A non-empty `networkTimeout` SHALL be a canonical ASCII decimal
+integer string from `1` through `3600`, with no sign, whitespace, leading zero, or other character. Invalid options
+SHALL fail with status 1 and a message naming the option. With valid options and an empty package list, the feature
+SHALL succeed without refreshing, upgrading, cleaning, or changing any configuration, also without the package manager.
+
+#### Scenario: Invalid control fails before any change
+
+- **WHEN** a control value is invalid, also when packages is empty
+- **THEN** the feature exits with status 1, names the option, and changes nothing
+
+#### Scenario: Empty list ignores installation controls
+
+- **WHEN** packages is empty and valid non-default controls are provided
+- **THEN** the feature succeeds without invoking the package manager or touching any cache
+
+#### Scenario: Timeout boundaries are validated
+
+- **WHEN** networkTimeout is empty, 1, or 3600, or an invalid value such as 0, 3601, 01, or shell text
+- **THEN** empty and the two boundaries are accepted; every invalid value fails before a package-manager command
+
+### Requirement: Network timeout is scoped to installation
+
+An empty `networkTimeout` SHALL leave native timeout settings unchanged. A non-empty value SHALL apply to DNF connection
+timeout, also used with its inherited minrate low-speed threshold on every refresh and install call made by the feature.
+It SHALL NOT set an overall build deadline, change retry policy, disable certificate checks, or persist a setting in the
+image.
+
+#### Scenario: Native timeout is inherited
+
+- **WHEN** networkTimeout is omitted or empty
+- **THEN** no timeout override is passed
+
+#### Scenario: Explicit timeout reaches network operations
+
+- **WHEN** networkTimeout is a valid non-empty value and installation needs network access
+- **THEN** every feature refresh and install call receives the corresponding native timeout override, while retry and
+  verification settings remain unchanged
+
 ### Requirement: Option packages
 
 The feature SHALL accept the option `packages` as declared here, a comma-separated list of package entries in which
@@ -45,10 +145,10 @@ names no package.
 ### Requirement: Install the listed packages
 
 The feature SHALL install, with `dnf`, every package named in the comma-separated `packages` option, taking each package
-and its dependencies only from the repositories enabled in the image. It SHALL NOT install packages that a listed
-package only recommends or supplements (weak dependencies), and SHALL NOT upgrade installed packages other than the
-listed packages and what they need. A listed package that the image already has MAY be upgraded when the list names it
-without a version, as the image's `dnf` configuration decides.
+and its dependencies only from the repositories enabled in the image. Weak Recommends and Supplements SHALL be excluded
+when `installWeakDeps=false` and considered by DNF when `installWeakDeps=true`. Apart from that dependency selection, it
+SHALL NOT upgrade installed packages other than the listed packages and what they need. A listed package that the image
+already has MAY be upgraded when the list names it without a version, as the image's `dnf` configuration decides.
 
 #### Scenario: Listed packages are installed
 
@@ -57,7 +157,8 @@ without a version, as the image's `dnf` configuration decides.
 
 #### Scenario: Weak dependencies are left out
 
-- **WHEN** `packages` names a package that recommends another package which nothing installed requires
+- **WHEN** `installWeakDeps=false` and `packages` names a package that recommends another package which nothing
+  installed requires
 - **THEN** the listed package is installed and the recommended package is not
 
 #### Scenario: Listed package already installed at its newest version
@@ -65,6 +166,13 @@ without a version, as the image's `dnf` configuration decides.
 - **WHEN** `packages` names, without a version, a package that is already installed at the newest version the enabled
   repositories offer
 - **THEN** the feature succeeds and the package stays at that version
+
+#### Scenario: Optional dependency selection is enabled
+
+- **WHEN** `installWeakDeps=true` and a listed package has an applicable recommendation that is available and
+  unconstrained
+- **THEN** the package manager includes that recommendation in its resolution; required dependencies and conflict
+  protection remain in effect
 
 ### Requirement: Version and architecture qualifiers
 
@@ -193,33 +301,58 @@ The feature SHALL exit with status 1, with a message naming `dnf` and the distri
 
 ### Requirement: Repository metadata refresh
 
-The feature SHALL NOT force a refresh of repository metadata: the metadata of an enabled repository is downloaded only
-when the image's `dnf` configuration considers the metadata the image holds for it missing or expired. The feature SHALL
-fail when the metadata of an enabled repository cannot be loaded, including after a transient download failure, unless
-the image's configuration marks that repository as skippable (`skip_if_unavailable`); the installation then continues
-without that repository.
+With `refreshPolicy=default`, DNF SHALL decide missing or expired metadata using the image configuration and MAY skip a
+repository the image marks skippable. With `always`, the feature SHALL force a metadata check of every enabled
+repository and SHALL fail before installation when any enabled repository cannot be refreshed or verified, including one
+the image marks skippable. With `never`, the feature SHALL use DNF cache-only mode, SHALL NOT fetch metadata or package
+files, and SHALL fail before installation if any enabled repository lacks usable cached metadata or a required package
+file is absent or invalid. Existing cached metadata MAY be expired. No policy SHALL change signature or TLS checks.
 
 #### Scenario: Missing metadata is downloaded
 
-- **WHEN** the image holds no metadata for the enabled repositories
+- **WHEN** `refreshPolicy=default` and the image holds no metadata for the enabled repositories
 - **THEN** the feature downloads it from the image's enabled repositories before installing
 
 #### Scenario: Unexpired metadata is used as is
 
-- **WHEN** the image already holds metadata of every enabled repository that its `dnf` configuration does not consider
-  expired
+- **WHEN** `refreshPolicy=default` and the image already holds metadata of every enabled repository that its `dnf`
+  configuration does not consider expired
 - **THEN** the feature installs from that metadata without downloading it again
 
 #### Scenario: Failed metadata download fails the feature
 
-- **WHEN** the metadata of an enabled repository that the image does not mark as skippable cannot be downloaded
+- **WHEN** `refreshPolicy=default` and the metadata of an enabled repository that the image does not mark as skippable
+  cannot be downloaded
 - **THEN** the feature exits with a non-zero status and installs none of the listed packages
 
 #### Scenario: Skippable repository is skipped
 
-- **WHEN** the metadata of an enabled repository that the image marks as skippable cannot be downloaded, and the listed
-  packages come from other repositories
+- **WHEN** `refreshPolicy=default` and the metadata of an enabled repository that the image marks as skippable cannot be
+  downloaded, and the listed packages come from other repositories
 - **THEN** the feature installs the listed packages from the other repositories and exits with status 0
+
+#### Scenario: Refresh is explicitly requested
+
+- **WHEN** refreshPolicy=always with a non-empty package list and existing metadata
+- **THEN** every configured or enabled repository is checked before installing; failure of any repository fails before
+  packages change
+
+#### Scenario: Cached metadata is explicitly selected
+
+- **WHEN** refreshPolicy=never and every required index or metadata cache is usable and all required package files are
+  cached
+- **THEN** no metadata is fetched and installation uses the existing metadata under the package manager's normal
+  verification policy
+
+#### Scenario: Missing cached metadata fails without refresh
+
+- **WHEN** refreshPolicy=never and a required repository has no usable cached metadata
+- **THEN** the feature fails before installing without attempting a metadata download
+
+#### Scenario: Cache-only package miss fails
+
+- **WHEN** refreshPolicy=never with cached metadata but a missing or invalid required package file
+- **THEN** the feature fails without downloading or installing a package
 
 ### Requirement: Package signature checking stays in effect
 
@@ -261,12 +394,31 @@ The feature SHALL complete without reading any input.
 
 ### Requirement: Clean package caches
 
-After installing, the feature SHALL leave neither downloaded package files nor repository metadata in `dnf`'s cache.
+After successful installation, `cleanup=all` SHALL explicitly remove downloaded package files and repository metadata
+from the effective DNF cache. With `packages`, it SHALL explicitly remove downloaded package files while leaving usable
+metadata; with `none`, it SHALL perform no explicit cache deletion. No mode SHALL remove installed-package databases,
+signing keys, or unrelated paths. Package-manager configuration or image hooks MAY independently delete downloads; none
+does not guarantee that package files are retained, and packages does not guarantee that missing metadata is created.
 
 #### Scenario: Caches are removed
 
-- **WHEN** the feature has installed packages
+- **WHEN** `cleanup=all` and the feature has installed packages
 - **THEN** the image holds no downloaded package files and no repository metadata in `dnf`'s cache
+
+#### Scenario: Only package files are cleaned
+
+- **WHEN** cleanup=packages with usable metadata and package files present in the managed cache after installation
+- **THEN** package files are removed from the managed cache and usable metadata remains
+
+#### Scenario: Feature cleanup is disabled
+
+- **WHEN** cleanup=none and the native package manager and image hooks retain downloads
+- **THEN** the feature leaves cached package files and metadata in place
+
+#### Scenario: Native package retention is independent
+
+- **WHEN** cleanup=none but a native setting or image hook deletes package files
+- **THEN** the feature does not override the native deletion and does not promise retained packages
 
 ### Requirement: Installing the feature twice
 
@@ -274,6 +426,10 @@ Installing the feature a second time SHALL leave installed every package that ei
 treat the second list as a first installation would. The second installation MAY upgrade an installed package that its
 list names without a version, or that a package of its list needs, and SHALL install a version its list pins, also below
 the installed one.
+
+The second invocation SHALL use its own control values, with no permanent override of image configuration. Earlier cache
+choices SHALL NOT override the later refresh or cleanup policy. Disabling optional dependencies on a later invocation
+SHALL NOT uninstall previously installed packages.
 
 #### Scenario: Same list on the second install
 
@@ -290,3 +446,10 @@ the installed one.
 - **WHEN** the second installation's `packages` holds `name-version-release` with a version older than the one
   installed, which the repositories offer
 - **THEN** the second installation succeeds and exactly the pinned version of the package is installed
+
+#### Scenario: Later controls apply to the second installation
+
+- **WHEN** the first invocation preserves metadata and the second uses different refresh or cleanup values with a
+  non-empty compatible package list
+- **THEN** the second invocation follows its own values, retains the packages guaranteed by this requirement, and does
+  not persist control settings
