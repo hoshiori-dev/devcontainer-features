@@ -6,7 +6,7 @@
       declarations in unit tests.
 - [x] 1.2 Expand scenario matrix entries with architecture and runner, and declare glab's existing dual-architecture
       coverage; verify default, explicit, empty, no-scenario, and matrix-limit cases in unit tests.
-- [ ] 1.3 Update the shared workflow and remove the dedicated job; synchronize workflow and affected-script descriptions
+- [x] 1.3 Update the shared workflow and remove the dedicated job; synchronize workflow and affected-script descriptions
       and the CI job map, and verify the planned jobs with `just affected`.
 
 ## 2. Scenario compatibility validation
@@ -20,6 +20,6 @@
 
 - [x] 3.1 Run `just check` with the CI-pinned OpenSpec version and review the diff; verify unchanged supported pairs,
       feature artifacts, and required-check settings.
-- [ ] 3.2 Push the implementation, verify all eight glab scenarios on both native architectures and the remaining CI
+- [x] 3.2 Push the implementation, verify all eight glab scenarios on both native architectures and the remaining CI
       checks, and record every proposal Acceptance item with results and run links in the PR's Validation section before
       marking ready.
