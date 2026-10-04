@@ -11,7 +11,7 @@
 ```
 
 The feature installs the listed packages with `apk` from the repositories the image already configures. It adds no
-repository, tag, key, or apk configuration of its own, and it does not upgrade the system.
+repository, tag, key, or apk configuration of its own, and it does not perform a full system upgrade.
 
 ## Entries
 
@@ -38,9 +38,9 @@ version the repositories do not offer, and a constraint apk cannot read all fail
 
 - Every entry is recorded in apk's world (`/etc/apk/world`), constraint included. A constraint stays in effect for later
   apk operations: an `apk upgrade` in your Dockerfile keeps a package pinned with `name=version` where it is.
-- An installed package keeps its version unless an entry's constraint or a newly installed package requires another one.
-  When the installed version does not satisfy an entry's constraint, apk replaces it with one that does, which can be a
-  lower version.
+- With `upgradePackages=false`, an installed package keeps its version unless an entry's constraint or a newly installed
+  package requires another one. When the installed version does not satisfy an entry's constraint, apk replaces it with
+  one that does, which can be a lower version.
 - apk also installs packages whose install-if conditions are all met. For example, listing `docs` together with `jq`
   installs `jq-doc`, and the `-doc` packages of the other installed packages. apk has no option to turn this off.
 
@@ -83,9 +83,9 @@ non-empty list fails with a message naming the detected distribution.
 
 `refreshPolicy` (default): Select native default refresh, check every repository, or require cached metadata without
 refreshing. `cleanup` (all): Remove all managed caches, package files only, or skip feature cleanup. Native retention
-remains independent. `networkTimeout` (): Native network timeout in seconds (1–3600), or empty to inherit image
-settings; applies only to this invocation. `upgradePackages` (false): Request upgrades of listed packages and their
-dependencies with apk add, preserving world constraints.
+remains independent. `networkTimeout` (default: empty): Native network timeout in seconds (1–3600), or empty to inherit
+image settings; applies only to this invocation. `upgradePackages` (false): Request upgrades of listed packages and
+their dependencies with apk add, preserving world constraints.
 
 Controls apply separately on each invocation and never persist image configuration. Invalid values fail even for an
 empty package list; valid empty lists leave caches unchanged. Previously installed packages remain installed.
