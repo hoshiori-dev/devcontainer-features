@@ -2,11 +2,11 @@
 
 ## 1. Installation controls
 
-- [ ] 1.1 Implement the approved package parsing, option validation, native operations, and cleanup; verify invalid
+- [x] 1.1 Implement the approved package parsing, option validation, native operations, and cleanup; verify invalid
       inputs leave the image unchanged and container checks exercise each control.
-- [ ] 1.2 Declare every option and release version, document defaults and limitations in NOTES.md, and regenerate README
+- [x] 1.2 Declare every option and release version, document defaults and limitations in NOTES.md, and regenerate README
       with `just docs`; verify metadata against the delta with `just spec-check`.
-- [ ] 1.3 Add scenario tests for control effects on each supported package-manager generation and direct checks for
+- [x] 1.3 Add scenario tests for control effects on each supported package-manager generation and direct checks for
       failures, cache reuse, and consecutive invocations; verify configuration and unrelated-cache sentinels remain
       unchanged.
 
