@@ -346,13 +346,16 @@ Validation section. On arm64, CI runs only test.sh and duplicate.sh.
 
 ### Supported images
 
-The planned `test/zypper-packages/compatibility.json`, both images on `amd64` and `arm64` (manifests list both; arm64
-repository files inspected on 2026-09-30):
+The planned `test/zypper-packages/compatibility.json` (manifests list both architectures; arm64 repository files
+inspected on 2026-09-30). The maintainer directed temporary removal of Tumbleweed arm64 in conversation on 2026-10-05
+(Asia/Tokyo), following native package digest failures in PR #43. The comment in `test/zypper-packages/test.sh` requires
+restoring and verifying that combination on the next feature change. Until then, Tumbleweed arm64 is outside the
+declared compatibility list and has no passing test evidence; Leap arm64 and both amd64 images remain covered.
 
 | Image                 | Architectures | Why                                                                |
 | --------------------- | ------------- | ------------------------------------------------------------------ |
 | `opensuse/leap:16.0`  | amd64, arm64  | Current openSUSE Leap; 15.6 reached its end of life                |
-| `opensuse/tumbleweed` | amd64, arm64  | openSUSE's rolling release; exercises separate update repositories |
+| `opensuse/tumbleweed` | amd64         | openSUSE's rolling release; exercises separate update repositories |
 
 ## URL inventory
 

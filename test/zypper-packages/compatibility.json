@@ -11,8 +11,7 @@
     {
       "image": "opensuse/tumbleweed",
       "arch": [
-        "amd64",
-        "arm64"
+        "amd64"
       ]
     }
   ]
