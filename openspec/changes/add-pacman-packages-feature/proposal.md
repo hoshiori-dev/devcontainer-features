@@ -1,8 +1,9 @@
 # Proposal
 
 This file describes the baseline implementation. The same PR also carries ../configure-pacman-packages-cleanup/, a
-separate phase 1 extension awaiting approval and implementation. Its delta supersedes the relevant baseline requirements
-only when applied; the baseline task completion and test results do not validate its new paths.
+separate phase 1 extension approved in conversation on 2026-10-04 and implemented in this first release. Its delta
+supersedes the relevant baseline requirements only when applied; the baseline task completion and test results do not
+validate its new paths.
 
 Implements [#23](https://github.com/hoshiori-dev/devcontainer-features/issues/23).
 

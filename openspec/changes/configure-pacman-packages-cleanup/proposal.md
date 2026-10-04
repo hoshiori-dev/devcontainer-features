@@ -35,8 +35,8 @@ None.
   closes; the current artifact is not claimed to implement the new controls.
 
 This delta depends on the ADDED requirements in add-pacman-packages-feature. Apply that baseline before this MODIFIED
-delta. Existing code, completed tasks, and validation evidence cover only the baseline; this change has no tasks until
-its expanded package is approved.
+delta. At proposal time, existing code, completed tasks, and validation evidence covered only the baseline. The expanded
+package was approved in conversation on 2026-10-04; its own tasks and implementation checks followed that approval.
 
 ## Acceptance
 
