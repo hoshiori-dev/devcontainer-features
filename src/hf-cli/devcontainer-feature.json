@@ -1,0 +1,25 @@
+{
+  "id": "hf-cli",
+  "version": "1.0.0",
+  "name": "Hugging Face CLI",
+  "description": "Installs the Hugging Face CLI with its standalone installer for the remote user, optionally with the upstream hf-cli agent skill.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/hf-cli",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "1.33.0"],
+      "default": "latest",
+      "description": "The huggingface_hub release: latest, resolved at build time, or a stable MAJOR.MINOR.PATCH at or above 1.27.0."
+    },
+    "installSkill": {
+      "type": "boolean",
+      "default": false,
+      "description": "Generate the upstream hf-cli agent skill in the remote user's home and link it into ~/.claude/skills."
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/python:1",
+    "ghcr.io/hoshiori-dev/devcontainer-features/uv"
+  ],
+  "containerEnv": { "HF_HUB_DISABLE_UPDATE_CHECK": "1" }
+}
