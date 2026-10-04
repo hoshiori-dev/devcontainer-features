@@ -100,7 +100,9 @@ relies on TLS to that host alone and on the path naming the upstream repository'
 the feature SHALL write the tag and the file's SHA-256 digest to the build log; the digest is a record that lets two
 builds be compared, and the feature compares it with nothing. The installer downloads only the Python packages that
 "Verify package downloads" names (`huggingface_hub`, its dependencies, and `pip`), from the sources named there; its
-skill step generates the skill locally and downloads nothing.
+skill step generates the skill locally and downloads nothing. Build-time CLI checks and skill generation SHALL run with
+`HF_HUB_OFFLINE=1`, preventing auxiliary Hub requests and cache files; this setting SHALL NOT be added to the container
+environment, so runtime Hub access remains available.
 
 #### Scenario: No release tag for the version
 
@@ -228,7 +230,8 @@ and SHALL leave no uv or pip cache in the image.
 
 - **WHEN** the feature is installed together with the `uv` feature, and a container starts from the image with a new
   `uv` volume
-- **THEN** `/var/lib/uv` in that container is empty and owned by the remote user
+- **THEN** `/var/lib/uv` in that container is empty and writable by the remote user according to the `uv` feature's
+  "Grant write access through the group uv" requirement, also after the tooling changes the remote user's UID
 
 #### Scenario: No cache left behind
 
@@ -261,7 +264,9 @@ The feature SHALL accept the option `installSkill` as declared here: when it is 
 add the `hf-cli` skill, which the installed CLI generates locally without downloading it, as `~/.agents/skills/hf-cli`
 in the remote user's home and a link to it named `hf-cli` in that user's `~/.claude/skills`, and, because the installer
 only warns when this step fails, fails the build unless `~/.agents/skills/hf-cli/SKILL.md` exists afterwards and names
-the installed version; when it is disabled, the feature passes `--exclude-skill` and creates no skill files.
+the installed version; when it is disabled, the feature passes `--exclude-skill` and creates no skill files. When the
+requested version is already installed and only the skill needs generating, the feature SHALL call that installed CLI
+directly, using the flags supported by that release, without rerunning the installer or reinstalling any packages.
 
 | Field   | Value     |
 | ------- | --------- |

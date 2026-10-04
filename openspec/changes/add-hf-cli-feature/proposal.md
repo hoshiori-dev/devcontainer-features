@@ -24,7 +24,10 @@ and keeping the image's shell files and build inputs under control.
   `pip` is checked by pip against the same index digests. The installation writes nothing under the `uv` feature's
   volume path.
 - The feature adds the distribution's `python3`, `python3-venv`, and `ca-certificates` when the image lacks them.
-- An `installSkill` option lets the installer add the upstream `hf-cli` agent skill for the remote user.
+- An `installSkill` option adds the upstream `hf-cli` agent skill for the remote user; enabling it for an already
+  installed version generates it with that CLI without reinstalling packages.
+- Build-time CLI checks and skill generation run offline, without auxiliary Hub requests or cache writes; runtime Hub
+  access remains available.
 - The container runs with the CLI's daily update check turned off, since the CLI is upgraded by rebuilding with another
   `version`.
 - The package sources are fixed: the build environment's index or mirror settings do not apply, while a build behind a
