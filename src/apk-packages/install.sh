@@ -7,6 +7,8 @@
 set -eu
 
 # Entries are matched as bytes, so no pattern below can admit a non-ASCII letter.
+locale_was_set=${LC_ALL+yes}
+locale_before=${LC_ALL-}
 LC_ALL=C
 export LC_ALL
 
@@ -58,11 +60,30 @@ describe_system() {
 # Removes the two directories the feature created; nothing else of the feature's is in the image.
 cache_dir=
 work_dir=
-cleanup() {
+remove_temporary_dirs() {
   cd /
-  [ -z "$cache_dir" ] || rm -rf -- "$cache_dir"
+  [ "$CLEANUP" != all ] || [ -z "$cache_dir" ] || rm -rf -- "$cache_dir"
   [ -z "$work_dir" ] || rm -rf -- "$work_dir"
 }
+
+
+# Validate controls before package-manager calls, cache creation, and the empty-list exit.
+REFRESHPOLICY="${REFRESHPOLICY-default}"
+case $REFRESHPOLICY in default | always | never) ;; *) fail "refreshPolicy must be one of: default, always, never." ;; esac
+CLEANUP="${CLEANUP-all}"
+case $CLEANUP in all | packages | none) ;; *) fail "cleanup must be one of: all, packages, none." ;; esac
+NETWORKTIMEOUT="${NETWORKTIMEOUT-}"
+case $NETWORKTIMEOUT in
+  "") ;;
+  0* | *[!0123456789]*) fail "networkTimeout must be empty or an integer from 1 through 3600 without leading zeros." ;;
+  *)
+    if [ "${#NETWORKTIMEOUT}" -gt 4 ] || [ "$NETWORKTIMEOUT" -gt 3600 ]; then
+      fail "networkTimeout must be from 1 through 3600."
+    fi
+    ;;
+esac
+UPGRADEPACKAGES="${UPGRADEPACKAGES-false}"
+case $UPGRADEPACKAGES in true | false) ;; *) fail "upgradePackages must be true or false." ;; esac
 
 # Parse and validate every entry before anything else happens; accepted entries become "$@", so each
 # reaches apk as one argument and none is ever evaluated as shell code.
@@ -77,6 +98,8 @@ while [ -n "$rest" ]; do
   set -- "$@" "$trimmed"
 done
 
+if [ -n "$locale_was_set" ]; then LC_ALL=$locale_before; else unset LC_ALL; fi
+
 if [ "$#" -eq 0 ]; then
   echo "apk-packages: no packages listed; nothing to do."
   exit 0
@@ -86,25 +109,59 @@ if ! command -v apk >/dev/null 2>&1; then
   fail "apk was not found on this image ($(describe_system)). This feature supports Alpine Linux images, which provide apk."
 fi
 
-trap cleanup EXIT
+trap remove_temporary_dirs EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# Both directories are new: the cache directory holds only what this run fetches, and the working
-# directory stays empty, so apk cannot read an entry as a local package file.
-cache_dir=$(mktemp -d "${TMPDIR:-/tmp}/apk-packages.XXXXXX")
+# A fresh work directory prevents package entries from resolving to local files.
+# Retained indexes are feature-owned; image caches are only read, never cleaned.
+if [ "$CLEANUP" = all ]; then
+  cache_dir=$(mktemp -d "${TMPDIR:-/tmp}/apk-packages.XXXXXX")
+else
+  cache_dir=/var/cache/apk-packages
+  mkdir -p "$cache_dir"
+fi
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/apk-packages.XXXXXX")
 cd "$work_dir"
 
-# apk update exits 0 only when the index of every configured repository was fetched and verified;
-# apk add alone would skip a failing repository and install from the others.
-echo "apk-packages: fetching the index of every configured repository"
-apk update --no-interactive --cache-dir "$cache_dir" || {
-  status=$?
-  printf 'apk-packages: apk update failed (exit %s): the index of every configured repository must be fetched and verified before anything is installed.\n' "$status" >&2
-  exit "$status"
+apk_network() {
+  if [ -n "$NETWORKTIMEOUT" ]; then
+    apk --timeout "$NETWORKTIMEOUT" "$@"
+  else
+    apk "$@"
+  fi
 }
 
+if [ "$REFRESHPOLICY" = never ]; then
+  # Copy missing indexes from native image caches. apk itself verifies repository
+  # coverage and signatures offline before any add; a cache miss cannot fetch an index.
+  for source_dir in /var/cache/apk /etc/apk/cache /var/cache/apk-packages; do
+    [ "$source_dir" != "$cache_dir" ] || continue
+    for index in "$source_dir"/APKINDEX.*.tar.gz "$source_dir"/*.adb; do
+      [ -f "$index" ] || continue
+      [ -e "$cache_dir/${index##*/}" ] || cp -p "$index" "$cache_dir/"
+    done
+  done
+  apk_network update --no-network --no-interactive --cache-dir "$cache_dir" || fail "refreshPolicy=never requires usable cached indexes for every repository."
+else
+  echo "apk-packages: fetching the index of every configured repository"
+  apk_network update --no-interactive --cache-dir "$cache_dir" || {
+    status=$?
+    printf 'apk-packages: apk update failed (exit %s): every repository must be fetched and verified before installation.\n' "$status" >&2
+    exit "$status"
+  }
+fi
+
+# Offline verification above establishes every cached index; the large age limit
+# prevents add from checking remote indexes while still permitting package downloads.
+set -- -- "$@"
+[ "$UPGRADEPACKAGES" = false ] || set -- --upgrade "$@"
 echo "apk-packages: installing $*"
-apk add --no-interactive --cache-dir "$cache_dir" -- "$@"
+apk_network add --no-interactive --cache-dir "$cache_dir" --cache-max-age 35791394 "$@"
+
+case $CLEANUP in
+  all) rm -rf /var/cache/apk-packages ;;
+  packages) rm -f "$cache_dir"/*.apk ;;
+  none) ;;
+esac

@@ -143,11 +143,15 @@ class Container {
      * Runs the feature the way the CLI does, as root; `packages` undefined leaves PACKAGES unset. `cwd` is the
      * directory the feature is started from, and `tty` attaches a terminal without any input.
      */
-    install(packages?: string, options: { cwd?: string; tty?: boolean } = {}): Promise<Result> {
+    install(
+        packages?: string,
+        options: { cwd?: string; tty?: boolean; upgradePackages?: boolean } = {},
+    ): Promise<Result> {
         const args = ["exec"];
         if (packages !== undefined) args.push("--env", `PACKAGES=${packages}`);
         if (options.cwd) args.push("--workdir", options.cwd);
         if (options.tty) args.push("--tty");
+        if (options.upgradePackages !== undefined) args.push("--env", `UPGRADEPACKAGES=${options.upgradePackages}`);
         return docker([...args, this.name, "/feature/install.sh"], INSTALL_TIMEOUT_MS);
     }
 
@@ -271,6 +275,27 @@ function noApkSnapshot(c: Container): Promise<string> {
 }
 
 const CHECKS: Check[] = [
+    {
+        scenario: "Listed packages are upgraded on request",
+        on: "lagging",
+        network: "bridge",
+        async run(c, t) {
+            const first =
+                (await c.text(`apk --no-cache version -l '<' 2>/dev/null | awk '$2 == "<" { print $1, $3 }'`)).split(
+                    "\n",
+                )[0];
+            if (!first) throw new Error(`no installed package lags the repositories on ${c.image}`);
+            const [installedAs, newer] = first.split(" ");
+            const pkg = installedAs.replace(/-[0-9][^-]*-r[0-9]+$/, "");
+            const before = await c.version(pkg);
+            t.exit(await c.install(pkg, { upgradePackages: false }), 0, "upgrade disabled");
+            t.ok(await c.version(pkg) === before, "upgradePackages=false changed the installed version");
+            t.exit(await c.install(pkg, { upgradePackages: true }), 0, "upgrade enabled");
+            t.ok(await c.version(pkg) === newer, "upgradePackages=true did not install the offered newer version");
+            t.ok(await c.inWorld(pkg), "the upgraded package is missing from world");
+        },
+    },
+
     {
         scenario: "Omitted packages",
         on: "apk",

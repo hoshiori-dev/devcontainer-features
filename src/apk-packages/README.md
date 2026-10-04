@@ -16,6 +16,10 @@ Installs a list of system packages with apk from the repositories the Alpine Lin
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
 | packages | Comma-separated packages to install: name, name=version, name~version, a range such as name>=version, name@tag, or a provided name such as cmd:jq. Whitespace around entries and empty entries are ignored; an empty list installs nothing. | string | - |
+| refreshPolicy | Select native default refresh, check every repository, or require cached metadata without refreshing. | string | default |
+| cleanup | Remove all managed caches, package files only, or skip feature cleanup. Native retention remains independent. | string | all |
+| networkTimeout | Native network timeout in seconds (1–3600), or empty to inherit image settings; applies only to this invocation. | string | - |
+| upgradePackages | Request upgrades of listed packages and their dependencies with apk add, preserving world constraints. | boolean | false |
 
 ## Usage
 
@@ -65,11 +69,14 @@ version the repositories do not offer, and a constraint apk cannot read all fail
 
 ## Package index
 
-On every run that names a package, the feature fetches the index of every repository the image configures and fails if
-any of them cannot be fetched or verified, even when the listed packages would come from another repository. It never
-installs from an index the image already holds. A mirror outage therefore fails the build; rebuild to retry. The fetch
-downloads a few megabytes on each build of this layer. After installing, the feature removes the indexes and package
-files it fetched and leaves `/var/cache/apk`, and a cache the image configures through `/etc/apk/cache`, as they were.
+With `refreshPolicy=default` or `always`, every configured repository is refreshed and verified before installation.
+`never` requires cached indexes for every repository, reads existing image caches without modifying them, and permits
+package downloads without refreshing indexes. Missing or invalid indexes fail before installation.
+
+`cleanup=all` removes the temporary feature cache. `packages` retains indexes under `/var/cache/apk-packages` and
+removes package files; `none` skips explicit cache deletion. Native apk retention remains independent. Existing image
+caches are preserved. Retained feature indexes can be reused by a later `refreshPolicy=never` invocation. Temporary work
+directories are removed even on failure.
 
 ## Security
 
@@ -94,6 +101,17 @@ constraint that the repositories cannot satisfy fails and changes nothing.
 Alpine Linux images, which provide `apk`; the tested images are listed in
 [test/apk-packages/compatibility.json](../../test/apk-packages/compatibility.json). On an image without `apk`, a
 non-empty list fails with a message naming the detected distribution.
+
+## Installation controls
+
+`refreshPolicy` (default): Select native default refresh, check every repository, or require cached metadata without
+refreshing. `cleanup` (all): Remove all managed caches, package files only, or skip feature cleanup. Native retention
+remains independent. `networkTimeout` (): Native network timeout in seconds (1–3600), or empty to inherit image
+settings; applies only to this invocation. `upgradePackages` (false): Request upgrades of listed packages and their
+dependencies with apk add, preserving world constraints.
+
+Controls apply separately on each invocation and never persist image configuration. Invalid values fail even for an
+empty package list; valid empty lists leave caches unchanged. Previously installed packages remain installed.
 
 
 ---
