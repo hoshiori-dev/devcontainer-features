@@ -501,6 +501,19 @@ chmod +x "/tmp/bin/$1"`,
         },
     },
     {
+        name: "Unexpired metadata is used offline for a cached uninstalled package",
+        async run(c) {
+            await c.setup("dnf install -y --downloadonly --setopt=install_weak_deps=False bc");
+            assert(!await c.installed("bc"), "fixture installed the cached target");
+            const config = await c.config();
+            const disconnected = await docker("network", "disconnect", "bridge", c.name);
+            assert(disconnected.code === 0, disconnected.text);
+            await c.succeeds("bc", { cleanup: "none" });
+            assert(await c.installed("bc"), "default did not install the cached payload offline");
+            assert(await c.config() === config, "offline installation changed configuration");
+        },
+    },
+    {
         name: "Weak dependencies are excluded by default and enabled on a later invocation",
         async run(c) {
             await c.succeeds("ipcalc", { cleanup: "none" });
