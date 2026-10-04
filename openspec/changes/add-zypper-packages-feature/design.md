@@ -242,9 +242,9 @@ values and unavailable repositories, and two consecutive invocations with differ
 retention separately from package retention, preserve sentinel files in unrelated caches, and assert that
 trust/configuration files are unchanged. Existing scenarios apply to default controls and remain regression coverage.
 
-Package-manager settings were checked against the official documents listed below. New option paths have not been run in
-containers; their acceptance depends on the implementation checks. Zypper's missing-cache refusal needs explicit
-container checks before implementation is considered complete.
+Package-manager settings were checked against the official documents listed below. At proposal time, the new option
+paths had not been run in containers. Their implementation checks are recorded in the PR Validation section. Zypper's
+missing-cache refusal needs explicit container checks before implementation is considered complete.
 
 Official references:
 
