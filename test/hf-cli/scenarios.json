@@ -1,0 +1,72 @@
+{
+  "pinned_version": {
+    "image": "debian:12",
+    "features": {
+      "hf-cli": {
+        "version": "1.27.0"
+      }
+    }
+  },
+  "install_skill": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "hf-cli": {
+        "installSkill": true
+      }
+    }
+  },
+  "redirected_sources": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "hf-cli": {
+        "version": "1.33.0"
+      }
+    }
+  },
+  "redirected_sources_uv": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "ghcr.io/hoshiori-dev/devcontainer-features/uv:1": {},
+      "hf-cli": {
+        "version": "1.33.0"
+      }
+    }
+  },
+  "existing_python": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "hf-cli": {
+        "version": "1.33.0"
+      }
+    }
+  },
+  "earlier_python": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "hf-cli": {
+        "version": "1.33.0"
+      }
+    }
+  },
+  "first_party_python": {
+    "image": "debian:12",
+    "features": {
+      "ghcr.io/devcontainers/features/python:1": {
+        "version": "os-provided",
+        "installTools": false
+      },
+      "hf-cli": {
+        "version": "1.33.0"
+      }
+    }
+  }
+}

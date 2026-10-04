@@ -1,0 +1,42 @@
+{
+  "listed_packages_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {
+        "packages": "bc,file"
+      }
+    }
+  },
+  "listed_packages_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "bc,file"
+      }
+    }
+  },
+  "recommends_and_whitespace": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": " wget ,\t bc,, "
+      }
+    }
+  },
+  "native_architecture": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "bc:amd64"
+      }
+    }
+  },
+  "debconf_question": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "keyboard-configuration"
+      }
+    }
+  }
+}
