@@ -21,6 +21,7 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 | Feature                                                     | Description                                                                                                                                |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`apt-packages`](src/apt-packages/)                         | Installs a list of system packages with `apt-get` from the repositories a Debian or Ubuntu image already configures.                       |
 | [deno](src/deno/)                                           | Installs the Deno CLI, verified against its published checksums, with global tools on `PATH` for every user.                               |
 | [glab](src/glab/)                                           | The GitLab CLI, installed from its checksum-verified release archive with no authentication configured.                                    |
 | [`nvidia-container-toolkit`](src/nvidia-container-toolkit/) | Installs the NVIDIA Container Toolkit from NVIDIA's signed repository and registers its runtime with a Docker daemon in the dev container. |
