@@ -1,28 +1,26 @@
 # Tasks
 
-## 1. Approval reconciliation and feature setup
+## 1. Revised specification and environment selection
 
-- [x] 1.1 Carry the approved offline CLI, uv group access, skill-only reinstall, and Debian 11 fixture corrections into
-      the planning artifacts; verify with `just spec-check`.
-- [x] 1.2 Scaffold hf-cli at 1.0.0 with exactly the specified options and uv dependency; verify metadata with
-      `just validate`.
+- [x] 1.1 Reconcile proposal, delta spec, and design with optional uv, first-party Python ordering and interpreter
+      reuse; verify with `just spec-check`.
+- [x] 1.2 Remove the hard dependency and implement interpreter selection, apt fallback, and optional uv version checks;
+      verify metadata and Python reuse/failure observations.
 
-## 2. Installation and user documentation
+## 2. Installation and documentation
 
-- [x] 2.1 Implement platform, user, Python, uv, version, and tagged download checks and the constrained upstream
-      installer; verify defaults, pinned version, redirected sources, and all failure observations.
-- [x] 2.2 Implement optional skill generation and install-twice behavior; verify duplicate tests and a network-disabled
-      same-version skill-only install leave packages unchanged.
-- [x] 2.3 Document installation scope, sources, runtime authentication, skills, proxies, and limitations in NOTES.md and
-      the root feature table; generate README with `just docs` and verify `just docs-check`.
-- [x] 2.4 Add compatibility, default, duplicate, pinned, skill, and redirected-source tests; verify `just test hf-cli`
-      and `just test-scenarios hf-cli`.
+- [x] 2.1 Apply equivalent fixed-source, wheel-only, version-constraint and cache rules to pip and uv; verify both
+      redirected-source paths, pinning, hash failures, and proxy observations.
+- [x] 2.2 Verify optional skills, install-twice behavior, and offline identical/skill-only installs leave packages
+      unchanged on both pip and uv installations.
+- [x] 2.3 Update NOTES and generate README with `just docs`; verify `just docs-check` and human documentation review.
+- [x] 2.4 Add existing-Python, first-party Python, and unusable-earlier-candidate coverage; run `just test hf-cli` and
+      `just test-scenarios hf-cli` on the selected compatibility images.
 
 ## 3. Integration and acceptance evidence
 
-- [x] 3.1 Add the uv_and_hf_cli global scenario covering uv's INSTALLER record, environment, empty mounted volume, and
-      group write access; verify `just test-global` and empty/non-empty mounted-volume observations.
-- [x] 3.2 Observe all specified failure cases, identical reinstall, tagged download logs, and the proxy-only build using
-      disposable containers; record results against Acceptance in the PR.
-- [x] 3.3 Review the final implementation against the spec and URL inventory, run `just check`, and verify every
-      selected CI job passes; complete the PR description.
+- [x] 3.1 Keep uv_and_hf_cli as an explicit optional composition; verify `just test-global` and empty/non-empty
+      mounted-volume observations.
+- [x] 3.2 Re-run all failure and proxy observations for the revised paths, and record results against Acceptance.
+- [ ] 3.3 Review implementation against the revised spec and URL inventory, run `just check`, verify selected CI jobs,
+      and update the PR description for joint specification and implementation review.

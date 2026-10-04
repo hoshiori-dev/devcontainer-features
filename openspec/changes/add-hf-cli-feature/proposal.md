@@ -19,11 +19,10 @@ and keeping the image's shell files and build inputs under control.
   repository's rule for installer scripts allows; upstream publishes no checksum or signature for it, so its content is
   not verified, and the build log records the tag and the file's SHA-256. The version is pinned and checked after
   installation.
-- The feature depends on the `uv` feature, so the installer installs `huggingface_hub` and its dependencies through uv,
-  which checks every package file against the digests the Python Package Index publishes; the installer's own upgrade of
-  `pip` is checked by pip against the same index digests. The installation writes nothing under the `uv` feature's
-  volume path.
-- The feature adds the distribution's `python3`, `python3-venv`, and `ca-certificates` when the image lacks them.
+- The feature has no hard feature dependency. The upstream installer uses an existing supported uv, or pip when uv is
+  absent; both paths install wheels from fixed PyPI sources and check index digests.
+- The feature reuses a usable Python, preferring the first-party Python feature when selected. It prepares distribution
+  Python and venv support only when needed, and CA certificates when missing; it never downloads or compiles Python.
 - An `installSkill` option adds the upstream `hf-cli` agent skill for the remote user; enabling it for an already
   installed version generates it with that CLI without reinstalling packages.
 - Build-time CLI checks and skill generation run offline, without auxiliary Hub requests or cache writes; runtime Hub
@@ -55,8 +54,8 @@ None.
 - Files: `src/hf-cli/`, `test/hf-cli/`, the new `test/_global/` (`scenarios.json` and the `uv_and_hf_cli` scenario),
   `openspec/specs/hf-cli/spec.md` at archive, and the root `README.md` (one row under "Features").
 - Canary membership in `test/canary.json` is left to the maintainer; this change does not touch it.
-- Dependencies: `dependsOn` the `uv` feature (`ghcr.io/hoshiori-dev/devcontainer-features/uv:1`). The implementation
-  waits until the `uv` feature (#14) is merged; from then on, CI re-tests `hf-cli` whenever `uv` changes.
+- Dependencies: no `dependsOn`; `installsAfter` orders after the first-party Python feature and this collection's uv
+  feature when the user selects them. Both are optional.
 - Users' images gain a system `python3` with `venv` where they had none, and a virtual environment and `~/.local/bin/hf`
   link in the remote user's home.
 - Network at build time: the hosts in the design's URL inventory, through the build's proxy when it sets one; nothing at
@@ -72,15 +71,18 @@ None.
   `test/hf-cli/compatibility.json`, and "Remote user is root or unset" there on the image without a remote user; the
   build-log line of "Omitted version" is recorded in the PR's Validation section.
 - "Pinned version", "Skill enabled", and "Redirected sources in the build environment" pass as scenarios in
-  `test/hf-cli/scenarios.json`.
+  `test/hf-cli/scenarios.json`, including the pip path and a separate uv combination with redirected build sources.
+- "uv missing" passes in the default tests; "Existing usable Python", "First-party Python selected", and "Earlier Python
+  unusable" pass in dedicated scenarios and disposable-container observations. Both pip and uv paths retain version
+  pinning, wheel-only installation, verified fixed sources, proxy routing, and idempotency.
 - "Different version the second time", "Skill enabled, then disabled", and "No token after install" pass in
   `test/hf-cli/duplicate.sh` on every compatibility image and architecture.
 - "Packages installed with the uv feature's uv" and "Nothing left under the uv volume path" pass in the global scenario
   `uv_and_hf_cli`; from this change on, that scenario also checks the `uv` change's (#14) "Later feature runs uv" on
   every change to either feature.
-- "Container with the uv volume mounted" passes in `test.sh` with the `uv` feature's volume, and its non-empty case, and
-  any mounted-volume scenario the test runner cannot mount, is observed with the method the design's "Test fixtures"
-  names and recorded in the PR's Validation section.
+- "Container with the uv volume mounted" passes in the global scenario with the explicitly selected uv feature, and its
+  empty and non-empty cases are observed with the method the design's "Test fixtures" names and recorded in the PR's
+  Validation section.
 - "Installer fetched from its tag" is observed in a build log recorded in the PR's Validation section.
 - Every failure scenario of the spec except "Digest mismatch", and "Same options twice" and "Build behind a proxy", are
   each observed with the method the design names for it and recorded in the PR's Validation section.

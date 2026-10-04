@@ -44,8 +44,9 @@ for home in {pathlib.Path(sys.argv[1]), pathlib.Path('/root')}:
         if path.exists():
             assert 'Added by Hugging Face CLI installer' not in path.read_text(), path
 PY
-check "the uv volume is mounted" bash -c 'grep -q "^[^ ]* [^ ]* [^ ]* [^ ]* /var/lib/uv " /proc/self/mountinfo'
-check "the mounted volume is empty" [ -z "$(ls -A /var/lib/uv)" ]
-check "hf works with the mounted volume" hf version
+check "packages were installed by pip without uv" "$venv/bin/python" -c 'import importlib.metadata; assert importlib.metadata.distribution("huggingface_hub").read_text("INSTALLER").strip() == "pip"'
+check "uv was not installed" bash -c '! command -v uv'
+no_uv_settings() { [[ ! -e /var/lib/uv && -z "${UV_PYTHON_INSTALL_DIR:-}" && -z "${UV_CACHE_DIR:-}" ]]; }
+check "no uv volume or environment was added" no_uv_settings
 check "anonymous Hub request uses verified TLS" hf models info openai-community/gpt2
 reportResults

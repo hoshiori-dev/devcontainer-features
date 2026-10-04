@@ -1,8 +1,8 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write=/tmp --allow-run=docker,devcontainer
 // Exercises a proxy-only install and a real devcontainer rebuild with a populated uv volume.
-// Usage: ./test/hf-cli/integration_checks.ts ROOT_IMAGE UBUNTU_IMAGE
-const [rootImage, ubuntuImage] = Deno.args;
-if (!rootImage || !ubuntuImage) throw new Error("Supply the tested root and Ubuntu images.");
+// Usage: ./test/hf-cli/integration_checks.ts ROOT_PIP_IMAGE UBUNTU_UV_IMAGE ROOT_UV_IMAGE
+const [rootImage, ubuntuImage, rootUvImage] = Deno.args;
+if (!rootImage || !ubuntuImage || !rootUvImage) throw new Error("Supply the tested root and Ubuntu images.");
 const source = await Deno.realPath("src/hf-cli/install.sh");
 const scratch = await Deno.makeTempDir({ prefix: "hf-cli-integration-" });
 const prefix = `hf-cli-${crypto.randomUUID().slice(0, 8)}`;
@@ -48,29 +48,31 @@ ENTRYPOINT ["tinyproxy", "-d"]
         `type=bind,src=${source},dst=/tmp/hf-cli-install.sh,readonly`,
     ];
     const command = "rm -rf /root/.hf-cli; rm -f /usr/local/bin/hf; VERSION=1.33.0 bash /tmp/hf-cli-install.sh";
-    const failure = await run(
-        "docker",
-        [...args, "--entrypoint", "bash", rootImage, "-euc", command],
-        "without-proxy",
-        true,
-    );
-    // The tools write failures on stderr; the saved log proves it was the feature's first download.
-    const failureLog = await Deno.readTextFile(`${scratch}/without-proxy.log`);
-    if (!failureLog.includes("Cannot fetch") || failure.includes("Installed hf")) {
-        throw new Error("Expected download failure without proxy.");
+    for (const [client, image] of [["pip", rootImage], ["uv", rootUvImage]]) {
+        const failure = await run(
+            "docker",
+            [...args, "--entrypoint", "bash", image, "-euc", command],
+            `without-proxy-${client}`,
+            true,
+        );
+        // The tools write failures on stderr; the saved log proves it was the feature's first download.
+        const failureLog = await Deno.readTextFile(`${scratch}/without-proxy-${client}.log`);
+        if (!failureLog.includes("Cannot fetch") || failure.includes("Installed hf")) {
+            throw new Error("Expected download failure without proxy.");
+        }
+        await run("docker", [
+            ...args,
+            "-e",
+            `http_proxy=http://${proxy}:8888`,
+            "-e",
+            `https_proxy=http://${proxy}:8888`,
+            "--entrypoint",
+            "bash",
+            image,
+            "-euc",
+            command,
+        ], `proxy-only-install-${client}`);
     }
-    await run("docker", [
-        ...args,
-        "-e",
-        `http_proxy=http://${proxy}:8888`,
-        "-e",
-        `https_proxy=http://${proxy}:8888`,
-        "--entrypoint",
-        "bash",
-        rootImage,
-        "-euc",
-        command,
-    ], "proxy-only-install");
 
     // Image metadata supplies uv's actual named volume and creation hook; no custom mounts or repairs.
     const workspace = `${scratch}/workspace`;

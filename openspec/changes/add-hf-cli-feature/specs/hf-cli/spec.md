@@ -147,13 +147,14 @@ environment is exactly the resolved version.
 
 The Python packages installed into the virtual environment SHALL come only from the Python Package Index, through its
 simple index at https://pypi.org/simple/ and its file host https://files.pythonhosted.org/. `huggingface_hub` and its
-dependencies SHALL be installed with uv and from wheels only. Every downloaded package file, the `pip` the installer
-upgrades in the new environment included, SHALL be installed only when its SHA-256 digest matches the one the index
-publishes for it. These index-published digests are the feature's package verification; the feature pins no checksum or
-signature of its own. Package-index configuration files, and uv, pip, or installer environment variables of the build,
-SHALL NOT redirect these sources, weaken these checks, or pass extra arguments to the installer. The build's proxy
-variables (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY`, and their lowercase forms) SHALL reach the installer
-unchanged, so a build behind a proxy installs from the same sources with the same checks.
+dependencies SHALL be installed with an existing uv of at least `0.12.16`, or with pip when uv is absent, and from
+wheels only. Every downloaded package file, the `pip` the installer upgrades in the new environment included, SHALL be
+installed only when its SHA-256 digest matches the one the index publishes for it. These index-published digests are the
+feature's package verification; the feature pins no checksum or signature of its own. Package-index configuration files,
+and uv, pip, or installer environment variables of the build, SHALL NOT redirect these sources, weaken these checks, or
+pass extra arguments to the installer. The build's proxy variables (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`,
+`ALL_PROXY`, and their lowercase forms) SHALL reach the installer unchanged, so a build behind a proxy installs from the
+same sources with the same checks.
 
 #### Scenario: Digest mismatch
 
@@ -171,11 +172,12 @@ unchanged, so a build behind a proxy installs from the same sources with the sam
 - **WHEN** the build reaches the network only through a proxy that its `http_proxy` and `https_proxy` variables name
 - **THEN** the feature installs the CLI from the sources this requirement names, with the same checks
 
-### Requirement: Require a verifying uv
+### Requirement: Use an optional verifying uv
 
-The feature SHALL depend on the `uv` feature and SHALL fail before downloading the installer unless the `uv` the
-installer will find on its `PATH` is version `0.12.16` or later, the first release that checks package files against
-index hashes.
+The feature SHALL NOT install or depend on the `uv` feature. When installed together, it SHALL run after that feature.
+If uv is available on the standard system PATH, the installer SHALL use it, and the build SHALL fail before downloading
+the installer unless that uv is version `0.12.16` or later, the first release that checks package files against index
+hashes. When uv is absent, the installer SHALL use the virtual environment's pip.
 
 #### Scenario: uv too old
 
@@ -185,7 +187,8 @@ index hashes.
 #### Scenario: uv missing
 
 - **WHEN** no `uv` is on that `PATH`
-- **THEN** the build fails with a message naming the `uv` feature
+- **THEN** installation succeeds using pip, and the `huggingface_hub` distribution's `INSTALLER` record names `pip`
+- **AND** the feature adds no uv executable, persistent volume, or uv container environment setting
 
 #### Scenario: Packages installed with the uv feature's uv
 
@@ -195,24 +198,46 @@ index hashes.
 
 ### Requirement: Provide the installer's Python
 
-The installer's virtual environment SHALL be based on the image's `python3`, the first on the system's standard `PATH`,
-which SHALL be version 3.10 or later with the `venv` and `ensurepip` modules. When the image has no `python3`, the
-feature SHALL install the distribution's `python3` and `python3-venv`; when the distribution's `python3` lacks
-`ensurepip`, `python3-venv`; and when the image lacks the CA certificate bundle, `ca-certificates`. It SHALL install
-them with their dependencies from the apt repositories the image already configures, which apt verifies against the
-image's archive keyrings, and SHALL add no apt repository or key. Any other `python3` that is older than 3.10 or lacks
-these modules SHALL fail the build before the installer is downloaded.
+The installer's virtual environment SHALL use an interpreter of at least Python 3.10 with `venv` and `ensurepip`. The
+feature SHALL run after `ghcr.io/devcontainers/features/python:1` when the user selects it, but SHALL NOT install that
+feature as a dependency. It SHALL prefer a usable `python3`, then `python`, under `/usr/local/python/current/bin`, then
+search standard system PATH directories for a usable `python3`, then `python`. An unusable earlier candidate SHALL NOT
+prevent selection of a usable later candidate. The feature SHALL make the selected interpreter available to the upstream
+installer as `python3` without changing the image's default interpreter or shell configuration. When the image has no
+interpreter in those locations, the feature SHALL install the distribution's `python3` and `python3-venv`; when a
+supported distribution interpreter needs venv support and no other usable interpreter exists, it SHALL install
+`python3-venv`. When the image lacks the CA certificate bundle, it SHALL install `ca-certificates`. These packages and
+their dependencies SHALL come from the apt repositories the image already configures, verified against the image's
+archive keyrings. The feature SHALL add no apt repository or key and SHALL NOT download or compile a Python interpreter
+itself. If no usable interpreter remains, the build SHALL fail before the installer is downloaded with the required
+Python version and guidance to configure the first-party Python feature.
 
 #### Scenario: Image without Python
 
-- **WHEN** the image has no `python3`
+- **WHEN** the image has no interpreter in the supported locations
 - **THEN** the feature installs `python3` and `python3-venv` from the image's configured apt repositories, and the
   installer's virtual environment uses that interpreter
 
 #### Scenario: Python too old
 
-- **WHEN** the `python3` the installer would use is older than 3.10
-- **THEN** the build fails with a message naming the found and the required version
+- **WHEN** all available interpreters are older than 3.10
+- **THEN** the build fails with the required version and guidance to configure the first-party Python feature
+
+#### Scenario: Existing usable Python
+
+- **WHEN** a usable interpreter exists on the standard system PATH
+- **THEN** the installer uses it without installing another Python or replacing the image's interpreter
+
+#### Scenario: First-party Python selected
+
+- **WHEN** the user selects the first-party Python feature with a usable interpreter
+- **THEN** that feature installs first, and the CLI's virtual environment uses its interpreter
+- **AND** this feature leaves its Python and development-tool configuration unchanged
+
+#### Scenario: Earlier Python unusable
+
+- **WHEN** an earlier candidate is too old or lacks the required modules and a later candidate is usable
+- **THEN** the installer uses the later candidate successfully
 
 ### Requirement: Keep the installation in the image
 

@@ -117,19 +117,22 @@ Upstream facts, read on 2026-09-30:
   unset); a user without an entry in the image's passwd database fails before anything is downloaded. Checked by the
   failure observations below.
 - The installer runs unmodified, as the remote user (root when the remote user is root or unset), in an environment
-  built from nothing but `HOME`, `USER`, `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`, the
+  built from nothing but `HOME`, `USER`, a temporary Python wrapper directory followed by the standard system PATH, the
   feature's own `UV_NO_CONFIG=1`, `UV_NO_CACHE=1`, `UV_NO_BUILD=1`, `UV_COMPILE_BYTECODE=1`, `UV_CONSTRAINT`,
-  `PIP_CONSTRAINT`, `PIP_CONFIG_FILE=/dev/null`, `PIP_NO_CACHE_DIR=1`, and `HF_HUB_DISABLE_UPDATE_CHECK=1`,
-  `HF_HUB_OFFLINE=1`, and the build's proxy variables, copied unchanged when set: `HTTP_PROXY`, `HTTPS_PROXY`,
-  `NO_PROXY`, `ALL_PROXY`, and their lowercase forms. No `HF_HOME`, `HF_CLI_BIN_DIR`, `HF_CLI_PIP_ARGS`, `HF_PIP_ARGS`,
-  `CLAUDE_CONFIG_DIR`, CA-bundle or insecure-host variable, or other `UV_*` or `PIP_*` variable from the build or the
-  `uv` feature reaches it. The fixed `PATH` makes the installer take the first `python3` and `uv` there. Its arguments
-  are `--no-modify-path`, plus `--exclude-skill` unless `installSkill` is enabled, plus `--force` when an installation
-  is required; never `--with-transformers`. Checked by the `redirected_sources` scenario and review.
+  `PIP_CONSTRAINT`, `PIP_CONFIG_FILE=/dev/null`, `PIP_NO_CACHE_DIR=1`, `PIP_ONLY_BINARY=:all:`, and
+  `HF_HUB_DISABLE_UPDATE_CHECK=1`, `HF_HUB_OFFLINE=1`, and the build's proxy variables, copied unchanged when set:
+  `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY`, and their lowercase forms. No `HF_HOME`, `HF_CLI_BIN_DIR`,
+  `HF_CLI_PIP_ARGS`, `HF_PIP_ARGS`, `CLAUDE_CONFIG_DIR`, CA-bundle or insecure-host variable, or other `UV_*` or `PIP_*`
+  variable from the build or the `uv` feature reaches it. A temporary `python3` wrapper execs the selected interpreter
+  by its stable path; the venv never links to the removed wrapper. The rest of PATH preserves optional system uv
+  discovery. Its arguments are `--no-modify-path`, plus `--exclude-skill` unless `installSkill` is enabled, plus
+  `--force` when an installation is required; never `--with-transformers`. Checked by the `redirected_sources` scenario
+  and review.
 - The feature's messages never print a proxy variable's value, since a proxy URL can carry credentials. "Build behind a
   proxy" is observed outside CI and recorded in the PR's Validation section: in a container on a Docker network without
-  a route out (`--internal`), with uv installed beforehand, `install.sh` succeeds when `http_proxy` and `https_proxy`
-  name a forward proxy on that network (for example Debian's `tinyproxy`) and fails at its first download without them.
+  a route out (`--internal`), with prerequisites installed beforehand, `install.sh` succeeds on both pip and uv paths
+  when `http_proxy` and `https_proxy` name a forward proxy on that network (for example Debian's `tinyproxy`) and fails
+  at its first download without them.
 - The constraint file holds exactly `huggingface_hub==<version>`, lives in a temporary directory readable by the remote
   user, and is removed afterwards. After the installer, the venv's interpreter, run as the remote user, reads the
   installed version with `importlib.metadata`; a mismatch fails the build before `/usr/local/bin/hf` is written. Checked
@@ -140,11 +143,13 @@ Upstream facts, read on 2026-09-30:
   context (certificates verified against the system store), HTTPS only, following no redirect; anything but a 200 fails.
   `urllib`'s default proxy handling stays, so they go through the proxy that `https_proxy` or `HTTPS_PROXY` names when
   the build sets one. Checked by review.
-- `uv --version` of the `uv` on the installer's `PATH` is at least `0.12.16`, checked before the installer is
-  downloaded. Checked by the failure observations below.
-- Distribution packages: `python3`, `python3-venv`, and `ca-certificates`, only those missing, with apt lists removed
-  afterwards; a `python3` below 3.10 fails before the installer is downloaded. Checked by `test.sh` (`dpkg -s`) and the
-  failure observations below.
+- Existing uv must be at least `0.12.16`, checked before downloading the installer; absence selects pip. Checked by the
+  default pip tests, explicit uv global scenario, and old-uv failure observation.
+- Python selection prefers usable `python3` then `python` under `/usr/local/python/current/bin`, then those commands on
+  standard system PATH. Python must be at least 3.10 with venv and ensurepip; an unusable earlier candidate does not
+  shadow a usable later one. When no candidate exists, apt prepares Python; a supported system interpreter missing venv
+  triggers only `python3-venv`. Otherwise failure advises the first-party feature. CA certificates are prepared when
+  missing. Checked by default tests, Python scenarios, and real 3.9 failure observations.
 - Every file under the remote user's `~/.hf-cli` belongs to the remote user, and every build-time command that runs the
   venv's interpreter runs as that user. Checked by `test.sh` (`find ~/.hf-cli ! -user <remote user>` is empty).
 - `/usr/local/bin/hf` is a root-owned symbolic link to `<home>/.hf-cli/venv/bin/hf`, replaced only after the version
@@ -168,7 +173,7 @@ Upstream facts, read on 2026-09-30:
   - malformed version with `2.0` and `2.0.0rc0`; below the floor with `1.26.1`; no release tag with `9.9.9`;
   - endpoint unusable with `latest` in a container without network access, prerequisites installed beforehand; the half
     where the endpoint answers something other than a version is checked by review;
-  - uv too old with a `uv` stub that prints `uv 0.12.15`; uv missing with no `uv` installed;
+  - uv too old with a `uv` stub that prints `uv 0.12.15`; uv missing is successful default pip coverage;
   - release absent from PyPI with a `uv` wrapper that replaces the constraint with a release PyPI lacks and runs the
     real `uv`; installed version differs with a wrapper that drops the constraint while `1.33.0` is requested;
   - Python too old on Debian 11 with a real Python 3.9 interpreter (`python:3.9-bullseye`, an official Python image
@@ -203,11 +208,11 @@ The feature has two options, both new in this change; the spec's Option requirem
 | `installSkill` | `boolean` | `false`    | none                            | Let the installer add the upstream `hf-cli` agent skill for the remote user                                                       |
 
 - **Default `latest` for `version`.** A configuration that omits `version` gets the current release, as upstream's own
-  installer does, yet each build installs exactly one release and logs it; a pinned `version` gives reproducible builds.
-  Proposals, not an enum: every release from the floor on is valid, and each new release adds one. `1.33.0` is the
-  proposal after the default, so the duplicate test installs it with `installSkill` enabled and then the defaults
-  (Context); its installer is identical to `v2.0.0`'s, and it differs from what `latest` resolves to, so the second
-  install takes the `--force` path.
+  installer does, yet each build installs exactly one release and logs it; a pinned `version` fixes the CLI release
+  while its dependencies can vary. Proposals, not an enum: every release from the floor on is valid, and each new
+  release adds one. `1.33.0` is the proposal after the default, so the duplicate test installs it with `installSkill`
+  enabled and then the defaults (Context); its installer is identical to `v2.0.0`'s, and it differs from what `latest`
+  resolves to, so the second install takes the `--force` path.
 - **Default `false` for `installSkill`** (maintainer decision; Open Questions, item 2). The skill changes what coding
   agents in the container read and writes into `~/.claude`, so the feature adds it only on request, although upstream's
   installer adds it by default.
@@ -232,17 +237,17 @@ options, on `mcr.microsoft.com/devcontainers/base:ubuntu24.04` as `vscode`. Its 
 environment, and that `/var/lib/uv` is a mount, empty, belongs to the `uv` group with mode 2775, and is writable by
 `vscode`, also after UID remapping. For the `uv` change's (#14) "Later feature runs uv", which this scenario checks
 again from this change on: the build succeeding shows that a later feature found and ran `uv` during its install,
-because this feature runs `uv --version` for its floor check and fails without it; the runtime value of
-`UV_PYTHON_INSTALL_DIR` equals the value later features saw during their install, because the `uv` feature's
-`containerEnv` is written as image `ENV` before they install (Context). This feature's `install.sh` does not assert that
-variable itself, since it keeps it away from the installer.
+because this explicit combination checks and runs the existing uv; the runtime value of `UV_PYTHON_INSTALL_DIR` equals
+the value later features saw during their install, because the `uv` feature's `containerEnv` is written as image `ENV`
+before they install (Context). This feature's `install.sh` does not assert that variable itself, since it keeps it away
+from the installer.
 
-`test.sh` and the global scenario see the `uv` feature's volume only if `devcontainer features test` applies feature
-`mounts`, which the `uv` change's Risks list as unverified. If it does not, those assertions fail; the implementation
-reports that before changing them, and observes the mounted-volume scenarios with `devcontainer up` instead, recorded in
-the PR's Validation section. The non-empty case of "Container with the uv volume mounted" is observed that way in any
-case: a dev container with both features is rebuilt with its `uv` volume kept after uv has written to it, and
-`hf version` runs for the remote user.
+The global scenario sees the explicitly selected `uv` feature's volume only if `devcontainer features test` applies
+feature `mounts`, which the `uv` change's Risks list as unverified. If it does not, those assertions fail; the
+implementation reports that before changing them, and observes the mounted-volume scenarios with `devcontainer up`
+instead, recorded in the PR's Validation section. The non-empty case of "Container with the uv volume mounted" is
+observed that way in any case: a dev container with both features is rebuilt with its `uv` volume kept after uv has
+written to it, and `hf version` runs for the remote user.
 
 ## Decisions
 
@@ -282,20 +287,19 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
   latest release (a tag can exist before its PyPI release).
 - **Floor `1.27.0`.** One set of installer flags works from there on, and every accepted installer has the uv path.
   Rejected: `1.1.0` with version-dependent flags (no `--exclude-skill` before `1.27.0`, no uv path before `1.2.0`).
-- **`dependsOn` the `uv` feature, kept so the installer takes its uv path.** uv checks index hashes (from 0.12.16) and
-  lets the feature require wheels only. pip also checks the index hash (tested), so the dependency does not add a
-  stronger trust root; it adds the uv floor, `UV_NO_BUILD`, and consistency with the collection. Rejected: letting the
-  installer fall back to pip.
+- **Optional uv instead of a hard dependency.** The package clients both check PyPI index hashes and support wheels
+  only. uv accelerates installation when already available; pip keeps a CLI-only image free of uv's volume and
+  environment settings. Existing old uv fails visibly. Rejected: forcing the uv feature on every CLI user.
 - **The pair's contract in a global scenario, `uv_and_hf_cli`.** It installs both features by name, so the checks both
   changes rely on (uv found and used during this install, the `uv` volume path left empty and writable according to the
   merged `uv` contract) live in one place that runs when either feature or `test/_global/` changes. Rejected: only this
-  feature's `test.sh`, which installs `uv` implicitly through `dependsOn`, so the pair's contract would sit among this
-  feature's own checks.
+  feature's `test.sh`, which exercises the pip path without uv, so the pair's contract would sit among this feature's
+  own checks.
 - **The distribution's `python3` and `python3-venv`, installed when missing.** Both images lack Python; apt verifies the
-  packages against the image's archive keyring; the installer and `hf update` are written for a system Python. Rejected:
-  a uv-managed CPython on the installer's `PATH` (the venv would depend on an interpreter directory the feature must own
-  outside the `uv` volume, plus python-build-standalone downloads); `python3-full` or `python3-pip` (more than the
-  installer needs); requiring users to add Python themselves.
+  packages against the image's archive keyring; an existing qualified interpreter takes precedence over apt preparation.
+  Rejected: a uv-managed CPython on the installer's `PATH` (the venv would depend on an interpreter directory the
+  feature must own outside the `uv` volume, plus python-build-standalone downloads); `python3-full` or `python3-pip`
+  (more than the installer needs); requiring users to add Python themselves.
 - **The feature's requests go through `python3`'s `urllib`.** `python3` is required anyway and parses JSON. Rejected:
   `curl` plus `jq` from apt (two more packages on `debian:12`); relying on the `uv` feature's `curl` (a prerequisite of
   that feature, not an interface).
@@ -336,8 +340,8 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
     verified: upstream publishes no checksum or signature, and a tag can be moved. `feature-authoring.md`'s "Installer
     scripts" rule allows this, since the file is saved and run, never piped, and the spec states it (Decisions). The
     SHA-256 in the build log shows a change between two builds and verifies nothing.
-  - `huggingface_hub` and its dependencies: SHA-256 digests from PyPI's simple index, enforced by uv (0.12.16 or later),
-    wheels only.
+  - `huggingface_hub` and its dependencies: SHA-256 digests from PyPI's simple index, enforced by uv (0.12.16 or later)
+    or pip, wheels only.
   - `pip`, upgraded by the installer inside the new venv: the SHA-256 digest from the index, enforced by the pip that
     `python3-venv` provides (tested), a check pip documents as protection against corruption.
   - `python3`, `python3-venv`, `ca-certificates`: apt's signed repository metadata and the image's keyrings.
@@ -359,9 +363,9 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
   and to install `hf-mount` from Homebrew or GitHub releases, downloads outside the URL inventory. The feature generates
   the skill only on request (`installSkill` defaults to `false`), leaves the generated file unedited, and `NOTES.md`
   states what it tells agents.
-- **Metadata:** `dependsOn` `ghcr.io/hoshiori-dev/devcontainer-features/uv:1`; `containerEnv`
-  `HF_HUB_DISABLE_UPDATE_CHECK=1`, which only silences the CLI. No `installsAfter`, `mounts`, `capAdd`, `privileged`,
-  `securityOpt`, `entrypoint`, `init`, or lifecycle command.
+- **Metadata:** no hard dependency; `installsAfter` the optional first-party Python and uv features; `containerEnv`
+  `HF_HUB_DISABLE_UPDATE_CHECK=1`, which only silences the CLI. No `mounts`, `capAdd`, `privileged`, `securityOpt`,
+  `entrypoint`, `init`, or lifecycle command.
 - **Files outside the feature's link:** in the remote user's home, `~/.hf-cli/venv`, `~/.local/bin/hf`, with
   `installSkill` `~/.agents/skills/hf-cli` and `~/.claude/skills/hf-cli`. No shell rc or profile file is edited.
 - **Inputs:** `version` is validated before any use; `installSkill` is a boolean. No option takes a credential. The
@@ -369,7 +373,7 @@ case: a dev container with both features is rebuilt with its `uv` volume kept af
   they select a connection's route, not its destination or its checks.
 - **Idempotency:** see Goals and the spec's "Install twice".
 - **Failure behavior:** the spec's "Option version", "Resolve the latest version", "Download the installer from the
-  release tag", "Pin the installed version", "Require a verifying uv", "Provide the installer's Python", "Option
+  release tag", "Pin the installed version", "Use an optional verifying uv", "Provide the installer's Python", "Option
   installSkill", "Refuse unsupported platforms", and the missing remote user in "Install the Hugging Face CLI with the
   standalone installer"; each fails before `/usr/local/bin/hf` is written.
 
@@ -399,11 +403,11 @@ Docker Hub) are left out, as in the `uv` change's inventory.
 | `https://pypi.org/pypi/huggingface_hub/json`                                                                                                                                                                                                                                                                                                                                                           | Resolve `latest` from `info.version`                                                             | Build (when `version` is `latest`) and test                                                                                 | TLS to `pypi.org`; the value is validated as `MAJOR.MINOR.PATCH`                                               | https://docs.pypi.org/api/json/                                                                                                                                                                                                                                                                                                                                                        | 2026-09-30: 200, no redirect, `info.version` `2.0.0`                                                                                                                                                                                                                                                                                                           |
 | `https://raw.githubusercontent.com/huggingface/huggingface_hub/refs/tags/v<version>/utils/installers/install.sh`                                                                                                                                                                                                                                                                                       | The installer; a 404 is the tag check                                                            | Build                                                                                                                       | TLS to `raw.githubusercontent.com`; the path names the upstream release tag; no upstream checksum or signature | GitHub's page https://github.com/huggingface/huggingface_hub/blob/v2.0.0/utils/installers/install.sh names `https://github.com/huggingface/huggingface_hub/raw/refs/tags/v2.0.0/utils/installers/install.sh`, which answers 302 to this host and path                                                                                                                                  | 2026-09-30: `v2.0.0` 200, no redirect, 583 lines, SHA-256 `e657ec04…6eb8` (equal to `main` and to `huggingface.co/cli/install.sh`); `v1.27.0` 200; `v2.0.1` 404                                                                                                                                                                                                |
 | `https://pypi.org/simple/<project>/` for `huggingface-hub`, each dependency, `pip`, and the test fixture `pycowsay`                                                                                                                                                                                                                                                                                    | Resolution; lists every file with its SHA-256                                                    | Build                                                                                                                       | TLS to `pypi.org`; source of the digests uv and pip enforce                                                    | https://docs.pypi.org/api/index-api/; PyPI as uv's default index: https://docs.astral.sh/uv/concepts/indexes/; pip's `--index-url` default `https://pypi.org/simple`: https://pip.pypa.io/en/stable/cli/pip_install/                                                                                                                                                                   | 2026-09-30: `/simple/huggingface-hub/` and `/simple/pip/` 200, no redirect; `huggingface_hub-2.0.0-py3-none-any.whl` listed with `b3eecb60…d6dd`, `pip-26.2.1-py3-none-any.whl` with `71138adf…ed3e`                                                                                                                                                           |
-| `https://files.pythonhosted.org/packages/<path>/<file>` (wheels and their `.metadata` files)                                                                                                                                                                                                                                                                                                           | Package downloads, including the `pip` wheel of the installer's pip upgrade                      | Build                                                                                                                       | SHA-256 from the simple index, checked by uv ≥ 0.12.16 (packages) and by pip (`pip` itself)                    | https://docs.pypi.org/api/ (names `files.pythonhosted.org` as the file host)                                                                                                                                                                                                                                                                                                           | 2026-09-30: `huggingface_hub-2.0.0-py3-none-any.whl`, its `.metadata`, and `pip-26.2.1-py3-none-any.whl` 200, no redirect                                                                                                                                                                                                                                      |
+| `https://files.pythonhosted.org/packages/<path>/<file>` (wheels and their `.metadata` files)                                                                                                                                                                                                                                                                                                           | Package downloads, including the `pip` wheel of the installer's pip upgrade                      | Build                                                                                                                       | SHA-256 from the simple index, checked by uv ≥ 0.12.16 or pip (packages), and by pip (`pip` itself)            | https://docs.pypi.org/api/ (names `files.pythonhosted.org` as the file host)                                                                                                                                                                                                                                                                                                           | 2026-09-30: `huggingface_hub-2.0.0-py3-none-any.whl`, its `.metadata`, and `pip-26.2.1-py3-none-any.whl` 200, no redirect                                                                                                                                                                                                                                      |
 | `http://deb.debian.org/debian` (`bookworm`, `bookworm-updates`), `http://deb.debian.org/debian-security` (`bookworm-security`)                                                                                                                                                                                                                                                                         | `python3`, `python3-venv`, `ca-certificates` when missing; the repositories the image configures | Build, `debian:12`                                                                                                          | apt checks the signed `InRelease` against the image's `debian-archive-keyring`                                 | https://www.debian.org/mirror/list ("The Debian project maintains deb.debian.org"); https://deb.debian.org/ lists `/debian-security/`                                                                                                                                                                                                                                                  | 2026-09-30: all three `InRelease` 200, no redirect                                                                                                                                                                                                                                                                                                             |
 | `http://archive.ubuntu.com/ubuntu` (`noble`, `-updates`, `-backports`) and `http://security.ubuntu.com/ubuntu` (`noble-security`) on amd64; `http://ports.ubuntu.com/ubuntu-ports` (all four) on arm64                                                                                                                                                                                                 | `python3`, `python3-venv` when missing; the repositories the image configures                    | Build, `base:ubuntu24.04`                                                                                                   | apt checks the signed `InRelease` against the image's `ubuntu-archive-keyring`                                 | The image's `/etc/apt/sources.list.d/ubuntu.sources` (Ubuntu's default, `Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg`); https://ubuntu.com/project/docs/how-ubuntu-is-made/concepts/package-archive/ (Canonical) names `archive.ubuntu.com` and `security.ubuntu.com`; no Canonical page found naming `ports.ubuntu.com`, whose evidence is the image's own sources file | 2026-09-30: all eight `InRelease` 200, no redirect                                                                                                                                                                                                                                                                                                             |
-| `ghcr.io/hoshiori-dev/devcontainer-features/uv:1`: `https://ghcr.io/token?scope=repository:hoshiori-dev/devcontainer-features/uv:pull`, `https://ghcr.io/v2/hoshiori-dev/devcontainer-features/uv/manifests/1`, and `https://ghcr.io/v2/hoshiori-dev/devcontainer-features/uv/blobs/sha256:<digest>`, which answers 307 to `https://pkg-containers.githubusercontent.com/<path>/blobs/sha256:<digest>` | `dependsOn`, pulled by the dev container CLI                                                     | Build, for users; the repository's tests pull it from their local staging registry instead (`.agents/knowledge/testing.md`) | OCI manifest and blob digests; published by this repository's release workflow                                 | https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry (names `ghcr.io`); https://api.github.com/meta (`domains.packages` lists `*.ghcr.io` and `*.githubusercontent.com`); the ref form: https://github.com/hoshiori-dev/devcontainer-features/blob/main/.agents/knowledge/feature-authoring.md                              | 2026-10-04: the public `uv:1` token and manifest requests returned 200; manifest SHA-256 `f408235a6f8a95f0cce9e6119e62c4f8f2c4914946a1e7fc4d3f77169e0aaa21` and the feature blob digest were verified. The same flow on the public `ghcr.io/devcontainers/features/common-utils:2`: token and manifest 200, blob 307 to `pkg-containers.githubusercontent.com` |
-| The `uv` feature's downloads: rows 1–4 of the `uv` change's URL inventory (`https://github.com/astral-sh/uv/releases/…` and `https://release-assets.githubusercontent.com/…`)                                                                                                                                                                                                                          | The `uv` feature's own install, which `dependsOn` runs                                           | Build and test                                                                                                              | SHA-256 from the release's `.sha256`, checked by the `uv` feature                                              | The `uv` change's (#14) design                                                                                                                                                                                                                                                                                                                                                         | As recorded there; rows 5–8 there only when a user sets that feature's `toolsToInstall`                                                                                                                                                                                                                                                                        |
+| `ghcr.io/hoshiori-dev/devcontainer-features/uv:1`: `https://ghcr.io/token?scope=repository:hoshiori-dev/devcontainer-features/uv:pull`, `https://ghcr.io/v2/hoshiori-dev/devcontainer-features/uv/manifests/1`, and `https://ghcr.io/v2/hoshiori-dev/devcontainer-features/uv/blobs/sha256:<digest>`, which answers 307 to `https://pkg-containers.githubusercontent.com/<path>/blobs/sha256:<digest>` | Optional uv composition, pulled by the dev container CLI when selected                           | Build, for users; the repository's tests pull it from their local staging registry instead (`.agents/knowledge/testing.md`) | OCI manifest and blob digests; published by this repository's release workflow                                 | https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry (names `ghcr.io`); https://api.github.com/meta (`domains.packages` lists `*.ghcr.io` and `*.githubusercontent.com`); the ref form: https://github.com/hoshiori-dev/devcontainer-features/blob/main/.agents/knowledge/feature-authoring.md                              | 2026-10-04: the public `uv:1` token and manifest requests returned 200; manifest SHA-256 `f408235a6f8a95f0cce9e6119e62c4f8f2c4914946a1e7fc4d3f77169e0aaa21` and the feature blob digest were verified. The same flow on the public `ghcr.io/devcontainers/features/common-utils:2`: token and manifest 200, blob 307 to `pkg-containers.githubusercontent.com` |
+| The `uv` feature's downloads: rows 1–4 of the `uv` change's URL inventory (`https://github.com/astral-sh/uv/releases/…` and `https://release-assets.githubusercontent.com/…`)                                                                                                                                                                                                                          | The optional `uv` feature's own install                                                          | Build and test                                                                                                              | SHA-256 from the release's `.sha256`, checked by the `uv` feature                                              | The `uv` change's (#14) design                                                                                                                                                                                                                                                                                                                                                         | As recorded there; rows 5–8 there only when a user sets that feature's `toolsToInstall`                                                                                                                                                                                                                                                                        |
 | `https://huggingface.co/api/models/openai-community/gpt2`                                                                                                                                                                                                                                                                                                                                              | The anonymous Hub request of `test.sh` (`hf models info openai-community/gpt2`)                  | Test only                                                                                                                   | TLS verified by `truststore` against the system trust store                                                    | Default endpoint `_HF_DEFAULT_ENDPOINT` in https://github.com/huggingface/huggingface_hub/blob/v2.0.0/src/huggingface_hub/constants.py; `model_info` path in https://github.com/huggingface/huggingface_hub/blob/v2.0.0/src/huggingface_hub/hf_api.py; https://huggingface.co/docs/hub/api                                                                                             | 2026-09-30: 200, no redirect; the command succeeded in `debian:12` (see Context)                                                                                                                                                                                                                                                                               |
 | `https://hf.co/cli/install.sh`, answering 307 to `https://huggingface.co/cli/install.sh`                                                                                                                                                                                                                                                                                                               | The documented installer URL, which `hf update` pipes into bash                                  | Never by the feature or its tests; only if a user runs `hf update` in a container                                           | TLS only; mutable, not tied to a version                                                                       | https://huggingface.co/docs/huggingface_hub/main/en/installation.md; https://huggingface.co/docs/huggingface_hub/main/en/guides/cli.md                                                                                                                                                                                                                                                 | 2026-09-30: 307 to `huggingface.co`, then 200; SHA-256 `e657ec04…6eb8`                                                                                                                                                                                                                                                                                         |
 
@@ -437,7 +441,7 @@ through the proxy they name; that proxy is the build's own and adds no URL here.
   feature leaves the generated file unedited, and `NOTES.md` states what it tells agents (Security review).
 - [A future installer revision adds a default step, drops a flag, or changes paths] → an unknown flag or a moved venv
   fails the build visibly (the marker, version, and link checks); a new default step would run unseen until a test or
-  review notices. CI tests `latest` only when this feature or its dependency changes.
+  review notices. CI tests `latest` when this feature or a selected in-repo predecessor changes.
 - [The installer's pip upgrade is unpinned] → accepted; the file is checked against the index digest.
 - [Transitive dependencies float within `huggingface_hub`'s ranges, so two builds of one `version` can differ] →
   accepted for 1.0.0.
@@ -462,8 +466,6 @@ through the proxy they name; that proxy is the build's own and adds no URL here.
   states it and names uv's `--managed-python` flag and `UV_MANAGED_PYTHON` variable.
 - [The `refs/tags/` raw path is GitHub behavior observed and linked by GitHub's own pages, not a documented API] → if it
   changes, every build fails with a message naming the tag.
-- [The `uv` feature may merge with other directories, variables, or minimum version] → the installer's environment is
-  built from scratch; the inventory's `uv:1` row and the supported images are re-checked when #14 merges.
 - [`test.sh` compares the installed version with the endpoint at test time] → a release published between build and test
   fails the job once; a rerun passes.
 - [The Hub request makes `test.sh` depend on `huggingface.co` being reachable from CI, and anonymous requests from
@@ -516,3 +518,52 @@ On 2026-10-04 the maintainer approved the package and these corrections in conve
 and skill generation; the merged uv group access contract for an empty volume; direct CLI skill generation without
 reinstalling packages for the same version; and a real Debian 11 Python 3.9 fixture, using the official Debian snapshot
 archive if needed. Archive and merge remain separate maintainer commands.
+
+## Optional runtime prerequisites revision
+
+On 2026-10-04 the maintainer authorized revising specification and implementation together for review. This replaces all
+earlier mandatory-uv decisions in this record: no hard feature dependency, Python reuse and apt fallback, optional
+first-party Python ordering, and equivalent pip/uv package checks. Archive and merge remain separate commands.
+
+The first-party Python feature is a soft predecessor, not an automatic install: its default tools, editor settings,
+interpreter configuration and possible source build are broader than a CLI needs. Rejected: a hard Python dependency,
+downloading a private interpreter, compiling Python here, and requiring the uv feature solely to speed up packages.
+Existing suitable Python is reused without changing its default command; `~/.hf-cli/venv` remains isolated. The selected
+interpreter is executed by a root-created temporary wrapper before standard PATH, so upstream finds it as python3 even
+when an older python3 exists. The wrapper is removed after install; venv links refer to the stable interpreter path. A
+first-party Python scenario and an older-system-Python observation verify interpreter selection and link survival.
+
+The upstream installer chooses uv solely through PATH. Existing standard-path uv keeps its verified minimum version; old
+uv fails visibly rather than silently changing package managers. No uv selects upstream's pip path. Both receive
+constraints, disabled configuration and caches, and wheel-only settings; the clean environment excludes incoming index,
+home, certificate and installer argument overrides. Rejected: editing upstream to force pip and adding a user
+package-manager option. Scenario coverage exercises both branches with hostile configuration; local hash observations
+check each client's index verification, and proxy observations exercise each full installer path.
+
+The first-party Python combination is test-only and installs `ghcr.io/devcontainers/features/python:1` with
+`version: os-provided` and `installTools: false` on the supported Debian image. The disposable first-party path fixture
+also uses a stable non-system interpreter path alongside an older candidate. The feature's own URL inventory is
+unchanged: Python feature downloads belong to that independently selected feature. Its os-provided scenario requests
+only the image's signed apt repositories, including additional Python development packages. OCI distribution uses
+`https://ghcr.io/token?scope=repository:devcontainers/features/python:pull`, the corresponding `/v2/.../manifests/1` and
+`/blobs/sha256:<digest>` URLs, and GitHub's package blob redirect hosts. Sources:
+https://github.com/devcontainers/features/tree/main/src/python and
+https://github.com/devcontainers/spec/blob/main/docs/specs/devcontainer-features.md#the-installsafter-property.
+
+Changing the base interpreter later can break an existing venv; rebuild the container after changing Python. A Python
+below 3.10 requires the user to select a suitable first-party version. The current support matrix remains Debian/Ubuntu
+on amd64/arm64; this revision adds no distribution or feature options.
+
+The `hash_checks.ts` disposable-container fixture uses only loopback HTTP (`http://127.0.0.1:8181/simple/`) on an
+isolated network to serve a generated minimal wheel with wrong then correct SHA-256 links. Both clients must reject
+incorrect bytes before installing and accept the same wheel with the correct digest. This is test-only traffic with no
+external registry or credentials; it does not change the feature's fixed HTTPS sources.
+
+The `earlier_python` build fixture pairs the official `python:3.12-slim-bullseye` interpreter with distribution Python
+3.9, exposed as the earlier first-party-path candidate. Debian 11's security package URLs returned 404 during
+preparation on 2026-10-04, so this fixture uses only `https://snapshot.debian.org/archive/debian/20260801T000000Z/`
+(`bullseye main`), with its InRelease, index and package paths (including HTTPS snapshot redirects to `/file/<digest>`).
+apt verifies the archive signature against the image's Debian keyring and package digests against that index. This main
+suite has no Valid-Until header; no signature, TLS or freshness check is disabled. It is test-only, following the
+already-approved official snapshot fallback, and adds no repository or key to the feature. Reference:
+https://snapshot.debian.org/#usage.

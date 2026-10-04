@@ -42,15 +42,35 @@ if [[ "$remote_user" != root ]]; then
     command -v runuser >/dev/null || fail 'runuser is required to install as the remote user.'
 fi
 
-# The image's system Python supplies venv and ensurepip; never download a managed interpreter.
-if command -v python3 >/dev/null; then
-    python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))' || fail "Python $(python3 --version) is too old; Python 3.10 or later is required."
-fi
+# Prefer the first-party feature's interpreter, then standard system commands.
+# Keep interpreter selection separate from upstream's python3-before-python discovery.
+python_candidates=(/usr/local/python/current/bin/python3 /usr/local/python/current/bin/python)
+IFS=: read -r -a system_directories <<< "$SYSTEM_PATH"
+for command_name in python3 python; do
+    for directory in "${system_directories[@]}"; do
+        if [[ -x "$directory/$command_name" ]]; then python_candidates+=("$directory/$command_name"); fi
+    done
+done
+python_command=''
+system_venv_missing=false
+python_found=false
+for candidate in "${python_candidates[@]}"; do
+    [[ -x "$candidate" ]] || continue
+    python_found=true
+    "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 10))' >/dev/null 2>&1 || continue
+    if "$candidate" -c 'import venv, ensurepip' >/dev/null 2>&1; then
+        python_command="$candidate"
+        break
+    fi
+    if [[ "$(readlink -f "$candidate")" == /usr/bin/python3.* ]]; then system_venv_missing=true; fi
+done
 packages=()
-if ! command -v python3 >/dev/null; then
+if [[ "$python_found" == false ]]; then
     packages+=(python3 python3-venv)
-elif [[ "$(command -v python3)" == /usr/bin/python3 ]]; then
-    python3 -c 'import venv, ensurepip' >/dev/null 2>&1 || packages+=(python3-venv)
+elif [[ -z "$python_command" && "$system_venv_missing" == true ]]; then
+    packages+=(python3-venv)
+elif [[ -z "$python_command" ]]; then
+    fail 'No usable Python: Python 3.10 or later with venv and ensurepip is required. Configure ghcr.io/devcontainers/features/python:1 with a suitable version.'
 fi
 [[ -s /etc/ssl/certs/ca-certificates.crt ]] || packages+=(ca-certificates)
 if (( ${#packages[@]} )); then
@@ -59,11 +79,17 @@ if (( ${#packages[@]} )); then
     apt-get install -y --no-install-recommends "${packages[@]}"
     rm -rf /var/lib/apt/lists/*
 fi
-python3 -c 'import sys, venv, ensurepip; sys.exit(sys.version_info < (3, 10))' || fail 'System python3 must be Python 3.10 or later with venv and ensurepip.'
-command -v uv >/dev/null || fail 'uv is missing; install the uv feature first.'
-uv_version=$(uv --version | awk '{print $2}')
-[[ "$uv_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Cannot read uv version: $uv_version."
-older_than "$uv_version" '0.12.16' && fail "uv $uv_version is too old; uv 0.12.16 or later is required."
+if [[ -z "$python_command" ]]; then python_command=/usr/bin/python3; fi
+"$python_command" -c 'import sys, venv, ensurepip; sys.exit(sys.version_info < (3, 10))' || fail 'Python 3.10 or later with venv and ensurepip is required; configure ghcr.io/devcontainers/features/python:1 with a suitable version.'
+log "Using Python: $python_command ($("$python_command" --version))"
+if command -v uv >/dev/null; then
+    uv_version=$(uv --version | awk '{print $2}')
+    [[ "$uv_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Cannot read uv version: $uv_version."
+    older_than "$uv_version" '0.12.16' && fail "uv $uv_version is too old; uv 0.12.16 or later is required."
+    log "Using existing uv $uv_version for package installation."
+else
+    log 'uv is absent; the upstream installer will use pip.'
+fi
 
 # Only proxy routing variables pass through. No build index, argument, CA or credential settings do.
 proxy_env=()
@@ -71,7 +97,7 @@ for variable in HTTP_PROXY HTTPS_PROXY NO_PROXY ALL_PROXY http_proxy https_proxy
     if [[ -v "$variable" ]]; then proxy_env+=("$variable=${!variable}"); fi
 done
 fetch() {
-    env -i PATH="$SYSTEM_PATH" "${proxy_env[@]}" python3 - "$@" <<'PY'
+    env -i PATH="$SYSTEM_PATH" "${proxy_env[@]}" "$python_command" - "$@" <<'PY'
 import sys
 import urllib.request
 
@@ -95,9 +121,14 @@ PY
 temporary_dir=$(mktemp -d)
 trap 'rm -rf "$temporary_dir"' EXIT
 chmod 755 "$temporary_dir"
+# Execute the selected interpreter by its stable path, so the venv never links to
+# a temporary symlink or accidentally uses an older python3 elsewhere on PATH.
+mkdir "$temporary_dir/bin"
+printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$python_command" > "$temporary_dir/bin/python3"
+chmod 755 "$temporary_dir/bin/python3"
 if [[ "$VERSION" == latest ]]; then
     fetch "$LATEST_URL" "$temporary_dir/latest.json"
-    VERSION=$(python3 - "$temporary_dir/latest.json" <<'PY'
+    VERSION=$("$python_command" - "$temporary_dir/latest.json" <<'PY'
 import json, sys
 try:
     value = json.load(open(sys.argv[1]))["info"]["version"]
@@ -115,10 +146,11 @@ log "Resolved huggingface_hub version: $VERSION"
 printf 'huggingface_hub==%s\n' "$VERSION" > "$temporary_dir/constraints.txt"
 chmod 644 "$temporary_dir/constraints.txt"
 install_env=(
-    "HOME=$remote_home" "USER=$remote_user" "PATH=$SYSTEM_PATH"
+    "HOME=$remote_home" "USER=$remote_user" "PATH=$temporary_dir/bin:$SYSTEM_PATH"
     UV_NO_CONFIG=1 UV_NO_CACHE=1 UV_NO_BUILD=1 UV_COMPILE_BYTECODE=1
     "UV_CONSTRAINT=$temporary_dir/constraints.txt" "PIP_CONSTRAINT=$temporary_dir/constraints.txt"
-    PIP_CONFIG_FILE=/dev/null PIP_NO_CACHE_DIR=1 HF_HUB_DISABLE_UPDATE_CHECK=1 HF_HUB_OFFLINE=1
+    PIP_CONFIG_FILE=/dev/null PIP_NO_CACHE_DIR=1 PIP_ONLY_BINARY=:all:
+    HF_HUB_DISABLE_UPDATE_CHECK=1 HF_HUB_OFFLINE=1
     "${proxy_env[@]}"
 )
 run_as_user() {

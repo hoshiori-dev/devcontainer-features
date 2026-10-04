@@ -17,6 +17,9 @@
       "description": "Generate the upstream hf-cli agent skill in the remote user's home and link it into ~/.claude/skills."
     }
   },
-  "dependsOn": { "ghcr.io/hoshiori-dev/devcontainer-features/uv:1": {} },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/python:1",
+    "ghcr.io/hoshiori-dev/devcontainer-features/uv"
+  ],
   "containerEnv": { "HF_HUB_DISABLE_UPDATE_CHECK": "1" }
 }
