@@ -16,6 +16,7 @@ Installs a list of system packages with pacman from the repositories the Arch Li
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
 | packages | Comma-separated packages to install: a name, a provided name, or a group, optionally with a version constraint (name>=version). Whitespace around entries and empty entries are ignored; an empty list installs nothing, and a non-empty list also upgrades the whole system. | string | - |
+| cleanup | Remove all managed caches, package files only, or skip feature cleanup. Native retention remains independent. | string | all |
 
 ## Usage
 
@@ -64,8 +65,9 @@ configuration file you changed is kept when its package is upgraded; a differing
 The same list therefore gives different images over time, and pinning the base image's digest does not change that. If
 you need a fixed, reviewed package set, prebuild the dev container image and pin the digest of the built image.
 
-After installing, the feature removes the downloaded packages and the sync databases, as the official image ships
-without them. To install more packages later, run `pacman -Syu <package>`.
+With the default `cleanup=all`, the feature removes downloaded packages and sync databases from their default
+directories. `packages` keeps sync databases and `none` skips feature cleanup. To install more packages later, run
+`pacman -Syu <package>`.
 
 ## Security
 
@@ -95,6 +97,17 @@ Arch Linux images that provide `pacman`; the tested images are listed in
 [test/pacman-packages/compatibility.json](../../test/pacman-packages/compatibility.json). Arch Linux publishes no
 official arm64 image, so only amd64 is tested. On an image without `pacman`, a non-empty list fails with a message
 naming the detected distribution.
+
+## Installation controls
+
+`cleanup` (all): Remove all managed caches, package files only, or skip feature cleanup. Native retention remains
+independent.
+
+Controls apply separately on each invocation and never persist image configuration. Invalid values fail even for an
+empty package list; valid empty lists leave caches unchanged.
+
+Cleanup affects only `/var/cache/pacman/pkg` and `/var/lib/pacman/sync`; custom `CacheDir` and `DBPath` locations stay
+untouched. Every non-empty invocation still performs a full system synchronization and upgrade.
 
 
 ---

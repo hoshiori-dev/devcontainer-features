@@ -54,6 +54,11 @@ describe_system() {
   printf '%s' "${system:-an unidentified distribution}"
 }
 
+
+# Validate controls before package-manager calls, cache creation, and the empty-list exit.
+CLEANUP="${CLEANUP-all}"
+case $CLEANUP in all | packages | none) ;; *) fail "cleanup must be one of: all, packages, none." ;; esac
+
 # Parse and validate every entry before anything else happens; accepted entries become "$@", so each
 # reaches pacman as one argument and none is ever evaluated as shell code. The check runs in the C
 # locale, where a bracket expression matches single bytes and so no non-ASCII letter; the locale the
@@ -93,4 +98,8 @@ echo "pacman-packages: upgrading the system and installing $*"
 pacman -Syu --needed --noconfirm -- "$@"
 
 # Deleted directly: `pacman -Scc` asks before it removes, and under --noconfirm the answer is no.
-rm -rf /var/cache/pacman/pkg/* /var/lib/pacman/sync/*
+case $CLEANUP in
+  all) rm -rf /var/cache/pacman/pkg/* /var/lib/pacman/sync/* ;;
+  packages) rm -rf /var/cache/pacman/pkg/* ;;
+  none) ;;
+esac

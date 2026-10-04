@@ -27,7 +27,18 @@ for entry in "${entries[@]}"; do
   [ -n "$entry" ] || continue
   check "$entry from the first install is installed" installed "$entry"
 done
-check "no downloaded package or signature file is left" no_package_files
-check "no sync database file is left" no_sync_databases
+# The second invocation's empty default list is a no-op, so the first cleanup
+# policy determines cache state. The control checks cover two non-empty lists.
+case ${CLEANUP:-all} in
+  all)
+    check "package files are cleaned" no_package_files
+    check "metadata is cleaned" no_sync_databases
+    ;;
+  packages)
+    check "package files are cleaned" no_package_files
+    check "metadata survives the empty second invocation" bash -c 'find /var/lib/pacman/sync -name "*.db" | grep -q .'
+    ;;
+  none) ;;
+esac
 
 reportResults
