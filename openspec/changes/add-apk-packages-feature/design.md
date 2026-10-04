@@ -1,5 +1,9 @@
 # Design
 
+This file describes the baseline implementation. The same PR also carries ../configure-apk-packages-installation/, a
+separate phase 1 extension awaiting approval and implementation. Its delta supersedes the relevant baseline requirements
+only when applied; the baseline task completion and test results do not validate its new paths.
+
 ## Context
 
 See proposal.md - Why. Facts this change relies on, checked on 2026-09-30 against upstream documents and source, and by

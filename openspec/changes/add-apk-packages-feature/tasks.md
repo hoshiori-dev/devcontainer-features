@@ -1,5 +1,9 @@
 # Tasks
 
+This file describes the baseline implementation. The same PR also carries ../configure-apk-packages-installation/, a
+separate phase 1 extension awaiting approval and implementation. Its delta supersedes the relevant baseline requirements
+only when applied; the baseline task completion and test results do not validate its new paths.
+
 ## 1. Feature
 
 - [x] 1.1 Scaffold `src/apk-packages/` and `test/apk-packages/` with `just new-feature apk-packages` and verify that the
