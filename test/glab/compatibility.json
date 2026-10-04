@@ -1,5 +1,6 @@
 {
   "$schema": "../compatibility.schema.json",
+  "scenarioArchitectures": ["amd64", "arm64"],
   "images": [
     {
       "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
