@@ -22,7 +22,7 @@
 
 - [x] 3.1 Add the uv_and_hf_cli global scenario covering uv's INSTALLER record, environment, empty mounted volume, and
       group write access; verify `just test-global` and empty/non-empty mounted-volume observations.
-- [ ] 3.2 Observe all specified failure cases, identical reinstall, tagged download logs, and the proxy-only build using
+- [x] 3.2 Observe all specified failure cases, identical reinstall, tagged download logs, and the proxy-only build using
       disposable containers; record results against Acceptance in the PR.
-- [ ] 3.3 Review the final implementation against the spec and URL inventory, run `just check`, and verify every
-      selected CI job passes; complete the PR description and mark ready for review.
+- [x] 3.3 Review the final implementation against the spec and URL inventory, run `just check`, and verify every
+      selected CI job passes; complete the PR description.
