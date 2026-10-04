@@ -18,7 +18,7 @@ export const RELEASE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 export const RUNNERS = { amd64: "ubuntu-24.04", arm64: "ubuntu-24.04-arm" } as const;
 export type Arch = keyof typeof RUNNERS;
 
-/** Architecture of the runners the scenario and global scenario jobs use (.github/workflows/ci.yml). */
+/** Default feature scenario architecture and fixed global scenario architecture. */
 export const SCENARIO_ARCH: Arch = "amd64";
 
 /** Repository paths whose change can break feature testing itself; they select the canary set. */
@@ -44,6 +44,7 @@ export interface CompatEntry {
 
 export interface Compat {
     images: CompatEntry[];
+    scenarioArchitectures?: Arch[];
     idempotencyExemption?: string;
 }
 
@@ -143,6 +144,11 @@ export function parseScenarios(value: unknown): Scenario[] {
             featureKeys: refsOf(config.features),
         };
     });
+}
+
+/** Architectures selected for all of a feature's scenario tests. */
+export function scenarioArchesOf(compat: Compat): Arch[] {
+    return compat.scenarioArchitectures ?? [SCENARIO_ARCH];
 }
 
 /** Default architecture list of a compatibility entry. */
@@ -451,7 +457,7 @@ export interface TestJob {
 
 export interface Plan {
     tests: TestJob[];
-    scenarios: { feature: string }[];
+    scenarios: { feature: string; arch: Arch; runner: string }[];
     runGlobal: boolean;
     reasons: Record<string, string>;
 }
@@ -459,7 +465,7 @@ export interface Plan {
 /** Expands a selection into CI matrices; throws with a fix-it message on unusable input. */
 export function buildPlan(selection: Selection, model: RepoModel): Plan {
     const tests: TestJob[] = [];
-    const scenarios: { feature: string }[] = [];
+    const scenarios: Plan["scenarios"] = [];
     for (const id of [...selection.reasons.keys()].sort()) {
         const feature = model.features.get(id)!;
         if (!feature.compat) {
@@ -480,7 +486,11 @@ export function buildPlan(selection: Selection, model: RepoModel): Plan {
                 });
             }
         }
-        if (feature.scenarios.length > 0) scenarios.push({ feature: id });
+        if (feature.scenarios.length > 0) {
+            for (const arch of scenarioArchesOf(feature.compat)) {
+                scenarios.push({ feature: id, arch, runner: RUNNERS[arch] });
+            }
+        }
     }
     for (const [name, count] of [["feature x image", tests.length], ["scenario", scenarios.length]] as const) {
         if (count > MATRIX_LIMIT) {

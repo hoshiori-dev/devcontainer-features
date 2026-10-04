@@ -29,11 +29,14 @@ review of test execution follows review-guidance.md.
 
 `compatibility.json` is the single source of the images a feature supports; its spec refers to it and never lists
 images. Each entry is `{"image": "…"}` with optional `"arch": ["amd64", "arm64"]` (default amd64; arm64 runs on an arm64
-runner) and `"remoteUser"`. Every scenario `image` must be in the list for amd64, the architecture scenario jobs run on;
-a global scenario's image must be listed so by every feature it installs (`build` scenarios are exempt). Glab's version
-scenarios also run on native arm64 in CI; each scenario image must therefore list arm64 for glab too. Adding an image or
-architecture is a MINOR bump, dropping one MAJOR (`feature-authoring.md`); `just validate` checks the bump against the
-base. `duplicate.sh` is required unless the list sets `idempotencyExemption`, which a maintainer approves.
+runner) and `"remoteUser"`. Optional top-level `"scenarioArchitectures"` selects architectures for all feature scenarios
+(default `["amd64"]`); it is a nonempty, unique array of `amd64` and/or `arm64`. Glab declares both architectures to
+retain its version scenario coverage. Every scenario `image` must be listed for every selected architecture by the owner
+and every in-repo feature it installs; `build` scenarios are exempt. Global scenarios run on amd64 and their images must
+be listed for amd64 by every in-repo feature they install. Scenario architecture selection controls CI coverage and does
+not change supported image/architecture pairs or require a version bump by itself. Adding an image or architecture is a
+MINOR bump, dropping one MAJOR (`feature-authoring.md`); `just validate` checks the bump against the base.
+`duplicate.sh` is required unless the list sets `idempotencyExemption`, which a maintainer approves.
 
 ## Running tests locally
 
@@ -60,8 +63,8 @@ set (`scripts/affected.ts`, `scripts/lib/repo.ts`):
    scenarios.
 4. A change to the test infrastructure (the paths in `INFRA_PATHS` in `scripts/lib/repo.ts`) adds the canary features,
    without their dependents, and runs the global scenarios, so both test paths go through the changed pipeline.
-5. Each affected feature gets one job per compatibility image and architecture, plus one scenario job when it has
-   `scenarios.json`. More than 256 jobs in one matrix fails `plan`: split the PR.
+5. Each affected feature gets one job per compatibility image and architecture, plus one scenario job per selected
+   scenario architecture when it has scenarios. More than 256 jobs in one matrix fails `plan`: split the PR.
 
 ## Local dependency resolution
 
