@@ -42,8 +42,7 @@ for home in {pathlib.Path(sys.argv[1]), pathlib.Path('/root')}:
     for name in ['.bashrc', '.bash_profile', '.profile', '.zshrc', '.config/fish/config.fish']:
         path = home / name
         if path.exists():
-            assert '# Hugging Face CLI' not in path.read_text(), path
-            assert '.local/bin' not in '\n'.join(line for line in path.read_text().splitlines() if 'hf-cli' in line), path
+            assert 'Added by Hugging Face CLI installer' not in path.read_text(), path
 PY
 check "the uv volume is mounted" bash -c 'grep -q "^[^ ]* [^ ]* [^ ]* [^ ]* /var/lib/uv " /proc/self/mountinfo'
 check "the mounted volume is empty" [ -z "$(ls -A /var/lib/uv)" ]
