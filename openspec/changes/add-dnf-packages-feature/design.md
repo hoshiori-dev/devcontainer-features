@@ -246,9 +246,9 @@ endpoint; they do not rely on a public mirror being slow. Existing scenarios app
 regression coverage.
 
 Package-manager settings and upstream source were checked against the official documents and, for DNF4 cache-only
-package behavior, its CLI/base source. New option paths have not been run in containers; their acceptance depends on the
-implementation checks. APK2/APK3 index reuse without refresh and Zypper's missing-cache refusal need explicit container
-checks before implementation is considered complete.
+package behavior, its CLI/base source. At proposal time, the new option paths had not been run in containers. Their
+implementation checks are recorded in the PR Validation section. APK2/APK3 index reuse without refresh and Zypper's
+missing-cache refusal need explicit container checks before implementation is considered complete.
 
 Official references:
 
