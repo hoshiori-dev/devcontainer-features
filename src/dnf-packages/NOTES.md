@@ -6,7 +6,7 @@ shell characters are refused. The feature uses the image's existing repositories
 settings.
 
 Examples: `bc,file`, `file-5.46-6.fc44` (an offered version-release), `bc.x86_64` (an architecture qualifier), or
-`libz.so.1` (a native capability). Pins must name an edition offered by the enabled repositories.
+`libz.so.1` (a native capability). Pins must specify a version offered by the enabled repositories.
 
 ## Installation controls
 
@@ -18,8 +18,8 @@ without refreshing.
 `cleanup` (default `all`): Remove all managed caches, package files only, or skip feature cleanup. Image hooks and
 native retention settings may remove downloaded packages even when feature cleanup is disabled.
 
-`networkTimeout` (default ``): Native network timeout in seconds (1–3600), or empty to inherit image settings; applies
-only to this invocation.
+`networkTimeout` (default: empty): Native network timeout in seconds (1–3600), or empty to inherit image settings;
+applies only to this invocation.
 
 Controls apply separately on each invocation; disabling optional dependencies does not remove installed packages.
 Invalid controls fail even with an empty list. Native hooks can remove downloaded packages independently of cleanup.
