@@ -462,7 +462,7 @@ chmod +x "/tmp/bin/$1"`,
             if (MANAGER === "zypper") await c.setup("zypper --non-interactive refresh");
             let pkg = "";
             let older = "";
-            for (const candidate of ["file", "bc", "libfuse3-3", "curl", "openssl-libs", "glibc"]) {
+            for (const candidate of ["file", "bc", "libfuse3-3", "openssl-libs", "curl-minimal", "glibc"]) {
                 const listing = MANAGER === "dnf"
                     ? await c.sh('dnf list --showduplicates "$1"', candidate)
                     : await c.sh(
