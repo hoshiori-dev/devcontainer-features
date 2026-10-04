@@ -1,0 +1,15 @@
+{
+  "pinned_version": {
+    "image": "debian:12",
+    "features": { "hf-cli": { "version": "1.27.0" } }
+  },
+  "install_skill": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": { "hf-cli": { "installSkill": true } }
+  },
+  "redirected_sources": {
+    "build": { "dockerfile": "Dockerfile" },
+    "features": { "hf-cli": { "version": "1.33.0" } }
+  }
+}
