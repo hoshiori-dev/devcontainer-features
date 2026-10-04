@@ -11,7 +11,7 @@ test/<id>/            <- its tests: test.sh, duplicate.sh, scenarios, compatibil
 test/_global/         <- cross-feature scenarios; test/canary.json: features CI runs when test infra changes
 openspec/             <- OpenSpec: config.yaml, specs/<id>/ (living spec per feature), changes/ (+ archive/)
 scripts/              <- Deno scripts (selection, staging, validation, docs, PR checks); lib/ shared model
-.github/              <- workflows (ci, pr, release), actions/ (composite), issue forms, PR template
+.github/              <- workflows (ci, pr, release), actions/ (composite), issue forms, PR template, Copilot guidance
 .agents/knowledge/    <- agent knowledge base (this file routes into it)
 .agents/skills/       <- project skills and OpenSpec's generated skills (Claude Code sees them via .claude/skills)
 ```
@@ -49,6 +49,7 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 | Verifying a fact about the Dev Container spec, OpenSpec, GitHub, Deno, uv, just, or pre-commit         | `.agents/knowledge/references.md`               |
 | Issue → branch → draft PR → approval → ready → archive, any `gh` write, a failing run                  | `github-project-workflow` skill                 |
 | Proposing, applying, updating, or archiving an OpenSpec change                                         | OpenSpec skills (`openspec-*`, `/opsx:*`)       |
+| Reviewing changes or writing administration scripts and Actions                                        | `.agents/knowledge/review-guidance.md`          |
 
 ## Development Environment
 

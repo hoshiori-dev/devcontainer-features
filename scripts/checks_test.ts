@@ -6,8 +6,14 @@ import { bodyProblems } from "./check_pr_body.ts";
 import { type Archive, CONFIG, configProblems, exitCode, optionProblems, ruleProblems } from "./check_openspec.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
-import { compatBumpProblems, inRepoRefProblem, scenarioImageProblems, scenarioImages } from "./validate.ts";
-import { type Compat, type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
+import {
+    checkFeatures,
+    compatBumpProblems,
+    inRepoRefProblem,
+    scenarioImageProblems,
+    scenarioImages,
+} from "./validate.ts";
+import { type Compat, type FeatureInfo, loadRepo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
 import { optionDifferences, parseOptionRequirements } from "./lib/options.ts";
 
 Deno.test("titleProblems accepts the convention", () => {
@@ -366,4 +372,38 @@ Deno.test("optionProblems reports an unreadable requirement once, from the file 
     assertEquals(problems, [
         'openspec/changes/add-demo/specs/demo/spec.md: Option requirement "version": no Default row',
     ]);
+});
+
+Deno.test("scenario dependencies must support the owner's selected architecture", () => {
+    const m = repoWith({ a: "1.0.0", b: "1.0.0" });
+    m.features.get("a")!.compat = {
+        images: [{ image: "debian:12", arch: ["amd64", "arm64"] }],
+        scenarioArchitectures: ["amd64", "arm64"],
+    };
+    m.features.get("b")!.compat = { images: [{ image: "debian:12" }], scenarioArchitectures: ["amd64"] };
+    const scenarios = [
+        { name: "s", image: "debian:12", usesBuild: false, featureKeys: ["a", "b"] },
+        { name: "built", image: "debian:12", usesBuild: true, featureKeys: ["a", "b"] },
+    ];
+    assertEquals(scenarioImageProblems(m, scenarios, "test/a/scenarios.json", "a", "amd64"), []);
+    const problems = scenarioImageProblems(m, scenarios, "test/a/scenarios.json", "a", "arm64");
+    assertEquals(problems.length, 1);
+    for (const part of ['scenario "s"', "b", "debian:12", "arm64"]) assert(problems[0].message.includes(part));
+    assertEquals(scenarioImageProblems(m, scenarios, "test/_global/scenarios.json"), []);
+});
+
+Deno.test("feature scenario owners are validated on every declared architecture", async () => {
+    const m = await loadRepo(".");
+    const glab = m.features.get("glab")!;
+    glab.compat = {
+        images: [{ image: "debian:12", arch: ["amd64"] }],
+        scenarioArchitectures: ["amd64", "arm64"],
+    };
+    glab.scenarios = [
+        { name: "version", image: "debian:12", usesBuild: false, featureKeys: ["glab"] },
+        { name: "built", image: "debian:12", usesBuild: true, featureKeys: ["glab"] },
+    ];
+    const problems = (await checkFeatures(m, {})).filter((p) => p.file === "test/glab/scenarios.json");
+    assertEquals(problems.length, 1);
+    for (const part of ['scenario "version"', "glab", "debian:12", "arm64"]) assert(problems[0].message.includes(part));
 });

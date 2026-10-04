@@ -30,6 +30,7 @@ import FEATURE_SCHEMA from "https://raw.githubusercontent.com/devcontainers/spec
 };
 import { activeChanges } from "./check_spec_archived.ts";
 import {
+    type Arch,
     archesOf,
     type Compat,
     exists,
@@ -47,6 +48,7 @@ import {
     runGit,
     type Scenario,
     SCENARIO_ARCH,
+    scenarioArchesOf,
     scenarioKeyId,
     unreadableFiles,
 } from "./lib/repo.ts";
@@ -73,9 +75,9 @@ async function requireExecutable(problems: Problem[], path: string, why: string)
 }
 
 /** Images a compatibility list supports on the architecture scenario jobs run on. */
-export function scenarioImages(compat: Compat): Set<string> {
+export function scenarioImages(compat: Compat, arch: Arch = SCENARIO_ARCH): Set<string> {
     return new Set(
-        compat.images.filter((entry) => archesOf(entry).includes(SCENARIO_ARCH)).map((entry) => entry.image),
+        compat.images.filter((entry) => archesOf(entry).includes(arch)).map((entry) => entry.image),
     );
 }
 
@@ -88,17 +90,18 @@ export function scenarioImageProblems(
     scenarios: Scenario[],
     file: string,
     owner?: string,
+    arch: Arch = SCENARIO_ARCH,
 ): Problem[] {
     const problems: Problem[] = [];
     for (const scenario of scenarios) {
         if (scenario.usesBuild || !scenario.image) continue;
         for (const id of new Set(scenario.featureKeys.map(scenarioKeyId))) {
             const compat = id === undefined || id === owner ? undefined : model.features.get(id)?.compat;
-            if (!compat || scenarioImages(compat).has(scenario.image)) continue;
+            if (!compat || scenarioImages(compat, arch).has(scenario.image)) continue;
             problems.push({
                 file,
                 message: `scenario "${scenario.name}" installs ${id} on ${scenario.image}, which ` +
-                    `test/${id}/compatibility.json does not list for ${SCENARIO_ARCH}, the architecture scenario jobs ` +
+                    `test/${id}/compatibility.json does not list for ${arch}, the architecture scenario jobs ` +
                     "run on. Use an image every installed feature lists for it.",
             });
         }
@@ -258,25 +261,30 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
                 );
             }
             const images = new Set(feature.compat.images.map((entry) => entry.image));
-            const runnable = scenarioImages(feature.compat);
-            for (const scenario of feature.scenarios) {
-                if (scenario.usesBuild || !scenario.image) continue;
-                if (!images.has(scenario.image)) {
-                    problems.push({
-                        file: `test/${id}/scenarios.json`,
-                        message:
-                            `scenario "${scenario.name}" uses ${scenario.image}, which is not in test/${id}/compatibility.json. ` +
-                            "Add the image to the compatibility list or use a listed one.",
-                    });
-                } else if (!runnable.has(scenario.image)) {
-                    problems.push({
-                        file: `test/${id}/scenarios.json`,
-                        message:
-                            `scenario "${scenario.name}" uses ${scenario.image}, which test/${id}/compatibility.json ` +
-                            `does not list for ${SCENARIO_ARCH}, the architecture scenario jobs run on. Use an image ` +
-                            `listed for ${SCENARIO_ARCH}.`,
-                    });
+            for (const arch of scenarioArchesOf(feature.compat)) {
+                const runnable = scenarioImages(feature.compat, arch);
+                for (const scenario of feature.scenarios) {
+                    if (scenario.usesBuild || !scenario.image) continue;
+                    if (!images.has(scenario.image)) {
+                        problems.push({
+                            file: `test/${id}/scenarios.json`,
+                            message:
+                                `scenario "${scenario.name}" uses ${scenario.image}, which is not in test/${id}/compatibility.json for ${arch}. ` +
+                                "Add the image to the compatibility list or use a listed one.",
+                        });
+                    } else if (!runnable.has(scenario.image)) {
+                        problems.push({
+                            file: `test/${id}/scenarios.json`,
+                            message:
+                                `scenario "${scenario.name}" uses ${scenario.image}, which test/${id}/compatibility.json ` +
+                                `does not list for ${arch}, the architecture scenario jobs run on. Use an image ` +
+                                `listed for ${arch}.`,
+                        });
+                    }
                 }
+                problems.push(
+                    ...scenarioImageProblems(model, feature.scenarios, `test/${id}/scenarios.json`, id, arch),
+                );
             }
         }
 
@@ -288,7 +296,6 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
             );
         }
         problems.push(...scenarioRefProblems(model, feature.scenarios, `test/${id}/scenarios.json`));
-        problems.push(...scenarioImageProblems(model, feature.scenarios, `test/${id}/scenarios.json`, id));
 
         if (!(await exists(`openspec/specs/${id}/spec.md`)) && !inChanges.has(id)) {
             problems.push({

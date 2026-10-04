@@ -41,6 +41,13 @@
         }
       }
     },
+    "scenarioArchitectures": {
+      "description": "Architectures for all feature scenarios; defaults to [\"amd64\"]. Each scenario image must support every selected architecture in each installed in-repo feature. This selects CI coverage without changing supported image/architecture pairs.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["amd64", "arm64"] }
+    },
     "idempotencyExemption": {
       "description": "Why this feature cannot be installed twice. When set, test/<id>/duplicate.sh is not required; a maintainer approves every exemption.",
       "type": "string",
