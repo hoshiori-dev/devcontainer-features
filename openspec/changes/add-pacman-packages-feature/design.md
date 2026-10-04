@@ -1,5 +1,9 @@
 # Design
 
+This file describes the baseline implementation. The same PR also carries ../configure-pacman-packages-cleanup/, a
+separate phase 1 extension awaiting approval and implementation. Its delta supersedes the relevant baseline requirements
+only when applied; the baseline task completion and test results do not validate its new paths.
+
 ## Context
 
 See proposal.md - Why. The five installers share one option shape and one script skeleton; this design follows the
