@@ -114,7 +114,7 @@ try:
             output.write(response.read())
 except Exception:
     # Proxy failures may carry credentials in their exception text; name only the requested URL.
-    sys.exit(f"hf-cli feature: error: Cannot fetch {url}; a direct HTTPS 200 response is required.")
+    sys.exit(f"hf-cli feature: error: Cannot fetch {url}; an HTTPS 200 response without redirects is required.")
 PY
 }
 
