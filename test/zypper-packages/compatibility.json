@@ -1,0 +1,19 @@
+{
+  "$schema": "../compatibility.schema.json",
+  "images": [
+    {
+      "image": "opensuse/leap:16.0",
+      "arch": [
+        "amd64",
+        "arm64"
+      ]
+    },
+    {
+      "image": "opensuse/tumbleweed",
+      "arch": [
+        "amd64",
+        "arm64"
+      ]
+    }
+  ]
+}
