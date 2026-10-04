@@ -72,8 +72,8 @@ trust/configuration files are unchanged. Timeout tests inspect native arguments 
 endpoint; they do not rely on a public mirror being slow. Existing scenarios apply to default controls and remain
 regression coverage.
 
-Package-manager settings were checked against the official documents listed below. New option paths have not been run in
-containers; their acceptance depends on the implementation checks.
+Package-manager settings were checked against the official documents listed below. At proposal time, the new option
+paths had not been run in containers. Their implementation checks are recorded in the PR Validation section.
 
 APK2/APK3 index reuse without refresh needs explicit container checks.
 
@@ -94,7 +94,7 @@ signatures or TLS, override package holds, add repositories or keys, or permit c
 Cached metadata can become stale or stop resolving as repositories change. Retaining downloads increases the image size.
 Native hooks may remove downloads even with cleanup disabled. Declared controls apply at build time only and do not
 promise runtime environment settings or reproducibility. Baseline completed tasks and recorded container results must
-not be represented as validation of these unimplemented paths.
+not be represented as validation of the new control paths without their own checks.
 
 ## Follow-up work
 
