@@ -3,6 +3,7 @@ import { join } from "jsr:@std/path@1.1.6";
 import {
     buildPlan,
     classifyPath,
+    compatSchemaErrors,
     type FeatureInfo,
     findInstallCycle,
     inRepoId,
@@ -13,6 +14,7 @@ import {
     majorOf,
     NAMESPACE,
     type RepoModel,
+    scenarioArchesOf,
     scenarioKeyId,
     selectAffected,
     unreadableFiles,
@@ -191,7 +193,7 @@ Deno.test("buildPlan expands images and architectures and lists scenario jobs", 
         { feature: "a", image: "debian:12", arch: "arm64", runner: "ubuntu-24.04-arm", remoteUser: "" },
         { feature: "a", image: "ubuntu:24.04", arch: "amd64", runner: "ubuntu-24.04", remoteUser: "ubuntu" },
     ]);
-    assertEquals(plan.scenarios, [{ feature: "a" }]);
+    assertEquals(plan.scenarios, [{ feature: "a", arch: "amd64", runner: "ubuntu-24.04" }]);
 });
 
 Deno.test("buildPlan of an empty selection is an empty matrix", () => {
@@ -267,4 +269,49 @@ Deno.test("loadRepo records unreadable test files instead of throwing", async ()
     } finally {
         await Deno.remove(root, { recursive: true });
     }
+});
+
+Deno.test("scenario architecture declarations default to amd64 and reject invalid lists", async () => {
+    const compat = { images: [{ image: "debian:12" }] };
+    assertEquals(scenarioArchesOf(compat), ["amd64"]);
+    assertEquals(await compatSchemaErrors(".", compat), undefined);
+    for (const scenarioArchitectures of [["amd64"], ["arm64"], ["amd64", "arm64"]]) {
+        assertEquals(await compatSchemaErrors(".", { ...compat, scenarioArchitectures }), undefined);
+    }
+    for (const scenarioArchitectures of [[], ["amd64", "amd64"], ["riscv64"], "amd64"]) {
+        assert(await compatSchemaErrors(".", { ...compat, scenarioArchitectures }));
+    }
+});
+
+Deno.test("buildPlan expands explicit scenario architectures without changing default tests", () => {
+    const a = feature("a", {
+        compat: {
+            images: [{ image: "debian:12", arch: ["amd64", "arm64"] }],
+            scenarioArchitectures: ["amd64", "arm64"],
+        },
+        scenarios: [{ name: "s", image: "debian:12", usesBuild: false, featureKeys: ["a"] }],
+    });
+    const b = feature("b", { compat: a.compat });
+    const m = model([a, b]);
+    const selection = selectAffected(["test/a/compatibility.json", "test/b/test.sh"], m);
+    const dual = buildPlan(selection, m);
+    assertEquals(dual.scenarios, [
+        { feature: "a", arch: "amd64", runner: "ubuntu-24.04" },
+        { feature: "a", arch: "arm64", runner: "ubuntu-24.04-arm" },
+    ]);
+    a.compat = { images: a.compat!.images, scenarioArchitectures: ["arm64"] };
+    const arm = buildPlan(selection, m);
+    assertEquals(arm.scenarios, [dual.scenarios[1]]);
+    assertEquals(arm.tests, dual.tests);
+});
+
+Deno.test("buildPlan counts architecture expansion toward the scenario matrix limit", () => {
+    const features = Array.from({ length: 129 }, (_, i) =>
+        feature(`f${i}`, {
+            compat: { images: [{ image: "debian:12" }], scenarioArchitectures: ["amd64", "arm64"] },
+            scenarios: [{ name: "s", image: "debian:12", usesBuild: false, featureKeys: [] }],
+        }));
+    const m = model(features);
+    const selection = selectAffected(features.map((f) => `test/${f.id}/scenarios.json`), m);
+    assertThrows(() => buildPlan(selection, m), Error, "258 scenario jobs");
 });
