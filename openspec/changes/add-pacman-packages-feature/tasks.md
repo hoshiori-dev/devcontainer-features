@@ -1,8 +1,9 @@
 # Tasks
 
 This file describes the baseline implementation. The same PR also carries ../configure-pacman-packages-cleanup/, a
-separate phase 1 extension awaiting approval and implementation. Its delta supersedes the relevant baseline requirements
-only when applied; the baseline task completion and test results do not validate its new paths.
+separate phase 1 extension approved in conversation on 2026-10-04 and implemented in this first release. Its delta
+supersedes the relevant baseline requirements only when applied; the baseline task completion and test results do not
+validate its new paths.
 
 ## 1. Feature
 
@@ -69,5 +70,5 @@ only when applied; the baseline task completion and test results do not validate
 - [x] 5.3 Run `just test-scenarios pacman-packages` and verify every scenario passes
 - [x] 5.4 Run `test/pacman-packages/direct_checks.ts` on every image of the compatibility list and on the pinned
       `alpine:3.24` digest, and verify every check passes
-- [ ] 5.5 Record each Acceptance item and each scenario with its test, image, architecture, and result, including the
+- [x] 5.5 Record each Acceptance item and each scenario with its test, image, architecture, and result, including the
       direct checks' output, in the PR's Validation section

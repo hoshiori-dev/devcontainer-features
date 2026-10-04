@@ -335,6 +335,22 @@ chmod +x "/tmp/bin/$1"`,
             }
         },
     },
+    {
+        name: "Custom cache paths are outside the cleanup bound",
+        async run(c) {
+            await c.setup(
+                "mkdir -p /tmp/custom-cache /tmp/custom-db; cp -a /var/lib/pacman/local /tmp/custom-db/; sed -i '/^\\[options\\]/a CacheDir = /tmp/custom-cache\\nDBPath = /tmp/custom-db' /etc/pacman.conf",
+            );
+            const config = await c.config();
+            await c.succeeds("tree", { cleanup: "all" });
+            assert(
+                await c.setup("find /tmp/custom-cache -name '*.pkg.tar.*'") !== "",
+                "custom package cache was cleaned",
+            );
+            assert(await c.setup("find /tmp/custom-db/sync -name '*.db'") !== "", "custom sync database was cleaned");
+            assert(await c.config() === config, "cleanup changed the custom path configuration");
+        },
+    },
 ];
 
 let failed = 0;
