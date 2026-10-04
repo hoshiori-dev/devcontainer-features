@@ -1,6 +1,6 @@
 {
   "id": "apt-packages",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "APT packages",
   "description": "Installs a list of system packages with apt-get from the repositories the Debian or Ubuntu image already configures.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apt-packages",
@@ -8,8 +8,41 @@
     "packages": {
       "type": "string",
       "default": "",
-      "proposals": ["bc", "bc,file"],
+      "proposals": [
+        "bc",
+        "bc,file"
+      ],
       "description": "Comma-separated packages to install: name, name=version, or name:architecture. Whitespace around entries and empty entries are ignored; an empty list installs nothing."
+    },
+    "installRecommends": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include recommended dependencies; suggested dependencies remain excluded."
+    },
+    "refreshPolicy": {
+      "type": "string",
+      "default": "default",
+      "enum": [
+        "default",
+        "always",
+        "never"
+      ],
+      "description": "Select native default refresh, check every repository, or require cached metadata without refreshing."
+    },
+    "cleanup": {
+      "type": "string",
+      "default": "all",
+      "enum": [
+        "all",
+        "packages",
+        "none"
+      ],
+      "description": "Remove all managed caches, package files only, or skip feature cleanup. Native retention remains independent."
+    },
+    "networkTimeout": {
+      "type": "string",
+      "default": "",
+      "description": "Native network timeout in seconds (1\u20133600), or empty to inherit image settings; applies only to this invocation."
     }
   }
 }

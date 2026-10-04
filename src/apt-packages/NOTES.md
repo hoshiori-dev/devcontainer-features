@@ -11,8 +11,8 @@
 ```
 
 The feature installs the listed packages with `apt-get` from the repositories the image already configures. It adds no
-repository, key, or apt configuration of its own, and leaves out packages that a listed package only recommends or
-suggests; list them explicitly when you need them.
+repository, key, or apt configuration of its own. Suggested packages are excluded; recommended packages are excluded by
+default and can be enabled with `installRecommends`.
 
 ## Entries
 
@@ -33,11 +33,14 @@ checked after the index is ready and before any package is installed.
 
 ## Package index
 
-When the image holds no package index, the feature runs `apt-get update` first and fails if any configured repository
-cannot be refreshed. When the image already holds an index, the feature uses it as it is, even if it is stale or covers
-only some repositories; a version the mirrors no longer serve then fails. Clear `/var/lib/apt/lists` or run
-`apt-get update` in your Dockerfile before this feature if the image ships an old index. After installing, the feature
-removes the downloaded packages and every index list.
+With `refreshPolicy=default`, when the image holds no package index, the feature runs `apt-get update` first and fails
+if any configured repository cannot be refreshed. When the image already holds an index, the feature uses it as it is,
+even if it is stale or covers only some repositories; a version the mirrors no longer serve then fails. Clear
+`/var/lib/apt/lists` or run `apt-get update` in your Dockerfile before this feature if the image ships an old index.
+With `always`, every configured repository is refreshed before installing. With `never`, the feature requires an
+existing index and does not refresh, while package downloads remain possible. `cleanup=all` removes downloaded packages
+and indexes at APT's effective directories; `packages` keeps indexes; `none` skips explicit cleanup. Native image hooks
+can still delete downloaded files.
 
 ## Security
 
@@ -64,3 +67,15 @@ feature never downgrades. The feature never overrides a package hold or an APT p
 Debian and Ubuntu images that provide `apt-get`; the tested images are listed in
 [test/apt-packages/compatibility.json](../../test/apt-packages/compatibility.json). On an image without `apt-get`, a
 non-empty list fails with a message naming the detected distribution.
+
+## Installation controls
+
+`installRecommends` (false): Include recommended dependencies; suggested dependencies remain excluded. `refreshPolicy`
+(default): Select native default refresh, check every repository, or require cached metadata without refreshing.
+`cleanup` (all): Remove all managed caches, package files only, or skip feature cleanup. Native retention remains
+independent. `networkTimeout` (): Native network timeout in seconds (1–3600), or empty to inherit image settings;
+applies only to this invocation.
+
+Controls apply separately on each invocation and never persist image configuration. Invalid values fail even for an
+empty package list; valid empty lists leave caches unchanged. Disabling optional dependencies does not remove installed
+packages.
