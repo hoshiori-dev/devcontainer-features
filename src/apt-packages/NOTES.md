@@ -73,8 +73,8 @@ non-empty list fails with a message naming the detected distribution.
 `installRecommends` (false): Include recommended dependencies; suggested dependencies remain excluded. `refreshPolicy`
 (default): Select native default refresh, check every repository, or require cached metadata without refreshing.
 `cleanup` (all): Remove all managed caches, package files only, or skip feature cleanup. Native retention remains
-independent. `networkTimeout` (): Native network timeout in seconds (1–3600), or empty to inherit image settings;
-applies only to this invocation.
+independent. `networkTimeout` (default: empty): Native network timeout in seconds (1–3600), or empty to inherit image
+settings; applies only to this invocation.
 
 Controls apply separately on each invocation and never persist image configuration. Invalid values fail even for an
 empty package list; valid empty lists leave caches unchanged. Disabling optional dependencies does not remove installed
