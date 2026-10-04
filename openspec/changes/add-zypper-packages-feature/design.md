@@ -121,11 +121,12 @@ carry the same repository files and zypper version (checked by running both), un
 - Every entry is validated before the `zypper` check and any `zypper` call, so a refused list leaves the image
   untouched. Checked by the direct refusal checks, which also assert that `/var/cache/zypp` holds no file and that the
   installed package list is unchanged.
-- No `zypper` call carries an option that weakens verification, adds a source, or changes how zypper selects packages:
-  never `--no-gpg-checks`, `--gpg-auto-import-keys`, `--allow-unsigned-rpm`, `--plus-repo`, `--plus-content`, `--repo`,
-  `--from`, `--type`, `--capability`, `--name`, `--oldpackage`, `--force`, `--force-resolution`, `--replacefiles`,
-  `--auto-agree-with-licenses`, `--ignore-unknown`, or `--root`. The refresh is `zypper --non-interactive refresh`
-  without `--force`; the install is `zypper --non-interactive --no-refresh install --no-recommends --` followed by the
+- No `zypper` call carries an option that weakens verification, adds a source, or overrides package selection outside
+  the declared controls: never `--no-gpg-checks`, `--gpg-auto-import-keys`, `--allow-unsigned-rpm`, `--plus-repo`,
+  `--plus-content`, `--repo`, `--from`, `--type`, `--capability`, `--name`, `--oldpackage`, `--force`,
+  `--force-resolution`, `--replacefiles`, `--auto-agree-with-licenses`, `--ignore-unknown`, or `--root`. Declared phase
+  1 controls below are the only additional overrides. The default refresh is `zypper --non-interactive refresh` without
+  `--force`; the default install is `zypper --non-interactive --no-refresh install --no-recommends --` followed by the
   entries. Checked by review of `install.sh` against this list, and by the checks for "Capability selects a providing
   package", "Conflict with an installed package fails", "Failed refresh fails the feature", "Unverifiable repository
   fails the refresh", "Unsigned repository fails the refresh", and "Pin below the installed version on the second
@@ -143,7 +144,8 @@ carry the same repository files and zypper version (checked by running both), un
 
 - Adding repositories, services, or keys, upgrading the whole system, installing patterns, patches, or products, or
   choosing a package manager across distributions (issue #24, Out of scope).
-- An option for recommended packages, repository selection, exact-name matching, or keeping the metadata cache.
+- Repository selection, exact-name matching, libzypp network tuning, and downgrade controls; phase 2 and phase 3 track
+  these separately.
 - Checking the architecture: the feature downloads nothing architecture-specific, and zypper resolves packages for the
   image's architecture; the compatibility list names the architectures that are tested.
 - Removing zypper's logs; they are not caches.
@@ -185,24 +187,12 @@ carry the same repository files and zypper version (checked by running both), un
   Rejected: `--name`, which confines matching to package names and so refuses capabilities zypper would install (Open
   question 4); `--capability`; checking each name with `zypper search` first, a second code path that must agree with
   zypper's own.
-- **A strict refresh, then an install from that metadata.** `zypper --non-interactive refresh` brings every enabled
-  repository up to date, downloading only indexes when the cache is current, and fails when any repository fails; the
-  install then runs with the global `--no-refresh`, so it uses exactly the metadata that refresh verified. Rejected:
-  relying on autorefresh inside `install`, which skips a failing repository, installs from the rest, and fails only
-  afterwards with 106 (Context); a heuristic keyed on `/var/cache/zypp/raw`, which both images lack, so it adds nothing;
-  `refresh --force`, which downloads every repository's metadata again on each run. The spec names this requirement
-  "Repository metadata refresh", not `apt-packages`' "Package index refresh", and its scenarios differ from apt's,
-  because the guarantee differs: zypper checks each repository's index file (`repomd.xml`) on every run instead of
-  skipping the refresh when metadata exists, so the spec uses "index" for that file and "metadata" for what it lists.
 - **zypper's own answer to a pin below the installed version.** Without `--oldpackage` zypper keeps the installed
   version, says so, and succeeds; the spec states that. Rejected: `--oldpackage`, which lets a second install move a
   package down; a post-install check of every pinned entry, which re-implements zypper's edition matching (Open question
   2).
 - **No license agreement on the user's behalf.** Without `--auto-agree-with-licenses`, a package that needs a license
   confirmed fails the feature. Rejected: agreeing automatically, which accepts third-party terms the user never saw.
-- **Clean with `zypper clean --all`.** It removes downloaded packages, raw metadata, and the parsed `solv` cache, also
-  for metadata the image shipped. Rejected: deleting `/var/cache/zypp` by hand, which also drops directories zypper
-  expects; keeping the metadata, which grows the layer.
 - **Detect by binary, describe by `/etc/os-release`.** Support means `zypper` is on the `PATH`; `/etc/os-release` is
   read only to name the detected distribution in the failure message. Rejected: an `ID` allowlist, which would refuse
   SUSE Linux Enterprise and other zypper-based systems while adding no safety.
@@ -217,22 +207,60 @@ carry the same repository files and zypper version (checked by running both), un
   its context; two scenario keys for the feature, which the CLI installs once; extending `scripts/test_feature.ts` with
   expected-failure scenarios, a test-infrastructure change outside this change (Open question 6).
 
-### Options
+### Phase 1 installation controls
 
-The feature's only option; the delta spec's Option requirement states its contract.
+The option requirements are the source of truth. Defaults retain the existing installation behavior; declared controls
+override only their matching native setting for this invocation. Undeclared settings remain inherited. All inputs are
+validated before a package-manager call. An empty package list is a no-op with valid controls, including a non-default
+cleanup value.
 
-| Name       | Type     | Default | Enum or proposals              | Meaning                                                                                                                                                                                                                                                 |
-| ---------- | -------- | ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages` | `string` | `""`    | proposals: `"bc"`, `"bc,file"` | Comma-separated entries (`name`, `name=edition`, a range such as `name>=edition`, `name.architecture`, `name.architecture=edition`, or a capability a package provides) that `zypper` installs; whitespace around entries and empty entries are dropped |
+| Name                | Type      | Default     | Enum or proposals              | Meaning                                                                                              |
+| ------------------- | --------- | ----------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `packages`          | `string`  | `""`        | existing proposals             | Existing comma-separated native package entries; empty installs nothing.                             |
+| `installRecommends` | `boolean` | `false`     | none                           | Whether recommended packages are considered during dependency resolution.                            |
+| `refreshPolicy`     | `string`  | `"default"` | `["default","always","never"]` | Metadata refresh policy; default preserves this installer's existing behavior.                       |
+| `cleanup`           | `string`  | `"all"`     | `["all","packages","none"]`    | Feature cleanup after successful installation; retention by the package manager remains independent. |
 
-- **Default `""`.** An empty list installs nothing and, because the empty check runs before the `zypper` check, succeeds
-  on any image, including one without `zypper` (decision "Validate, then the empty check, then the `zypper` check"). The
-  proposals are two lists installed on neither image, so the install-twice test installs real packages (Goals).
-- **Rejected shapes:** an array (feature options are only `string` or `boolean`); options for repositories or package
-  types (out of scope); options for recommended packages, exact-name matching, or keeping the metadata cache
-  (Non-Goals).
+Defaults are installRecommends=false, refreshPolicy=default, and cleanup=all, retaining baseline behavior. Rejected:
+changing defaults, one cross-manager dependency/downgrade abstraction, arbitrary extraArgs/setopt/environment
+dictionaries, permanently editing configuration, or treating cleanup=none as a guarantee that downloads are retained.
+
+- Dependency selection uses --recommends or --no-recommends on install. Capabilities continue to resolve natively;
+  --name and --oldpackage stay out of scope.
+- Default and always retain strict `zypper --non-interactive refresh` followed by `--no-refresh install`. Never requires
+  usable cached metadata for every enabled repository before `--no-refresh install`; it must not silently bootstrap
+  missing metadata. Do not replace the default with install autorefresh, which can install before reporting skipped
+  repositories.
+- Cleanup all uses `zypper --non-interactive clean --all`; packages uses clean without --all; none skips clean. Native
+  repository package retention, ZYPP_CONF, keys, services, and trust settings stay inherited. No network timeout option
+  is added until the separate libzypp configuration design is reviewed.
+
+#### Verification bounds
+
+New controls need option scenarios on every supported package-manager generation, direct failure checks for invalid
+values and unavailable repositories, and two consecutive invocations with different control values. Test metadata
+retention separately from package retention, preserve sentinel files in unrelated caches, and assert that
+trust/configuration files are unchanged. Existing scenarios apply to default controls and remain regression coverage.
+
+Package-manager settings were checked against the official documents listed below. New option paths have not been run in
+containers; their acceptance depends on the implementation checks. Zypper's missing-cache refusal needs explicit
+container checks before implementation is considered complete.
+
+Official references:
+
+https://raw.githubusercontent.com/openSUSE/zypper/master/doc/zypper.8.txt
+
+#### Risks and deferred controls
+
+Keeping metadata increases image size and can expose stale candidates. Disabling refresh does not guarantee
+reproducibility or package availability. Feature cleanup cannot undo native image hooks. New controls do not weaken
+signatures or TLS, override package holds, add repositories or keys, or permit conflict-driven removal.
 
 ### Deviations from `feature-authoring.md`
+
+Phase 1 proposes a further deviation: selectable cleanup permits retaining metadata or skipping feature cleanup, whereas
+the baseline convention requires cleaning. The expanded package needs approval; no previous approval is claimed for
+these new controls.
 
 The maintainer accepted each for the five installers on 2026-10-01.
 
@@ -269,9 +297,9 @@ The maintainer accepted each for the five installers on 2026-10-01.
 - **Metadata:** none of `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`, `containerEnv`, lifecycle
   commands, `dependsOn`, or `installsAfter`: the feature runs once at build time as root, installs system-wide, and
   needs nothing at container start. The feature does no user-scoped setup and does not read `_REMOTE_USER`.
-- **Idempotency:** a second run validates, refreshes (the first run removed the metadata), and installs its list;
-  already installed packages stay; unpinned listed packages and needed dependencies may be upgraded to the newest
-  version; a pin below the installed version leaves the package as it is and succeeds. No `idempotencyExemption`.
+- **Idempotency:** a second run validates its own controls, selects metadata under its own refresh policy, and installs
+  its list; already installed packages stay; unpinned listed packages and needed dependencies may be upgraded to the
+  newest version; a pin below the installed version leaves the package as it is and succeeds. No `idempotencyExemption`.
 - **Failure behavior:** a refused entry and a missing `zypper` exit 1 before anything changes; a failed refresh or
   signature check exits with zypper's 4 before the install starts; an unknown name, edition, or architecture and an
   unsatisfied range exit 104, a conflict with an installed package exits 4, and another dependency problem, a lock the
@@ -279,6 +307,9 @@ The maintainer accepted each for the five installers on 2026-10-01.
   107 after the packages were installed, which still fails the build.
 
 ### Test plan
+
+The existing rows cover default-control regressions; the phase 1 verification bounds above add the new option and
+interaction checks.
 
 Where each scenario of `specs/zypper-packages/spec.md` is checked. "Scenario" means `scenarios.json`, run in CI on amd64
 on the image each entry names; "test.sh" and "duplicate.sh" run in CI on every image and architecture of the
@@ -427,3 +458,9 @@ behavior first":
 6. **Direct checks in CI.** As for `apt-packages`: the local runner is accepted for this change, and issue #50 tracks
    the test-infrastructure change that lets a feature's tests assert expected failures in CI for all five installers.
    Does not change the spec.
+
+## Follow-up work
+
+Phase 2 is tracked in [#59](https://github.com/hoshiori-dev/devcontainer-features/issues/59). Phase 3 is tracked in
+[#63](https://github.com/hoshiori-dev/devcontainer-features/issues/63). These issues carry later requirements, outside
+this approval package.

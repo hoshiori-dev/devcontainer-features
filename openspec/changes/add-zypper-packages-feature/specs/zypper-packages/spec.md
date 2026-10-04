@@ -13,6 +13,68 @@ Upstream sources:
 
 ## ADDED Requirements
 
+### Requirement: Option installRecommends
+
+The feature SHALL accept the option `installRecommends` as declared here.
+
+| Field   | Value     |
+| ------- | --------- |
+| Type    | `boolean` |
+| Default | `false`   |
+
+#### Scenario: Omitted installRecommends
+
+- **WHEN** `installRecommends` is omitted
+- **THEN** the feature uses `false` as specified by the requirements below
+
+### Requirement: Option refreshPolicy
+
+The feature SHALL accept the option `refreshPolicy` as declared here.
+
+| Field   | Value                          |
+| ------- | ------------------------------ |
+| Type    | `string`                       |
+| Default | `"default"`                    |
+| Enum    | `["default","always","never"]` |
+
+#### Scenario: Omitted refreshPolicy
+
+- **WHEN** `refreshPolicy` is omitted
+- **THEN** the feature uses `"default"` as specified by the requirements below
+
+### Requirement: Option cleanup
+
+The feature SHALL accept the option `cleanup` as declared here.
+
+| Field   | Value                       |
+| ------- | --------------------------- |
+| Type    | `string`                    |
+| Default | `"all"`                     |
+| Enum    | `["all","packages","none"]` |
+
+#### Scenario: Omitted cleanup
+
+- **WHEN** `cleanup` is omitted
+- **THEN** the feature uses `"all"` as specified by the requirements below
+
+### Requirement: Installation controls are validated before changes
+
+The feature SHALL validate `installRecommends`, `refreshPolicy`, `cleanup` and all package entries before invoking any
+package-manager command or creating any cache. Boolean options SHALL accept only `true` or `false`; enum options SHALL
+accept only their declared values. Invalid options SHALL fail with status 1 and a message naming the option. With valid
+options and an empty package list, the feature SHALL succeed without refreshing, upgrading, cleaning, or changing any
+configuration, also without the package manager.
+
+#### Scenario: Invalid control fails before any change
+
+- **WHEN** a control value is invalid, also when packages is empty
+- **THEN** the feature exits with status 1, names the option, and changes nothing
+
+#### Scenario: Empty list ignores installation controls
+
+- **WHEN** packages is empty and valid non-default controls are provided
+- **THEN** the feature succeeds without invoking the package manager or touching any cache
+
 ### Requirement: Option packages
 
 The feature SHALL accept the option `packages` as declared here, a comma-separated list of package entries in which
@@ -44,9 +106,9 @@ names no package.
 ### Requirement: Install the listed packages
 
 The feature SHALL install, with `zypper`, every package named in the comma-separated `packages` option, taking each
-package and its dependencies only from the repositories enabled in the image. It SHALL NOT install packages that a
-listed package only recommends, and SHALL NOT upgrade installed packages other than the listed packages and what they
-need.
+package and its dependencies only from the repositories enabled in the image. Recommended packages SHALL be excluded
+when `installRecommends=false` and considered by Zypper when `installRecommends=true`. Apart from that dependency
+selection, it SHALL NOT upgrade installed packages other than the listed packages and what they need.
 
 #### Scenario: Listed packages are installed
 
@@ -55,7 +117,8 @@ need.
 
 #### Scenario: Recommended packages are left out
 
-- **WHEN** `packages` names a package that recommends another package which nothing installed requires
+- **WHEN** `installRecommends=false` and `packages` names a package that recommends another package which nothing
+  installed requires
 - **THEN** the listed package is installed and the recommended package is not
 
 #### Scenario: Listed package already installed at its newest version
@@ -63,6 +126,13 @@ need.
 - **WHEN** `packages` names, without a version, a package that is already installed at the newest version the enabled
   repositories offer
 - **THEN** the feature succeeds and the package stays at that version
+
+#### Scenario: Optional dependency selection is enabled
+
+- **WHEN** `installRecommends=true` and a listed package has an applicable recommendation that is available and
+  unconstrained
+- **THEN** the package manager includes that recommendation in its resolution; required dependencies and conflict
+  protection remain in effect
 
 ### Requirement: Version and architecture qualifiers
 
@@ -198,26 +268,46 @@ The feature SHALL exit with status 1, with a message naming `zypper` and the dis
 
 ### Requirement: Repository metadata refresh
 
-Before installing, the feature SHALL check the index of every repository enabled in the image and download a
-repository's metadata only when none is cached or its index changed, and SHALL install from that metadata. The feature
-SHALL fail, installing none of the listed packages, when refreshing any enabled repository fails, including a transient
-download failure; it SHALL NOT skip a failing repository and install from the others.
+With `refreshPolicy=default` or `always`, the feature SHALL check every enabled repository index before installation and
+download metadata only when missing or changed. If any enabled repository cannot be refreshed or verified, the feature
+SHALL fail before installing and SHALL NOT skip it. With `never`, it SHALL use existing metadata without contacting
+repositories for refresh and SHALL fail before installation if any enabled repository has no usable cached metadata;
+package files MAY still be downloaded. Installation SHALL use the selected metadata without another automatic refresh.
+Signature and TLS checks SHALL remain in effect.
 
 #### Scenario: Missing metadata is refreshed
 
-- **WHEN** the image holds no cached repository metadata
+- **WHEN** `refreshPolicy=default` and the image holds no cached repository metadata
 - **THEN** the feature downloads the metadata of every enabled repository before installing
 
 #### Scenario: Current metadata is kept
 
-- **WHEN** the image already holds cached metadata of every enabled repository and no repository's index has changed
+- **WHEN** `refreshPolicy=default` and the image already holds cached metadata of every enabled repository and no
+  repository's index has changed
 - **THEN** the feature installs from the cached metadata, downloading only each repository's index file
 
 #### Scenario: Failed refresh fails the feature
 
-- **WHEN** refreshing the metadata of any enabled repository fails, while the other enabled repositories refresh and
-  offer the listed packages
+- **WHEN** `refreshPolicy=default` and refreshing the metadata of any enabled repository fails, while the other enabled
+  repositories refresh and offer the listed packages
 - **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+#### Scenario: Refresh is explicitly requested
+
+- **WHEN** refreshPolicy=always with a non-empty package list and existing metadata
+- **THEN** every configured or enabled repository is checked before installing; failure of any repository fails before
+  packages change
+
+#### Scenario: Cached metadata is explicitly selected
+
+- **WHEN** refreshPolicy=never and every required index or metadata cache is usable
+- **THEN** no metadata is fetched and installation uses the existing metadata under the package manager's normal
+  verification policy
+
+#### Scenario: Missing cached metadata fails without refresh
+
+- **WHEN** refreshPolicy=never and a required repository has no usable cached metadata
+- **THEN** the feature fails before installing without attempting a metadata download
 
 ### Requirement: Repository authentication stays in effect
 
@@ -260,18 +350,42 @@ installation that needs a license confirmed fails, installing none of the listed
 
 ### Requirement: Clean package caches
 
-After installing, the feature SHALL leave neither downloaded package files nor cached repository metadata in the image.
+After successful installation, `cleanup=all` SHALL explicitly remove downloaded package files and repository metadata
+from the effective libzypp package, raw metadata, and parsed metadata caches. With `packages`, it SHALL explicitly
+remove downloaded package files while leaving usable metadata; with `none`, it SHALL perform no explicit cache deletion.
+No mode SHALL remove installed-package databases, signing keys, or unrelated paths. Package-manager configuration or
+image hooks MAY independently delete downloads; none does not guarantee that package files are retained, and packages
+does not guarantee that missing metadata is created.
 
 #### Scenario: Caches are removed
 
-- **WHEN** the feature has installed packages
+- **WHEN** `cleanup=all` and the feature has installed packages
 - **THEN** the image holds no downloaded package files, no raw repository metadata, and no parsed metadata cache
+
+#### Scenario: Only package files are cleaned
+
+- **WHEN** cleanup=packages with usable metadata and package files present in the managed cache after installation
+- **THEN** package files are removed from the managed cache and usable metadata remains
+
+#### Scenario: Feature cleanup is disabled
+
+- **WHEN** cleanup=none and the native package manager and image hooks retain downloads
+- **THEN** the feature leaves cached package files and metadata in place
+
+#### Scenario: Native package retention is independent
+
+- **WHEN** cleanup=none but a native setting or image hook deletes package files
+- **THEN** the feature does not override the native deletion and does not promise retained packages
 
 ### Requirement: Installing the feature twice
 
 Installing the feature a second time SHALL leave installed every package that either installation listed, and SHALL
 treat the second list as a first installation would. The second installation MAY upgrade an installed package that its
 list names without an edition or with a range, or that a package of its list needs.
+
+The second invocation SHALL use its own control values, with no permanent override of image configuration. Earlier cache
+choices SHALL NOT override the later refresh or cleanup policy. Disabling optional dependencies on a later invocation
+SHALL NOT uninstall previously installed packages.
 
 #### Scenario: Same list on the second install
 
@@ -288,3 +402,10 @@ list names without an edition or with a range, or that a package of its list nee
 - **WHEN** the second installation's `packages` holds `name=edition` with an edition that the enabled repositories offer
   and that is older than the one installed
 - **THEN** the second installation succeeds and the installed version stays as it was
+
+#### Scenario: Later controls apply to the second installation
+
+- **WHEN** the first invocation preserves metadata and the second uses different refresh or cleanup values with a
+  non-empty compatible package list
+- **THEN** the second invocation follows its own values, retains the packages guaranteed by this requirement, and does
+  not persist control settings
