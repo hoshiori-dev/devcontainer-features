@@ -317,9 +317,11 @@ accept the long form; long options on every command, which fails on `alpine:3.24
   maintainer accepted the repeated lines at the package gate. Rejected: keeping `latest_version` shared, since it
   asserts nothing and the guide prefers repeating a few lines.
 - In `duplicate.sh`, the two checks of the harness's option inputs become a precondition: when `VERSION` is not `1.47.0`
-  or `VERSION__DEFAULT` is not `latest`, the script stops with a message saying the replace path would not run.
-  Rejected: keeping them as checks with behavior labels, which the spec does not state; a comment alone, which would let
-  a changed proposal silently turn the test into a test of the skip path.
+  or `VERSION__DEFAULT` is not `latest`, the script stops with a message saying the replace path would not run. It stops
+  the same way when the latest release is itself `1.47.0`; no check carries that condition, because "`glab --version`
+  reports the version the second install selected" is the check that shows the replacement. Rejected: keeping them as
+  checks with behavior labels, which the spec does not state; a comment alone, which would let a changed proposal
+  silently turn the test into a test of the skip path.
 - Each of the eight scenario scripts sources only `checks.sh` and carries its own two checks, with the literal
   `1.119.0`. Rejected: keeping the six wrappers, since the guide prefers repeating a few lines to sourcing another test
   script.

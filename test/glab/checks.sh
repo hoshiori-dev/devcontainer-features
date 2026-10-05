@@ -32,7 +32,11 @@ reportResults() {
 
 # Runs a command as root: directly when already root, else through passwordless sudo.
 as_root() {
-  if [ "$(id -u)" = "0" ]; then "$@"; else sudo -n "$@"; fi
+  if [ "$(id -u)" = "0" ]; then
+    "$@"
+  else
+    sudo -n "$@"
+  fi
 }
 
 # Runs glab without an update check or telemetry, so tests contact no host through glab.

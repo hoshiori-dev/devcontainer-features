@@ -16,8 +16,8 @@ if [ "${VERSION-}" != "1.47.0" ] || [ "${VERSION__DEFAULT-}" != "latest" ]; then
   exit 1
 fi
 
-# The release the latest-release link names when the test runs, read as install.sh reads it, without following the
-# redirect; a release between build and test fails once.
+# The release the permanent link to the latest release names when the test runs, read as install.sh reads it,
+# without following the redirect; a release between build and test fails once.
 location="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --retry 3 \
   --head --output /dev/null --write-out '%{redirect_url}' "${LATEST_URL}")"
 if [ -z "${location}" ]; then
@@ -29,6 +29,10 @@ latest="${location%%[?#]*}"
 latest="${latest%/}"
 latest="${latest##*/}"
 latest="${latest#v}"
+if [ "${latest}" = "1.47.0" ]; then
+  printf 'the replace path would not run: the latest release is 1.47.0, the version of the first install\n' >&2
+  exit 1
+fi
 printf 'first install: %s; second install: %s; latest now: %s\n' "${VERSION}" "${VERSION__DEFAULT}" "${latest}"
 
 # Before glab runs here: the second install ran the installed 1.47.0 as root at build time, and 1.47.0 writes its
@@ -50,7 +54,6 @@ only_one_glab() {
 check "/usr/local/bin holds no file other than glab whose name contains glab" only_one_glab
 
 check "glab --version reports the version the second install selected" glab_reports_version "${latest}"
-check "the second install replaced 1.47.0" test "${latest}" != 1.47.0
 check "no temporary directory or staged binary of the installs remains" no_install_leftovers
 
 reportResults

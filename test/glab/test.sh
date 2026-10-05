@@ -9,8 +9,8 @@ readonly LATEST_URL="https://gitlab.com/gitlab-org/cli/-/releases/permalink/late
 # shellcheck source=/dev/null
 . "$(dirname "$0")/checks.sh"
 
-# The release the latest-release link names when the test runs, read as install.sh reads it, without following the
-# redirect; a release between build and test fails once.
+# The release the permanent link to the latest release names when the test runs, read as install.sh reads it,
+# without following the redirect; a release between build and test fails once.
 location="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --retry 3 \
   --head --output /dev/null --write-out '%{redirect_url}' "${LATEST_URL}")"
 if [ -z "${location}" ]; then
@@ -34,7 +34,8 @@ check "none of GITLAB_TOKEN, GITLAB_ACCESS_TOKEN, and OAUTH_TOKEN is set" no_tok
 check "command -v glab resolves to /usr/local/bin/glab" glab_resolves_to_usr_local_bin
 check "glab --version exits 0" glab_quiet --version
 check "git --version exits 0" git --version
-check "glab --version reports the release the latest-release link names" glab_reports_version "${latest}"
+check "glab --version reports the release the permanent link to the latest release points to" \
+  glab_reports_version "${latest}"
 
 # No file under apt's package lists, dnf's cache, or apk's cache, whichever of them the image has.
 package_caches_empty() {
