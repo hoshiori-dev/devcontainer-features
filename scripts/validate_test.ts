@@ -238,6 +238,20 @@ Deno.test("a compatibility list that is not valid JSONC at the branch point skip
     }
 });
 
+Deno.test("a compatibility list that git cannot read at the branch point is reported as a problem", async () => {
+    await withRepo(async (repo) => {
+        await repo.feature("a", "1.0.0", ["debian:12", "ubuntu:24.04"]);
+        await repo.commit("add an image");
+        // The list is listed on main, but its content is gone from the object store.
+        const oid = (await repo.git("rev-parse", "main:test/a/compatibility.json")).trim();
+        await Deno.remove(join(repo.root, ".git", "objects", oid.slice(0, 2), oid.slice(2)));
+        const problems = await repo.check();
+        assertEquals(problems.length, 1);
+        assert(problems[0].startsWith("test/a/compatibility.json: "), problems[0]);
+        assert(problems[0].includes("could not read test/a/compatibility.json on "), problems[0]);
+    });
+});
+
 Deno.test("readBaseJsonc tells a path missing on the base from a failed read", async () => {
     await withRepo(async (repo) => {
         const path = "src/a/devcontainer-feature.json";

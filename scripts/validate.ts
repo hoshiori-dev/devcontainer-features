@@ -530,7 +530,15 @@ export async function checkVersionBumps(model: RepoModel, base: string, root = "
             continue;
         }
         if (compatChanged.has(id) && feature?.compat) {
-            const oldCompat = await readBaseJsonc(fork, `test/${id}/compatibility.json`, root, "skip");
+            const compatPath = `test/${id}/compatibility.json`;
+            let oldCompat: { found: boolean; value?: unknown };
+            try {
+                oldCompat = await readBaseJsonc(fork, compatPath, root, "skip");
+            } catch (error) {
+                // A failed read of the list is reported like the metadata read above, not as an uncaught error.
+                problems.push({ file: compatPath, message: error instanceof Error ? error.message : String(error) });
+                continue;
+            }
             // A list new since the fork adds every image; one that is not valid JSONC there was warned about.
             const imagesComparable = !oldCompat.found || oldCompat.value !== undefined;
             if (imagesComparable) {
