@@ -2,55 +2,55 @@
 
 ## 1. install.sh
 
-- [ ] 1.1 Restructure `src/apk-packages/install.sh` to the guide's POSIX skeleton as design.md, "Script structure",
+- [x] 1.1 Restructure `src/apk-packages/install.sh` to the guide's POSIX skeleton as design.md, "Script structure",
       "Option defaults and `readonly`", "Constants name the paths and the cache age", and "Guards, long options, and
       comments" describe; verify that `shellcheck` and `shellcheck -o require-variable-braces,require-double-brackets`
       report nothing for it, that it has no line over 120 characters, and that it ends with `main "$@"`.
-- [ ] 1.2 Give every failure and log line the wording of design.md, "Wording follows the template the five package-list
+- [x] 1.2 Give every failure and log line the wording of design.md, "Wording follows the template the five package-list
       installers share", and end `apk update`, `apk update --no-network`, and `apk add` with `|| fail` naming apk's
       status; verify with `docker run` on `alpine:3.24` and `alpine:3.22` that a default install of `file,tree` exits 0
       and prints the cache, refresh, install, and cleanup lines, that an invalid value of each control exits 1 with its
       message, and that a failing refresh, offline update, and install each exit 1 with apk's status in the message.
-- [ ] 1.3 Read the distribution name from `/etc/os-release` in a subshell in the `apk` check; verify on a Debian image,
+- [x] 1.3 Read the distribution name from `/etc/os-release` in a subshell in the `apk` check; verify on a Debian image,
       where `sh` is dash, that a non-empty list exits 1 with `apk was not found on this image (<PRETTY_NAME>)`, that a
       refused entry is reported before it, and that an empty list exits 0.
-- [ ] 1.4 Keep apk's argument vectors; verify with a recording `apk` stub that 1.0.0 and the restyled script pass the
+- [x] 1.4 Keep apk's argument vectors; verify with a recording `apk` stub that 1.0.0 and the restyled script pass the
       same arguments for each `refreshPolicy`, with and without `networkTimeout` and `upgradePackages`, except that
       `--no-network` follows `--cache-dir` in the offline update, and that an argument given to `install.sh` reaches no
       apk call.
-- [ ] 1.5 Set `version` to `1.0.1` in `src/apk-packages/devcontainer-feature.json` and run `just docs`; verify that
+- [x] 1.5 Set `version` to `1.0.1` in `src/apk-packages/devcontainer-feature.json` and run `just docs`; verify that
       `just validate` and `just docs-check` pass, and that `NOTES.md`, `scenarios.json`, and `compatibility.json` are
       not in `git diff --stat origin/main`.
 
 ## 2. Test scripts
 
-- [ ] 2.1 Add `test/apk-packages/checks.sh` with the POSIX `check` / `reportResults` stand-in and the assertions
+- [x] 2.1 Add `test/apk-packages/checks.sh` with the POSIX `check` / `reportResults` stand-in and the assertions
       `installed`, `in_world`, `cache_empty`, and `no_temporary_dir`; verify that it has no shebang, is not executable,
       and passes both shellcheck runs.
-- [ ] 2.2 Make `test.sh` and the `listed_packages_*` and `install_if_and_whitespace_*` scripts source `checks.sh`, with
+- [x] 2.2 Make `test.sh` and the `listed_packages_*` and `install_if_and_whitespace_*` scripts source `checks.sh`, with
       the label "no temporary directory of the feature is left"; verify that the other labels and commands are those of
       1.0.0 (`git diff`), and that each script passes in a `docker run` container after the install it tests.
-- [ ] 2.3 Make `duplicate.sh` assert `file` and `tree` as literals, without parsing `PACKAGES`, under a header naming
+- [x] 2.3 Make `duplicate.sh` assert `file` and `tree` as literals, without parsing `PACKAGES`, under a header naming
       what it asserts; verify that it passes in a `docker run` container after the two installs the CLI derives.
-- [ ] 2.4 Give the four `controls_*.sh` labeled checks in the words of "Only package files are cleaned" and "Feature
+- [x] 2.4 Give the four `controls_*.sh` labeled checks in the words of "Only package files are cleaned" and "Feature
       cleanup is disabled", with glob loops in place of `find … | grep`; verify that each reports every check and passes
       in a `docker run` container after its scenario's install, and that both shellcheck runs report nothing for every
       `test/apk-packages/*.sh`.
 
 ## 3. Host runners
 
-- [ ] 3.1 Correct the comment above `refuses` in `test/apk-packages/direct_checks.ts`: the message, not the exit status,
+- [x] 3.1 Correct the comment above `refuses` in `test/apk-packages/direct_checks.ts`: the message, not the exit status,
       shows that validation ran first; verify that `deno check` passes and the diff holds only that comment.
-- [ ] 3.2 In `test/apk-packages/control_checks.ts`, add `--check` to the shebang, pass `PATH` with its own `--env`
+- [x] 3.2 In `test/apk-packages/control_checks.ts`, add `--check` to the shebang, pass `PATH` with its own `--env`
       argument, replace the no-op ternary with `"file"`, and bind the stalled-endpoint listener to `127.0.0.1`; verify
       that the script type-checks and that "Explicit timeout bounds a stalled local repository" passes, which shows the
       host-network container reaches the loopback listener.
-- [ ] 3.3 Run `test/apk-packages/direct_checks.ts` and `test/apk-packages/control_checks.ts` on every amd64 image of
+- [x] 3.3 Run `test/apk-packages/direct_checks.ts` and `test/apk-packages/control_checks.ts` on every amd64 image of
       `test/apk-packages/compatibility.json`; verify that both end with 0 failed.
 
 ## 4. Integration
 
-- [ ] 4.1 Run `just check`; verify that it passes.
+- [x] 4.1 Run `just check`; verify that it passes.
 - [ ] 4.2 Run `just test apk-packages`; verify that the autogenerated and install-twice tests pass in CI on every
       compatibility image and architecture.
 - [ ] 4.3 Run `just test-scenarios apk-packages`; verify that every scenario passes in CI.
