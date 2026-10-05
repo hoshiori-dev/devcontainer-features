@@ -60,7 +60,7 @@ workspace_untouched() {
 check "the workspace holds no openspec/ directory or agent skill files" workspace_untouched
 
 # Installed locations.
-check "command -v openspec resolves to ${WRAPPER}" [ "$(command -v openspec)" = "${WRAPPER}" ]
+check "command -v openspec resolves to ${WRAPPER}" test "$(command -v openspec)" = "${WRAPPER}"
 
 # The package and its dependencies are installed as an npm project tree: the two files npm writes for one, and the
 # directory that holds the packages.
@@ -72,7 +72,7 @@ check "the package @fission-ai/openspec and its dependencies are under ${PREFIX_
 # Owner, group, and mode are compared with what install.sh gives the wrapper: mode 755 is also what makes openspec
 # runnable by every user of the container.
 check "${WRAPPER} is owned by root and writable only by root" \
-  [ "$(stat -c '%U:%G %a' "${WRAPPER}")" = "root:root 755" ]
+  test "$(stat -c '%U:%G %a' "${WRAPPER}")" = "root:root 755"
 
 # Whether $1 and everything under it belong to the user and the group root and are writable by no one else. The mode
 # of a symbolic link is not read: it is 777 for every link.

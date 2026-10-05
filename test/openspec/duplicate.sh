@@ -49,7 +49,7 @@ check "the package installed as @fission-ai/openspec is at exactly the selected 
 # Requirement "Install twice". The second check reads it as one installation with nothing staged or set aside next
 # to it; the spec has no sentence of its own on what an install leaves behind.
 check "exactly one OpenSpec installation remains reachable as openspec: one openspec is on PATH" \
-  [ "$(type -ap openspec | sort -u)" = "${WRAPPER}" ]
+  test "$(type -ap openspec | sort -u)" = "${WRAPPER}"
 check "exactly one OpenSpec installation remains reachable as openspec: nothing is staged or set aside next to it" \
   single_installation
 
