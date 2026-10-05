@@ -87,8 +87,8 @@ None.
 - No test script swallows a failure to read the latest-release link, no scenario script sources another test script, and
   every assertion in `test/glab/checks.sh` is used by more than one test script.
 - `src/glab/devcontainer-feature.json` has version `1.0.1`, and `src/glab/README.md` matches what `just docs` generates.
-- `just test glab` and `just test-scenarios glab` pass locally, and the PR's container test jobs pass on amd64 and
-  arm64.
+- `just test glab` and `just test-scenarios glab` pass in the PR's container test jobs, on amd64 and arm64. They are not
+  run locally: concurrent runs of the devcontainer CLI remove each other's containers.
 
 **Stays true:**
 
