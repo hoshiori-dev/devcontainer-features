@@ -4,6 +4,7 @@
 # because alpine:3.24 ships no bash.
 set -eu
 
+# The path is computed from $0 at run time, so shellcheck cannot follow it.
 # shellcheck source=/dev/null
 . "$(dirname "$0")/checks.sh"
 
@@ -25,10 +26,11 @@ reports_release() {
   [ "${reports_release_rest%% *}" = "$2" ]
 }
 
-# Whether the file $1 exists and has none of the permission bits of the octal mode $2.
+# Whether the file $1 exists and has none of the permission bits of the octal mode $2. stat decides it, because every
+# compatibility image has stat and opensuse/leap:16.0 has no find.
 lacks_mode_bits() {
-  lacks_mode_bits_found="$(find "$1" -perm "-$2" -print)"
-  [ -e "$1" ] && [ -z "${lacks_mode_bits_found}" ]
+  lacks_mode_bits_mode="$(stat -c %a "$1")" || return 1
+  [ "$((0${lacks_mode_bits_mode} & $2))" -eq 0 ]
 }
 
 one_group_uv_lists_the_user_once() {
@@ -54,13 +56,13 @@ check "uvx --version reports the second install's release" reports_release uvx "
 # Nothing writable by every user: uv's lock files, which the first install's tool created.
 for lock in "${SHARE_DIR}/tools/.lock" "${SHARE_DIR}/python/.lock"; do
   check "${lock} is not writable by every user" lacks_mode_bits "${lock}" 0002
-  if [ "$(id -u)" = 0 ]; then
+  if [ "$(id -u)" = "0" ]; then
     check "${lock} is writable by root only" lacks_mode_bits "${lock}" 0020
   fi
 done
 
 # Group after a second install.
-if [ "$(id -u)" != 0 ]; then
+if [ "$(id -u)" != "0" ]; then
   check "the image has one group uv that lists the remote user once" one_group_uv_lists_the_user_once
   check "the tool of the first install belongs to the group uv and is writable by its members" \
     [ "$(stat -c '%G %a' "${SHARE_DIR}/tools/pycowsay")" = "uv 2775" ]

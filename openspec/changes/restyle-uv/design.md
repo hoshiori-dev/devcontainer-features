@@ -277,14 +277,17 @@ difference.
 - Expected values are literals: `duplicate.sh` names `pycowsay`, the tool its first install gets from the proposals, and
   stops re-parsing `toolsToInstall`; `pinned_release.sh` expects the `musl` target with the architecture from
   `uname -m`, so a local arm64 run still passes. `test.sh` and `duplicate.sh` keep computing the latest release, and
-  `test.sh` the target, each with a comment saying why. Lock modes are checked with `find -perm` as `tools.sh` does,
-  instead of octal arithmetic on `stat` output. The build-time UID 23456 in `changed_uid.sh` gets a comment naming
-  `changed_uid/Dockerfile`.
+  `test.sh` the target, each with a comment saying why. Lock modes stay checked with octal arithmetic on `stat` output:
+  `duplicate.sh` runs on every compatibility image, and `opensuse/leap:16.0` has no `find`, so `find -perm` as in
+  `tools.sh`, which runs only on the Ubuntu base image, would pass there without checking anything. The build-time UID
+  23456 in `changed_uid.sh` gets a comment naming `changed_uid/Dockerfile`.
 - Setup runs as plain commands; `check` holds only assertions, labeled in the words of the spec's requirements and
-  scenarios. Long `sh -c` checks become helpers named after the behavior; `duplicate.sh` stops interpolating a tool name
-  into an `sh -c` string. `repair_volume.sh` separates setup, action, and assertions with blank lines and comments and
-  removes its work directory through a cleanup function. Variables are braced, mutable globals lower case, and fixed
-  expected values readonly. `is_mount` and `is_empty_dir` stay repeated in each script.
+  scenarios. Three checks assert what the spec does not state (owner and mode of the repair script and of
+  `/etc/profile.d/uv.sh`, setgid on every directory of the tool tree); each keeps its assertion and gets a comment
+  naming the requirement it supports. Long `sh -c` checks become helpers named after the behavior; `duplicate.sh` stops
+  interpolating a tool name into an `sh -c` string. `repair_volume.sh` separates setup, action, and assertions with
+  blank lines and comments and removes its work directory through a cleanup function. Variables are braced, mutable
+  globals lower case, and fixed expected values readonly. `is_mount` and `is_empty_dir` stay repeated in each script.
 - `check "…" [ … ]` keeps `[` or `test` in the bash tests, because `[[` is a keyword and cannot be passed as a command.
 - What each test asserts about the feature stays the same; only the warning prefix `repair_volume.sh` greps changes with
   the script.

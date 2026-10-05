@@ -89,9 +89,9 @@ check "uv fails on a volume that another UID filled" uv_fails_on_the_volume
 mkdir "${work_dir}/stubs"
 cat >"${work_dir}/stubs/sudo" <<'STUB'
 #!/bin/sh
-[ "$1" = -n ] || exit 99
-if [ "$2" = true ]; then
-  if [ "${SUDO_MODE}" != denied ]; then exit 0; fi
+[ "$1" = "-n" ] || exit 99
+if [ "$2" = "true" ]; then
+  if [ "${SUDO_MODE}" != "denied" ]; then exit 0; fi
   echo 'password required' >&2
   exit 1
 fi

@@ -47,6 +47,8 @@ check "the volume is new and empty" is_empty_dir "${VOLUME_DIR}"
 check "everything under ${SHARE_DIR} belongs to the group uv" tool_tree_has_none ! -group uv
 check "everything but links under ${SHARE_DIR} is writable by the group" tool_tree_has_none ! -type l ! -perm -0020
 check "nothing under ${SHARE_DIR} is writable by every user" tool_tree_has_none ! -type l -perm -0002
+# An implementation check, not a statement of the spec. It supports "Grant write access through the group uv": setgid
+# gives the group uv to what the install, or later a member of the group, creates below a directory.
 check "every directory under ${SHARE_DIR} has setgid" tool_tree_has_none -type d ! -perm -2000
 
 # Tools on PATH.

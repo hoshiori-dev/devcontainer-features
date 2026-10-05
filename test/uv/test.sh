@@ -3,6 +3,7 @@
 # with default options. POSIX sh, because alpine:3.24 ships no bash.
 set -eu
 
+# The path is computed from $0 at run time, so shellcheck cannot follow it.
 # shellcheck source=/dev/null
 . "$(dirname "$0")/checks.sh"
 
@@ -51,7 +52,7 @@ uv_bin_after_system() {
     case "${uv_bin_after_system_dir}" in
       /usr/local/share/uv/bin) uv_bin_after_system_seen=true ;;
       /usr/local/bin | /usr/bin)
-        if [ "${uv_bin_after_system_seen}" = true ]; then
+        if [ "${uv_bin_after_system_seen}" = "true" ]; then
           IFS="${uv_bin_after_system_ifs}"
           return 1
         fi
@@ -59,7 +60,7 @@ uv_bin_after_system() {
     esac
   done
   IFS="${uv_bin_after_system_ifs}"
-  [ "${uv_bin_after_system_seen}" = true ]
+  [ "${uv_bin_after_system_seen}" = "true" ]
 }
 
 # A writable tool with a system command's name must not shadow that command, in this shell or in a login shell.
@@ -78,10 +79,12 @@ system_command_wins() {
 check "${VOLUME_DIR} is a mount of the volume" is_mount "${VOLUME_DIR}"
 check "the volume holds no files before uv first runs" is_empty_dir "${VOLUME_DIR}"
 check "the remote user can create files in the volume" test -w "${VOLUME_DIR}"
+# An implementation check, not a statement of the spec. It supports "Repair a volume that no longer fits the remote
+# user": the remote user runs the script (mode 755), and only root can change what it does.
 check "the volume-repair script is root's, mode 755" [ "$(stat -c '%u %g %a' "${REPAIR}")" = "0 0 755" ]
 
 # Root remote user, Remote user in the group.
-if [ "$(id -u)" = 0 ]; then
+if [ "$(id -u)" = "0" ]; then
   check "the install creates no group uv for root" no_group_uv
   for dir in "${VOLUME_DIR}" "${SHARE_DIR}" "${SHARE_DIR}/tools" "${SHARE_DIR}/python" "${SHARE_DIR}/bin"; do
     check "${dir} is owned by root and writable by root only" [ "$(stat -c '%u %g %a' "${dir}")" = "0 0 755" ]
@@ -107,12 +110,12 @@ check "sudo is not run on a volume that fits" test ! -e "${stubs}/called"
 check "nothing in the volume changes" is_empty_dir "${VOLUME_DIR}"
 
 # Repair skipped for root: an entry another UID owns stays as it is.
-if [ "$(id -u)" = 0 ]; then
+if [ "$(id -u)" = "0" ]; then
   touch "${VOLUME_DIR}/foreign"
   chown 23456:23456 "${VOLUME_DIR}/foreign"
   check "the repair succeeds for root" \
     env PATH="${stubs}:${PATH}" SUDO_RECORD="${stubs}/called" "${REPAIR}" 2>"${stubs}/warning"
-  check "nothing in the volume changes for root" [ "$(stat -c %u "${VOLUME_DIR}/foreign")" = 23456 ]
+  check "nothing in the volume changes for root" [ "$(stat -c %u "${VOLUME_DIR}/foreign")" = "23456" ]
   check "no warning is printed for root" test ! -s "${stubs}/warning"
   check "sudo is not run for root" test ! -e "${stubs}/called"
   rm "${VOLUME_DIR}/foreign"
@@ -133,10 +136,10 @@ done
 machine="$(uname -m)"
 target="${machine}-unknown-linux-${libc}"
 printf '%s\n' "Expecting uv ${release} (${target})"
-check "uv is installed as /usr/local/bin/uv" [ "$(command -v uv)" = /usr/local/bin/uv ]
-check "uvx is installed as /usr/local/bin/uvx" [ "$(command -v uvx)" = /usr/local/bin/uvx ]
-check "uv is executable by every user" [ "$(stat -c %a /usr/local/bin/uv)" = 755 ]
-check "uvx is executable by every user" [ "$(stat -c %a /usr/local/bin/uvx)" = 755 ]
+check "uv is installed as /usr/local/bin/uv" [ "$(command -v uv)" = "/usr/local/bin/uv" ]
+check "uvx is installed as /usr/local/bin/uvx" [ "$(command -v uvx)" = "/usr/local/bin/uvx" ]
+check "uv is executable by every user" [ "$(stat -c %a /usr/local/bin/uv)" = "755" ]
+check "uvx is executable by every user" [ "$(stat -c %a /usr/local/bin/uvx)" = "755" ]
 check "uv --version reports the newest release and the target of this platform" \
   [ "$(uv --version)" = "uv ${release} (${target})" ]
 check "uvx --version reports the newest release and the target of this platform" \
@@ -150,6 +153,8 @@ check "no Python interpreter is downloaded at build time" is_empty_dir "${SHARE_
 # Environment of the remote user, a login shell included.
 check "each variable has the stated value" shell_has_uv_env -c
 check "PATH contains the tool directory after /usr/local/bin and /usr/bin" uv_bin_after_system "${PATH}"
+# An implementation check, not a statement of the spec. It supports "Point uv at the feature's locations" ("also in
+# login shells whose system profile resets PATH"): every user's login shell reads the file, and only root changes it.
 check "/etc/profile.d/uv.sh is root's, mode 644" [ "$(stat -c '%U %a' /etc/profile.d/uv.sh)" = "root 644" ]
 check "each variable has the stated value in a login shell" shell_has_uv_env -lc
 # PATH expands in the login shell that sh starts, not in this one.
@@ -166,6 +171,6 @@ check "system commands take precedence over same-named tools" system_command_win
 
 # Later feature runs uv: what a later feature relies on during its own install.
 check "a later feature finds uv at /usr/local/bin/uv" /usr/local/bin/uv --version
-check "UV_PYTHON_INSTALL_DIR is set to /var/lib/uv/python" [ "${UV_PYTHON_INSTALL_DIR}" = /var/lib/uv/python ]
+check "UV_PYTHON_INSTALL_DIR is set to /var/lib/uv/python" [ "${UV_PYTHON_INSTALL_DIR}" = "/var/lib/uv/python" ]
 
 reportResults

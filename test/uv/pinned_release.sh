@@ -3,6 +3,7 @@
 # alpine:3.24 ships no bash.
 set -eu
 
+# The path is computed from $0 at run time, so shellcheck cannot follow it.
 # shellcheck source=/dev/null
 . "$(dirname "$0")/checks.sh"
 
