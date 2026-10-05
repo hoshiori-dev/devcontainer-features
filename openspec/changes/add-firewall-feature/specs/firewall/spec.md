@@ -474,8 +474,11 @@ The container SHALL be able to send DNS queries beyond the loopback interface on
 `/etc/resolv.conf` as Docker last generated it (Requirement: Firewall applied at every start); queries to Docker's
 embedded resolver `127.0.0.11` and to the feature's local resolver travel through the loopback interface and stay
 allowed. DNS traffic to any other address SHALL be refused, whatever `defaultAction` and the allowed entries say. Every
-name SHALL still resolve, including names that no option allows and denied names, since only connections are filtered.
-The feature SHALL keep the `search` and `options` lines of `/etc/resolv.conf` intact.
+name SHALL still resolve, including names that no option allows and denied names, since only connections are filtered,
+when Docker forwards lookups from the host's network namespace or `/etc/resolv.conf` names the configured DNS servers.
+On a user-defined network with DNS servers configured for the container or the Docker daemon, only the names Docker
+itself answers resolve, and `NOTES.md` SHALL state that limitation. The feature SHALL keep the `search` and `options`
+lines of `/etc/resolv.conf` intact.
 
 #### Scenario: Other DNS server refused
 
@@ -512,13 +515,16 @@ when another process already holds its address and port. A resolver that cannot 
 naming the container's own resolvers, never the process that holds the port. What a failed start leaves in place is
 stated in Requirement: Option failureMode; in both modes the start SHALL be recorded as failed with its reason. When no
 rule can be loaded at all (the container lacks `NET_ADMIN`, the entrypoint does not run as root, or the kernel lacks
-nftables support), outbound traffic stays unrestricted in both modes. A resolver that exits after a successful start
-SHALL NOT change the recorded result or the rules; name lookups then fail until the next start.
+nftables support), outbound traffic stays unrestricted in both modes. A start under an entrypoint that does not run as
+root loads no rule and writes no record; the start check reports it from the missing record, and `NOTES.md` SHALL state
+that the entrypoint has to run as root. A resolver that exits after a successful start SHALL NOT change the recorded
+result or the rules; name lookups then fail until the next start.
 
 #### Scenario: Rules cannot be loaded
 
 - **WHEN** the container runs without `NET_ADMIN` or the entrypoint does not run as root
-- **THEN** outbound traffic is not restricted and the start is recorded as not applied
+- **THEN** outbound traffic is not restricted; a start that runs as root is recorded as not applied, and a start under
+  an entrypoint that does not run as root writes no record, so the start check reports it from the missing record
 
 #### Scenario: Resolver port taken
 
@@ -565,8 +571,9 @@ non-zero, and with `warn` it SHALL exit zero after a warning on standard error.
 
 ### Requirement: Start record readable by the remote user
 
-Each start SHALL write a record of its result (applied, failed, or not applied), its reason, its time, and the options
-in effect to a file whose path `NOTES.md` documents, readable and not writable by the remote user.
+Each start whose entrypoint runs as root SHALL write a record of its result (applied, failed, or not applied), its
+reason, its time, and the options in effect to a file whose path `NOTES.md` documents, readable and not writable by the
+remote user. A start under an entrypoint that does not run as root writes no record (Requirement: Failure mode).
 
 #### Scenario: Remote user reads the record
 
