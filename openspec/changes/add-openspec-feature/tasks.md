@@ -298,3 +298,28 @@ the design's run was changed to an image an amd64 host runs without emulation.
       `scenarios (openspec, arm64)`)
 - [x] 8.5 Record each Acceptance item and each scenario of the delta spec with its test or local run, image,
       architecture, and result in the PR's Validation section
+
+## 9. Review follow-up
+
+Work after the review of the ready pull request (design, Decisions after the review of the ready pull request).
+
+- [x] 9.1 Narrow the claims about ignored npm configuration to the layers the feature isolates, without changing a
+      script: in `specs/openspec/spec.md`, the phrase "regardless of any registry configured in the image" of
+      Requirement "Install the requested version" and the body of Requirement "Ignore the image's download settings"; in
+      `proposal.md`, the sentence of What Changes; in `design.md`, Security review surface - Downloads, the decision
+      that records the answer, and the open question it answers, which is removed; in `src/openspec/NOTES.md`, "What is
+      verified", with one sentence on the npmrc built into the Node.js installation; regenerate `src/openspec/README.md`
+      with `just docs`; verify by reading each changed sentence against design - Risks (the built-in npmrc) and against
+      `run_node` and `run_npm` in `install.sh`, that
+      `grep -rn "configured in the image\|whatever registry\|nothing else the image" src/openspec openspec/changes/add-openspec-feature`
+      finds only the scenario name "Registry configured in the image", the task lines that name it, and the two decision
+      records that quote the replaced phrase, and with `just spec-check` and `just docs-check`
+- [x] 9.2 Make `src/openspec/install.sh` fail when a directory is at the wrapper's path: a check after the runtime
+      checks and before the registry read, failing with `<reason>; <how to fix it>`, and `--no-target-directory` on the
+      final move of the wrapper; verify that `mv --help` names the option on both images of
+      `test/openspec/compatibility.json`, with `shellcheck -o require-variable-braces,require-double-brackets` reporting
+      nothing, and by a hand run in a throwaway container: a first and a second install with the defaults succeed; with
+      1.13.1 installed and the wrapper replaced by a directory, the install fails with that message before its first log
+      line and leaves the prefix, the directory, and the paths next to them as they were; with the directory removed the
+      install succeeds; a symbolic link to a directory at the path is replaced by the wrapper
+- [x] 9.3 Run `just check` and verify it passes
