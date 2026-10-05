@@ -472,7 +472,8 @@ export function buildPlan(selection: Selection, model: RepoModel): Plan {
             throw new Error(
                 `test/${id}/compatibility.json is ${feature.compatError === "missing" ? "missing" : "invalid"}` +
                     (feature.compatError && feature.compatError !== "missing" ? ` (${feature.compatError})` : "") +
-                    ". CI cannot know which images to test the feature on. Fix the file; see .agents/knowledge/testing.md.",
+                    ". CI cannot know which images to test the feature on. " +
+                    "Fix the file; see .agents/knowledge/testing.md.",
             );
         }
         for (const entry of feature.compat.images) {

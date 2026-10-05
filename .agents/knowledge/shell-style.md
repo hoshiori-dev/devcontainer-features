@@ -33,7 +33,7 @@ behavior contract to feature developers and auditors, so it is written for readi
 - Bash (`#!/usr/bin/env bash`, `set -euo pipefail`) is recommended for every other feature: it is easier to read.
 - Tests use the same pair: bash tests `set -euo pipefail`, POSIX tests `set -eu`. A POSIX test cannot source
   `dev-container-features-test-lib` (it is bash); it uses a POSIX stand-in with the same `check` / `reportResults`
-  interface, as `test/glab/checks.sh` does.
+  interface, as `test/glab/checks.sh` does; `just new-feature <id> --posix` generates one.
 - Never install bash into a user's image to satisfy this guide.
 
 ## Layout

@@ -31,8 +31,8 @@ runs:
         IMAGE: ${{ inputs.image }}
         REMOTE_USER: ${{ inputs.remote-user }}
       run: |
-        args=(--mode "$MODE")
-        if [[ -n "$FEATURE" ]]; then args+=(--feature "$FEATURE"); fi
-        if [[ -n "$IMAGE" ]]; then args+=(--image "$IMAGE"); fi
-        if [[ -n "$REMOTE_USER" ]]; then args+=(--remote-user "$REMOTE_USER"); fi
+        args=(--mode "${MODE}")
+        if [[ -n "${FEATURE}" ]]; then args+=(--feature "${FEATURE}"); fi
+        if [[ -n "${IMAGE}" ]]; then args+=(--image "${IMAGE}"); fi
+        if [[ -n "${REMOTE_USER}" ]]; then args+=(--remote-user "${REMOTE_USER}"); fi
         ./scripts/test_feature.ts "${args[@]}"

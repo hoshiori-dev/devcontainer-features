@@ -30,7 +30,7 @@ scenario matrix and are dependencies of `ci-gate`.
 | `test-global` (CI)                       | `just test-global`                                                                                                                                                                                                                                                        | PR; when `test/_global` or a feature it installs is affected    |
 | `ci-gate` (CI)                           | fails if any job above failed or was cancelled                                                                                                                                                                                                                            | always                                                          |
 | `pr-title` (PR)                          | `just check-title "<title>"`; for Dependabot the length ignores its `in /<directory>` suffix (`PR_AUTHOR`)                                                                                                                                                                | PR opened, edited, synchronized, ready, draft                   |
-| `pr-checklist` (PR)                      | `scripts/check_pr_body.ts --template <base commit's template> --body-file <file>`                                                                                                                                                                                         | same; skipped for Dependabot                                    |
+| `pr-checklist` (PR)                      | `scripts/check_pr_body.ts --template <base commit's template>`; the body comes from the `pull_request` event payload (`$GITHUB_EVENT_PATH`) in CI and from `--body-file <file>` locally                                                                                   | same; skipped for Dependabot                                    |
 | `spec-archived` (PR)                     | `just spec-status` (add `--ready` for the verdict a ready PR gets)                                                                                                                                                                                                        | same                                                            |
 | `verify` (Release)                       | `scripts/validate.ts --base <previous main>` on the commit about to be published, without the write token                                                                                                                                                                 | before every `publish`                                          |
 | `secret-scan` (Secret Scanning)          | TruffleHog over the commits the PR or push adds (`--results=verified,unknown`); locally `docker run --rm -v "$PWD:/tmp" -w /tmp <image> git file:///tmp/ --since-commit origin/main --branch HEAD --results=verified,unknown --fail`, `<image>` as pinned in `secret.yml` | PR, push to `main`                                              |
@@ -58,12 +58,13 @@ scenario matrix and are dependencies of `ci-gate`.
 CI pins Deno, just, the devcontainer CLI, and OpenSpec in `.github/actions/setup-tools/action.yml`, the only place CI
 versions live; shellcheck is the runner image's (0.9.0 on ubuntu-24.04, as in the dev container's apt package). The dev
 container installs its own copies (OpenSpec at `@latest` via `.devcontainer/setup.sh`). Before bumping a pin, run
-`just check` locally with that version. Every action, `actions/*` included, is pinned by full commit SHA with its
-version in a comment (`@<sha> # vX.Y.Z`); Dependabot proposes updates for them. Deno scripts pin their `jsr:` / `npm:`
-imports inline, and CI's OpenSpec install uses the same permission flags as `setup.sh`. The local registry image the
-feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts/test_feature.ts`. The TruffleHog action in
-`secret.yml` is pinned by commit SHA, and the image it runs by digest in its `version` input: Dependabot bumps only the
-action, so update the image with it.
+`just check` locally with that version. `publish` skips just (`just: "false"`), and it is the only job whose checkout
+keeps git credentials (`persist-credentials`), which `scripts/tag_releases.ts` needs to push tags. Every action,
+`actions/*` included, is pinned by full commit SHA with its version in a comment (`@<sha> # vX.Y.Z`); Dependabot
+proposes updates for them. Deno scripts pin their `jsr:` / `npm:` imports inline, and CI's OpenSpec install uses the
+same permission flags as `setup.sh`. The local registry image the feature tests publish to is pinned by digest as
+`REGISTRY_IMAGE` in `scripts/test_feature.ts`. The TruffleHog action in `secret.yml` is pinned by commit SHA, and the
+image it runs by digest in its `version` input: Dependabot bumps only the action, so update the image with it.
 
 ## Release path
 

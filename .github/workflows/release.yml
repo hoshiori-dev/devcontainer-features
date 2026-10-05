@@ -28,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-tools
       # A dispatch has no previous commit to compare with, so it checks the metadata only.
@@ -42,10 +43,13 @@ jobs:
       contents: write # push release tags
       packages: write # publish to ghcr.io
     steps:
+      # Keeps the checkout's credentials: scripts/tag_releases.ts pushes the release tags with them.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # This job runs the devcontainer CLI and a Deno script directly, never just.
       - uses: ./.github/actions/setup-tools
         with:
           devcontainer-cli: "true"
+          just: "false"
       - name: Publish features
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
