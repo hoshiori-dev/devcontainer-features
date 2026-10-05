@@ -103,7 +103,7 @@ check "the tools directories are owned by root and writable by the remote user" 
 # every other compatibility image.
 script="$(mktemp -d)/hello.ts"
 echo 'console.log("hello from a global tool");' >"${script}"
-check "deno install --global succeeds without elevated privileges" \
+check "deno install --global succeeds as the remote user" \
   deno install --global --name deno-feature-hello "${script}"
 check "the executable appears in /usr/local/share/deno/bin" test -x /usr/local/share/deno/bin/deno-feature-hello
 tool_runs() {

@@ -6,11 +6,12 @@ set -euo pipefail
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
 
+# Requirement "Shared location for global tools": ownership and mode only; the next checks show the write access.
 tools_directories_belong_to_group_deno() {
   [[ "$(stat -c %U:%G:%a /usr/local/share/deno)" == root:deno:2775 ]] || return 1
   [[ "$(stat -c %U:%G:%a /usr/local/share/deno/bin)" == root:deno:2775 ]]
 }
-check "the tools directories are writable through group deno" tools_directories_belong_to_group_deno
+check "the tools directories are root:deno with mode 2775" tools_directories_belong_to_group_deno
 remote_user_in_group_deno() {
   [[ " $(id -nG) " == *" deno "* ]]
 }

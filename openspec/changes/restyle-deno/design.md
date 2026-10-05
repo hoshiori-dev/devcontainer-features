@@ -163,9 +163,11 @@ and `getent`, which change nothing.
   in the up-front check and in the setup, with a comment giving the reason. GNU `id` exits 1 when one of the user's GIDs
   has no group entry and still prints every group, so the printed list decides, as it did when the call was a `case`
   subject. Checked in `debian:12` with `devuser:x:4242:4242` in `/etc/passwd` and no group 4242: the script at `main`
-  and the restyled one both install, create group `deno`, and add the user. Rejected: a bare assignment, whose status
-  would stop that build under `set -e` with only `id`'s message, a failure this change does not name. Rejected: reading
-  membership from the members field of `getent group deno`, which replaces the lookup the script uses today.
+  and the restyled one both install, create group `deno`, and add the user. Each call prints `id`'s
+  `cannot find name for group ID` line to stderr, so for such a user the build log shows it twice where `main` shows it
+  once. Rejected: a bare assignment, whose status would stop that build under `set -e` with only `id`'s message, a
+  failure this change does not name. Rejected: reading membership from the members field of `getent group deno`, which
+  replaces the lookup the script uses today.
 - `reported_version` stays a probe that prints nothing when the executable cannot run, with a comment that an existing
   `deno` that cannot run is treated as a different version and replaced.
 - The `getent group deno` probe keeps reading every failure as "no group", with a comment naming the consequence:
@@ -231,6 +233,12 @@ requirement in NOTES.md only, which leaves a failure condition outside the spec.
 - Each label states one behavior in the spec's words; `tools_access` keeps its assertions under a label from Requirement
   "Shared location for global tools", and helpers are named after what they assert (`fedora_remote_user.sh`,
   `uid_remap.sh`). `uid_remap.sh` keeps one root process across the remap, which the test needs.
+- Two labels state what their command verifies where the spec's words would claim more. In `test.sh`, the
+  `deno install --global` check is labeled "succeeds as the remote user", since the remote user is root on five of the
+  six compatibility images and "without elevated privileges" holds only on `base:ubuntu24.04`; `fedora_remote_user.sh`,
+  which runs as `devuser`, keeps the spec's words. In `fedora_remote_user.sh`, the `stat` comparison is labeled "the
+  tools directories are root:deno with mode 2775", with a comment naming the requirement it supports; the membership and
+  `deno install --global` checks after it show the write access.
 - Every script that reads the latest-release pointer at run time says why in a comment, as `test.sh` already does.
 - `duplicate.sh` states its premise (the CLI installs the first non-default proposal, then the default) in a comment
   instead of a check, and so do `exact_version.sh` and `fedora_remote_user.sh` for theirs (the checks run as the
