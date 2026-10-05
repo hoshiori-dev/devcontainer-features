@@ -61,48 +61,65 @@ State at `f64470a`, confirmed in the code against the #52 audit for this feature
 
 - New options, new validation, a different set of accepted entries, or a changed order of checks.
 - Detecting the distribution by `ID` instead of `pacman`'s presence; the spec defines the failure by a missing `pacman`.
-- Changing `direct_checks.ts`, `scenarios.json`, or `compatibility.json`, or adding a `.shellcheckrc`.
-- The sibling package-list features and the phase work in #60; #50's replacement of the host runners.
+- Changing `direct_checks.ts`, `control_checks.ts`, `scenarios.json`, or `compatibility.json`, or adding a
+  `.shellcheckrc`.
+- The sibling package-list features and the phase work in #60; trimming or replacing the host runners, which is #50.
 
 ## Decisions
 
 ### Messages
 
 `log` prints `pacman-packages: <text>` to stdout; `fail` prints `pacman-packages: error: <text>` to stderr and exits 1;
-both join their arguments with `"$*"`, so a long message is split across arguments in the source with identical output.
-Every message is lower case, one sentence, no trailing period; a failure reads `<reason>; <how to fix it>`. Planned
-texts after the prefix:
+both print `"$*"`. The texts are this feature's instantiation of the wording the five package-list installers share,
+fixed at the package gate (Package gate decisions):
+
+- Text is lower case with no trailing period, and every failure reads `<reason>; <how to fix it>`.
+- A value an option "is" goes in double quotes, an entry in single quotes, and a value in effect is written
+  `<option>=<value>`. A log line for a step that a control selects ends with `(<option>=<value>)`.
+- `<status>` is `$?`, written in `fail`'s argument directly right of `||`, so it is the failed command's status.
+- A message whose source line would pass 120 columns is split after its `;`, or before the trailing parenthesis, into
+  two arguments; the output is identical while `IFS` is the default.
+- No feature text contains `fetch`, `Downloading`, `Retrieving repository`, `signature`, `conflict`, `is up to date`, or
+  `failed to synchronize`, so the host checks that look for `pacman`'s own words stay meaningful.
+
+Failures, after `pacman-packages: error:`:
 
 - Invalid `cleanup`: `option cleanup is "<value>"; use all, packages, or none`.
-- Refused entry: `refusing the entry '<entry>'; write it as a package, provided, or group name of ASCII letters,`
-  `digits, and @ . _ + - that starts with a letter or digit, optionally followed by =, <, <=, >, or >= and a version`
-  `that may also hold : (paths, URLs, repository/name, options, patterns, and shell characters are not accepted)`, as
-  one line.
-- Empty list (log): `no packages listed; nothing to do`.
-- No `pacman`: `pacman was not found on this image (<PRETTY_NAME, or an unidentified distribution>); use an Arch Linux`
-  `image, which provides pacman`, as one line.
-- Transaction (log): `upgrading the system and installing <list> from the repositories the image configures`.
-- Transaction fails: `pacman could not upgrade the system and install <list>; check pacman's messages above, the`
-  `entries, and the image's mirror list and keyring`, as one line.
-- `cleanup=all` (log): `removing downloaded packages and signatures from /var/cache/pacman/pkg and sync databases from`
-  `/var/lib/pacman/sync`, as one line.
-- `cleanup=packages` (log): `removing downloaded packages and signatures from /var/cache/pacman/pkg`.
+- Refused entry, as one line: `refusing the entry '<entry>': not a package, provided, or group name with an optional`
+  `version constraint; start with an ASCII letter or digit and use only ASCII letters, digits, and @ . _ + - : < > =`.
+- No `pacman`, as one line: `pacman was not found on this image (<distribution>); use an Arch Linux image, which`
+  `provides pacman`, where `<distribution>` is `PRETTY_NAME`, or `an unidentified distribution`.
+- Transaction fails, as one line: `pacman --sync failed with status <status>; fix what pacman reports above (entries,`
+  `mirrors, keyring, or network)`.
 
-Bound: the wording may be polished at implementation, but each message keeps the substrings the host checks assert
-(Context), names what the spec says it names (the entry, the option, `pacman` and Arch Linux), and the paths in the logs
-come from the constants. `cleanup=none` logs nothing, since it changes nothing.
+Logs, after `pacman-packages:`:
+
+- Empty list: `no packages listed; nothing to do`.
+- Transaction: `upgrading the system and installing <entries> from the image's repositories`, where `<entries>` is the
+  accepted entries joined by spaces.
+- `cleanup=all`, as one line: `removing downloaded packages from /var/cache/pacman/pkg and the sync databases from`
+  `/var/lib/pacman/sync (cleanup=all)`.
+- `cleanup=packages`: `removing downloaded packages from /var/cache/pacman/pkg (cleanup=packages)`.
+
+Bound: each message keeps the substrings the host checks assert (Context), names what the spec says it names (the entry,
+the option, `pacman` and Arch Linux), and the paths in the logs come from the constants. `cleanup=none` logs nothing,
+since it changes nothing.
 
 - Rejected: keeping today's texts and only splitting the long lines. The guide forbids the trailing period and asks for
   the reason-and-fix form; splitting alone leaves both.
 - Rejected: a log line for `cleanup=none`. The guide asks for a line per step that changes the image; this one does not.
-- Rejected: dropping the list of refused forms from the entry message. It is what tells a developer why `extra/vim` or a
-  URL fails, which the spec's refusal scenarios are about.
+- Rejected: keeping the list of refused forms (paths, URLs, `repository/name`, options, patterns, shell characters) in
+  the entry message, as the draft planned. The character rule the message states already excludes each of them, and
+  without the list the refusal fits two source lines, as in the sibling installers.
+- Rejected: naming the list again in the transaction failure. The log line above `pacman`'s output already names it; the
+  failure names `pacman`'s exit status instead, which the draft's text hid.
 
 ### Explicit failure of the transaction
 
 The `pacman` call ends with `|| fail` with the message above. It is one command, so `set -e` stays in effect everywhere;
 `pacman`'s own output is still printed before the feature's line. The exit status of a failed transaction becomes
-exactly 1; the spec requires only a non-zero status for every failure it names there.
+exactly 1, as for every package-manager failure the five package-list installers handle, and `pacman`'s own status stays
+visible in the message; the spec requires only a non-zero status for every failure it names there.
 
 - Rejected: leaving the failure to `set -e`. The guide requires `|| fail` on a package-manager step the developer can
   fix, and the audit confirmed the unclear failure.
@@ -139,10 +156,12 @@ syntax, which are now interpreted instead of stripped.
 - `refuse` is inlined into `check_entry` and `describe_system` into the pacman-check step (single-use); `trim` and
   `check_entry` stay as named steps of the loop with one-sentence comments. The save and restore of `LC_ALL` stays
   around the loop with one comment giving the reason.
-- The header says what is installed, from where, and which paths cleanup empties; that it runs as root at build time;
-  that `packages` arrives as `PACKAGES` and `cleanup` as `CLEANUP`; and that it is POSIX because an empty list must
-  succeed, and a non-empty one fail clearly, on images without `pacman`, which may ship no bash. The step list, the
-  second-install sentence, and the comment about "cache creation" (this feature creates no cache) go.
+- The header is the one the five package-list installers share, in three sentences: the packages listed in the option
+  `packages` are installed with `pacman` from the image's repositories, as part of a full system upgrade, to the paths
+  the packages define; the script runs as root at image build time and the options arrive as `PACKAGES` and `CLEANUP`;
+  and it is POSIX `sh` because an empty list must succeed, and a missing `pacman` be reported, on images that ship no
+  bash. The paths cleanup empties are named by the constants below the header. The step list, the second-install
+  sentence, and the comment about "cache creation" (this feature creates no cache) go.
 - Long options where every target has them: `pacman --sync --refresh --sysupgrade --needed --noconfirm` and
   `rm --recursive --force`; both run only after `pacman` was found, so on an Arch image with GNU coreutils. The probe
   `command -v pacman` and everything before it keep forms busybox accepts. `NOTES.md` keeps `pacman -Syu` as the idiom
@@ -168,21 +187,30 @@ options where every target has them).
   spec's words, with headers naming their Scenarios: for `packages`, `tree` installed, sync databases remain, no package
   file remains ("Only package files are cleaned"); for `none`, `tree` installed, sync databases remain, downloaded
   package files remain ("Feature cleanup is disabled", on the image where retention was observed). The keys stay.
-- `control_checks.ts` keeps only the pacman checks, each named after its Scenario: "Invalid control fails before any
-  change", "Empty list ignores installation controls", "Only package files are cleaned", "Later controls apply to the
-  second installation", and "Custom cache paths are outside the cleanup bound". It drops the other managers' branches
-  and the `--allow-net` permission, and passes `PATH` as its own `--env` instead of as a control. TypeScript is outside
-  the shell guide; this follows the audit's confirmed finding on defensive tests.
-- `direct_checks.ts` stays unchanged: every message keeps the substrings it asserts.
+- `direct_checks.ts` and `control_checks.ts` stay unchanged: every message keeps the substrings they assert. Trimming
+  `control_checks.ts` to the pacman checks, which the draft planned, is left to #50 (Package gate decisions).
 
 Rejected: keeping `duplicate.sh`'s branches over `CLEANUP` (dead under the CLI's selection, and they hide which Scenario
 runs); POSIX scenario scripts with a stand-in `check` (every scenario image ships bash, and the test library gives
-labels for free); deferring `control_checks.ts` wholly to #50 (the audit confirmed the finding for this restyle, and #50
-can replace a trimmed runner as well as the template).
+labels for free); trimming `control_checks.ts` in this change (the host runners of the five package-list installers
+share one template, and #50 replaces them together).
+
+## Package gate decisions
+
+The maintainer closed the package deliberation on 2026-10-05. The draft named no open question; the gate decided:
+
+- Trimming `control_checks.ts` stays out of this change and is left to #50. The file is not edited (Tests).
+- The package list default is `${PACKAGES-}`, never `${PACKAGES:-}`, in all five package-list installers (Structure).
+- Every package-manager failure the script handles ends with `|| fail` and exits 1, with the tool's own exit status
+  visible in the message. Here that is the one `pacman` transaction (Explicit failure of the transaction).
+- Header, message, and log-line wording follows the template the five package-list installers share; the texts under
+  Messages and the header under Structure are this feature's instantiation and replace the draft's planned texts.
+- None of the optional improvements below is adopted.
+- The draft's other decisions stand.
 
 ## Optional improvements offered, not adopted
 
-Each is left out unless the maintainer picks it at the package gate.
+The maintainer adopted none of them at the package gate; each stays out of this change.
 
 - Rename the scenario keys `controls_packages_0` / `controls_none_0` to `cleanup_packages` / `cleanup_none`. Gain: names
   that say what they test. Cost: the four sibling package features use the same keys, so a rename belongs to a decision
@@ -222,10 +250,11 @@ Each is left out unless the maintainer picks it at the package gate.
   instead of silently testing something else; the comment names the rule to re-check.
 - [`cleanup=none` retention depends on the image] → An image that starts deleting downloads in a hook fails that check;
   the Scenario is conditional on retention, so the fix is the test's premise, not the feature.
-- [Overlap with #60 and #50] → The restyle lands before #60 on the same `install.sh`; the trimmed `control_checks.ts` is
-  what #50 would replace, with the same Scenario names.
-- [Consistency with the sibling restyles] → Header wording, message forms, and scenario keys should match across the
-  five package installers; differences found at review are aligned in whichever PR is still open.
+- [Overlap with #60 and #50] → The restyle lands before #60 on the same `install.sh`; `control_checks.ts` keeps the
+  multi-manager template until #50 replaces it, so its dead branches and its checks named after Scenarios this spec
+  lacks stay for now.
+- [Consistency with the sibling restyles] → Header wording and message forms follow the shared template (Messages), and
+  the scenario keys stay the ones all five use; differences found at review are aligned in whichever PR is still open.
 
 ## URL inventory
 
