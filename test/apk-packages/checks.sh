@@ -31,6 +31,16 @@ installed() {
   apk info -e "$1" >/dev/null 2>&1
 }
 
+# The tree package's program prints "tree v<version> …". The images ship a BusyBox tree applet, which exits 0 on
+# --version without printing that line, so the exit status alone would not show that the package's program runs.
+tree_package_prints_its_version() {
+  tree_package_prints_its_version_line="$(tree --version)" || return 1
+  case "${tree_package_prints_its_version_line}" in
+    "tree v"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # $1 is a whole line of apk's world, constraint included.
 in_world() {
   grep -Fqx -- "$1" /etc/apk/world

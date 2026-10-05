@@ -10,8 +10,8 @@ set -eu
 
 check "file is installed" installed file
 check "tree is installed" installed tree
-check "file runs" file --version
-check "tree runs" tree --version
+check "file, with its dependencies, is installed: it prints its version" file --version
+check "tree, with its dependencies, is installed: the package's tree prints its version" tree_package_prints_its_version
 check "the dependency libmagic is installed" installed libmagic
 check "file is a line of apk's world" in_world file
 check "tree is a line of apk's world" in_world tree
