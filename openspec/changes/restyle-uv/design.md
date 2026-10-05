@@ -93,7 +93,8 @@ Constraints of this approach; the invariants that hold under any approach are th
 **Non-Goals:**
 
 - Tests for the failure scenarios of the spec: #50 owns them.
-- `test/_global/uv_and_hf_cli.sh`: it is shared with hf-cli and stays unchanged here.
+- `test/_global/uv_and_hf_cli.sh`: it is shared with hf-cli, and the hf-cli restyle (#89) owns it (Open Questions); it
+  stays unchanged here.
 - A `.shellcheckrc`, other features, new options, and behavior beyond the confirmed audit items.
 - `src/uv/NOTES.md`: it quotes no message and describes no changed behavior.
 - How the remote user is determined (`${_REMOTE_USER:-root}`): it is a tooling variable, not an option.
@@ -287,8 +288,8 @@ difference.
 
 ## Optional improvements offered, not adopted
 
-Each item is outside what the guide requires or what the audit confirmed; the maintainer may pick any at the package
-gate.
+Each item is outside what the guide requires or what the audit confirmed. The maintainer adopted none of them at the
+package gate on 2026-10-05.
 
 - **Log the repair before it changes ownership.** One line such as `uv: changing the owner of /var/lib/uv to <owner>`
   before the `sudo chown`. Gain: the creation log shows that a repair ran. Cost: the guide's "every step that changes
@@ -353,6 +354,17 @@ gate.
   the test in the same PR, as the duplicate test's contract already requires.
 - [hf-cli installs after uv and its scenarios install uv] → no hf-cli file reads uv's messages; CI re-tests hf-cli and
   the global scenarios.
+
+## Open Questions
+
+None open. The maintainer closed the package deliberation on 2026-10-05 and approved the package:
+
+1. **The draft.** Accepted as drafted; every decision above stands, including that `check` in the new
+   `test/uv/checks.sh` returns 1 after recording a failure, so every uv test stops at its first failed check (Test
+   restyle).
+2. **Optional improvements.** None of "Optional improvements offered, not adopted" is adopted.
+3. **`test/_global/uv_and_hf_cli.sh`.** It belongs to the hf-cli restyle (#89), not to this change, and stays unchanged
+   here (Non-Goals).
 
 ## URL inventory
 
