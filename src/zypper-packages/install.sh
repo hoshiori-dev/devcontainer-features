@@ -56,11 +56,12 @@ check_entry() {
       fail "refusing the entry '$1': not a package name; use name, name.arch, name=edition, or name>=edition"
       ;;
   esac
-  # The patterns are quoted against the style guide: an unquoted < or > is a redirection.
+  # The empty pattern and the patterns with < or > are quoted against the style guide: an empty pattern cannot be
+  # written unquoted, and an unquoted < or > is a redirection.
   case "${check_entry_edition}" in
     "") ;;
     '<='* | '>='*) check_entry_edition="${check_entry_edition#??}" ;;
-    '='* | '<'* | '>'*) check_entry_edition="${check_entry_edition#?}" ;;
+    =* | '<'* | '>'*) check_entry_edition="${check_entry_edition#?}" ;;
   esac
   case "${check_entry_edition}" in
     *[!A-Za-z0-9._+~^:-]*)
@@ -94,23 +95,26 @@ validate_options() {
 # Fails unless zypper is on PATH. The message names the distribution, read from /etc/os-release with builtins only, so
 # that it also appears on an image that offers no other command.
 require_zypper() {
-  require_zypper_name=""
+  if command -v zypper >/dev/null 2>&1; then return 0; fi
+  require_zypper_distribution=""
   if [ -r /etc/os-release ]; then
-    # A file that cannot be sourced leaves the name empty instead of ending the script before its message.
+    # A malformed /etc/os-release, or one that assigns a readonly name, fails the subshell. The message below must
+    # still be the one that ends the run, so the distribution then stays unidentified.
     # shellcheck source=/dev/null
-    if ! require_zypper_name="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")"; then
-      require_zypper_name=""
+    if ! require_zypper_distribution="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")"; then
+      require_zypper_distribution=""
     fi
   fi
-  if [ -z "${require_zypper_name}" ]; then require_zypper_name="an unidentified distribution"; fi
-  command -v zypper >/dev/null 2>&1 \
-    || fail "zypper was not found on this image (${require_zypper_name}); use an openSUSE image, which provides zypper"
+  fail "zypper was not found on this image (${require_zypper_distribution:-an unidentified distribution});" \
+    "use an openSUSE image, which provides zypper"
 }
 
 # Refreshes every enabled repository in a step of its own, so that a repository that cannot be refreshed or verified
 # fails the build before anything is installed.
 refresh_metadata() {
   log "refreshing the repository metadata from the image's enabled repositories (refreshPolicy=${REFRESHPOLICY})"
+  # Against the style guide's rule on repeated arguments, every zypper call in this file spells out --non-interactive
+  # and --no-refresh instead of taking them from a function: whoever checks a call sees every flag zypper is run with.
   zypper --non-interactive refresh \
     || fail "zypper refresh failed with status $?; fix what zypper reports above (repositories, keys, or network)"
 }
@@ -201,6 +205,8 @@ clean_caches() {
 }
 
 main() {
+  # The controls are validated before any zypper call and before the empty-list exit: an invalid control fails also
+  # when no package is listed.
   validate_options
 
   # The accepted entries are collected in main's positional parameters: POSIX sh has no arrays, and a `set --` inside a

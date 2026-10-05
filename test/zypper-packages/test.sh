@@ -3,6 +3,7 @@ set -euo pipefail
 
 # TODO(#43): compatibility.json omits Tumbleweed arm64 after native package digest failures there. Restore that
 # combination once upstream fixes the cause.
+
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
 

@@ -33,7 +33,8 @@
       labeled `check` calls of the test library, with the glob loops as helpers named after what they assert; verify
       that shellcheck with the two optional checks reports nothing and, with `docker run` on `opensuse/leap:16.0` and a
       stand-in for the test library, that each script passes after the installation its scenario describes and fails
-      when its behavior is absent
+      when its behavior is absent; the package-file check of `controls_packages_*.sh` fails once a package file is in
+      the cache, but passes after `cleanup=none` as well (design.md, Risks)
 - [x] 2.3 Leave `compatibility.json`, `scenarios.json`, and `control_checks.ts` as they are; verify that
       `git diff --stat main -- test/zypper-packages/` lists none of the three
 

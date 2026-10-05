@@ -27,6 +27,9 @@ no_package_file_remains() {
 check "bc is installed with refreshPolicy=always and installRecommends=true" rpm -q bc
 check "file is installed with refreshPolicy=always and installRecommends=true" rpm -q file
 check "cleanup=packages leaves usable metadata in the parsed metadata cache" parsed_metadata_remains
-check "cleanup=packages removes package files from the managed cache" no_package_file_remains
+# libzypp deletes each downloaded package after installing it unless its repository sets keeppackages, which none of
+# the image's does: after cleanup=none the package cache holds no package file either. So this check only shows that
+# no package file is left; no test plants one to see `zypper clean` remove it.
+check "cleanup=packages leaves no package file in the managed cache" no_package_file_remains
 
 reportResults

@@ -58,8 +58,9 @@ feature:
 **Goals:**
 
 - `install.sh` follows the guide's POSIX sections and the POSIX skeleton's layout; the tests follow its bash and Tests
-  sections. The one deliberate deviation is the quoted `case` patterns below, marked by a comment. Checked by review
-  against the guide and by shellcheck with the two optional checks.
+  sections. The two deliberate deviations are the quoted `case` patterns below and the `zypper` flags repeated at every
+  call instead of held in a function (Optional improvements), each marked by a comment. Checked by review against the
+  guide and by shellcheck with the two optional checks.
 - The order of checks stays as the spec fixes it and, where it fixes none, as the script has it: controls, entries, the
   empty-list exit, the `zypper` check, then the metadata step, install, and cleanup. Checked by `control_checks.ts`
   (invalid controls with an empty list and a stubbed `zypper`, refusals with `--network none`, the missing-`zypper` run)
@@ -114,27 +115,30 @@ No option is added, changed, renamed, or removed, so the design carries no optio
   `LC_ALL=C`, which would let `trim` strip non-ASCII whitespace in a UTF-8 locale instead of refusing it (offered
   below).
 - **`case` layout.** Every one-line `case … esac` becomes the guide's multi-line layout. The patterns that hold `<`,
-  `>`, or the empty string stay quoted, with a comment above saying an unquoted `<` or `>` is a redirection; this is the
-  one deliberate deviation from "patterns are unquoted". `${1#"${check_entry_name}"}` keeps its inner quotes so the name
-  is removed literally.
-- **Guards.** `command -v zypper >/dev/null 2>&1 || …` and `[ … ] || fail …` are guards; everything else branches with
-  `if`. A guard that does not fit in 120 characters ends its line with `\` and continues with `|| fail`, indented two
-  spaces; a message that still does not fit is split as Messages and logging says.
+  `>`, or the empty string stay quoted, with a comment above saying an unquoted `<` or `>` is a redirection and an empty
+  pattern cannot be written unquoted; this is the one deliberate deviation from "patterns are unquoted", and the `=*`
+  pattern beside them is unquoted. `${1#"${check_entry_name}"}` keeps its inner quotes so the name is removed literally.
+- **Guards.** `[ … ] || fail …` and `zypper … || fail …` are guards; everything else branches with `if`. The `zypper`
+  step opens with `if command -v zypper >/dev/null 2>&1; then return 0; fi`, so that everything below it runs only when
+  `zypper` is missing. A guard that does not fit in 120 characters ends its line with `\` and continues with `|| fail`,
+  indented two spaces; a message that still does not fit is split as Messages and logging says.
 - **No pipeline decides anything.** The distribution name for the missing-`zypper` message comes from the guide's idiom,
   `/etc/os-release` sourced in a subshell printing `${PRETTY_NAME:-}`, behind the existing readability check, with a
-  fallback to an empty name and the existing `an unidentified distribution` default; it is assigned to a variable before
-  the `fail` call, not substituted inside its arguments. The enabled aliases are extracted from the saved `zypper repos`
-  output through a here-document, not `printf | sed`. Rejected: keeping `sed | tr`, where the fallback is decided by
-  `tr`'s status alone and the substitution sits inside `fail`'s arguments, both of which the guide rules out; `sed` on
-  the file with quote stripping by parameter expansion, which keeps a spawned tool for what the guide's idiom does with
-  builtins. The output differs from today only for a `PRETTY_NAME` with quotes inside its value.
+  fallback to an empty name and the existing `an unidentified distribution` default, which `${…:-…}` supplies in the
+  `fail` argument; it is assigned to a variable before the `fail` call, not substituted inside its arguments. As in
+  1.0.0, the file is read only after `zypper` was found missing. The enabled aliases are extracted from the saved
+  `zypper repos` output through a here-document, not `printf | sed`. Rejected: keeping `sed | tr`, where the fallback is
+  decided by `tr`'s status alone and the substitution sits inside `fail`'s arguments, both of which the guide rules out;
+  `sed` on the file with quote stripping by parameter expansion, which keeps a spawned tool for what the guide's idiom
+  does with builtins. The output differs from today only for a `PRETTY_NAME` with quotes inside its value.
 - **Alias extraction keeps `sed`, with its long option.** The regular expression stays as it is and the call spells
   `--quiet` instead of `-n`: it runs only after `zypper` was found, so only on the supported openSUSE images, whose GNU
   `sed` has the long option the guide asks for. Rejected: a builtin loop with `case` and parameter expansion, which
   would have to reproduce the expression's greedy match (the last `alias="` on a line) by hand in code #59 reworks.
 - **Comments.** `check_entry` gets one sentence: what it accepts, that `$1` is the trimmed entry, and that it fails on a
   refused entry. The cached-metadata step's comment names the failure mode it handles: `never` must fail instead of
-  letting `zypper` bootstrap missing metadata. The existing why-comments stay; none is deleted.
+  letting `zypper` bootstrap missing metadata. The existing why-comments stay; none is deleted, and the one on
+  validating the controls first now sits above that step in `main`.
 
 ### Messages and logging
 
@@ -217,8 +221,8 @@ The header comment of `install.sh` is the shared one as well:
 
 - Every test script is bash: `#!/usr/bin/env bash`, `set -euo pipefail`, the library sourced with
   `# shellcheck source=/dev/null`, one `check` per behavior, `reportResults` last. Labels state the behavior in the
-  spec's words and name the scenario's values (for example "bc.x86_64 installs the x86_64 build of bc", "the recommended
-  package file is left out with installRecommends=false").
+  spec's words and name the scenario's values (for example "bc.x86_64 installs bc for the x86_64 architecture", "the
+  recommended package file is not installed with installRecommends=false").
 - The assertions stay the same behaviors: the architecture of `bc`; `less` with and without `file`; `bc` and `file`
   installed, parsed metadata retained, and, for `cleanup=packages`, no package file left; nothing installed by default;
   both packages kept after the empty second installation; the whitespace scenario's two packages. Expected values are
@@ -241,7 +245,8 @@ so none is part of this change.
 - **A `zypper` wrapper for repeated arguments.** `zypper_run() { zypper --non-interactive "$@"; }` would satisfy the
   guide's rule on arguments used more than once (six calls repeat `--non-interactive`). Trade-off: shorter calls and a
   single place for the flag, against every flag being visible at each call, which the verification review relies on; it
-  should be decided once for all five installers.
+  should be decided once for all five installers. Without it the calls deviate from that rule, and a comment above the
+  first call gives this reason.
 - **Rewording the `refreshPolicy` description.** `default` and `always` run the same strict refresh, as the spec and
   NOTES.md already say, but the option description suggests otherwise. Trade-off: clearer metadata and README, against
   touching `devcontainer-feature.json`, NOTES.md, and the generated README in a restyle; the five installers share the
@@ -255,8 +260,9 @@ so none is part of this change.
   audit could not verify, against comments on code that #59 is expected to rework.
 - **Making the `cleanup=packages` assertion meaningful under native package deletion.** If the images' repositories set
   `keeppackages=0`, zypper deletes downloaded packages itself and the "no package file remains" check passes without
-  `zypper clean`. Trade-off: a seeded package file or a comment makes the check prove the feature's cleanup, against
-  adding fixture logic; the images' setting was not checked for this design.
+  `zypper clean`. Trade-off: a seeded package file makes the check prove the feature's cleanup, against adding fixture
+  logic. The images' setting was not checked for this design; it was measured after the implementation, and the tests
+  now say what the check does not show (Risks).
 - **Removing the dead apt, apk, dnf, and pacman branches of `control_checks.ts`.** Trade-off: a shorter runner now,
   against churn in a file #50 replaces.
 
@@ -288,6 +294,13 @@ so none is part of this change.
   failure the log therefore holds the feature's line with zypper's status but not zypper's own text, although the shared
   wording says "reports above". Printing the captured output would take a second command between the call and `fail`,
   against the `|| fail` decision; it is left as it is.
+- [The `cleanup=packages` tests cannot tell a working `zypper clean` from a missing one] → libzypp deletes each
+  downloaded package after installing it unless its repository sets `keeppackages`, and no repository of either image
+  does: after an installation with `cleanup=none`, `/var/cache/zypp/packages` holds no package file on
+  `opensuse/leap:16.0` and `opensuse/tumbleweed` (measured on 2026-10-05). The check in `controls_packages_*.sh`
+  therefore only shows that no package file is left; its label and a comment say so, and neither the scenarios nor
+  `control_checks.ts` plant a package file. Unchanged from 1.0.0; a test that plants one needs a scenario whose image
+  keeps packages and is left to a later change.
 - [Depth of the package cache] → libzypp stores a downloaded package in `<alias>/<arch>` below
   `/var/cache/zypp/packages` on `opensuse/tumbleweed` and in `<alias>/%2E%2E/<arch>` on `opensuse/leap:16.0` (seen with
   `zypper install --download-only` on 2026-10-05). The loop of 1.0.0 reached two levels, so on Leap it passed with a
