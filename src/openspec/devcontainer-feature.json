@@ -9,7 +9,7 @@
       "type": "string",
       "proposals": ["latest", "1.13.1"],
       "default": "latest",
-      "description": "The OpenSpec version to install: latest, the version the npm registry names as latest at build time, or one exact published version such as 1.13.1."
+      "description": "The OpenSpec version to install: 'latest' (the version the npm registry names as latest at build time) or one exact published version such as 1.13.1. Any other value, such as a range, fails the build."
     },
     "disableUpdateCheck": {
       "type": "boolean",
