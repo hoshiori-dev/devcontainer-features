@@ -22,8 +22,8 @@ per assertion and `reportResults` last.
 Tests run known logic in declared environments with expected inputs; they are not public input-processing products. Make
 setup, the action under test, and assertions easy to compare with the intended behavior. Add defensive handling only
 when the expected environment requires it or it clarifies the test's meaning. Invalid input is appropriate when it is
-the explicit subject of a test. Use the block-comment guidance in feature-authoring.md for shell readability. Security
-review of test execution follows review-guidance.md.
+the explicit subject of a test. Write test scripts as `.agents/knowledge/shell-style.md` says. Security review of test
+execution follows review-guidance.md.
 
 ## Compatibility list
 
