@@ -276,7 +276,7 @@ start check.
       left is one design.md names (Goals: Scripts follow the shell style guide), a `# shellcheck disable` kept for one
       line included, with its reason in a comment on the line above.
 - [x] 8.2 Run `just check`; verify it passes with the regenerated `README.md` in place.
-- [x] 8.3 Re-run, against the rebuilt scripts, the builds of 2.6 and the checks of 3.8, adding the hand runs of 5.2 for
+- [ ] 8.3 Re-run, against the rebuilt scripts, the builds of 2.6 and the checks of 3.8, adding the hand runs of 5.2 for
       a list value with a line break; verify that each ends as its scenario states and that every build that must fail
       ends with one `firewall: error:` line naming what its scenario requires.
 - [ ] 8.4 Run `just test firewall` and `just test-scenarios firewall` through the PR's container test jobs, which run
