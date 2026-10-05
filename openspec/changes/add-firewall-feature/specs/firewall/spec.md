@@ -330,10 +330,11 @@ such as a dynamic DNS provider's domain, allows nearly any destination.
 
 Each `deniedDomains` entry SHALL deny the name itself and every subdomain of it, on every protocol and port. The
 addresses the container's resolver returns for a denied name SHALL be refused from the time of that lookup until the
-next start of the container, and the name SHALL still resolve. A name matched by both an allowed domain (from `presets`
-or `allowedDomains`) and a denied one SHALL follow the longer of the two entries, and the denied one when both are the
-same name. An address that the container reaches without a lookup of a denied name through its resolver is not refused
-by `deniedDomains`, and every other name that shares a refused address is refused with it.
+next start of the container, and the name SHALL still resolve wherever Requirement: DNS only to the container's
+resolvers says names resolve. A name matched by both an allowed domain (from `presets` or `allowedDomains`) and a denied
+one SHALL follow the longer of the two entries, and the denied one when both are the same name. An address that the
+container reaches without a lookup of a denied name through its resolver is not refused by `deniedDomains`, and every
+other name that shares a refused address is refused with it.
 
 #### Scenario: Denied domain refused
 
