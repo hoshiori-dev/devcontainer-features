@@ -18,7 +18,7 @@
       }
     }
   },
-  "github-npm": {
+  "github_npm": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -32,7 +32,7 @@
       "firewall": {}
     }
   },
-  "fetch-fails": {
+  "fetch_fails": {
     "image": "debian:12",
     "features": {
       "firewall": {}
@@ -57,7 +57,7 @@
       }
     }
   },
-  "dind-no-forward": {
+  "dind_no_forward": {
     "image": "debian:12",
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:4": {},
@@ -67,7 +67,7 @@
       }
     }
   },
-  "allow-all": {
+  "allow_all": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -76,7 +76,7 @@
       }
     }
   },
-  "denied-cidrs": {
+  "denied_cidrs": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -87,7 +87,7 @@
       }
     }
   },
-  "denied-domains": {
+  "denied_domains": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -99,7 +99,7 @@
       }
     }
   },
-  "denied-in-range": {
+  "denied_in_range": {
     "image": "debian:12",
     "features": {
       "firewall": {
