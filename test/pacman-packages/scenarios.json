@@ -1,0 +1,36 @@
+{
+  "listed_packages": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {
+        "packages": "bc,jq"
+      }
+    }
+  },
+  "optional_dependencies_and_whitespace": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {
+        "packages": " rsync ,\t bc,, "
+      }
+    }
+  },
+  "controls_packages_0": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {
+        "packages": "tree",
+        "cleanup": "packages"
+      }
+    }
+  },
+  "controls_none_0": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {
+        "packages": "tree",
+        "cleanup": "none"
+      }
+    }
+  }
+}

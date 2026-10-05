@@ -19,9 +19,19 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 
 ## Features
 
-| Feature                     | Description                                                                                                                                     |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`hf-mount`](src/hf-mount/) | Installs the Hugging Face `hf-mount` daemon and its NFS and FUSE backends, to mount Hugging Face Buckets and repositories as local filesystems. |
+| Feature                                                     | Description                                                                                                                                     |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apt-packages`](src/apt-packages/)                         | Installs a list of system packages with `apt-get` from the repositories a Debian or Ubuntu image already configures.                            |
+| [deno](src/deno/)                                           | Installs the Deno CLI, verified against its published checksums, with global tools on `PATH` for every user.                                    |
+| [glab](src/glab/)                                           | The GitLab CLI, installed from its checksum-verified release archive with no authentication configured.                                         |
+| [`hf-cli`](src/hf-cli/)                                     | Installs the Hugging Face CLI with its standalone installer for the remote user, optionally with its agent skill.                               |
+| [`nvidia-container-toolkit`](src/nvidia-container-toolkit/) | Installs the NVIDIA Container Toolkit from NVIDIA's signed repository and registers its runtime with a Docker daemon in the dev container.      |
+| [uv](src/uv/)                                               | Installs Astral's uv and uvx, optionally Python command-line tools, and keeps uv's interpreters and cache on a per-container volume.            |
+| [dnf-packages](src/dnf-packages/)                           | Installs listed system packages with dnf.                                                                                                       |
+| [apk-packages](src/apk-packages/)                           | Installs listed system packages with apk.                                                                                                       |
+| [pacman-packages](src/pacman-packages/)                     | Installs listed system packages with pacman.                                                                                                    |
+| [zypper-packages](src/zypper-packages/)                     | Installs listed system packages with zypper.                                                                                                    |
+| [`hf-mount`](src/hf-mount/)                                 | Installs the Hugging Face `hf-mount` daemon and its NFS and FUSE backends, to mount Hugging Face Buckets and repositories as local filesystems. |
 
 ## Development
 

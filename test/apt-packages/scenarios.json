@@ -1,0 +1,90 @@
+{
+  "listed_packages_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {
+        "packages": "bc,file"
+      }
+    }
+  },
+  "listed_packages_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "bc,file"
+      }
+    }
+  },
+  "recommends_and_whitespace": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": " wget ,\t bc,, "
+      }
+    }
+  },
+  "native_architecture": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "bc:amd64"
+      }
+    }
+  },
+  "debconf_question": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "keyboard-configuration"
+      }
+    }
+  },
+  "controls_packages_0": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {
+        "packages": "bc,file",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installRecommends": true
+      }
+    }
+  },
+  "controls_none_0": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {
+        "packages": "bc,file",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installRecommends": true
+      }
+    }
+  },
+  "controls_packages_1": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "bc,file",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installRecommends": true
+      }
+    }
+  },
+  "controls_none_1": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "bc,file",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installRecommends": true
+      }
+    }
+  }
+}

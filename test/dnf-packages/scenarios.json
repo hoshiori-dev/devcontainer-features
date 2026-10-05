@@ -1,0 +1,176 @@
+{
+  "listed_packages_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {
+        "packages": " bc , file ,, "
+      }
+    }
+  },
+  "listed_packages_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": " bc , file ,, "
+      }
+    }
+  },
+  "listed_packages_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": " bc , file ,, "
+      }
+    }
+  },
+  "controls_packages_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc,file",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "controls_none_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc,file",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "controls_packages_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc,file",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "controls_none_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc,file",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "controls_packages_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc,file",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "controls_none_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc,file",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "optional_false_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {
+        "packages": "ipcalc",
+        "installWeakDeps": false
+      }
+    }
+  },
+  "optional_true_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {
+        "packages": "ipcalc",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "architecture_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc.x86_64"
+      }
+    }
+  },
+  "optional_false_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "ipcalc",
+        "installWeakDeps": false
+      }
+    }
+  },
+  "optional_true_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "ipcalc",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "architecture_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc.x86_64"
+      }
+    }
+  },
+  "optional_false_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "ipcalc",
+        "installWeakDeps": false
+      }
+    }
+  },
+  "optional_true_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "ipcalc",
+        "installWeakDeps": true
+      }
+    }
+  },
+  "architecture_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc.x86_64"
+      }
+    }
+  }
+}

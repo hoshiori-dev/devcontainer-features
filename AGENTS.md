@@ -11,7 +11,7 @@ test/<id>/            <- its tests: test.sh, duplicate.sh, scenarios, compatibil
 test/_global/         <- cross-feature scenarios; test/canary.json: features CI runs when test infra changes
 openspec/             <- OpenSpec: config.yaml, specs/<id>/ (living spec per feature), changes/ (+ archive/)
 scripts/              <- Deno scripts (selection, staging, validation, docs, PR checks); lib/ shared model
-.github/              <- workflows (ci, pr, release), actions/ (composite), issue forms, PR template
+.github/              <- workflows (ci, pr, release), actions/ (composite), issue forms, PR template, Copilot guidance
 .agents/knowledge/    <- agent knowledge base (this file routes into it)
 .agents/skills/       <- project skills and OpenSpec's generated skills (Claude Code sees them via .claude/skills)
 ```
@@ -40,6 +40,7 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
 | Creating or editing anything under `src/<id>/`                                                         | `.agents/knowledge/feature-authoring.md`        |
 | Writing tests, compatibility lists, or canaries; running feature tests; CI tested something unexpected | `.agents/knowledge/testing.md`                  |
+| Writing or editing a shell script under `src/` or `test/`, or the `scripts/new_feature.ts` templates   | `.agents/knowledge/shell-style.md`              |
 | Starting a behavior change, creating an issue from a spec, or editing `openspec/`                      | `.agents/knowledge/spec-workflow.md`            |
 | Committing, marking a PR ready, requesting review, archiving, or unsure whether an action is yours     | `.agents/knowledge/agent-authority.md`          |
 | Creating a branch, opening or updating an issue or PR, or proposing a new management structure         | `.agents/knowledge/github-workflow.md`          |
@@ -49,6 +50,7 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 | Verifying a fact about the Dev Container spec, OpenSpec, GitHub, Deno, uv, just, or pre-commit         | `.agents/knowledge/references.md`               |
 | Issue → branch → draft PR → approval → ready → archive, any `gh` write, a failing run                  | `github-project-workflow` skill                 |
 | Proposing, applying, updating, or archiving an OpenSpec change                                         | OpenSpec skills (`openspec-*`, `/opsx:*`)       |
+| Reviewing changes or writing administration scripts and Actions                                        | `.agents/knowledge/review-guidance.md`          |
 
 ## Development Environment
 
@@ -83,6 +85,7 @@ above; this line is only the map.
 | A knowledge file or project skill is added, renamed, or removed                   | this file's When To Read What table                                                                     |
 | A `just` recipe is added or renamed                                               | the Validation table here and `.agents/knowledge/github/checks.md` if CI calls it                       |
 | Feature or test conventions (layout, idempotency, versions, compatibility format) | `feature-authoring.md` / `testing.md`, `openspec/config.yaml` rules, `scripts/new_feature.ts` templates |
+| A rule or skeleton in `shell-style.md`                                            | the `scripts/new_feature.ts` templates                                                                  |
 | OpenSpec is upgraded or its generated files regenerate                            | `spec-workflow.md` (verified version and date)                                                          |
 | GitHub-side pairs (jobs, templates, forms, pins, tags)                            | the Synchronization table in `.agents/knowledge/github-workflow.md`                                     |
 | This file passes about 120 lines, or every tenth merged feature PR                | the Harness review in `.agents/knowledge/github-workflow.md`                                            |

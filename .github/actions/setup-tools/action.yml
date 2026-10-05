@@ -1,12 +1,15 @@
-# Installs the pinned toolchain CI jobs share: Deno and just always; the devcontainer CLI and
-# OpenSpec when a job asks for them. Versions are pinned here and only here for CI; the dev
-# container installs its own (see .agents/knowledge/github/checks.md).
+# Installs the pinned toolchain CI jobs share: Deno always; just unless a job turns it off; the
+# devcontainer CLI and OpenSpec when a job asks for them. Versions are pinned here and only here for
+# CI; the dev container installs its own (see .agents/knowledge/github/checks.md).
 name: Set up repository tools
-description: Install Deno, just, and on request the devcontainer CLI and OpenSpec.
+description: Install Deno, just unless turned off, and on request the devcontainer CLI and OpenSpec.
 inputs:
   devcontainer-cli:
     description: Install the devcontainer CLI.
     default: "false"
+  just:
+    description: Install just.
+    default: "true"
   openspec:
     description: Install the OpenSpec CLI.
     default: "false"
@@ -17,10 +20,9 @@ runs:
       with:
         deno-version: v2.9.7
     - name: Install just
+      if: inputs.just == 'true'
       shell: bash
-      run: |
-        pipx install rust-just==1.58.0
-        echo "$HOME/.deno/bin" >> "$GITHUB_PATH"
+      run: pipx install rust-just==1.58.0
     - name: Install the devcontainer CLI
       if: inputs.devcontainer-cli == 'true'
       shell: bash
@@ -28,8 +30,15 @@ runs:
     - name: Install OpenSpec
       if: inputs.openspec == 'true'
       shell: bash
-      # Same permissions as .devcontainer/setup.sh grants the local install.
+      # Same permissions as .devcontainer/setup.sh grants the local install. edge.openspec.dev is the one host Deno lets
+      # OpenSpec reach: its anonymous telemetry, which the scripts turn off with OPENSPEC_TELEMETRY=0. It stays allowed
+      # so Deno never stops at a permission prompt. The update check (registry.npmjs.org) is off and not allowed.
       run: >-
         deno install --global --force
         --allow-read --allow-write --allow-env --allow-sys=cpus,homedir,uid --allow-net=edge.openspec.dev
         npm:@fission-ai/openspec@1.13.2
+    - name: Put the OpenSpec binary on PATH
+      if: inputs.openspec == 'true'
+      shell: bash
+      # deno install --global writes the openspec binary to $HOME/.deno/bin; later steps find it through PATH.
+      run: printf '%s\n' "${HOME}/.deno/bin" >> "${GITHUB_PATH}"
