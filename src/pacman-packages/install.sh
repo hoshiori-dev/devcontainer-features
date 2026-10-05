@@ -1,105 +1,141 @@
 #!/bin/sh
-# Installs the packages named in the `packages` option (PACKAGES) with pacman, from the repositories
-# the image already configures, as part of a full system upgrade, and configures nothing else. Runs
-# as root at image build time. POSIX sh so the package installers share one skeleton: parse,
-# validate, the empty check, the package-manager check, install (pacman synchronizes the databases
-# in the same call), clean. A second run does the same with its own list
-# (openspec/specs/pacman-packages/spec.md, "Installing the feature twice").
+# Installs the packages listed in the option `packages` with pacman from the image's repositories, as part of a full
+# system upgrade, to the paths the packages define.
+# Runs as root at image build time; the options arrive as PACKAGES and CLEANUP.
+# POSIX sh, because an empty list must succeed, and a missing pacman be reported, on images that ship no bash.
 set -eu
 
-PACKAGES="${PACKAGES:-}"
+readonly PACKAGE_CACHE_DIR="/var/cache/pacman/pkg"
+readonly SYNC_DB_DIR="/var/lib/pacman/sync"
+
+PACKAGES="${PACKAGES-}"
+CLEANUP="${CLEANUP-all}"
+
+trimmed=""
+
+log() {
+  printf 'pacman-packages: %s\n' "$*"
+}
 
 fail() {
-  printf 'pacman-packages: %s\n' "$1" >&2
+  printf 'pacman-packages: error: %s\n' "$*" >&2
   exit 1
 }
 
-# Sets $trimmed to $1 without leading and trailing whitespace.
+validate_options() {
+  case "${CLEANUP}" in
+    all | packages | none) ;;
+    *) fail "option cleanup is \"${CLEANUP}\"; use all, packages, or none" ;;
+  esac
+  readonly CLEANUP
+}
+
+# Sets trimmed to $1 without its leading and trailing whitespace.
 trim() {
-  trimmed=$1
+  trimmed="$1"
   while :; do
-    case $trimmed in
-      [[:space:]]*) trimmed=${trimmed#?} ;;
+    case "${trimmed}" in
+      [[:space:]]*) trimmed="${trimmed#?}" ;;
       *) break ;;
     esac
   done
   while :; do
-    case $trimmed in
-      *[[:space:]]) trimmed=${trimmed%?} ;;
+    case "${trimmed}" in
+      *[[:space:]]) trimmed="${trimmed%?}" ;;
       *) break ;;
     esac
   done
 }
 
-refuse() {
-  fail "refusing the entry '$1': an entry is a package name, a provided name, or a group (ASCII letters, digits, '@', '.', '_', '+', '-', starting with a letter or digit), optionally followed by a version constraint ('=', '<', '<=', '>', or '>=' and a version, which may hold ':'). Paths, URLs, 'repository/name', options, patterns, and shell characters are not accepted."
-}
-
-# Accepts $1 only when it matches ^[A-Za-z0-9][A-Za-z0-9@._+:<>=-]*$. The character sets are spelled
-# out instead of written as ranges, which some shells read by locale collation.
+# Fails unless the entry $1 matches ^[A-Za-z0-9][A-Za-z0-9@._+:<>=-]*$. The character sets are spelled out instead of
+# written as ranges, which some shells read by locale collation.
 check_entry() {
-  case $1 in
+  case "$1" in
     [!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789]* | \
       *[!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@._+:\<\>=-]*)
-      refuse "$1"
+      fail "refusing the entry '$1': not a package, provided, or group name with an optional version constraint;" \
+        "start with an ASCII letter or digit and use only ASCII letters, digits, and @ . _ + - : < > ="
       ;;
   esac
 }
 
-describe_system() {
-  system=
+# Fails unless pacman is on PATH, naming the distribution /etc/os-release describes.
+require_pacman() {
+  if command -v pacman >/dev/null 2>&1; then return 0; fi
+  require_pacman_distribution=""
   if [ -r /etc/os-release ]; then
-    system=$(sed -n 's/^PRETTY_NAME=//p' /etc/os-release | tr -d "\"'") || system=
+    # A malformed /etc/os-release, or one that assigns a readonly name, fails the subshell. The message below must
+    # still be the one that ends the run, so the distribution then stays unidentified.
+    # shellcheck source=/dev/null
+    if ! require_pacman_distribution="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")"; then
+      require_pacman_distribution=""
+    fi
   fi
-  printf '%s' "${system:-an unidentified distribution}"
+  fail "pacman was not found on this image (${require_pacman_distribution:-an unidentified distribution});" \
+    "use an Arch Linux image, which provides pacman"
 }
 
-
-# Validate controls before package-manager calls, cache creation, and the empty-list exit.
-CLEANUP="${CLEANUP-all}"
-case $CLEANUP in all | packages | none) ;; *) fail "cleanup must be one of: all, packages, none." ;; esac
-
-# Parse and validate every entry before anything else happens; accepted entries become "$@", so each
-# reaches pacman as one argument and none is ever evaluated as shell code. The check runs in the C
-# locale, where a bracket expression matches single bytes and so no non-ASCII letter; the locale the
-# build set is restored afterwards, so pacman and the packages' install scripts run in it.
-locale_was_set=${LC_ALL+yes}
-locale_before=${LC_ALL-}
-LC_ALL=C
-set --
-rest="$PACKAGES,"
-while [ -n "$rest" ]; do
-  entry=${rest%%,*}
-  rest=${rest#*,}
-  trim "$entry"
-  [ -n "$trimmed" ] || continue
-  check_entry "$trimmed"
-  set -- "$@" "$trimmed"
-done
-if [ -n "$locale_was_set" ]; then
-  LC_ALL=$locale_before
-else
-  unset LC_ALL
-fi
-
-if [ "$#" -eq 0 ]; then
-  echo "pacman-packages: no packages listed; nothing to do."
-  exit 0
-fi
-
-if ! command -v pacman >/dev/null 2>&1; then
-  fail "pacman was not found on this image ($(describe_system)). This feature supports Arch Linux images, which provide pacman."
-fi
-
-# One transaction: synchronize every database, upgrade the system (Arch Linux supports no partial
-# upgrade), and install the list. --needed skips a listed package that is already up to date, and
+# Installs the entries given as arguments in one transaction that also synchronizes every database and upgrades the
+# system (Arch Linux supports no partial upgrade). --needed skips a listed package that is already up to date, and
 # --noconfirm takes pacman's default answer to every question.
-echo "pacman-packages: upgrading the system and installing $*"
-pacman -Syu --needed --noconfirm -- "$@"
+install_packages() {
+  log "upgrading the system and installing $* from the image's repositories"
+  pacman --sync --refresh --sysupgrade --needed --noconfirm -- "$@" \
+    || fail "pacman --sync failed with status $?;" \
+      "fix what pacman reports above (entries, mirrors, keyring, or network)"
+}
 
-# Deleted directly: `pacman -Scc` asks before it removes, and under --noconfirm the answer is no.
-case $CLEANUP in
-  all) rm -rf /var/cache/pacman/pkg/* /var/lib/pacman/sync/* ;;
-  packages) rm -rf /var/cache/pacman/pkg/* ;;
-  none) ;;
-esac
+# Empties the cache directories that CLEANUP selects. They are deleted directly: `pacman --sync --clean --clean` asks
+# before it removes, and under --noconfirm the answer is no. `:?` stops rm if a path constant were ever empty.
+clean_caches() {
+  case "${CLEANUP}" in
+    all)
+      log "removing downloaded packages from ${PACKAGE_CACHE_DIR} and the sync databases from ${SYNC_DB_DIR}" \
+        "(cleanup=all)"
+      rm --recursive --force "${PACKAGE_CACHE_DIR:?}"/* "${SYNC_DB_DIR:?}"/*
+      ;;
+    packages)
+      log "removing downloaded packages from ${PACKAGE_CACHE_DIR} (cleanup=packages)"
+      rm --recursive --force "${PACKAGE_CACHE_DIR:?}"/*
+      ;;
+    none) ;;
+  esac
+}
+
+main() {
+  validate_options
+
+  # Every entry is checked before anything else happens, and the accepted entries become main's positional parameters,
+  # so each reaches pacman as one argument and none is evaluated as shell code. The check runs in the C locale, where a
+  # bracket expression matches single bytes and so no non-ASCII letter; the locale the build set is restored
+  # afterwards, so pacman and the packages' install scripts run in it.
+  main_locale_was_set="${LC_ALL+yes}"
+  main_locale_before="${LC_ALL-}"
+  LC_ALL=C
+  set --
+  main_rest="${PACKAGES},"
+  while [ -n "${main_rest}" ]; do
+    main_entry="${main_rest%%,*}"
+    main_rest="${main_rest#*,}"
+    trim "${main_entry}"
+    if [ -z "${trimmed}" ]; then continue; fi
+    check_entry "${trimmed}"
+    set -- "$@" "${trimmed}"
+  done
+  if [ -n "${main_locale_was_set}" ]; then
+    LC_ALL="${main_locale_before}"
+  else
+    unset LC_ALL
+  fi
+  readonly PACKAGES
+
+  if [ "$#" -eq 0 ]; then
+    log "no packages listed; nothing to do"
+    exit 0
+  fi
+  require_pacman
+  install_packages "$@"
+  clean_caches
+}
+
+main "$@"

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Scenario optional_dependencies_and_whitespace (scenarios.json): spec scenarios "Optional dependencies
-# are left out", "Spaces and empty entries are ignored", and "Caches are removed". rsync names python
-# as an optional dependency, which nothing in the image needs; the value has spaces, a tab, and an
-# empty entry.
-set -e
+# Scenario optional_dependencies_and_whitespace (scenarios.json): spec scenarios "Optional dependencies are left out",
+# "Spaces and empty entries are ignored", and "Caches are removed". rsync names python as an optional dependency, which
+# nothing in the image needs; the value has spaces, a tab, and an empty entry.
+set -euo pipefail
 
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
@@ -17,11 +16,11 @@ not_installed() {
 }
 
 no_package_files() {
-  [ -z "$(find /var/cache/pacman/pkg -mindepth 1 -print -quit)" ]
+  [[ -z "$(find /var/cache/pacman/pkg -mindepth 1 -print -quit)" ]]
 }
 
 no_sync_databases() {
-  [ -z "$(find /var/lib/pacman/sync -mindepth 1 -print -quit)" ]
+  [[ -z "$(find /var/lib/pacman/sync -mindepth 1 -print -quit)" ]]
 }
 
 check "rsync is installed" installed rsync
