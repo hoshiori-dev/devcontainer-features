@@ -1,7 +1,8 @@
 # Review Guidance
 
 Read this when reviewing repository changes or writing administration scripts and Actions workflows. Product authoring
-and user-documentation policy lives in feature-authoring.md; test policy lives in testing.md.
+and user-documentation policy lives in feature-authoring.md; test policy lives in testing.md; shell style lives in
+shell-style.md.
 
 ## Administration and execution risks
 

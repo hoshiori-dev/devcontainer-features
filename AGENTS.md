@@ -40,6 +40,7 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
 | Creating or editing anything under `src/<id>/`                                                         | `.agents/knowledge/feature-authoring.md`        |
 | Writing tests, compatibility lists, or canaries; running feature tests; CI tested something unexpected | `.agents/knowledge/testing.md`                  |
+| Writing or editing a shell script under `src/` or `test/`, or the `scripts/new_feature.ts` templates   | `.agents/knowledge/shell-style.md`              |
 | Starting a behavior change, creating an issue from a spec, or editing `openspec/`                      | `.agents/knowledge/spec-workflow.md`            |
 | Committing, marking a PR ready, requesting review, archiving, or unsure whether an action is yours     | `.agents/knowledge/agent-authority.md`          |
 | Creating a branch, opening or updating an issue or PR, or proposing a new management structure         | `.agents/knowledge/github-workflow.md`          |
@@ -84,6 +85,7 @@ above; this line is only the map.
 | A knowledge file or project skill is added, renamed, or removed                   | this file's When To Read What table                                                                     |
 | A `just` recipe is added or renamed                                               | the Validation table here and `.agents/knowledge/github/checks.md` if CI calls it                       |
 | Feature or test conventions (layout, idempotency, versions, compatibility format) | `feature-authoring.md` / `testing.md`, `openspec/config.yaml` rules, `scripts/new_feature.ts` templates |
+| A rule or skeleton in `shell-style.md`                                            | the `scripts/new_feature.ts` templates                                                                  |
 | OpenSpec is upgraded or its generated files regenerate                            | `spec-workflow.md` (verified version and date)                                                          |
 | GitHub-side pairs (jobs, templates, forms, pins, tags)                            | the Synchronization table in `.agents/knowledge/github-workflow.md`                                     |
 | This file passes about 120 lines, or every tenth merged feature PR                | the Harness review in `.agents/knowledge/github-workflow.md`                                            |

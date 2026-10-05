@@ -117,10 +117,15 @@ Deno.test("scaffold declares exactly the spec's options and reads each one in in
     assert(install.includes('VERSION="${VERSION:-latest}"'), install);
     assert(install.includes('FAILURE_MODE="${FAILURE_MODE:-a\\"\\$b\\}}"'), install);
     assert(install.includes('INSTALLTOOLS="${INSTALLTOOLS:-false}"'), install);
-    assert(install.includes("(VERSION, FAILURE_MODE, INSTALLTOOLS)"), install);
+    assert(
+        install.includes("#   version: VERSION\n#   failure-mode: FAILURE_MODE\n#   installTools: INSTALLTOOLS\n"),
+        install,
+    );
     const bare = scaffold("demo", "Demo", new Map());
     assert(!("options" in JSON.parse(bare["src/demo/devcontainer-feature.json"])));
-    assert(bare["src/demo/install.sh"].includes("(none)"));
+    assert(install.includes("  readonly VERSION FAILURE_MODE INSTALLTOOLS\n"), install);
+    assert(bare["src/demo/install.sh"].includes("it takes no options."));
+    assert(!bare["src/demo/install.sh"].includes("validate_options"));
 });
 
 Deno.test("releaseTag uses <id>/v<version>", () => {
