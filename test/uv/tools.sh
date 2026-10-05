@@ -1,74 +1,75 @@
-#!/bin/sh
-# Scenario "tools": two tools, with surrounding whitespace and an empty entry, on the Ubuntu base
-# image as vscode ("Tools on PATH", "Tools survive a replaced volume", "Remote user manages
-# tools", "Default sources").
-set -e
-
-# The test library is a bash script. Re-execute with bash, adding it from the image's apk
-# repositories on Alpine (inside this test container only).
-if [ -z "${FEATURE_TEST_BASH:-}" ]; then
-    command -v bash >/dev/null 2>&1 || apk add --no-cache bash >/dev/null
-    FEATURE_TEST_BASH=1 exec bash "$0" "$@"
-fi
+#!/usr/bin/env bash
+# Scenario "tools": two tools, with surrounding whitespace and an empty entry, on the Ubuntu base image as vscode
+# ("Tools on PATH", "Tools survive a replaced volume", "Remote user manages tools", "Default sources", "Nothing
+# writable by every user").
+set -euo pipefail
 
 # shellcheck source=/dev/null
-. dev-container-features-test-lib
+source dev-container-features-test-lib
 
-VOLUME=/var/lib/uv
+readonly VOLUME_DIR="/var/lib/uv"
+readonly SHARE_DIR="/usr/local/share/uv"
 
 is_mount() {
-    grep -q "^[^ ]* [^ ]* [^ ]* [^ ]* $1 " /proc/self/mountinfo
+  grep -q "^[^ ]* [^ ]* [^ ]* [^ ]* $1 " /proc/self/mountinfo
 }
 
 is_empty_dir() {
-    [ -d "$1" ] && [ -z "$(ls -A "$1")" ]
+  [[ -d "$1" && -z "$(ls -A "$1")" ]]
 }
 
-# The interpreter of a build-time tool's environment lives in the image, not on the volume.
+# Whether find, given the arguments after the tool tree, matches nothing in it.
+tool_tree_has_none() {
+  local found
+  found="$(find "${SHARE_DIR}" "$@" -print -quit)"
+  [[ -z "${found}" ]]
+}
+
+# Whether the interpreter of the build-time tool $1 lives in the image, not on the volume.
 interpreter_in_image() {
-    interpreter=$(readlink -f "/usr/local/share/uv/tools/$1/bin/python")
-    echo "$1 runs on $interpreter"
-    case "$interpreter" in
-        /usr/local/share/uv/python/*) [ -x "$interpreter" ] ;;
-        *) return 1 ;;
-    esac
+  local interpreter
+  interpreter="$(readlink -f "${SHARE_DIR}/tools/$1/bin/python")"
+  printf '%s\n' "$1 runs on ${interpreter}"
+  [[ "${interpreter}" == "${SHARE_DIR}"/python/* && -x "${interpreter}" ]]
+}
+
+# Prints the names of the uv variables in the environment, sorted, each followed by a space.
+uv_variable_names() {
+  env | grep '^UV_' | cut -d= -f1 | sort | tr '\n' ' '
 }
 
 # Tools survive a replaced volume: this container starts with a new, empty volume.
-check "the volume is mounted at $VOLUME" is_mount "$VOLUME"
-check "the volume is new and empty" is_empty_dir "$VOLUME"
+check "${VOLUME_DIR} is a mount of the volume" is_mount "${VOLUME_DIR}"
+check "the volume is new and empty" is_empty_dir "${VOLUME_DIR}"
 
-# Assert the image layout before Python writes __pycache__ with the user's umask.
-# shellcheck disable=SC2016
-check "every entry belongs to uv" sh -c 'test -z "$(find /usr/local/share/uv ! -group uv -print -quit)"'
-# shellcheck disable=SC2016
-check "every non-link has group write" sh -c 'test -z "$(find /usr/local/share/uv ! -type l ! -perm -0020 -print -quit)"'
-# shellcheck disable=SC2016
-check "no non-link has other-write" sh -c 'test -z "$(find /usr/local/share/uv ! -type l -perm -0002 -print -quit)"'
-# shellcheck disable=SC2016
-check "every directory has setgid" sh -c 'test -z "$(find /usr/local/share/uv -type d ! -perm -2000 -print -quit)"'
+# Remote user in the group, Nothing writable by every user: asserted before Python writes __pycache__ with the user's
+# umask.
+check "everything under ${SHARE_DIR} belongs to the group uv" tool_tree_has_none ! -group uv
+check "everything but links under ${SHARE_DIR} is writable by the group" tool_tree_has_none ! -type l ! -perm -0020
+check "nothing under ${SHARE_DIR} is writable by every user" tool_tree_has_none ! -type l -perm -0002
+check "every directory under ${SHARE_DIR} has setgid" tool_tree_has_none -type d ! -perm -2000
 
 # Tools on PATH.
-check "pycowsay is found by name" [ "$(command -v pycowsay)" = /usr/local/share/uv/bin/pycowsay ]
-check "cowsay is found by name" [ "$(command -v cowsay)" = /usr/local/share/uv/bin/cowsay ]
-check "pycowsay runs" sh -c 'pycowsay hello >/dev/null'
-check "cowsay runs" sh -c 'cowsay -t hello >/dev/null'
-check "pycowsay's interpreter is in the image" interpreter_in_image pycowsay
-check "cowsay's interpreter is in the image" interpreter_in_image cowsay
-check "the volume is still empty after running the tools" is_empty_dir "$VOLUME"
+check "pycowsay is found by name" [ "$(command -v pycowsay)" = "${SHARE_DIR}/bin/pycowsay" ]
+check "cowsay is found by name" [ "$(command -v cowsay)" = "${SHARE_DIR}/bin/cowsay" ]
+check "pycowsay runs by name" pycowsay hello
+check "cowsay runs by name" cowsay -t hello
+check "pycowsay's interpreter resolves outside the volume" interpreter_in_image pycowsay
+check "cowsay's interpreter resolves outside the volume" interpreter_in_image cowsay
+check "the volume is still empty after the tools ran" is_empty_dir "${VOLUME_DIR}"
 
 # Default sources: the feature sets no uv variable beyond its five locations and no configuration file.
-check "the only uv variables are the feature's five" [ "$(env | grep '^UV_' | cut -d= -f1 | sort | tr '\n' ' ')" \
-    = "UV_CACHE_DIR UV_LINK_MODE UV_PYTHON_INSTALL_DIR UV_TOOL_BIN_DIR UV_TOOL_DIR " ]
-check "no system uv.toml" [ ! -e /etc/uv/uv.toml ]
-check "no user uv.toml" [ ! -e "${XDG_CONFIG_HOME:-$HOME/.config}/uv/uv.toml" ]
+check "the only uv variables are the feature's five" \
+  [ "$(uv_variable_names)" = "UV_CACHE_DIR UV_LINK_MODE UV_PYTHON_INSTALL_DIR UV_TOOL_BIN_DIR UV_TOOL_DIR " ]
+check "the image has no system uv.toml" [ ! -e /etc/uv/uv.toml ]
+check "the remote user has no uv.toml" [ ! -e "${XDG_CONFIG_HOME:-${HOME}/.config}/uv/uv.toml" ]
 
 # Remote user manages tools, without elevated privileges.
 check "the remote user is not root" [ "$(id -u)" != 0 ]
 check "the remote user upgrades a build-time tool" uv tool upgrade pycowsay
 check "the remote user reinstalls a build-time tool" uv tool install --reinstall pycowsay
 check "the remote user removes a build-time tool" uv tool uninstall cowsay
-check "the remote user installs a new tool" uv tool install pyjokes
-check "the new tool runs by name" sh -c 'pyjoke >/dev/null'
+check "the remote user adds a tool" uv tool install pyjokes
+check "the added tool runs by name" pyjoke
 
 reportResults
