@@ -29,12 +29,15 @@ volume_fits() {
   # entries, escapes newlines in names, and does not follow symbolic links; the numeric owner is field three of each
   # entry's long format.
   if ! volume_fits_listing="$(LC_ALL=C ls -lnARb -- "${VOLUME_DIR}" 2>&1)"; then return 1; fi
-  awk -v uid="$1" '
-    $1 ~ /^[-bcdlps]/ && $3 != uid {foreign=1}
-    END {exit foreign ? 1 : 0}
-  ' <<EOF
-${volume_fits_listing}
-EOF
+  # A deliberate deviation from the shell style guide, which lets no pipeline's status decide anything: this pipeline's
+  # status is awk's, the deciding command, and awk reads the listing to its end. A here-document needs a temporary
+  # file in bash, the sh of that image; where none can be created, awk would not run and a volume that fits would look
+  # unfit.
+  printf '%s\n' "${volume_fits_listing}" \
+    | awk -v uid="$1" '
+      $1 ~ /^[-bcdlps]/ && $3 != uid {foreign=1}
+      END {exit foreign ? 1 : 0}
+    '
 }
 
 main() {

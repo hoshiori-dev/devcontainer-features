@@ -216,10 +216,13 @@ after it stays with `set -e`. The exit status of such a failure becomes 1 instea
 `sha256sum` output is captured on its own and split with parameter expansion, so its failure stops the build as itself
 under `set -e`. Every command substitution whose failure matters is assigned to a variable before use: the version of
 the freshly installed `uv` and the version for the final log line fail the build when `uv --version` fails; the versions
-of an already present `uv` and `uvx` keep a fallback to empty, so a broken existing binary is replaced. The same holds
-for the substitutions that today sit in a `case` subject or an argument (`id -u` and `id -G` of the remote user, the
-directory of `$0` for the repair script's source). Rejected: a retry or a catch-all around the package managers (hidden
-recovery the spec does not describe), and `|| fail` on the step function (switches `set -e` off inside it).
+of an already present `uv` and `uvx` keep a fallback to empty, so a broken existing binary is replaced. That includes an
+existing `uv` or `uvx` that prints its release but exits with a non-zero status: today's pipeline takes the status of
+`cut`, so such a binary counts as installed and is kept, and now it is replaced, because a failing command is a failure.
+The same holds for the substitutions that today sit in a `case` subject or an argument (`id -u` and `id -G` of the
+remote user, the directory of `$0` for the repair script's source). Rejected: a retry or a catch-all around the package
+managers (hidden recovery the spec does not describe), and `|| fail` on the step function (switches `set -e` off inside
+it).
 
 ### Validation keeps the accepted set
 
@@ -252,8 +255,12 @@ last statement returns 0, and a `warn` that writes to standard error with the pr
 `log` (it prints nothing when nothing is wrong) nor an exiting `fail`; those deviations and the missing `set -e` and
 `set -u` are commented with the spec's reason (creation continues in every case), and the short `sudo -n` with its own
 (Long options). The `ls` fallback's comment names its failure mode, an image without `find` such as
-`opensuse/leap:16.0`, and `awk` reads the listing from a here-document instead of a pipeline. It prints nothing on a
-volume that fits and for root, as today. Rejected: a bare `return` (returns the last test's status 1 and would stop
+`opensuse/leap:16.0`, and `awk` reads the listing from a `printf` pipeline, as today: a deliberate deviation from the
+guide's rule that no pipeline's status decides anything, with its reason in a comment. The pipeline's status is that of
+`awk`, the deciding command. A here-document is not equivalent: bash, the `sh` of that image, writes a here-document
+larger than a pipe's buffer to a temporary file, and where none can be created (for example on a read-only root
+filesystem), `awk` does not run, a volume that fits looks unfit, and the script goes on to `sudo`. It prints nothing on
+a volume that fits and for root, as today. Rejected: a bare `return` (returns the last test's status 1 and would stop
 container creation), and `set -e` (the spec requires creation to continue).
 
 ### Kept as they are
