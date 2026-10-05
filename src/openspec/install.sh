@@ -76,18 +76,17 @@ cleanup() {
 }
 
 # Runs node with PATH, a HOME and a TMPDIR in the temporary directory, and nothing else of the build's environment, so
-# no NODE_*, proxy, or certificate variable reaches it. TMPDIR keeps what Node.js and npm write to a temporary
-# directory, such as the compile cache, out of the image.
+# no NODE_*, proxy, or certificate variable reaches it.
 run_node() {
+  # TMPDIR keeps what Node.js and npm write to a temporary directory, such as the compile cache, out of the image.
   env --ignore-environment PATH="${PATH}" HOME="${tmp}/home" TMPDIR="${tmp}/tmp" node "$@"
 }
 
 # Runs npm in the same environment as run_node, so no npm_config_* variable reaches it either, with the flags no call
-# varies: the public registry, full certificate checking, two distinct empty files as the user and the global
-# configuration, no install script, no audit request, no update notice, and a cache in the temporary directory. Every
-# call adds --prefix, the directory npm takes as its project, so npm reads no project configuration from the build's
-# working directory.
+# varies; every call adds --prefix, the directory npm takes as its project.
 run_npm() {
+  # Two distinct empty files stand for the user and the global configuration, and the cache is in the temporary
+  # directory. With --prefix, npm reads no project configuration from the build's working directory.
   env --ignore-environment PATH="${PATH}" HOME="${tmp}/home" TMPDIR="${tmp}/tmp" \
     npm \
     "--registry=${REGISTRY_URL}" \
@@ -102,7 +101,7 @@ run_npm() {
     "$@"
 }
 
-# Succeeds when version $1 is lower than version $2. Both are MAJOR.MINOR.PATCH; a suffix is ignored.
+# Succeeds when version $1 is lower than version $2, both MAJOR.MINOR.PATCH with an optional suffix, which is ignored.
 older_than() {
   local -a have
   local -a want
@@ -159,7 +158,7 @@ create_work_dir() {
   touch "${tmp}/userconfig" "${tmp}/globalconfig"
 }
 
-# Finds Node.js, npm, and setpriv on PATH and fails unless npm is NPM_MINIMUM or newer. Uses no network.
+# Finds Node.js, npm, and setpriv on PATH, without any network access, and fails unless npm is NPM_MINIMUM or newer.
 find_runtime() {
   local node_on_path
   node_on_path="$(command -v node)" \
@@ -190,11 +189,11 @@ find_runtime() {
 }
 
 # Reads the package's registry document once, relying on TLS alone and following no redirect, and takes from it the
-# version to install, its publish time, and the Node.js it requires. The document only selects what is installed; the
-# packages are verified after the install.
+# version to install, its publish time, and the Node.js range it requires.
 select_version() {
   local selection
   local -a selected
+  # The document only selects what is installed; the packages are verified after the install.
   log "reading ${DOCUMENT_URL} to select the version for \"${VERSION}\""
   selection="$(
     run_node - "${VERSION}" "${EXACT_VERSION_RE}" "${PACKAGE}" "${DOCUMENT_URL}" "${NETWORK_HINT}" <<'EOF'
@@ -266,9 +265,7 @@ EOF
     "and npm ${npm_version}"
 }
 
-# Installs the selected version into a staging tree next to the prefix. --before bounds every package, dependencies
-# included, to what the registry had published when this OpenSpec version was released; npm checks each tarball
-# against the sha512 integrity of its registry manifest, and no install script runs.
+# Installs the selected version with npm into a staging tree next to the prefix.
 install_staged() {
   staging="$(mktemp --directory "${STAGING_TEMPLATE}")"
   # mktemp creates the directory for root alone, and the unprivileged version check has to reach the tree in it.
@@ -278,6 +275,8 @@ install_staged() {
   mkdir "${tree}"
   log "installing ${PACKAGE}@${openspec_version} and its dependencies, none published after ${published}," \
     "from ${REGISTRY_URL} to ${tree}"
+  # --before bounds every package, dependencies included, to what the registry had published when this OpenSpec
+  # version was released; npm checks each tarball against the sha512 integrity of its registry manifest.
   if ! run_npm --prefix "${tree}" install "--before=${published}" "${PACKAGE}@${openspec_version}" 2>&1 \
     | tee "${tmp}/install.log"; then
     # Known failure mode: a tarball does not match the hash in its registry manifest, which npm reports as EINTEGRITY.
@@ -290,9 +289,10 @@ install_staged() {
 }
 
 # Fails unless package-lock.json holds the package itself at exactly the selected version and every entry came from
-# the public registry. `npm audit signatures` skips a package that does not come from a registry, so this check is
-# what keeps a git or URL dependency out.
+# the public registry.
 check_sources() {
+  # `npm audit signatures` skips a package that does not come from a registry, so this check is what keeps a git or
+  # URL dependency out.
   run_node - "${tree}/package-lock.json" "${PACKAGE}" "${openspec_version}" "${REGISTRY_URL}" <<'EOF'
 const [lockfile, name, version, registry] = process.argv.slice(2);
 const packages = JSON.parse(require("node:fs").readFileSync(lockfile, "utf8")).packages;
@@ -316,23 +316,24 @@ for (const [entry, value] of Object.entries(packages)) {
 EOF
 }
 
-# Has npm verify the registry signature and each published provenance attestation of every installed package, on the
-# cache the install filled (--prefer-offline), so that npm verifies the package documents the install took each
-# integrity hash from.
+# Has npm verify the registry signature and each published provenance attestation of every installed package.
 verify_signatures() {
   log "verifying the registry signatures and provenance attestations of the packages in ${tree}, published at" \
     "${REGISTRY_URL}, with the signing keys from ${TUF_MIRROR_URL}"
+  # --prefer-offline: the audit runs on the cache the install filled, so npm verifies the package documents the
+  # install took each integrity hash from.
   run_npm --prefix "${tree}" audit signatures --prefer-offline \
     || fail "signature verification failed: npm audit signatures did not verify the registry signature and the" \
       "published provenance attestations of every installed package (npm's report is above);" \
       "check that the build reaches ${TUF_MIRROR_URL} directly, and build again"
 }
 
-# Runs `openspec --version` of the staged tree, the only package code the build runs, as an unprivileged user without
-# supplementary groups and with telemetry and the update check off; HOME and XDG_CONFIG_HOME point into the temporary
-# directory, which that user cannot enter.
+# Runs `openspec --version` of the staged tree, the only package code the build runs, as an unprivileged user and
+# fails unless it prints the selected version.
 check_staged_version() {
   local reported
+  # The user has no supplementary groups, telemetry and the update check are off, and HOME and XDG_CONFIG_HOME point
+  # into the temporary directory, which that user cannot enter.
   # The one call that names the resolved Node.js binary instead of the command `node`: the check must run the binary
   # the wrapper pins. The path is an argument of setpriv, like the script it runs.
   reported="$(
@@ -346,14 +347,14 @@ check_staged_version() {
     || fail "the new installation reports version \"${reported}\", not the selected ${openspec_version}"
 }
 
-# Writes the wrapper next to its final path. It runs OpenSpec on the Node.js binary resolved above, whatever the
-# current Node.js is later, and passes the caller's environment through; a true option adds one fixed line, which sets
-# its variable only while the caller has not set it (an empty value counts as set). No option value is written into
-# it: the Node.js path is the only text that varies.
+# Writes the wrapper, which runs OpenSpec on the Node.js binary found at install time whatever the current Node.js is
+# later, next to its final path.
 write_wrapper() {
   local node_word
   local update_check_line=""
   local telemetry_line=""
+  # No option value is written into the wrapper: the Node.js path is the only text that varies. A true option adds
+  # one fixed line, which sets its variable only while the caller has not set it; an empty value counts as set.
   # The path as one single-quoted word of the wrapper; a single quote inside it is written as '\''.
   node_word="'${node_bin//\'/\'\\\'\'}'"
   if [[ "${DISABLEUPDATECHECK}" == true ]]; then
