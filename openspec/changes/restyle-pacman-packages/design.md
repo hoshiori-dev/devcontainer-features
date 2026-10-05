@@ -128,12 +128,12 @@ visible in the message; the spec requires only a non-zero status for every failu
 
 ### Distribution text in the no-`pacman` failure
 
-The pacman-check step reads `PRETTY_NAME` by sourcing `/etc/os-release` in a subshell (with the guide's
-`shellcheck source` directive), guarded by `[ -r /etc/os-release ]` and by `|| <variable>=""`, and assigns it to a
-variable named with the step's prefix (POSIX has no `local`) before calling `fail`; the fallback stays "an unidentified
-distribution". The guard keeps a file that fails to source from aborting the script with a status other than 1 and
-without the `pacman` message. Output differs from today's only when `PRETTY_NAME` holds escaped quotes or other shell
-syntax, which are now interpreted instead of stripped.
+The pacman-check step (`require_pacman`, named as in the sibling installers) reads `PRETTY_NAME` by sourcing
+`/etc/os-release` in a subshell (with the guide's `shellcheck source` directive), guarded by `[ -r /etc/os-release ]`
+and by `if ! <variable>="$(…)"`, and assigns it to a variable named with the step's prefix (POSIX has no `local`) before
+calling `fail`; the fallback stays "an unidentified distribution". The guard keeps a file that fails to source from
+aborting the script with a status other than 1 and without the `pacman` message. Output differs from today's only when
+`PRETTY_NAME` holds escaped quotes or other shell syntax, which are now interpreted instead of stripped.
 
 - Rejected: keeping `sed | tr`. A pipeline's status would decide the fallback, and it spawns two tools for what the
   guide's subshell read does.
@@ -144,8 +144,8 @@ syntax, which are now interpreted instead of stripped.
 
 - Skeleton order: shebang, header, `set -eu`, readonly constants `PACKAGE_CACHE_DIR` (`/var/cache/pacman/pkg`) and
   `SYNC_DB_DIR` (`/var/lib/pacman/sync`), option defaults `PACKAGES="${PACKAGES-}"` and `CLEANUP="${CLEANUP-all}"`, the
-  mutable global `trimmed`, `log` and `fail`, steps, `main`, `main "$@"`. Globs stay outside the quotes:
-  `"${PACKAGE_CACHE_DIR}"/*`.
+  mutable global `trimmed`, `log` and `fail`, steps, `main`, `main "$@"`. Globs stay outside the quotes, and `:?` stops
+  `rm` if a path constant were ever empty: `"${PACKAGE_CACHE_DIR:?}"/*`.
 - `CLEANUP` keeps the `-` form, so an explicitly empty value is still refused (`control_checks.ts` tests `""`).
   `PACKAGES` moves from `:-` to `-` with an identical result, since its default is empty and an empty list is a no-op by
   spec. `CLEANUP` becomes readonly once validated and `PACKAGES` once every entry is accepted. The `cleanup` check, one
@@ -235,7 +235,7 @@ The maintainer adopted none of them at the package gate; each stays out of this 
   reordering entries before `cleanup` would change which error two invalid values produce, and moving the `pacman` check
   earlier breaks the empty-list Scenarios on images without `pacman`.
 - [readonly and `/etc/os-release`] → None of the readonly names (`PACKAGES`, `CLEANUP`, `PACKAGE_CACHE_DIR`,
-  `SYNC_DB_DIR`) is a key that file assigns; should a file still fail to source, the `|| …=""` guard keeps the fallback
+  `SYNC_DB_DIR`) is a key that file assigns; should a file still fail to source, the `if ! …` guard keeps the fallback
   text. `LC_ALL` and `trimmed` stay mutable.
 - [POSIX positional parameters] → The parse loop and the `pacman` call share `main`'s parameters; review checks that no
   step runs `set --` for a caller.

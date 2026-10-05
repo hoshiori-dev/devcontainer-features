@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs the packages listed in the option `packages` with pacman from the image's repositories, as part of a full
 # system upgrade, to the paths the packages define.
-# Runs as root at image build time; the options arrive as PACKAGES, CLEANUP.
+# Runs as root at image build time; the options arrive as PACKAGES and CLEANUP.
 # POSIX sh, because an empty list must succeed, and a missing pacman be reported, on images that ship no bash.
 set -eu
 
@@ -60,17 +60,18 @@ check_entry() {
 }
 
 # Fails unless pacman is on PATH, naming the distribution /etc/os-release describes.
-check_pacman() {
+require_pacman() {
   if command -v pacman >/dev/null 2>&1; then return 0; fi
-  check_pacman_distribution=""
+  require_pacman_distribution=""
   if [ -r /etc/os-release ]; then
-    # A file that fails to source leaves the fallback text instead of ending the script without the pacman message.
+    # A malformed /etc/os-release, or one that assigns a readonly name, fails the subshell. The message below must
+    # still be the one that ends the run, so the distribution then stays unidentified.
     # shellcheck source=/dev/null
-    check_pacman_distribution="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")" \
-      || check_pacman_distribution=""
+    if ! require_pacman_distribution="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")"; then
+      require_pacman_distribution=""
+    fi
   fi
-  if [ -z "${check_pacman_distribution}" ]; then check_pacman_distribution="an unidentified distribution"; fi
-  fail "pacman was not found on this image (${check_pacman_distribution});" \
+  fail "pacman was not found on this image (${require_pacman_distribution:-an unidentified distribution});" \
     "use an Arch Linux image, which provides pacman"
 }
 
@@ -132,7 +133,7 @@ main() {
     log "no packages listed; nothing to do"
     exit 0
   fi
-  check_pacman
+  require_pacman
   install_packages "$@"
   clean_caches
 }
