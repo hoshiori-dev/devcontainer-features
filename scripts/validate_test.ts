@@ -1,8 +1,9 @@
-// Runs the version bump check against throwaway git repositories under /tmp, one per test.
-import { assert, assertEquals } from "jsr:@std/assert@1.0.19";
+// Runs the version bump check against throwaway git repositories under /tmp, one per test, and the file reads
+// validate.ts makes against failures other than a missing file.
+import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.6";
 import { exists, loadRepo } from "./lib/repo.ts";
-import { checkVersionBumps, versionBumpStep } from "./validate.ts";
+import { checkVersionBumps, isExecutable, readBaseJsonc, versionBumpStep } from "./validate.ts";
 
 const SCHEMA = await Deno.readTextFile("test/compatibility.schema.json");
 
@@ -199,4 +200,83 @@ Deno.test("dropping an image needs a MAJOR bump", async () => {
         await repo.feature("a", "2.0.0", ["debian:12"]);
         assertEquals(await repo.check(), []);
     });
+});
+
+Deno.test("a feature new on the branch needs no bump", async () => {
+    await withRepo(async (repo) => {
+        await repo.feature("b", "1.0.0");
+        await repo.commit("add b");
+        assertEquals(await repo.check(), []);
+    });
+});
+
+Deno.test("base metadata that is not valid JSONC fails the check, naming the file and the base", async () => {
+    await withRepo(async (repo) => {
+        await repo.git("checkout", "--quiet", "main");
+        await repo.write("src/a/devcontainer-feature.json", "{ broken");
+        await repo.commit("break a");
+        await repo.git("checkout", "--quiet", "topic");
+        await repo.write("src/a/install.sh", "#!/bin/sh\necho changed\n");
+        await assertRejects(() => repo.check(), Error, "src/a/devcontainer-feature.json on main is not valid JSONC");
+    });
+});
+
+Deno.test("a compatibility list that is not valid JSONC at the branch point skips the image check", async () => {
+    const repo = await Repo.create();
+    try {
+        await repo.feature("a", "1.0.0");
+        await repo.write("test/a/compatibility.json", "{ broken");
+        await repo.commit("base");
+        await repo.git("checkout", "--quiet", "-b", "topic");
+        await repo.feature("a", "1.0.0", ["debian:12", "ubuntu:24.04"]);
+        assertEquals(await repo.check(), []);
+    } finally {
+        await Deno.remove(repo.root, { recursive: true });
+    }
+});
+
+Deno.test("readBaseJsonc tells a path missing on the base from a failed read", async () => {
+    await withRepo(async (repo) => {
+        const path = "src/a/devcontainer-feature.json";
+        assertEquals(await readBaseJsonc("main", "src/b/devcontainer-feature.json", repo.root), { found: false });
+        assertEquals(await readBaseJsonc("main", path, repo.root), {
+            found: true,
+            value: { id: "a", version: "1.0.0", name: "a" },
+        });
+        await assertRejects(() => readBaseJsonc("gone", path, repo.root), Error, `cannot read ${path} on gone`);
+        // The path is listed on main, but its content is gone from the object store.
+        const oid = (await repo.git("rev-parse", `main:${path}`)).trim();
+        await Deno.remove(join(repo.root, ".git", "objects", oid.slice(0, 2), oid.slice(2)));
+        await assertRejects(() => readBaseJsonc("main", path, repo.root), Error, `could not read ${path} on main`);
+    });
+});
+
+Deno.test("readBaseJsonc fails on content that is not valid JSONC unless told to skip it", async () => {
+    await withRepo(async (repo) => {
+        const path = "test/a/compatibility.json";
+        await repo.write(path, "{ broken");
+        await repo.commit("break the list");
+        await assertRejects(
+            () => readBaseJsonc("topic", path, repo.root),
+            Error,
+            `${path} on topic is not valid JSONC`,
+        );
+        assertEquals(await readBaseJsonc("topic", path, repo.root, "skip"), { found: true });
+    });
+});
+
+Deno.test("isExecutable is false for a missing file and rethrows any other error", async () => {
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "validate-test-" });
+    try {
+        const script = join(root, "run.sh");
+        assertEquals(await isExecutable(script), false);
+        await Deno.writeTextFile(script, "#!/bin/sh\n");
+        assertEquals(await isExecutable(script), false);
+        await Deno.chmod(script, 0o755);
+        assertEquals(await isExecutable(script), true);
+        // A path through a regular file fails with ENOTDIR, not NotFound.
+        await assertRejects(() => isExecutable(join(script, "child")), Deno.errors.NotADirectory);
+    } finally {
+        await Deno.remove(root, { recursive: true });
+    }
 });

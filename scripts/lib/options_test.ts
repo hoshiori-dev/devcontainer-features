@@ -217,7 +217,8 @@ Deno.test("optionDifferences names the option, the field, and both values", () =
         'option "installTools": type is "boolean" in the spec but "string" in devcontainer-feature.json',
     ]);
     assertEquals(changed((o) => (o.failureMode.enum = ["warn", "closed"])), [
-        'option "failureMode": enum is ["closed","warn"] in the spec but ["warn","closed"] in devcontainer-feature.json',
+        'option "failureMode": enum is ["closed","warn"] in the spec ' +
+        'but ["warn","closed"] in devcontainer-feature.json',
     ]);
     assertEquals(changed((o) => delete o.failureMode.enum), [
         'option "failureMode": enum is ["closed","warn"] in the spec but absent in devcontainer-feature.json',
@@ -230,9 +231,13 @@ Deno.test("optionDifferences names the option, the field, and both values", () =
     ]);
 });
 
-Deno.test("optionVariable follows the Dev Container spec: non-word characters and a leading run of digits or _ become _", () => {
-    assertEquals(optionVariable("installTools"), "INSTALLTOOLS");
-    assertEquals(optionVariable("tools-python"), "TOOLS_PYTHON");
-    assertEquals(optionVariable("2fa"), "_FA");
-    assertEquals(optionVariable("__x"), "_X");
-});
+Deno.test(
+    "optionVariable follows the Dev Container spec: " +
+        "non-word characters and a leading run of digits or _ become _",
+    () => {
+        assertEquals(optionVariable("installTools"), "INSTALLTOOLS");
+        assertEquals(optionVariable("tools-python"), "TOOLS_PYTHON");
+        assertEquals(optionVariable("2fa"), "_FA");
+        assertEquals(optionVariable("__x"), "_X");
+    },
+);

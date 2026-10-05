@@ -3,7 +3,16 @@ import { parse } from "jsr:@std/semver@1.0.8";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
 import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
-import { type Archive, CONFIG, configProblems, exitCode, optionProblems, ruleProblems } from "./check_openspec.ts";
+import {
+    type Archive,
+    type Checks,
+    CONFIG,
+    configProblems,
+    type GeneratedResult,
+    main,
+    optionProblems,
+    ruleProblems,
+} from "./check_openspec.ts";
 import { ID_PATTERN, scaffold } from "./new_feature.ts";
 import { releaseTag } from "./tag_releases.ts";
 import {
@@ -13,7 +22,7 @@ import {
     scenarioImageProblems,
     scenarioImages,
 } from "./validate.ts";
-import { type Compat, type FeatureInfo, loadRepo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
+import { type Compat, type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
 import { optionDifferences, parseOptionRequirements } from "./lib/options.ts";
 
 Deno.test("titleProblems accepts the convention", () => {
@@ -216,22 +225,26 @@ Deno.test("ruleProblems names a rule that YAML reads as a mapping and how to fix
     }
 });
 
-Deno.test("ruleProblems reports other non-strings, empty rules, a value that is not a list, and rules that is not a mapping", () => {
-    const entries = ruleProblems(parseYaml('rules:\n  design:\n    - 42\n    -\n    - ""\n    - true\n'));
-    assertEquals(entries.length, 4, entries.join("\n"));
-    assert(entries[0].startsWith("rules.design entry 1 is a number"), entries[0]);
-    assert(entries[0].endsWith("Quote it so YAML reads it as a string"), entries[0]);
-    assert(entries[1].startsWith("rules.design entry 2 is empty"), entries[1]);
-    assert(entries[1].endsWith("Write the rule after the dash, or delete the dash"), entries[1]);
-    assert(entries[2].startsWith("rules.design entry 3 is an empty string"), entries[2]);
-    assert(entries[3].startsWith("rules.design entry 4 is a boolean"), entries[3]);
-    const scalar = ruleProblems(parseYaml("rules:\n  tasks: one rule\n"));
-    assertEquals(scalar.length, 1);
-    assert(scalar[0].startsWith("rules.tasks is a string, not a list"), scalar[0]);
-    const list = ruleProblems(parseYaml("rules:\n  - one rule\n"));
-    assertEquals(list.length, 1);
-    assert(list[0].startsWith("rules is a list, not a mapping"), list[0]);
-});
+Deno.test(
+    "ruleProblems reports other non-strings, empty rules, a value that is not a list, " +
+        "and rules that is not a mapping",
+    () => {
+        const entries = ruleProblems(parseYaml('rules:\n  design:\n    - 42\n    -\n    - ""\n    - true\n'));
+        assertEquals(entries.length, 4, entries.join("\n"));
+        assert(entries[0].startsWith("rules.design entry 1 is a number"), entries[0]);
+        assert(entries[0].endsWith("Quote it so YAML reads it as a string"), entries[0]);
+        assert(entries[1].startsWith("rules.design entry 2 is empty"), entries[1]);
+        assert(entries[1].endsWith("Write the rule after the dash, or delete the dash"), entries[1]);
+        assert(entries[2].startsWith("rules.design entry 3 is an empty string"), entries[2]);
+        assert(entries[3].startsWith("rules.design entry 4 is a boolean"), entries[3]);
+        const scalar = ruleProblems(parseYaml("rules:\n  tasks: one rule\n"));
+        assertEquals(scalar.length, 1);
+        assert(scalar[0].startsWith("rules.tasks is a string, not a list"), scalar[0]);
+        const list = ruleProblems(parseYaml("rules:\n  - one rule\n"));
+        assertEquals(list.length, 1);
+        assert(list[0].startsWith("rules is a list, not a mapping"), list[0]);
+    },
+);
 
 Deno.test("configProblems reports a file that is not valid YAML or not a mapping", async () => {
     const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "config-test-" });
@@ -245,15 +258,28 @@ Deno.test("configProblems reports a file that is not valid YAML or not a mapping
     }
 });
 
-Deno.test("exitCode fails on a dropped rule even when the generated files are current", () => {
-    assertEquals(exitCode(["rules.specs entry 1 is a mapping"], [], false, []), 1);
-    assertEquals(exitCode([], ["a generated file differs"], false, []), 1);
-    assertEquals(exitCode([], [], true, []), 1);
-    assertEquals(exitCode([], [], false, []), 0);
+/** Checks that all pass, with `overrides` replacing some of them by checks that return the given result. */
+function checksWith(overrides: { config?: string[]; options?: string[]; generated?: GeneratedResult }): Checks {
+    return {
+        config: () => Promise.resolve(overrides.config ?? []),
+        options: () => Promise.resolve(overrides.options ?? []),
+        generated: () => Promise.resolve(overrides.generated ?? { problems: [], initFailed: false }),
+    };
+}
+
+Deno.test("the main flow fails on a dropped rule even when the generated files are current", async () => {
+    assertEquals(await main(checksWith({ config: ["rules.specs entry 1 is a mapping"] })), 1);
+    assertEquals(
+        await main(checksWith({ generated: { problems: ["a generated file differs"], initFailed: false } })),
+        1,
+    );
+    assertEquals(await main(checksWith({ generated: { problems: [], initFailed: true } })), 1);
+    assertEquals(await main(checksWith({})), 0);
 });
 
-Deno.test("exitCode fails on an option problem even when everything else passes", () => {
-    assertEquals(exitCode([], [], false, ['src/demo/devcontainer-feature.json: option "version": default ...']), 1);
+Deno.test("the main flow fails on an option problem even when everything else passes", async () => {
+    const option = 'src/demo/devcontainer-feature.json: option "version": default ...';
+    assertEquals(await main(checksWith({ options: [option] })), 1);
 });
 
 /** An Option requirement for `version` with the given default, inside a section of the given title. */
@@ -301,20 +327,24 @@ function fakeArchive(calls: string[]): Archive {
 const DEMO_JSON = (value: string) =>
     JSON.stringify({ id: "demo", options: { version: { type: "string", default: value, proposals: ["1"] } } });
 
-Deno.test("optionProblems archives only changes with specs and tasks.md, and reports refusals without src/", async () => {
-    const calls: string[] = [];
-    const problems = await optionRun({
-        "openspec/changes/refused-a/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1"),
-        "openspec/changes/refused-a/tasks.md": "- [ ] 1.1 x\n",
-        "openspec/changes/b-no-tasks/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1"),
-        "openspec/changes/c-no-specs/tasks.md": "- [ ] 1.1 x\n",
-    }, fakeArchive(calls));
-    assertEquals(calls, ["refused-a"]);
-    assertEquals(problems, [
-        "openspec/changes/refused-a: OpenSpec refuses to archive it, so its deltas cannot be compared with " +
-        "devcontainer-feature.json: demo MODIFIED failed | Aborted.",
-    ]);
-});
+Deno.test(
+    "optionProblems archives only changes with specs and tasks.md, " +
+        "and reports refusals without src/",
+    async () => {
+        const calls: string[] = [];
+        const problems = await optionRun({
+            "openspec/changes/refused-a/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1"),
+            "openspec/changes/refused-a/tasks.md": "- [ ] 1.1 x\n",
+            "openspec/changes/b-no-tasks/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1"),
+            "openspec/changes/c-no-specs/tasks.md": "- [ ] 1.1 x\n",
+        }, fakeArchive(calls));
+        assertEquals(calls, ["refused-a"]);
+        assertEquals(problems, [
+            "openspec/changes/refused-a: OpenSpec refuses to archive it, so its deltas cannot be compared with " +
+            "devcontainer-feature.json: demo MODIFIED failed | Aborted.",
+        ]);
+    },
+);
 
 Deno.test("optionProblems compares metadata with the main spec until a change has tasks.md", async () => {
     const base = {
@@ -332,18 +362,22 @@ Deno.test("optionProblems compares metadata with the main spec until a change ha
     assertEquals(await optionRun(updated, fakeArchive([])), []);
 });
 
-Deno.test("optionProblems reports a new feature's delta alone as its spec, and skips a feature without one", async () => {
-    const problems = await optionRun({
-        "openspec/changes/add-demo/specs/demo/spec.md": versionSpec("ADDED Requirements", "latest"),
-        "openspec/changes/add-demo/tasks.md": "- [ ] 1.1 x\n",
-        "src/demo/devcontainer-feature.json": DEMO_JSON("1"),
-        "src/nospec/devcontainer-feature.json": DEMO_JSON("1"),
-    }, fakeArchive([]));
-    assertEquals(problems, [
-        'src/demo/devcontainer-feature.json: option "version": default is "latest" in the spec but "1" in ' +
-        "devcontainer-feature.json (spec: openspec/changes/add-demo/specs/demo/spec.md)",
-    ]);
-});
+Deno.test(
+    "optionProblems reports a new feature's delta alone as its spec, " +
+        "and skips a feature without one",
+    async () => {
+        const problems = await optionRun({
+            "openspec/changes/add-demo/specs/demo/spec.md": versionSpec("ADDED Requirements", "latest"),
+            "openspec/changes/add-demo/tasks.md": "- [ ] 1.1 x\n",
+            "src/demo/devcontainer-feature.json": DEMO_JSON("1"),
+            "src/nospec/devcontainer-feature.json": DEMO_JSON("1"),
+        }, fakeArchive([]));
+        assertEquals(problems, [
+            'src/demo/devcontainer-feature.json: option "version": default is "latest" in the spec but "1" in ' +
+            "devcontainer-feature.json (spec: openspec/changes/add-demo/specs/demo/spec.md)",
+        ]);
+    },
+);
 
 Deno.test("optionProblems reports problems that exist only once archived, and skips a refused feature", async () => {
     const main = versionSpec("Requirements", "latest");
@@ -355,7 +389,8 @@ Deno.test("optionProblems reports problems that exist only once archived, and sk
     }, fakeArchive([]));
     assertEquals(renamed, [
         'openspec/specs/demo/spec.md as archiving rename-x would produce it: Option requirement "install": no Type row',
-        'openspec/specs/demo/spec.md as archiving rename-x would produce it: Option requirement "install": no Default row',
+        "openspec/specs/demo/spec.md as archiving rename-x would produce it: " +
+        'Option requirement "install": no Default row',
     ]);
     const refused = await optionRun({
         "openspec/specs/demo/spec.md": main,
@@ -398,17 +433,19 @@ Deno.test("scenario dependencies must support the owner's selected architecture"
 });
 
 Deno.test("feature scenario owners are validated on every declared architecture", async () => {
-    const m = await loadRepo(".");
-    const glab = m.features.get("glab")!;
-    glab.compat = {
+    const m = repoWith({ a: "1.0.0" });
+    const a = m.features.get("a")!;
+    a.compat = {
         images: [{ image: "debian:12", arch: ["amd64"] }],
         scenarioArchitectures: ["amd64", "arm64"],
     };
-    glab.scenarios = [
-        { name: "version", image: "debian:12", usesBuild: false, featureKeys: ["glab"] },
-        { name: "built", image: "debian:12", usesBuild: true, featureKeys: ["glab"] },
+    a.scenarios = [
+        { name: "version", image: "debian:12", usesBuild: false, featureKeys: ["a"] },
+        { name: "built", image: "debian:12", usesBuild: true, featureKeys: ["a"] },
     ];
-    const problems = (await checkFeatures(m, {})).filter((p) => p.file === "test/glab/scenarios.json");
+    const problems = (await checkFeatures(m, {})).filter((p) => p.file === "test/a/scenarios.json");
     assertEquals(problems.length, 1);
-    for (const part of ['scenario "version"', "glab", "debian:12", "arm64"]) assert(problems[0].message.includes(part));
+    for (const part of ['scenario "version"', "test/a/compatibility.json", "debian:12", "arm64"]) {
+        assert(problems[0].message.includes(part), `${part} not in: ${problems[0].message}`);
+    }
 });
