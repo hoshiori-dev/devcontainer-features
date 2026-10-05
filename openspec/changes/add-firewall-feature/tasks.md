@@ -182,7 +182,7 @@ start check.
 
 ## 6. Tests under the shell style guide
 
-- [ ] 6.1 Rename `test/firewall/helpers.sh` to `test/firewall/checks.sh` (`# shellcheck shell=sh`, no shebang, not
+- [x] 6.1 Rename `test/firewall/helpers.sh` to `test/firewall/checks.sh` (`# shellcheck shell=sh`, no shebang, not
       executable) and reduce it to the POSIX stand-in and the assertions more than one script uses, with the helpers
       those assertions call: `check` and `reportResults` defined only when the CLI's library has not defined them, under
       a comment giving that reason (design.md, Open Questions 10); a failed `check` recorded in a lower-case list and
@@ -198,7 +198,7 @@ start check.
       `shellcheck -o require-variable-braces,require-double-brackets test/firewall/checks.sh`, that
       `grep -l helpers.sh test/firewall/*.sh` prints nothing, and that every function left in `checks.sh` is used by
       more than one script or by an assertion that is (the container run is 8.4).
-- [ ] 6.2 Bring `test/firewall/test.sh` to the guide's test rules: `set -eu`; `checks.sh` and `common.sh` each sourced
+- [x] 6.2 Bring `test/firewall/test.sh` to the guide's test rules: `set -eu`; `checks.sh` and `common.sh` each sourced
       with the reason for their `# shellcheck source=/dev/null`; no divider lines; a lower-case variable for the
       temporary directory; each fixture and each rejected option value as its own check, labelled in the words of its
       scenario (Implausible range, Fetch fails, Unknown preset, Malformed CIDR, CIDR that cannot be applied as written,
@@ -214,7 +214,7 @@ start check.
       `shellcheck -o require-variable-braces,require-double-brackets test/firewall/test.sh` and by comparing its checks
       with the script before the restyle: the eleven rejected option values, the nine fixtures, and every start-time
       check are still asserted (the container run is 8.4).
-- [ ] 6.3 Bring `test/firewall/duplicate.sh` to the guide's test rules, asserting what task 2.4 states: `set -eu`;
+- [x] 6.3 Bring `test/firewall/duplicate.sh` to the guide's test rules, asserting what task 2.4 states: `set -eu`;
       `checks.sh` sourced with the reason for its `# shellcheck source=/dev/null`; braced variables; the table listing
       saved before it is matched in `forward_filtered`; labels in the words of Scenario: Different options the second
       time; and the check of the harness's inputs kept as a check that compares `DEFAULTACTION` and `PRESETS` with the
@@ -222,12 +222,12 @@ start check.
       it asserts under a comment marking the deviation (design.md, Open Questions 13). Verify with
       `shellcheck -o require-variable-braces,require-double-brackets test/firewall/duplicate.sh` and that the script
       still holds its eight checks (the container run is 8.4, which also confirms the literals).
-- [ ] 6.4 Rename the seven kebab-case scenario scripts with `git mv`, and their keys in `test/firewall/scenarios.json`,
+- [x] 6.4 Rename the seven kebab-case scenario scripts with `git mv`, and their keys in `test/firewall/scenarios.json`,
       to snake_case (`github_npm`, `fetch_fails`, `dind_no_forward`, `allow_all`, `denied_cidrs`, `denied_domains`,
       `denied_in_range`; `domains`, `cidrs`, `rerun`, `warn`, and `dind` keep their names), with the name in each
       script's header comment; change no scenario's image or options. Verify that no key in `scenarios.json` and no file
       name under `test/firewall/` contains `-`, that every key has its `<key>.sh`, and that `just validate` passes.
-- [ ] 6.5 Bring the twelve scenario scripts to the guide's test rules as bash (design.md, Decisions: POSIX `sh`):
+- [x] 6.5 Bring the twelve scenario scripts to the guide's test rules as bash (design.md, Decisions: POSIX `sh`):
       `#!/usr/bin/env bash` and `set -euo pipefail`; `dev-container-features-test-lib` sourced first, then `checks.sh`
       with the reason for its `# shellcheck source=/dev/null`; `[[ … ]]` for tests (`test` stays where a check passes it
       as a command); `local` for function variables; `bash -c` for a pipeline that fits on one line, as the guide's
@@ -270,13 +270,13 @@ start check.
 
 ## 8. Verification
 
-- [ ] 8.1 Run `shellcheck -o require-variable-braces,require-double-brackets` on `src/firewall/install.sh`,
+- [x] 8.1 Run `shellcheck -o require-variable-braces,require-double-brackets` on `src/firewall/install.sh`,
       `src/firewall/scripts/*.sh`, and `test/firewall/*.sh`, and review each file against
       `.agents/knowledge/shell-style.md`, rule by rule; verify that shellcheck reports nothing and that every deviation
       left is one design.md names (Goals: Scripts follow the shell style guide), a `# shellcheck disable` kept for one
       line included, with its reason in a comment on the line above.
-- [ ] 8.2 Run `just check`; verify it passes with the regenerated `README.md` in place.
-- [ ] 8.3 Re-run, against the rebuilt scripts, the builds of 2.6 and the checks of 3.8, adding the hand runs of 5.2 for
+- [x] 8.2 Run `just check`; verify it passes with the regenerated `README.md` in place.
+- [x] 8.3 Re-run, against the rebuilt scripts, the builds of 2.6 and the checks of 3.8, adding the hand runs of 5.2 for
       a list value with a line break; verify that each ends as its scenario states and that every build that must fail
       ends with one `firewall: error:` line naming what its scenario requires.
 - [ ] 8.4 Run `just test firewall` and `just test-scenarios firewall` through the PR's container test jobs, which run
