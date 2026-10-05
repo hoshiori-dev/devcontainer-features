@@ -28,6 +28,9 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 | [`nvidia-container-toolkit`](src/nvidia-container-toolkit/) | Installs the NVIDIA Container Toolkit from NVIDIA's signed repository and registers its runtime with a Docker daemon in the dev container. |
 | [uv](src/uv/)                                               | Installs Astral's uv and uvx, optionally Python command-line tools, and keeps uv's interpreters and cache on a per-container volume.       |
 | [dnf-packages](src/dnf-packages/)                           | Installs listed system packages with dnf.                                                                                                  |
+| [apk-packages](src/apk-packages/)                           | Installs listed system packages with apk.                                                                                                  |
+| [pacman-packages](src/pacman-packages/)                     | Installs listed system packages with pacman.                                                                                               |
+| [zypper-packages](src/zypper-packages/)                     | Installs listed system packages with zypper.                                                                                               |
 
 ## Development
 

@@ -1,0 +1,6 @@
+{
+  "$schema": "../compatibility.schema.json",
+  "images": [
+    { "image": "archlinux:latest", "arch": ["amd64"] }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "listed_packages_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {
+        "packages": " bc , file ,, "
+      }
+    }
+  },
+  "listed_packages_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {
+        "packages": " bc , file ,, "
+      }
+    }
+  },
+  "controls_packages_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {
+        "packages": "bc,file",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "installRecommends": true
+      }
+    }
+  },
+  "controls_none_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {
+        "packages": "bc,file",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "installRecommends": true
+      }
+    }
+  },
+  "controls_packages_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {
+        "packages": "bc,file",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "installRecommends": true
+      }
+    }
+  },
+  "controls_none_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {
+        "packages": "bc,file",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "installRecommends": true
+      }
+    }
+  },
+  "optional_false_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {
+        "packages": "less",
+        "installRecommends": false
+      }
+    }
+  },
+  "optional_true_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {
+        "packages": "less",
+        "installRecommends": true
+      }
+    }
+  },
+  "architecture_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {
+        "packages": "bc.x86_64"
+      }
+    }
+  },
+  "optional_false_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {
+        "packages": "less",
+        "installRecommends": false
+      }
+    }
+  },
+  "optional_true_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {
+        "packages": "less",
+        "installRecommends": true
+      }
+    }
+  },
+  "architecture_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {
+        "packages": "bc.x86_64"
+      }
+    }
+  }
+}

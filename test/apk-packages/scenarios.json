@@ -1,0 +1,82 @@
+{
+  "listed_packages_alpine_3_24": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {
+        "packages": "file,tree"
+      }
+    }
+  },
+  "listed_packages_alpine_3_22": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {
+        "packages": "file,tree"
+      }
+    }
+  },
+  "install_if_and_whitespace_alpine_3_24": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {
+        "packages": " jq ,\t docs,, "
+      }
+    }
+  },
+  "install_if_and_whitespace_alpine_3_22": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {
+        "packages": " jq ,\t docs,, "
+      }
+    }
+  },
+  "controls_packages_0": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {
+        "packages": "tree",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "upgradePackages": true
+      }
+    }
+  },
+  "controls_none_0": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {
+        "packages": "tree",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "upgradePackages": true
+      }
+    }
+  },
+  "controls_packages_1": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {
+        "packages": "tree",
+        "cleanup": "packages",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "upgradePackages": true
+      }
+    }
+  },
+  "controls_none_1": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {
+        "packages": "tree",
+        "cleanup": "none",
+        "refreshPolicy": "always",
+        "networkTimeout": "10",
+        "upgradePackages": true
+      }
+    }
+  }
+}

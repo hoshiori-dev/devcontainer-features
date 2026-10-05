@@ -1,23 +1,18 @@
 {
-  "id": "apt-packages",
-  "version": "1.1.0",
-  "name": "APT packages",
-  "description": "Installs a list of system packages with apt-get from the repositories the Debian or Ubuntu image already configures.",
-  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apt-packages",
+  "id": "apk-packages",
+  "version": "1.0.0",
+  "name": "APK packages",
+  "description": "Installs a list of system packages with apk from the repositories the Alpine Linux image already configures.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apk-packages",
   "options": {
     "packages": {
       "type": "string",
       "default": "",
       "proposals": [
-        "bc",
-        "bc,file"
+        "file",
+        "file,tree"
       ],
-      "description": "Comma-separated packages to install: name, name=version, or name:architecture. Whitespace around entries and empty entries are ignored; an empty list installs nothing."
-    },
-    "installRecommends": {
-      "type": "boolean",
-      "default": false,
-      "description": "Include recommended dependencies; suggested dependencies remain excluded."
+      "description": "Comma-separated packages to install: name, name=version, name~version, a range such as name>=version, name@tag, or a provided name such as cmd:jq. Whitespace around entries and empty entries are ignored; an empty list installs nothing."
     },
     "refreshPolicy": {
       "type": "string",
@@ -43,6 +38,11 @@
       "type": "string",
       "default": "",
       "description": "Native network timeout in seconds (1\u20133600), or empty to inherit image settings; applies only to this invocation."
+    },
+    "upgradePackages": {
+      "type": "boolean",
+      "default": false,
+      "description": "Request upgrades of listed packages and their dependencies with apk add, preserving world constraints."
     }
   }
 }
