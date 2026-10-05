@@ -101,5 +101,187 @@
 ## 4. Integration
 
 - [x] 4.1 Run `just check` and verify it passes with the generated `README.md` in place.
-- [ ] 4.2 Verify `just affected` selects only `firewall`, CI passes on amd64 and arm64, and record every Acceptance item
-      of proposal.md with its result in the PR's Validation section.
+
+## 5. Shipped scripts under the shell style guide
+
+Sections 5 to 8 bring the implementation to the requirements the knowledge base gained after the tasks above were done
+(design.md, Context) and to design.md's Decisions of 2026-10-05. The ticked tasks above stay as the record of the
+earlier work. Nothing the delta spec fixes changes: no option, rule, file location, record field, or exit status of the
+start check.
+
+- [ ] 5.1 Rebuild `src/firewall/install.sh` on the POSIX skeleton of `.agents/knowledge/shell-style.md`, with the same
+      packages, files, and order of checks (the distribution, then the options): a header naming the packages, the
+      image's repositories, `/usr/local/share/firewall`, and each option with the variable it arrives in, without
+      second-install behavior; readonly constants for the paths it creates or modifies (`/usr/local/share/firewall`, and
+      `/var/lib/apt/lists` as design.md, Open Questions 11, is written); the eight option variables under their own
+      names with `${NAME-default}`, readonly once validated, in place of the `OPT_*` copies; `log` and `fail` with the
+      `firewall:` and `firewall: error:` prefixes in place of `die` and `echo`; `/etc/os-release` read inside a subshell
+      in place of the `sed | head | tr` pipeline; step functions and `main "$@"` with no code between the functions,
+      calls at most `main` → step → helper; lower-case mutable globals; the validators of `common.sh` called in an `if`,
+      not followed by `|| die`; the family's package manager checked before anything changes when a package is missing;
+      one log line for the package install (the packages, the package manager, the image's repositories) and one for the
+      files written; `apt-get update`, `apt-get install`, `apk add`, and `dnf install` each ending in
+      `|| fail "<reason>; <how to fix it>"` with their own output kept; the nftset probe's output saved to a variable
+      before it is matched, and the three failures after the package install worded with their fix; the missing packages
+      passed as positional parameters; long options wherever all four images accept them; a reason above the
+      `# shellcheck source=/dev/null` of the library and no per-file `# shellcheck disable`. Verify with
+      `shellcheck -o require-variable-braces,require-double-brackets src/firewall/install.sh`, a default install in a
+      plain container of each compatibility image, and hand runs with an unknown preset, an explicitly empty
+      `defaultAction`, and an unsupported distribution, each ending in one `firewall: error: <reason>; <how to fix it>`
+      line before any package is installed.
+- [ ] 5.2 Restyle the library `src/firewall/scripts/common.sh`: `# shellcheck shell=sh` alone on the first line and no
+      per-file disable; readonly constants; the option variables under the names `install.sh` gives them and lower-case
+      names for the other mutable globals; function-local variables prefixed with the function's full name; no `eval`
+      and no checker passed by name, each list validated by a direct call that assigns its output; every list split on
+      commas only, whitespace around an entry (line breaks included) ignored, and each entry matched as a whole, so a
+      line break inside an entry fails it (design.md, Decisions: Shell style); no pipeline whose status decides; `if` in
+      place of `&&` and `||` lists that branch; values assigned to variables before the options file is written; every
+      rejection of an option entry worded `<reason>; <how to fix it>` and still naming the entry, the rejections of a
+      fetched range, a looked-up address, or a nameserver keeping the reason alone; validators that return a status and
+      set the reason, for the sourcing script to fail the build or record the start. Verify with
+      `shellcheck -o require-variable-braces,require-double-brackets src/firewall/scripts/common.sh`, a run of the
+      validator under dash and BusyBox ash against the rejected values and fixtures `test.sh` uses, and hand runs
+      showing that `presets` with a line break between `github` and `npm` is rejected, that the same value with a comma
+      before the line break is accepted, and that `Example.COM` in `allowedDomains` is accepted.
+- [ ] 5.3 Rebuild `src/firewall/scripts/apply.sh` on the POSIX skeleton, with the same order of loads, the same
+      rulesets, and the same record: the `env -i` re-execution kept as the first lines, under a comment marking it as
+      the layout deviation of design.md (Goals: The check ignores its environment); readonly constants for the trust
+      surface (the meta URL and host, the probe address, `/usr/local/share/firewall`, `/run/firewall` and each file
+      written there, `/var/lib/firewall/resolvers`, `/etc/resolv.conf`, the table `inet firewall`); lower-case mutable
+      globals declared at the top, before the functions; `log` on standard output; the failed-start handler renamed from
+      `fail` to a name of its own (for example `end_failed_start`), exit status 0 kept on every path, and a comment at
+      the handler marking the missing exiting `fail` as the deviation of design.md (Goals: The entrypoint always exits
+      zero); step functions and `main "$@"`, calls at most `main` → step → helper, the single-use wrappers
+      `nameservers`, `dns_listening`, and `prefix_rules` inlined; function-local variables prefixed with the function's
+      name; `if` in place of `&&` and `||` lists that branch, and no `||` handler after a function that runs several
+      commands (`lookup_meta_host`, `load`, `fetch_meta`, `start_dnsmasq`); no pipeline whose status decides (the
+      lookup, the test for the `github` preset, the size cap of the fetch); one log line for the lookup and one for the
+      fetch, each naming its source, and none for the table loads, the rewrites of `/etc/resolv.conf`, or the resolver's
+      start (design.md, Open Questions 12); every failure the developer can fix worded `<reason>; <how to fix it>`, the
+      others keeping the reason alone; comments naming the retried curl exit statuses and the `sleep` fallback; no
+      state-changing command (`kill`, `nft delete table`) sent to `/dev/null`; a reason on the line above every
+      `# shellcheck disable`, above the `# shellcheck source=/dev/null` of the library, and above the two generators
+      `ruleset` and `dnsmasq_conf`, as design.md (Goals: Option values reach the generated files only in validated form)
+      gives it; long options wherever all four images accept them; `TODO(#<issue>)` at a known gap that stays. Verify
+      with `shellcheck -o require-variable-braces,require-double-brackets src/firewall/scripts/apply.sh`, `nft -c -f` on
+      the closed, pinned, and full rulesets, and a container built on `debian:12` whose first start is recorded as
+      applied with the chains it had before the rebuild and whose re-run with outbound HTTPS dropped ends with status 0
+      and a failed record (the scenarios run in 8.4).
+- [ ] 5.4 Rebuild `src/firewall/scripts/check.sh` on the POSIX skeleton: the `env -i` re-execution first, under its
+      deviation comment, then `set -eu` in place of `set -u`; readonly constants for the record, the options file, the
+      probe URL, and the wait; `log` and `fail` with the `firewall:` and `firewall: error:` prefixes, and the warning of
+      `failureMode` `warn` on standard error as `firewall: warning: …` with exit status 0; `main "$@"` as the list of
+      steps; each not-in-force report as one line `<reason>; <how to fix it>` that still prints the record's reason; the
+      probe's status taken in an `if`, and the record's fields read into variables before the summary is printed;
+      prefixed function-local variables, lower-case mutable globals, and quoted test operands; a comment where a mode
+      that cannot be read counts as `closed`; long options for `curl` wherever all four images accept them. Verify with
+      `shellcheck -o require-variable-braces,require-double-brackets src/firewall/scripts/check.sh` and hand runs in a
+      container built on `debian:12`: after an applied start, one summary line on standard output and status 0; after a
+      failed start, one `firewall: error:` line on standard error and a non-zero status with `failureMode` `closed`, and
+      one `firewall: warning:` line on standard error and status 0 with `warn` (the scenarios run in 8.4).
+
+## 6. Tests under the shell style guide
+
+- [ ] 6.1 Rename `test/firewall/helpers.sh` to `test/firewall/checks.sh` (`# shellcheck shell=sh`, no shebang, not
+      executable) and reduce it to the POSIX stand-in and the assertions more than one script uses, with the helpers
+      those assertions call: `check` and `reportResults` defined only when the CLI's library has not defined them, under
+      a comment giving that reason (design.md, Open Questions 10); a failed `check` recorded in a lower-case list and
+      returning 1 (Open Questions 9); readonly `SHARE` and `RECORD`; function-local variables prefixed with the
+      function's name; `printf` for text with an expansion; a command's status taken in an `if`, not read from `$?`
+      afterwards; output saved before it is matched in `first_address` and `current_start`. Move `timed_refusal` into
+      `test.sh`, `check_fails` into `rerun.sh`, `closed_table` into the fetch_fails script, and the `nested_*`
+      assertions with `nested_curl` into the two dind scripts, each defined before its first check; move the setup
+      helpers (`rerun`, `stop_resolver`, `hold_resolver_port`, `release_resolver_port`, `nested_setup`) into the scripts
+      that use them, without a guard the declared environment does not need (`.agents/knowledge/testing.md`, Test intent
+      and readability), with no step decided by a pipeline's status, and with the reason for
+      `# shellcheck disable=SC2016` on the line above it. Verify with
+      `shellcheck -o require-variable-braces,require-double-brackets test/firewall/checks.sh`, that
+      `grep -l helpers.sh test/firewall/*.sh` prints nothing, and that every function left in `checks.sh` is used by
+      more than one script or by an assertion that is (the container run is 8.4).
+- [ ] 6.2 Bring `test/firewall/test.sh` to the guide's test rules: `set -eu`; `checks.sh` and `common.sh` each sourced
+      with the reason for their `# shellcheck source=/dev/null`; no divider lines; a lower-case variable for the
+      temporary directory; each fixture and each rejected option value as its own check, labelled in the words of its
+      scenario (Implausible range, Fetch fails, Unknown preset, Malformed CIDR, CIDR that cannot be applied as written,
+      Malformed denied domain, Malformed denied CIDR) or, where the delta spec has no scenario (the two `allowedDomains`
+      values, a malformed response, the valid response), in the words of the requirement sentence that states it
+      (Requirement: Option allowedDomains, Requirement: GitHub ranges); the repository check labelled as what it
+      verifies (no repository or key file names the feature); the check that `/etc/resolv.conf` names only the local
+      resolver labelled in the words of Goals: Resolvers recorded once per container, under a comment marking the
+      deviation (design.md, Test coverage); output saved before it is matched in `has_nftset`, `no_feature_repository`,
+      `no_denied_entry`, `check_output`, `root_only_writable`, and the group check; function variables prefixed; the
+      `SC2034` reason on the line above its directive; a comment saying why the number of fetched ranges is not a
+      literal; and the names it reads from `common.sh` as 5.2 leaves them. Verify with
+      `shellcheck -o require-variable-braces,require-double-brackets test/firewall/test.sh` and by comparing its checks
+      with the script before the restyle: the eleven rejected option values, the nine fixtures, and every start-time
+      check are still asserted (the container run is 8.4).
+- [ ] 6.3 Bring `test/firewall/duplicate.sh` to the guide's test rules, asserting what task 2.4 states: `set -eu`;
+      `checks.sh` sourced with the reason for its `# shellcheck source=/dev/null`; braced variables; the table listing
+      saved before it is matched in `forward_filtered`; labels in the words of Scenario: Different options the second
+      time; and the check of the harness's inputs kept as a check that compares `DEFAULTACTION` and `PRESETS` with the
+      literals `allow` and `npm`, and their `__DEFAULT` counterparts with `deny` and `github`, labelled as the premise
+      it asserts under a comment marking the deviation (design.md, Open Questions 13). Verify with
+      `shellcheck -o require-variable-braces,require-double-brackets test/firewall/duplicate.sh` and that the script
+      still holds its eight checks (the container run is 8.4, which also confirms the literals).
+- [ ] 6.4 Rename the seven kebab-case scenario scripts with `git mv`, and their keys in `test/firewall/scenarios.json`,
+      to snake_case (`github_npm`, `fetch_fails`, `dind_no_forward`, `allow_all`, `denied_cidrs`, `denied_domains`,
+      `denied_in_range`; `domains`, `cidrs`, `rerun`, `warn`, and `dind` keep their names), with the name in each
+      script's header comment; change no scenario's image or options. Verify that no key in `scenarios.json` and no file
+      name under `test/firewall/` contains `-`, that every key has its `<key>.sh`, and that `just validate` passes.
+- [ ] 6.5 Bring the twelve scenario scripts to the guide's test rules as bash (design.md, Decisions: POSIX `sh`):
+      `#!/usr/bin/env bash` and `set -euo pipefail`; `dev-container-features-test-lib` sourced first, then `checks.sh`
+      with the reason for its `# shellcheck source=/dev/null`; `[[ … ]]` for tests (`test` stays where a check passes it
+      as a command); `local` for function variables; `bash -c` for a pipeline that fits on one line, as the guide's
+      Tests section allows, and no shell around a single command; braced variables; `printf` for text with an expansion;
+      no line over 120 characters; `if` blocks in place of `|| { …; }`; in every helper function, output saved before it
+      is matched, so that no other pipeline's status decides a check; every status that is expected to be non-zero taken
+      in an `if` or with `|| status=$?`; the setup steps wrapped in `check` today (`nested_setup` in the two dind
+      scripts, `hold_resolver_port` in fetch_fails and warn) as plain commands that stop the script; the elapsed time of
+      the fetch_fails re-run printed beside a fixed label; the four addresses of `raw.githubusercontent.com` as literals
+      in github_npm; a comment wherever a value is read at run time (an address a lookup returns, the recorded
+      resolvers, the number of fetched ranges); labels in the words of the scenarios design.md (Test coverage) maps to
+      each script; each check of a Goal named there labelled in the Goal's words under a comment marking the deviation;
+      the two premise checks of `rerun.sh` kept, labelled as premises and marked (design.md, Open Questions 13); and the
+      expected record and check texts brought to the messages 5.3 and 5.4 reword. Verify with
+      `shellcheck -o require-variable-braces,require-double-brackets` on each script, `just validate`, and by comparing
+      each script's checks with the script before the restyle: every assertion is still made, and only the four setup
+      steps are no longer checks (the container run is 8.4).
+
+## 7. Version and documentation
+
+- [ ] 7.1 Revise `src/firewall/NOTES.md` for human developers (`.agents/knowledge/feature-authoring.md`, User
+      documentation) and to the proposal's Acceptance item on it: open with the privilege assumption (a remote user
+      without root, passwordless `sudo`, or access to a Docker daemon; `vscode` of the Dev Containers base images has
+      passwordless `sudo`) and bring the `vscode` preset constraint into the first lines (design.md, Non-Goals and Open
+      Questions 2); keep one sentence each for `defaultAction` `allow` (only what the denied entries name is refused, a
+      denied name can be avoided, and `deniedCidrs` is for ranges that must stay out of reach) and for `failureMode`
+      `warn` (a process that can make a start fail removes the rules at that start), and one each for what other
+      approved text binds to the documentation: DNS lookups remain possible (proposal.md, What Changes) and other sites
+      share an allowed address or range (design.md, Risks); remove the bullets nothing else binds: the explanation of
+      DNS rebinding (the `allowedCidrs` recommendation further down stays), the examples of failing a start on purpose,
+      exploiting dnsmasq, `LD_PRELOAD`, and editing the dev container configuration; leave the statements of every other
+      section in place and check their grammar and wording; run `just docs`. Verify that every `NOTES.md` SHALL of the
+      delta spec (Requirements: Allowed domains, Presets, Forwarded traffic, Start record readable by the remote user,
+      Guardrail, not a security boundary) and every statement design.md's Non-Goals and Risks assign to `NOTES.md` is
+      still present, and that `just docs-check` passes.
+- [ ] 7.2 Leave the version in `src/firewall/devcontainer-feature.json` at `1.0.0` (the feature is unreleased;
+      `.agents/knowledge/feature-authoring.md`, Versions) and `test/firewall/compatibility.json` as task 1.2 wrote it.
+      Verify that `jq -r .version src/firewall/devcontainer-feature.json` prints `1.0.0`, that the compatibility list
+      still holds the four images on `amd64` and `arm64`, and that `just validate` passes.
+
+## 8. Verification
+
+- [ ] 8.1 Run `shellcheck -o require-variable-braces,require-double-brackets` on `src/firewall/install.sh`,
+      `src/firewall/scripts/*.sh`, and `test/firewall/*.sh`, and review each file against
+      `.agents/knowledge/shell-style.md`, rule by rule; verify that shellcheck reports nothing and that every deviation
+      left is one design.md names (Goals: Scripts follow the shell style guide), a `# shellcheck disable` kept for one
+      line included, with its reason in a comment on the line above.
+- [ ] 8.2 Run `just check`; verify it passes with the regenerated `README.md` in place.
+- [ ] 8.3 Re-run, against the rebuilt scripts, the builds of 2.6 and the checks of 3.8, adding the hand runs of 5.2 for
+      a list value with a line break; verify that each ends as its scenario states and that every build that must fail
+      ends with one `firewall: error:` line naming what its scenario requires.
+- [ ] 8.4 Run `just test firewall` and `just test-scenarios firewall` through the PR's container test jobs, which run
+      the first per compatibility image on amd64 and arm64 and the scenarios on amd64; verify every job is green, with
+      the GitHub fetches within design.md's budget.
+- [ ] 8.5 Verify `just affected` selects only `firewall`, and record the results of 8.1 to 8.4 and every Acceptance item
+      of proposal.md, with the scenarios it points to, in the PR's Validation section; verify each item of the
+      proposal's `## Acceptance` is named there with its result.

@@ -101,10 +101,10 @@ with an empty list selecting none and an entry that is not a known preset failin
 
 ### Requirement: Option allowedDomains
 
-The feature SHALL accept the option `allowedDomains` as declared here: comma-separated DNS names, ignoring surrounding
-whitespace and empty entries, each allowed as Requirement: Allowed domains states, with an entry that is not a valid DNS
-name, including an entry with a wildcard label such as `*.example` (subdomains are always included), failing the install
-with a message naming it.
+The feature SHALL accept the option `allowedDomains` as declared here: comma-separated DNS names, upper and lower case
+being equivalent, ignoring surrounding whitespace and empty entries, each allowed as Requirement: Allowed domains
+states, with an entry that is not a valid DNS name, including an entry with a wildcard label such as `*.example`
+(subdomains are always included), failing the install with a message naming it.
 
 | Field   | Value    |
 | ------- | -------- |
@@ -152,10 +152,10 @@ failing the install with a message naming it.
 
 ### Requirement: Option deniedDomains
 
-The feature SHALL accept the option `deniedDomains` as declared here: comma-separated DNS names, ignoring surrounding
-whitespace and empty entries, each denied as Requirement: Denied domains states, with an entry that is not a valid DNS
-name, including an entry with a wildcard label such as `*.example` (subdomains are always included), failing the install
-with a message naming it.
+The feature SHALL accept the option `deniedDomains` as declared here: comma-separated DNS names, upper and lower case
+being equivalent, ignoring surrounding whitespace and empty entries, each denied as Requirement: Denied domains states,
+with an entry that is not a valid DNS name, including an entry with a wildcard label such as `*.example` (subdomains are
+always included), failing the install with a message naming it.
 
 | Field   | Value    |
 | ------- | -------- |

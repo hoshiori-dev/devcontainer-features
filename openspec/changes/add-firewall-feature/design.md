@@ -95,6 +95,15 @@ Research for this change, checked on 2026-09-30; see `proposal.md` for the motiv
   (https://docs.docker.com/desktop/enterprise/allow-list/) lists next to `registry-1.docker.io` for pulls and pushes. A
   pull therefore needs two hosts outside the URL inventory, one of them a CDN; tests pull no image (Goals: Test
   destinations).
+- **Requirements added after the package was approved at commit `01d7e82`** (the knowledge base on `main` on
+  2026-10-05): `.agents/knowledge/shell-style.md`, `.agents/knowledge/review-guidance.md`, the sections "Developer trust
+  and readability" and "User documentation" of `.agents/knowledge/feature-authoring.md`, and "Test intent and
+  readability", the POSIX stand-in `test/<id>/checks.sh`, and `scenarioArchitectures` in `.agents/knowledge/testing.md`.
+  The scripts under `src/firewall/` and `test/firewall/` and `src/firewall/NOTES.md` were written before them: on
+  2026-10-05, plain `shellcheck` reported nothing on the branch's scripts, and
+  `shellcheck -o require-variable-braces,require-double-brackets` reported 391 findings (284 in the four shipped
+  scripts, 107 in the test scripts). Where this design names the shell style guide, or says what a comment in a script
+  marks, it describes the scripts as sections 5 to 8 of `tasks.md` leave them.
 
 Packages on the planned images, verified on 2026-09-30 for amd64 and arm64:
 
@@ -130,7 +139,7 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   load recreates the learned sets empty. With `defaultAction` `allow`, nothing is fetched and the full table replaces
   the closed one directly. No later step deletes the table except `failureMode` `warn` on failure; with `closed`, a
   failure after the full load, such as dnsmasq failing to start, replaces the full table with the closed one (without
-  `api.github.com`) in one transaction. Checked: review of the script's order, and the `fetch-fails` scenario.
+  `api.github.com`) in one transaction. Checked: review of the script's order, and the `fetch_fails` scenario.
 - **Chains.** Base chains: `output` and, with `filterForward`, `forward`, both at filter priority with policy drop; no
   `input` chain. Both run, in this order: accept established and related connections; accept ICMPv6 types 133–136
   (neighbour and router discovery) only with hop limit 255 and 143 (MLDv2 reports) only with hop limit 1, the values RFC
@@ -141,20 +150,20 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   repeat ranges), with the learned sets in the /32 and /128 pairs; last, an accept or a reject by `defaultAction`.
   `output` first accepts everything leaving through `lo`, which covers Docker's DNAT of `127.0.0.11`. Ordering by prefix
   length yields the longest match without computing range differences, and a same-length tie refuses. Checked: the
-  `rerun` scenario asserts the chain contents with `nft -j list table`; the `denied-cidrs`, `denied-domains`, and `dind`
+  `rerun` scenario asserts the chain contents with `nft -j list table`; the `denied_cidrs`, `denied_domains`, and `dind`
   scenarios.
 - **Bounded start.** The start-time script ends within 60 seconds even when the network is unreachable: the lookup of
   `api.github.com` is bounded at 5 seconds, the GitHub fetch at 20 seconds per attempt with at most two attempts (only
   after a connection error or timeout; an HTTP error status, including a rate-limit response, is not retried) and at 2
   MiB of response, and dnsmasq must answer within 5 seconds of its start. The check waits at most 90 seconds for the
   current start's record, longer than the script's bound, so a slow start that succeeds is never reported missing.
-  Checked: review, and the `fetch-fails` scenario measures the script's run time.
+  Checked: review, and the `fetch_fails` scenario measures the script's run time.
 - **Learned addresses in their own sets.** Addresses dnsmasq learns go to four named sets (allowed and denied, IPv4 and
   IPv6), separate from the configured and fetched ranges, so a learned address inside a range never makes an insert
   fail. Each domain entry gets one `--nftset` line naming only its own verdict's sets, so dnsmasq's longest match
   (Context) decides between an allowed domain and a denied one; a name in both lists gets only the denied line. Checked:
-  the `github-npm` scenario connects to `raw.githubusercontent.com`, which resolves inside a fetched `web` range; the
-  `denied-domains` and `denied-in-range` scenarios.
+  the `github_npm` scenario connects to `raw.githubusercontent.com`, which resolves inside a fetched `web` range; the
+  `denied_domains` and `denied_in_range` scenarios.
 - **Rejected, not dropped.** Refused outbound TCP connections get a TCP reset (connection refused), other protocols ICMP
   administratively prohibited, so they fail at once. The check accepts only a refused TCP connection to `192.0.2.1:443`
   within 3 seconds as proof; a timeout or an unreachable network means the firewall is not in force. Checked: `test.sh`
@@ -165,17 +174,21 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   `test.sh` asserts owner and mode of each file, and the `rerun` scenario covers "Environment does not change the
   rules".
 - **The check ignores its environment.** The check re-executes itself under `env -i` with a fixed `PATH` before doing
-  anything else, calls every tool by absolute path, and reads no file the remote user can write. The first process still
-  starts under the environment the dev container tool probed, so a dynamic-loader variable such as `LD_PRELOAD` acts
-  before the re-execution (Risks). Checked: the `rerun` scenario runs the check with a `PATH` that shadows its tools and
-  with `ENV` and `BASH_ENV` set.
+  anything else, calls every tool by absolute path, and reads no file the remote user can write. In `check.sh` and in
+  `apply.sh`, which clears its environment the same way, the re-execution is the script's first lines, before `set -eu`,
+  the constants, and the functions: a deliberate deviation from the layout `.agents/knowledge/shell-style.md`
+  (Skeletons) gives an executable script, so that no line of the script, the sourcing of the library included, runs
+  under the inherited environment; a comment above the re-execution gives this reason. The first process still starts
+  under the environment the dev container tool probed, so a dynamic-loader variable such as `LD_PRELOAD` acts before the
+  re-execution (Risks). Checked: the `rerun` scenario runs the check with a `PATH` that shadows its tools and with `ENV`
+  and `BASH_ENV` set.
 - **dnsmasq runs only from its own configuration.** It starts with a root-owned configuration file written at start (the
   allowed domains, the learned sets, and the recorded resolvers as upstream servers), reads neither the distribution's
   `/etc/dnsmasq.conf` nor a configuration directory nor `/etc/resolv.conf`, and listens on `127.0.0.1` only, with
   `--bind-interfaces`, so a port another process already holds makes it exit with an error; the start then fails before
   `/etc/resolv.conf` names it. It runs as the `dnsmasq` user its package creates (Context) and keeps only
   `CAP_NET_ADMIN`, to add to the sets. It is not supervised. Checked: review; the `rerun` scenario asserts its command
-  line; `test.sh` asserts its user; the `fetch-fails` scenario takes the port first.
+  line; `test.sh` asserts its user; the `fetch_fails` scenario takes the port first.
 - **Resolvers recorded once per container.** The nameservers of `/etc/resolv.conf` are recorded in the state directory
   before the feature first rewrites the file. At every start the script first writes the recorded resolvers back into
   the file's `nameserver` lines, and names the local dnsmasq only once dnsmasq answers, so the file names dnsmasq only
@@ -193,6 +206,24 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   malformed entry, one with host bits set, and a wildcard domain in `deniedCidrs` and `deniedDomains`. The same
   validator checks each fetched GitHub range, with the minimum prefixes of Decisions; `test.sh` runs it against fixture
   responses.
+- **Option values reach the generated files only in validated form.** The start-time script writes two files that
+  another program then reads: the ruleset for `nft -f` (One owned table, replaced atomically) and dnsmasq's
+  configuration (dnsmasq runs only from its own configuration). No option value is written to either as given: a CIDR
+  entry is written as the validator prints it again from the numbers it parsed, a domain entry in lower case and only
+  after each of its labels matched the validator's pattern for a DNS label, and `presets`, `defaultAction`, and
+  `filterForward` only select fixed text; the stored options are validated again at every start before either file is
+  written. This is the one deliberate deviation from the rule of `.agents/knowledge/shell-style.md` (Options are data)
+  that an option value never reaches a script the feature generates: the single-transaction load and dnsmasq's own
+  configuration file each need a generated file, and the validated forms cannot carry a directive of either format. A
+  comment above each of the two generators gives this reason. Checked: review of the validator and the two generators.
+- **The entrypoint always exits zero.** `apply.sh` ends with status 0 whether the start is applied, failed, or not
+  applied: the result reaches the user through the start record and the start check (Requirement: Failure mode,
+  Requirement: Start check), never through the entrypoint's status, so a tool that stops at a failing entrypoint still
+  runs the container's command. The script therefore defines no `fail` that exits 1, which
+  `.agents/knowledge/shell-style.md` (Logging and failure) asks of every executable shipped script. Its failed-start
+  handler has a name of its own, so no function called `fail` means something else, and a comment at the handler marks
+  the deviation with this reason; `log` writes to standard output, as the guide says. Checked: review of every exit of
+  the script.
 - **Idempotent install.** `install.sh` overwrites its configuration and scripts, installs packages only when missing,
   and adds no line to any shared file. Checked: `duplicate.sh` installs with non-default options (without the `github`
   preset, with `defaultAction` `allow` and denied entries), then defaults, and asserts that the defaults are in effect.
@@ -214,6 +245,15 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   GitHub's hourly limit. A rate-limited start fails with the reason in the check's output, so a red job names its cause;
   a re-run after the limit resets is the remedy. Tests carry no token. Checked: the scenario list below; the first CI
   run.
+- **Scripts follow the shell style guide.** Every `*.sh` under `src/firewall/` and `test/firewall/` follows
+  `.agents/knowledge/shell-style.md` as written. The only deliberate deviations are the ones this design names, each
+  marked in the script by a comment that gives its reason: option values in the two generated files, the entrypoint's
+  exit status, and the re-execution under `env -i` (the Goals above that state them), and the labels of the checks that
+  verify a Goal (Test coverage). Two more kinds are marked the same way: each `# shellcheck disable` a script keeps for
+  one line, which the guide counts as a deviation, and the labels of the three checks that assert a test's premise, for
+  as long as Open Questions 13 stands as written. Checked:
+  `shellcheck -o require-variable-braces,require-double-brackets` reports nothing on those files, and a review against
+  the guide, rule by rule.
 
 **Non-Goals:**
 
@@ -347,7 +387,28 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   for containers that must start anyway (Risks). `filterForward` is `true` so nested containers' traffic is filtered by
   default, as the proposal states, instead of leaving a nested Docker daemon as an unfiltered way out. Rejected: one
   boolean per preset (`w3cj`), which turns every new preset into a new option.
-- **POSIX `sh`.** Alpine ships no bash, so `install.sh` and the start-time scripts use `#!/bin/sh` with `set -eu`.
+- **POSIX `sh`.** Alpine ships no bash, so `install.sh` and the start-time scripts use `#!/bin/sh` with `set -eu`, as
+  `.agents/knowledge/shell-style.md` (Choosing bash or POSIX sh) requires of a feature whose compatibility list holds
+  such an image; the library `scripts/common.sh` is POSIX `sh` too. `test.sh` and `duplicate.sh` run on every
+  compatibility image, so they are POSIX `sh` with the stand-in `test/firewall/checks.sh`; the scenario scripts run only
+  on `debian:12` and are bash with `dev-container-features-test-lib` (Decisions of 2026-10-05).
+- **Shell style.** The scripts follow `.agents/knowledge/shell-style.md` (Goals: Scripts follow the shell style guide);
+  this entry holds only what the guide leaves open for this feature.
+  - Files: three executables, because each runs at another time and as another user (`install.sh` at build time,
+    `apply.sh` as the entrypoint, `check.sh` as the unprivileged `postStartCommand`), and one library,
+    `scripts/common.sh`, so the build and every start validate with one copy of the rules (Goals: Validated options,
+    twice). `install.sh` sources it next to itself, `apply.sh` sources the root-owned copy under
+    `/usr/local/share/firewall/`, and `check.sh` sources nothing.
+  - Lists: an option's list is split on commas only. Whitespace around an entry, line breaks included, is ignored, and
+    each entry is matched as a whole, so a line break inside an entry fails it, as the Option requirements'
+    comma-separated lists state. The validator on the branch also splits on line breaks, so it accepts `github` and
+    `npm` on two lines as two presets; `tasks.md` corrects it.
+  - Package managers: each update or install command of apt, apk, and dnf ends in the guide's `|| fail` and keeps its
+    own output, so the build still fails with the package manager's error (Requirement: Supported images), followed by
+    the feature's own line.
+  - Known failure modes handled, each under a comment naming it: a connection error or timeout of the GitHub fetch (one
+    more attempt, Goals: Bounded start) and a `sleep` that takes no fractional seconds. The EXIT trap of `apply.sh` is
+    Requirement: Failure mode applied to any stop of the script, not a recovery from an unknown error.
 
 ### Security review surface
 
@@ -363,6 +424,17 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   configuration; a flaw in it that an answer can exploit could change or flush the rules, which the spec states as a
   guardrail limit (Requirement: Guardrail, not a security boundary).
 - **Keys:** none.
+- **Options:** no option value is executed, sourced, or used as a path, URL, or command name. `defaultAction`,
+  `failureMode`, and `filterForward` are matched against their whole value, and a `presets` entry only selects a fixed
+  set (Requirement: Presets). Every list entry is validated at build and again at start (Goals: Validated options,
+  twice). Option values are written to the root-owned options file, the start record, and the build and container logs;
+  beyond those, only the validator's canonical form of a CIDR entry reaches the nftables ruleset and only that of a
+  domain entry reaches the dnsmasq configuration, the one place where an option value reaches an interpreter other than
+  as an argument (Goals: Option values reach the generated files only in validated form). No option changes the
+  container metadata, a user, a group, or a file mode. Every value that loosens the guardrail is a named option visible
+  in `devcontainer.json`: `defaultAction` `allow`, `failureMode` `warn`, `filterForward` `false`, and broad
+  `allowedDomains` or `allowedCidrs` entries. The start record, readable by every user of the container, holds the
+  option values and the recorded resolvers and no credential.
 - **Metadata:**
 
 | Field                                                         | Value                                                                                            | Justification                                                                            |
@@ -398,18 +470,27 @@ on the runners has none by default), and a failing `postStartCommand` fails the 
 start with a configuration that succeeds and then, as root, re-run the start-time script under the condition to test.
 Planned scenarios, all on `debian:12` (amd64) where the test runs as root: `domains` (`presets` empty, `allowedDomains`
 `githubusercontent.com`), `cidrs` (`presets` empty, `allowedCidrs` `185.199.108.0/22,2606:50c0::/32`, `deniedCidrs`
-`185.199.108.133/32`), `github-npm`, `rerun` (defaults), `fetch-fails` (defaults), `warn` (`failureMode` `warn`), `dind`
-(with docker-in-docker, `presets` `npm`, `allowedCidrs` `185.199.108.0/22`), `dind-no-forward` (with docker-in-docker,
-`filterForward` false, `presets` `npm`), `allow-all` (`defaultAction` `allow`, `deniedCidrs`
-`10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10`), `denied-cidrs`
+`185.199.108.133/32`), `github_npm`, `rerun` (defaults), `fetch_fails` (defaults), `warn` (`failureMode` `warn`), `dind`
+(with docker-in-docker, `presets` `npm`, `allowedCidrs` `185.199.108.0/22`), `dind_no_forward` (with docker-in-docker,
+`filterForward` false, `presets` `npm`), `allow_all` (`defaultAction` `allow`, `deniedCidrs`
+`10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10`), `denied_cidrs`
 (`defaultAction` `allow`, `presets` empty, `allowedCidrs` `185.199.109.133/32,185.199.110.0/24`, `deniedCidrs`
-`185.199.108.0/22,185.199.110.0/24`), `denied-domains` (`defaultAction` `allow`, `presets` empty, `allowedDomains`
+`185.199.108.0/22,185.199.110.0/24`), `denied_domains` (`defaultAction` `allow`, `presets` empty, `allowedDomains`
 `raw.githubusercontent.com`, `deniedDomains` `githubusercontent.com,registry.npmjs.org`, `deniedCidrs`
-`185.199.108.0/22`), and `denied-in-range` (`deniedDomains` `raw.githubusercontent.com`). `rerun` re-runs the script
+`185.199.108.0/22`), and `denied_in_range` (`deniedDomains` `raw.githubusercontent.com`). `rerun` re-runs the script
 once, after stopping dnsmasq, deleting the feature's table, leaving `resolv.conf` naming dnsmasq, adding a table of its
 own, and setting variables named like the options, then runs the check with a `PATH` that shadows its tools and with
-`ENV` and `BASH_ENV` set. `fetch-fails` also re-runs the script after an unprivileged process binds `127.0.0.1:53`. A
+`ENV` and `BASH_ENV` set. `fetch_fails` also re-runs the script after an unprivileged process binds `127.0.0.1:53`. A
 "Validation" entry is a run recorded in the PR's Validation section.
+
+Some checks verify a Goal that no spec scenario states: that `/etc/resolv.conf` names the local resolver after an
+applied start and that the recorded resolvers are the record's (Resolvers recorded once per container), the resolver's
+command line and configuration (dnsmasq runs only from its own configuration), the order of the rules (Chains), the
+60-second bound (Bounded start), the learned sets (Learned addresses in their own sets), and the table still in place
+beside a nested container (One owned table, replaced atomically). Each keeps its place, is labelled in the words of its
+Goal, and is marked in the script by a comment naming that Goal: a deviation from the rule of
+`.agents/knowledge/shell-style.md` (Tests) that a label uses the words of the spec, made because the delta spec states
+behavior and these are invariants of the approach.
 
 | Scenario of the spec                                                                                                                        | Covered by                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -417,7 +498,7 @@ own, and setting variables named like the options, then runs the check with a `P
 | Unsupported distribution                                                                                                                    | Validation: `devcontainer build` on an image of an unsupported distribution                                                                   |
 | Package verification fails                                                                                                                  | Validation: `devcontainer build` from a Dockerfile that removes the image's archive keys                                                      |
 | No repository added                                                                                                                         | Review of `install.sh`; `test.sh` asserts no repository or key file names the feature                                                         |
-| Unknown preset, Malformed CIDR, CIDR that cannot be applied, Malformed denied domain, Malformed denied CIDR                                 | Validation: `devcontainer build` runs (Goals: Validated options, twice)                                                                       |
+| Unknown preset, Malformed CIDR, CIDR that cannot be applied as written, Malformed denied domain, Malformed denied CIDR                      | Validation: `devcontainer build` runs (Goals: Validated options, twice)                                                                       |
 | First start                                                                                                                                 | `test.sh` (record of the current start is `applied`); ordering by review of the entrypoint                                                    |
 | Restart re-applies the same rules                                                                                                           | `rerun`; Validation: `docker restart`, then the check as the remote user                                                                      |
 | Allowed domain is reachable, GitHub preset, Omitted presets                                                                                 | `test.sh` (`github.com`, `api.github.com`)                                                                                                    |
@@ -428,28 +509,28 @@ own, and setting variables named like the options, then runs the check with a `P
 | Address not obtained through the resolver                                                                                                   | `domains` (a literal address of `github.com`)                                                                                                 |
 | IPv4 and IPv6 ranges                                                                                                                        | `cidrs` (IPv4 by connection, IPv6 by ruleset); Validation: IPv6 on an IPv6-enabled Docker network                                             |
 | Denied range inside an allowed range                                                                                                        | `cidrs` (`185.199.108.133` refused, `185.199.109.133` reachable)                                                                              |
-| Presets combine                                                                                                                             | `github-npm`                                                                                                                                  |
+| Presets combine                                                                                                                             | `github_npm`                                                                                                                                  |
 | Ranges loaded                                                                                                                               | `test.sh` (learned sets flushed as root, then a literal `github.com` address)                                                                 |
-| Fetch fails                                                                                                                                 | `fetch-fails` (a table of its own drops traffic to `api.github.com`, script re-run)                                                           |
+| Fetch fails                                                                                                                                 | `fetch_fails` (a table of its own drops traffic to `api.github.com`, script re-run)                                                           |
 | Implausible range                                                                                                                           | `test.sh` (the range validator against fixture responses)                                                                                     |
 | GitHub preset not selected                                                                                                                  | `domains` (the record names no fetch)                                                                                                         |
-| Unlisted traffic already let through                                                                                                        | `allow-all` (the record names no fetch)                                                                                                       |
-| Other DNS server refused                                                                                                                    | `test.sh` and `allow-all` (TCP to `8.8.8.8` port 53 is refused at once)                                                                       |
+| Unlisted traffic already let through                                                                                                        | `allow_all` (the record names no fetch)                                                                                                       |
+| Other DNS server refused                                                                                                                    | `test.sh` and `allow_all` (TCP to `8.8.8.8` port 53 is refused at once)                                                                       |
 | Unlisted name still resolves                                                                                                                | `test.sh` (`registry.npmjs.org` resolves and is refused)                                                                                      |
 | Nested container filtered, Nested container reaches an allowed range, Omitted filterForward                                                 | `dind` (`github.com` refused, `185.199.109.133` reachable)                                                                                    |
-| Forwarded traffic not filtered                                                                                                              | `dind-no-forward`                                                                                                                             |
-| Omitted failureMode, Failed start leaves only the resolvers, Failure reported as an error                                                   | `fetch-fails` (check exits non-zero)                                                                                                          |
+| Forwarded traffic not filtered                                                                                                              | `dind_no_forward`                                                                                                                             |
+| Omitted failureMode, Failed start leaves only the resolvers, Failure reported as an error                                                   | `fetch_fails` (check exits non-zero)                                                                                                          |
 | Failed start removes the rules, Failure reported as a warning                                                                               | `warn`                                                                                                                                        |
-| Unlisted destination let through                                                                                                            | `allow-all` (`registry.npmjs.org`), `denied-cidrs` and `denied-domains` (`github.com`)                                                        |
-| Denied range under open egress                                                                                                              | `denied-cidrs` (`185.199.108.133` refused, `github.com` reachable); `allow-all` asserts the private ranges' rejects in the ruleset            |
-| Allowed address inside a denied range                                                                                                       | `denied-cidrs` (`185.199.109.133` reachable, `185.199.111.133` refused)                                                                       |
-| Same range allowed and denied                                                                                                               | `denied-cidrs` (`185.199.110.133` refused)                                                                                                    |
+| Unlisted destination let through                                                                                                            | `allow_all` (`registry.npmjs.org`), `denied_cidrs` and `denied_domains` (`github.com`)                                                        |
+| Denied range under open egress                                                                                                              | `denied_cidrs` (`185.199.108.133` refused, `github.com` reachable); `allow_all` asserts the private ranges' rejects in the ruleset            |
+| Allowed address inside a denied range                                                                                                       | `denied_cidrs` (`185.199.109.133` reachable, `185.199.111.133` refused)                                                                       |
+| Same range allowed and denied                                                                                                               | `denied_cidrs` (`185.199.110.133` refused)                                                                                                    |
 | Resolvers inside a denied range                                                                                                             | Validation: a container whose `deniedCidrs` contains its recorded resolver                                                                    |
-| Allowed name inside a denied range, Allowed subdomain of a denied domain                                                                    | `denied-domains` (`raw.githubusercontent.com`)                                                                                                |
-| Denied domain refused                                                                                                                       | `denied-domains` (`registry.npmjs.org` resolves and is refused)                                                                               |
-| Denied subdomain of an allowed domain, Denied name inside an allowed range                                                                  | `denied-in-range` (`raw.githubusercontent.com` refused, `github.com` reachable)                                                               |
-| Rules cannot be loaded                                                                                                                      | `fetch-fails` (table deleted, script re-run under `setpriv` without `CAP_NET_ADMIN`)                                                          |
-| Resolver port taken                                                                                                                         | `fetch-fails` (port held by an unprivileged process, script re-run: failed record, closed table, `resolv.conf` naming the recorded resolvers) |
+| Allowed name inside a denied range, Allowed subdomain of a denied domain                                                                    | `denied_domains` (`raw.githubusercontent.com`)                                                                                                |
+| Denied domain refused                                                                                                                       | `denied_domains` (`registry.npmjs.org` resolves and is refused)                                                                               |
+| Denied subdomain of an allowed domain, Denied name inside an allowed range                                                                  | `denied_in_range` (`raw.githubusercontent.com` refused, `github.com` reachable)                                                               |
+| Rules cannot be loaded                                                                                                                      | `fetch_fails` (table deleted, script re-run under `setpriv` without `CAP_NET_ADMIN`)                                                          |
+| Resolver port taken                                                                                                                         | `fetch_fails` (port held by an unprivileged process, script re-run: failed record, closed table, `resolv.conf` naming the recorded resolvers) |
 | Firewall in force                                                                                                                           | `test.sh` (the check as the remote user)                                                                                                      |
 | Stale record                                                                                                                                | `rerun` (record's start time set to an earlier one, check run)                                                                                |
 | Changed environment                                                                                                                         | `rerun` (the check with a shadowing `PATH`, `ENV`, and `BASH_ENV`)                                                                            |
@@ -463,6 +544,52 @@ own, and setting variables named like the options, then runs the check with a `P
 | Root removes the firewall                                                                                                                   | `rerun` (`registry.npmjs.org` reachable after the table is deleted, before the re-run)                                                        |
 | Different options the second time                                                                                                           | `duplicate.sh`                                                                                                                                |
 | Same options twice                                                                                                                          | Validation: `install.sh` run twice with the same options in a plain container of each image                                                   |
+
+### Decisions of 2026-10-05
+
+The maintainer decided these points in conversation on 2026-10-05, when the package was revised for the requirements
+added to the knowledge base after its approval (Context). The answers settle these points and nothing else: the revised
+package returns to the package gate.
+
+- **Option values in the generated ruleset and resolver configuration.** The approach stays and is recorded as the one
+  deliberate deviation from the guide's rule that an option value never reaches a script the feature generates, with the
+  validation bound that makes it safe and a reason comment above each generator (Goals: Option values reach the
+  generated files only in validated form); the implementation does not change and no test is added. Rejected: passing
+  every entry as a command argument, which gives up the single-transaction load.
+- **A failed start in `apply.sh`.** The entrypoint keeps exit status 0 in every case; the failed-start handler gets a
+  name of its own, so no function called `fail` carries other semantics, and the deviation is commented, as the uv
+  restyle did for `repair_volume.sh` (Goals: The entrypoint always exits zero). Rejected: exiting 1 through the guide's
+  `fail` with an EXIT trap.
+- **The re-execution under `env -i`.** It stays as the first lines of `apply.sh` and `check.sh`, a marked deviation from
+  the skeleton's layout (Goals: The check ignores its environment). Rejected: making it the first step of `main`.
+- **Dialect of the tests.** `test.sh` and `duplicate.sh`, which run on Alpine, are POSIX `sh` with
+  `test/firewall/checks.sh`; the twelve scenario scripts, which run only on `debian:12`, are bash with
+  `dev-container-features-test-lib` (Decisions: POSIX `sh`). Rejected: every test script POSIX.
+- **Checks of a Goal that no spec scenario states.** They stay, each labelled in the words of the Goal it checks and
+  marked in the script as a deviation with that reason (Test coverage). Rejected: adding those behaviors to the delta
+  spec; dropping the checks.
+- **Letter case of domain entries.** Requirement: Option allowedDomains and Requirement: Option deniedDomains say that
+  upper and lower case are equivalent; the implementation does not change. Rejected: rejecting upper-case entries;
+  leaving the spec silent.
+- **Acceptance and the shell style guide.** The proposal's Becomes true gains the item that states the check of Goals:
+  Scripts follow the shell style guide, as the restyle proposals carry it. Rejected: leaving that check to this design
+  and the tasks alone.
+- **Coverage table.** It uses the delta spec's scenario name "CIDR that cannot be applied as written". Rejected: leaving
+  the table as it was.
+- **`NOTES.md` and the guardrail limits.** The proposal's Acceptance item names what Requirement: Guardrail, not a
+  security boundary says `NOTES.md` SHALL state, the nested Docker exception, and the metadata the feature adds;
+  `NOTES.md` is trimmed to that and keeps every statement other approved text binds to the documentation. Rejected:
+  keeping the full list of ways around the rules in `NOTES.md`.
+
+## Optional improvements offered, not adopted
+
+The audit of 2026-10-05 offered this with the decision on option values in the generated files; the maintainer did not
+adopt it (Decisions of 2026-10-05), and it stays out of this change.
+
+- **A check in `test.sh` that runs the validator against values with quotes, braces, semicolons, and line breaks.** Pro:
+  the bound on the two generated files would have a test of its own. Con: one more check of an invariant no spec
+  scenario states, for a bound that the review of the validator covers and that the existing checks of malformed entries
+  already exercise.
 
 ## URL inventory
 
@@ -547,7 +674,7 @@ hosts the tests connect to (Goals: Test destinations). Verified column: a read-o
   address, since a learned address is more specific than any range] → `NOTES.md` recommends `allowedCidrs`, not
   `allowedDomains`, for openings into a denied range.
 - [dnsmasq's longest match between `--nftset` entries is in its code, not its manual] → Context records the code read;
-  the `denied-domains` and `denied-in-range` scenarios check it on the packaged dnsmasq.
+  the `denied_domains` and `denied_in_range` scenarios check it on the packaged dnsmasq.
 
 ## Open Questions
 
@@ -581,3 +708,55 @@ answer changes the named part before approval.
    exception was taken for allowed domains, which fail closed; the same cause makes `deniedDomains` fail open for nested
    containers (Context), which was found afterwards. Alternative: treat nested lookups in the feature, which that
    decision set aside as complex.
+
+Questions 9 to 13 were raised on 2026-10-05, by requirements the knowledge base gained after the questions above were
+answered (Context). Each names the rule that raises it. No text of the proposal or the delta spec depends on them; the
+first answer of each is what sections 5 and 6 of `tasks.md` are written to.
+
+9. **What `check` in `checks.sh` does after a failed check.** `.agents/knowledge/shell-style.md` (Choosing bash or POSIX
+   sh) asks a POSIX test for a stand-in "with the same `check` / `reportResults` interface" and leaves the status of a
+   failed check open. As written: `check` records the failure and returns 1, as the stand-in on the branch and the CLI's
+   library do, so under `set -e` a POSIX test and a bash scenario both stop at their first failed check; the uv restyle
+   chose this for a feature with tests in both dialects. Alternative: record the failure and go on, as
+   `test/glab/checks.sh` and the stand-in that `just new-feature --posix` generates do, which changes
+   `test/firewall/checks.sh` (tasks 6.1) and gives `test.sh` and `duplicate.sh` other semantics than the scenario
+   scripts. Recommended: as written.
+10. **Where the assertions both dialects use live.** `.agents/knowledge/testing.md` (Layout) names `test/<id>/checks.sh`
+    as the file a POSIX test sources, and `.agents/knowledge/shell-style.md` (Tests) lets a shared helper file hold only
+    assertions several scripts use; neither says what a bash scenario sources beside the CLI's library. As written: one
+    POSIX file, `test/firewall/checks.sh`, holds the stand-in and the shared assertions with the helpers they call.
+    `test.sh` and `duplicate.sh` source it alone, the scenario scripts source it after the library, and it defines
+    `check` and `reportResults` only when the library has not, under a comment giving that reason: the file on the
+    branch, renamed and reduced to assertions. Alternatives: the stand-in alone in `checks.sh` and the shared assertions
+    in a second POSIX file every test sources, which adds a file and a source line to `test.sh` and `duplicate.sh`; or
+    no shared file for the scenario scripts, each repeating the assertions it uses as the uv restyle did, which repeats
+    about fifteen short functions across twelve scripts. Either changes tasks 6.1 to 6.3 and 6.5 and nothing under
+    `src/firewall/`. Recommended: as written.
+11. **`/var/lib/apt/lists` as a named constant.** `.agents/knowledge/shell-style.md` (Options are data) asks for a
+    readonly constant for "every path the feature creates or modifies outside a temporary directory", and `install.sh`
+    empties that directory after `apt-get install`. As written: `install.sh` names it, the rule read literally, as the
+    glab and hf-cli restyles did. Alternative: leave it unnamed as a path the package manager owns, as the uv restyle
+    did, which changes tasks 5.1 only. Recommended: as written.
+12. **Log lines for start-time steps that neither change the image nor use the network.**
+    `.agents/knowledge/shell-style.md` (Logging and failure) asks for one line "for every step that changes the image or
+    uses the network". At a start nothing changes the image, and only the lookup of `api.github.com` and the fetch use
+    the network. As written: `apply.sh` logs one line for the lookup and one for the fetch, each naming its source,
+    beside what it logs on the branch (a retry, a failed start, the result); the table loads, the rewrites of
+    `/etc/resolv.conf`, and the resolver's start get no line of their own, the reading on which the uv restyle left its
+    repair of a runtime volume without one. Alternative: one line for each of those steps too, which changes tasks 5.3
+    and adds up to six lines to the container log of every start. Recommended: as written.
+13. **Checks that assert a test's premise.** `.agents/knowledge/shell-style.md` (Tests) says a check's label states one
+    behavior in the words of the spec. `duplicate.sh` checks that "the first install used other options", and the
+    `rerun` scenario checks, before its re-run, that "resolv.conf still names the stopped resolver" and that "a table of
+    the test's own exists"; none of the three is a behavior of the feature. As written: all three stay checks, as they
+    are on the branch, each labelled as the premise it asserts and marked in the script as a deviation with that reason,
+    as the checks of a Goal are (Decisions of 2026-10-05), and `duplicate.sh` compares the harness's values with
+    literals. Alternative: preconditions that stop the script with a message and are no longer checks, which changes
+    tasks 6.3 and 6.5, removes three check lines, and takes the premise checks out of the deviations that Goals: Scripts
+    follow the shell style guide lists. The glab restyle decided this for its `duplicate.sh` and rejected keeping such
+    checks under labels the spec does not state, and on 2026-10-05 the maintainer chose the precondition for the same
+    point in the changes `add-hf-mount-feature` and `add-openspec-feature`; that answer was not given for this change,
+    so it is not written in. With `check` returning 1 (question 9), a failed premise stops the script under either
+    answer. Recommended: the alternative, so that the three changes treat a test's premise alike. Setup steps the branch
+    wraps in `check` (holding the resolver's port, importing the nested image) assert nothing and become plain commands
+    under the same rule; this question is about the three assertions only.

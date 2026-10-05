@@ -75,8 +75,11 @@ None.
 - The root `README.md`'s "Features" section has one row for `firewall`, linking to `src/firewall/` with a one-sentence
   description, and no longer says "No features have been published yet."; this row is written by hand, unlike the
   generated `src/firewall/README.md`.
-- `NOTES.md` states the guardrail limits named in Requirement: Guardrail, not a security boundary, the nested Docker
+- `NOTES.md` states what Requirement: Guardrail, not a security boundary says `NOTES.md` SHALL state, the nested Docker
   exception named in Requirement: Forwarded traffic, and the metadata the feature adds.
+- `shellcheck -o require-variable-braces,require-double-brackets` reports nothing on any `*.sh` under `src/firewall/` or
+  `test/firewall/`, and a review of those scripts against `.agents/knowledge/shell-style.md` finds no unmarked
+  deviation; every deliberate one carries a comment giving its reason.
 
 **Stays true:**
 
