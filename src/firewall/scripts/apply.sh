@@ -1,502 +1,616 @@
 #!/bin/sh
-# Start-time firewall of the firewall feature. The feature's entrypoint runs it as root at every
-# container start, before the container's command; it replaces everything an earlier run applied.
-# It reads only root-owned inputs: the options install.sh stored in /usr/local/share/firewall/options,
-# /etc/resolv.conf, its state directory /var/lib/firewall, and the GitHub meta response. Order: the
-# closed table (loopback, ICMPv6 neighbour discovery, DNS to the recorded resolvers), then, with the
-# github preset and defaultAction deny, the closed table plus api.github.com on TCP 443 and the fetch
-# of the GitHub ranges, then the full table in one transaction, then dnsmasq, then /etc/resolv.conf
-# naming dnsmasq. The result goes to the start record /run/firewall/status, which check.sh reports;
-# the script itself always exits zero, so it never stops the container's command.
-# POSIX sh: Alpine ships no bash.
+# Applies the firewall of the firewall feature: the feature's entrypoint, run as root at every container start,
+# before the container's command. It replaces everything an earlier run applied, and reads only root-owned inputs:
+# the options install.sh stored in /usr/local/share/firewall/options, /etc/resolv.conf, its own state in
+# /var/lib/firewall, and the response of https://api.github.com/meta. In order: the closed table (loopback, replies,
+# IPv6 neighbour discovery, DNS to the recorded resolvers); with the github preset and defaultAction deny, the closed
+# table plus api.github.com on TCP 443, and the fetch of GitHub's ranges; the full table, in one transaction;
+# dnsmasq; /etc/resolv.conf naming dnsmasq. The result goes to the start record /run/firewall/status, which check.sh
+# reports. It takes no option from its environment or its arguments.
+# POSIX sh, because Alpine images ship no bash.
 
-# Ignore the inherited environment: a fixed PATH, nothing else.
-if [ "${1-}" != --clean ]; then
-  exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /bin/sh /usr/local/share/firewall/apply.sh --clean
+# Deviation from the layout of shell-style.md (Skeletons), which the feature's design records under Goals, "The check
+# ignores its environment": the script first runs itself again with PATH as its whole environment, before `set -eu`,
+# the constants, and the functions, so that none of its lines, the sourcing of common.sh included, runs under the
+# environment it inherits.
+if [ "${1-}" != "--clean" ]; then
+  exec /usr/bin/env --ignore-environment PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+    /bin/sh /usr/local/share/firewall/apply.sh --clean
 fi
 set -eu
+# Every file this script writes is readable by every user and writable by root alone.
 umask 022
 
-SHARE=/usr/local/share/firewall
-RUN=/run/firewall
-STATE=/var/lib/firewall
-PROBE=192.0.2.1
-META_HOST=api.github.com
-META_URL=https://api.github.com/meta
-META_MAX_BYTES=2097152
+readonly SHARE_DIR="/usr/local/share/firewall"
+readonly OPTIONS_FILE="${SHARE_DIR}/options"
+readonly RUN_DIR="/run/firewall"
+readonly RECORD_FILE="${RUN_DIR}/status"
+readonly RECORD_TMP_FILE="${RUN_DIR}/status.tmp"
+readonly RULES_FILE="${RUN_DIR}/rules.nft"
+readonly DNSMASQ_CONF_FILE="${RUN_DIR}/dnsmasq.conf"
+readonly DNSMASQ_PID_FILE="${RUN_DIR}/dnsmasq.pid"
+readonly DNSMASQ_ERROR_FILE="${RUN_DIR}/dnsmasq.err"
+readonly META_FILE="${RUN_DIR}/meta.json"
+readonly META_HEADERS_FILE="${RUN_DIR}/meta.headers"
+readonly STATE_DIR="/var/lib/firewall"
+readonly RESOLVERS_FILE="${STATE_DIR}/resolvers"
+readonly RESOLV_CONF="/etc/resolv.conf"
+# The feature's own nftables table; no other table is read or changed.
+readonly TABLE_FAMILY="inet"
+readonly TABLE_NAME="firewall"
+# Where dnsmasq listens. common.sh defines PROBE_ADDRESS (192.0.2.1), which the rules always refuse.
+readonly LOCAL_RESOLVER="127.0.0.1"
+readonly META_HOST="api.github.com"
+readonly META_URL="https://api.github.com/meta"
+readonly META_MAX_BYTES=2097152
 
+# The options, which read_options of common.sh sets from OPTIONS_FILE; none is taken from the environment.
+DEFAULTACTION=""
+PRESETS=""
+ALLOWEDDOMAINS=""
+ALLOWEDCIDRS=""
+DENIEDDOMAINS=""
+DENIEDCIDRS=""
+FAILUREMODE=""
+FILTERFORWARD=""
+
+# What read_options and validate_options of common.sh set: why a value was rejected, and the validated lists.
+reason=""
+preset_list=""
+preset_domain_list=""
+allowed_domain_list=""
+allowed_cidr_lines=""
+denied_domain_list=""
+denied_cidr_lines=""
+# What the script was doing, for the record of a start that stops unexpectedly.
+step="starting"
+# The start time of the container's PID 1, which tells the record of this start from that of an earlier one.
+start_time=""
+# The first failure found before the closed table is loaded; the start ends with it once that table is in place.
+deferred_failure=""
+# The recorded resolvers, space-separated, and their IPv4 and IPv6 addresses as the bodies of nft sets.
+resolvers=""
+resolvers4=""
+resolvers6=""
+# The addresses one lookup of META_HOST returned: as the bodies of nft sets, and as curl's --resolve list.
+meta_addresses4=""
+meta_addresses6=""
+meta_resolve=""
+# The validated ranges of GitHub's meta response (cidr_lines lines), and what the record says about them.
+github_cidr_lines=""
+github_ranges="not fetched"
+# Why load_table could not load a ruleset; empty after a load.
+load_error=""
+
+# The feature's library: the option rules this script shares with install.sh, which installed it beside this script.
+# Its path exists only inside the image, so shellcheck cannot follow it.
 # shellcheck source=/dev/null
-. "$SHARE/common.sh"
+. "${SHARE_DIR}/common.sh"
 
 log() {
-  printf 'firewall: %s\n' "$*" >&2
+  printf 'firewall: %s\n' "$*"
 }
 
-# nap: a short wait for the polling loops.
+# Waits a fifth of a second. Known failure mode: a sleep that takes no fractional seconds fails, and a full second
+# is waited instead.
 nap() {
   sleep 0.2 2>/dev/null || sleep 1
 }
 
-# pid1_start: the start time of the container's PID 1 (field 22 of /proc/1/stat), which tells the
-# current start from an earlier one; check.sh reads it the same way.
-pid1_start() {
-  IFS= read -r fw_stat </proc/1/stat || return 1
-  set -f
-  # shellcheck disable=SC2086 # split the fields after the command name
-  set -- ${fw_stat##*) }
-  set +f
-  [ $# -ge 20 ] || return 1
-  shift 19
-  printf '%s\n' "$1"
-}
-
-# proc_alive PID: the process exists and is not a zombie.
+# Whether the process with the ID $1 exists and is not a zombie. An image without an init process leaves a stopped
+# dnsmasq as a zombie, which holds no port.
 proc_alive() {
-  [ -r "/proc/$1/stat" ] || return 1
-  IFS= read -r fw_pstat <"/proc/$1/stat" || return 1
-  set -f
-  # shellcheck disable=SC2086
-  set -- ${fw_pstat##*) }
-  set +f
-  [ "${1-}" != Z ]
+  if [ ! -r "/proc/$1/stat" ]; then return 1; fi
+  if ! IFS= read -r proc_alive_stat <"/proc/$1/stat"; then return 1; fi
+  # The state is the first field after the command name, which stands in parentheses and may hold spaces.
+  case "${proc_alive_stat##*) }" in
+    Z*) return 1 ;;
+  esac
 }
 
-# record RESULT REASON: writes the start record atomically, readable by every user.
-record() {
-  fw_tmp="$RUN/status.tmp"
-  {
-    printf 'result=%s\n' "$1"
-    printf 'reason=%s\n' "$(printf '%s' "$2" | tr '\n\t' '  ')"
-    printf 'time=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf 'start=%s\n' "$START"
-    printf 'defaultAction=%s\n' "$OPT_DEFAULT_ACTION"
-    printf 'presets=%s\n' "$OPT_PRESETS"
-    printf 'allowedDomains=%s\n' "$OPT_ALLOWED_DOMAINS"
-    printf 'allowedCidrs=%s\n' "$OPT_ALLOWED_CIDRS"
-    printf 'deniedDomains=%s\n' "$OPT_DENIED_DOMAINS"
-    printf 'deniedCidrs=%s\n' "$OPT_DENIED_CIDRS"
-    printf 'failureMode=%s\n' "$OPT_FAILURE_MODE"
-    printf 'filterForward=%s\n' "$OPT_FILTER_FORWARD"
-    printf 'githubRanges=%s\n' "$GITHUB_RANGES"
-    printf 'resolvers=%s\n' "$RESOLVERS"
-  } >"$fw_tmp"
-  chmod 0644 "$fw_tmp"
-  mv -f "$fw_tmp" "$RUN/status"
-  RECORDED=1
+# Prints the addresses of family $1 (4 or 6) among the cidr_lines lines $2 as the body of an nft set: "a, b".
+set_body() {
+  awk -v family="$1" '$1 == family { sub(/\/[0-9]+$/, "", $3); printf "%s%s", separator, $3; separator = ", " }' <<EOF
+$2
+EOF
 }
 
-# stop_dnsmasq: stops the dnsmasq an earlier run of this script started, if it still runs.
-stop_dnsmasq() {
-  [ -r "$RUN/dnsmasq.pid" ] || return 0
-  fw_pid=
-  IFS= read -r fw_pid <"$RUN/dnsmasq.pid" || true
-  rm -f "$RUN/dnsmasq.pid"
-  case $fw_pid in '' | *[!0-9]*) return 0 ;; esac
-  proc_alive "$fw_pid" || return 0
-  fw_comm=
-  IFS= read -r fw_comm <"/proc/$fw_pid/comm" || return 0
-  [ "$fw_comm" = dnsmasq ] || return 0
-  kill "$fw_pid" 2>/dev/null || return 0
-  fw_i=0
-  while proc_alive "$fw_pid" && [ $fw_i -lt 25 ]; do
-    nap
-    fw_i=$((fw_i + 1))
-  done
-  if proc_alive "$fw_pid"; then kill -9 "$fw_pid" 2>/dev/null || true; fi
+# Writes the start record: the result $1 (applied, failed, or not-applied), its reason $2, the time, the start it
+# belongs to, the options in effect, the fetched ranges, and the recorded resolvers. The record replaces the earlier
+# one in one step, since check.sh may read it at any time.
+write_record() {
+  write_record_time="$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
+  cat >"${RECORD_TMP_FILE}" <<EOF || return
+result=$1
+reason=${2%%"${NL}"*}
+time=${write_record_time}
+start=${start_time}
+defaultAction=${DEFAULTACTION}
+presets=${PRESETS}
+allowedDomains=${ALLOWEDDOMAINS}
+allowedCidrs=${ALLOWEDCIDRS}
+deniedDomains=${DENIEDDOMAINS}
+deniedCidrs=${DENIEDCIDRS}
+failureMode=${FAILUREMODE}
+filterForward=${FILTERFORWARD}
+githubRanges=${github_ranges}
+resolvers=${resolvers}
+EOF
+  mv --force "${RECORD_TMP_FILE}" "${RECORD_FILE}"
 }
 
-# nameservers: the nameserver addresses of /etc/resolv.conf, space-separated, in order.
-nameservers() {
-  awk '$1 == "nameserver" && NF >= 2 { printf "%s%s", sep, $2; sep = " " } END { print "" }' /etc/resolv.conf
-}
-
-# write_nameservers ADDRESSES: replaces the nameserver lines of /etc/resolv.conf with ADDRESSES and
-# keeps every other line. The file is rewritten in place: Docker bind-mounts it.
+# Replaces the nameserver lines of /etc/resolv.conf with the space-separated addresses $1 and keeps every other
+# line. The file is rewritten in place, because Docker bind-mounts it, and only once its new text is complete.
 write_nameservers() {
-  fw_tmp="$RUN/resolv.conf.tmp"
-  awk -v ns="$1" '
-    function emit(  i, n) {
-      if (!done) { n = split(ns, addrs, " "); for (i = 1; i <= n; i++) print "nameserver " addrs[i] }
-      done = 1
-    }
-    $1 == "nameserver" { emit(); next }
-    { print }
-    END { emit() }' /etc/resolv.conf >"$fw_tmp" || return 1
-  cat "$fw_tmp" >/etc/resolv.conf || return 1
-  rm -f "$fw_tmp"
-}
-
-# addresses FAMILY LINES: the single addresses of family 4 or 6 among fw_check_cidrs LINES, as an
-# nft set body ("a, b").
-addresses() {
-  printf '%s\n' "$2" | awk -v f="$1" '$1 == f { sub(/\/[0-9]+$/, "", $3); print $3 }' | fw_join | sed 's/,/, /g'
-}
-
-# setup_resolvers: sets RESOLVERS, RES4, and RES6 from the recorded resolvers, recording the
-# nameservers of /etc/resolv.conf first when none are recorded or Docker has regenerated the file.
-setup_resolvers() {
-  fw_current=$(nameservers) || fw_current=
-  fw_recorded=
-  if [ -r "$STATE/resolvers" ]; then IFS= read -r fw_recorded <"$STATE/resolvers" || true; fi
-  if [ -n "$fw_recorded" ] && { [ "$fw_current" = 127.0.0.1 ] || [ "$fw_current" = "$fw_recorded" ]; }; then
-    fw_resolvers=$fw_recorded
-  else
-    fw_resolvers=$fw_current
-    if [ -z "$fw_resolvers" ]; then
-      FW_ERROR="/etc/resolv.conf names no nameserver"
-      return 1
-    fi
-    case " $fw_resolvers " in
-      *" 127.0.0.1 "*)
-        FW_ERROR="/etc/resolv.conf names 127.0.0.1, where the feature's resolver listens, and no resolvers are recorded"
-        return 1
-        ;;
-    esac
-  fi
-  case $fw_resolvers in
-    */*)
-      FW_ERROR="the nameservers \"$fw_resolvers\" are not addresses"
-      return 1
-      ;;
-  esac
-  # shellcheck disable=SC2086 # one address per line
-  if ! fw_checked FW_RESOLVER_LINES "$(printf '%s,' $fw_resolvers)" fw_check_cidrs denied nameserver; then
-    return 1
-  fi
-  if [ "$fw_resolvers" != "$fw_recorded" ]; then
-    printf '%s\n' "$fw_resolvers" >"$STATE/resolvers.tmp"
-    chmod 0644 "$STATE/resolvers.tmp"
-    mv -f "$STATE/resolvers.tmp" "$STATE/resolvers"
-  fi
-  RESOLVERS=$fw_resolvers
-  RES4=$(addresses 4 "$FW_RESOLVER_LINES")
-  RES6=$(addresses 6 "$FW_RESOLVER_LINES")
-}
-
-# prefix_rules: one rule pair per prefix length, longest first, from "<allow|deny> <family> <length>
-# <cidr>" lines: the denied entries' refusal before the allowed entries' acceptance, so the longest
-# match decides and a tie refuses. The learned sets hold single addresses and join the /32 and /128 pairs.
-prefix_rules() {
-  awk '
-    NF == 4 {
-      k = $2 " " $3
-      if ($1 == "deny") { if (k in d) d[k] = d[k] ", " $4; else d[k] = $4 }
-      else if (k in a) a[k] = a[k] ", " $4
-      else a[k] = $4
-    }
-    END {
-      for (f = 4; f <= 6; f += 2) {
-        kw = (f == 4) ? "ip" : "ip6"
-        max = (f == 4) ? 32 : 128
-        for (len = max; len >= 0; len--) {
-          k = f " " len
-          if (k in d) printf "\t\t%s daddr { %s } goto refuse\n", kw, d[k]
-          if (len == max) printf "\t\t%s daddr @denied_learned%d goto refuse\n", kw, f
-          if (k in a) printf "\t\t%s daddr { %s } accept\n", kw, a[k]
-          if (len == max) printf "\t\t%s daddr @allowed_learned%d accept\n", kw, f
-        }
+  write_nameservers_text="$(
+    awk -v servers="$1" '
+      function emit(   i, n) {
+        if (!emitted) { n = split(servers, addresses, " "); for (i = 1; i <= n; i++) print "nameserver " addresses[i] }
+        emitted = 1
       }
-    }'
+      $1 == "nameserver" { emit(); next }
+      { print }
+      END { emit() }' "${RESOLV_CONF}"
+  )" || return
+  printf '%s\n' "${write_nameservers_text}" >"${RESOLV_CONF}"
 }
 
-# chain_rules MODE: the rules shared by the output and forward chains. MODE is closed (loopback,
-# replies, ICMPv6 neighbour discovery, DNS to the recorded resolvers), pinned (closed plus
-# api.github.com on TCP 443), or full (the configured rules).
-chain_rules() {
-  printf '\t\tct state established,related accept\n'
-  printf '\t\ticmpv6 type { nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert }'
-  printf ' ip6 hoplimit 255 accept\n'
-  printf '\t\ticmpv6 type mld2-listener-report ip6 hoplimit 1 accept\n'
-  if [ -n "$RES4" ]; then printf '\t\tip daddr { %s } meta l4proto { tcp, udp } th dport 53 accept\n' "$RES4"; fi
-  if [ -n "$RES6" ]; then printf '\t\tip6 daddr { %s } meta l4proto { tcp, udp } th dport 53 accept\n' "$RES6"; fi
-  printf '\t\tmeta l4proto { tcp, udp } th dport 53 goto refuse\n'
-  case $1 in
-    pinned)
-      if [ -n "$PIN4" ]; then printf '\t\tip daddr { %s } tcp dport 443 accept\n' "$PIN4"; fi
-      if [ -n "$PIN6" ]; then printf '\t\tip6 daddr { %s } tcp dport 443 accept\n' "$PIN6"; fi
-      ;;
-    full)
-      printf '\t\toifname "docker0" accept\n'
-      printf '\t\toifname "br-*" accept\n'
-      printf '\t\tip daddr %s goto refuse\n' "$PROBE"
-      printf '%s\n' "$ENTRIES" | prefix_rules
-      if [ "$OPT_DEFAULT_ACTION" = allow ]; then
-        printf '\t\taccept\n'
-        return 0
-      fi
-      ;;
-  esac
-  printf '\t\tgoto refuse\n'
-}
-
-# ruleset MODE: the nft script that replaces the feature's table in one transaction.
+# Prints the nft script that replaces the feature's table in one transaction, for the mode $1: closed (loopback,
+# replies, IPv6 neighbour discovery, DNS to the recorded resolvers), pinned (closed plus the looked-up addresses of
+# META_HOST on TCP 443), or full (the configured rules).
+# Deviation from shell-style.md (Options are data), which the feature's design records under Goals, "Option values
+# reach the generated files only in validated form": this script is generated from option values, because only a
+# file loads the whole table in one transaction. Of an option, only CIDRs reach it, each as cidr_lines printed it
+# again from the numbers it parsed, which cannot carry an nft statement; the other options select fixed text.
 ruleset() {
-  printf 'table inet firewall\ndelete table inet firewall\ntable inet firewall {\n'
-  if [ "$1" = full ]; then
-    for fw_set in allowed_learned4 denied_learned4; do printf '\tset %s {\n\t\ttype ipv4_addr\n\t}\n' "$fw_set"; done
-    for fw_set in allowed_learned6 denied_learned6; do printf '\tset %s {\n\t\ttype ipv6_addr\n\t}\n' "$fw_set"; done
+  ruleset_ranges=""
+  if [ "$1" = "full" ]; then
+    ruleset_allowed="$(
+      sort -u <<EOF
+${allowed_cidr_lines}
+${github_cidr_lines}
+EOF
+    )"
+    # One rule pair per prefix length, longest first: the refusal of that length's denied entries before the
+    # acceptance of its allowed ones, so the longest match decides and a tie refuses. The learned sets hold single
+    # addresses and join the /32 and /128 pairs.
+    ruleset_ranges="$(
+      awk '
+        $0 == "denied" { denied = 1; next }
+        NF == 3 {
+          key = $1 " " $2
+          if (denied) { if (key in refuse) refuse[key] = refuse[key] ", " $3; else refuse[key] = $3 }
+          else if (key in accept) accept[key] = accept[key] ", " $3
+          else accept[key] = $3
+        }
+        END {
+          for (family = 4; family <= 6; family += 2) {
+            match_word = (family == 4) ? "ip" : "ip6"
+            longest = (family == 4) ? 32 : 128
+            for (len = longest; len >= 0; len--) {
+              key = family " " len
+              if (key in refuse) printf "\t\t%s daddr { %s } goto refuse\n", match_word, refuse[key]
+              if (len == longest) printf "\t\t%s daddr @denied_learned%d goto refuse\n", match_word, family
+              if (key in accept) printf "\t\t%s daddr { %s } accept\n", match_word, accept[key]
+              if (len == longest) printf "\t\t%s daddr @allowed_learned%d accept\n", match_word, family
+            }
+          }
+        }' <<EOF
+${ruleset_allowed}
+denied
+${denied_cidr_lines}
+EOF
+    )"
+  fi
+
+  printf 'table %s %s\ndelete table %s %s\n' "${TABLE_FAMILY}" "${TABLE_NAME}" "${TABLE_FAMILY}" "${TABLE_NAME}"
+  printf 'table %s %s {\n' "${TABLE_FAMILY}" "${TABLE_NAME}"
+  if [ "$1" = "full" ]; then
+    printf '\tset %s {\n\t\ttype ipv4_addr\n\t}\n' allowed_learned4 denied_learned4
+    printf '\tset %s {\n\t\ttype ipv6_addr\n\t}\n' allowed_learned6 denied_learned6
   fi
   printf '\tchain refuse {\n'
   printf '\t\tmeta l4proto tcp reject with tcp reset\n'
   printf '\t\treject with icmpx type admin-prohibited\n'
   printf '\t}\n'
-  printf '\tchain output {\n'
-  printf '\t\ttype filter hook output priority filter; policy drop;\n'
-  printf '\t\toifname "lo" accept\n'
-  chain_rules "$1"
-  printf '\t}\n'
-  if [ "$OPT_FILTER_FORWARD" != false ]; then
-    printf '\tchain forward {\n'
-    printf '\t\ttype filter hook forward priority filter; policy drop;\n'
-    chain_rules "$1"
+  ruleset_hooks="output"
+  if [ "${FILTERFORWARD}" != "false" ]; then ruleset_hooks="output forward"; fi
+  for ruleset_hook in ${ruleset_hooks}; do
+    printf '\tchain %s {\n' "${ruleset_hook}"
+    printf '\t\ttype filter hook %s priority filter; policy drop;\n' "${ruleset_hook}"
+    # Traffic through lo includes Docker's redirection of queries to its embedded resolver, 127.0.0.11.
+    if [ "${ruleset_hook}" = "output" ]; then printf '\t\toifname "lo" accept\n'; fi
+    printf '\t\tct state established,related accept\n'
+    printf '\t\ticmpv6 type { nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert }'
+    printf ' ip6 hoplimit 255 accept\n'
+    printf '\t\ticmpv6 type mld2-listener-report ip6 hoplimit 1 accept\n'
+    if [ -n "${resolvers4}" ]; then
+      printf '\t\tip daddr { %s } meta l4proto { tcp, udp } th dport 53 accept\n' "${resolvers4}"
+    fi
+    if [ -n "${resolvers6}" ]; then
+      printf '\t\tip6 daddr { %s } meta l4proto { tcp, udp } th dport 53 accept\n' "${resolvers6}"
+    fi
+    printf '\t\tmeta l4proto { tcp, udp } th dport 53 goto refuse\n'
+    ruleset_last="goto refuse"
+    case "$1" in
+      pinned)
+        if [ -n "${meta_addresses4}" ]; then
+          printf '\t\tip daddr { %s } tcp dport 443 accept\n' "${meta_addresses4}"
+        fi
+        if [ -n "${meta_addresses6}" ]; then
+          printf '\t\tip6 daddr { %s } tcp dport 443 accept\n' "${meta_addresses6}"
+        fi
+        ;;
+      full)
+        printf '\t\toifname "docker0" accept\n'
+        printf '\t\toifname "br-*" accept\n'
+        printf '\t\tip daddr %s goto refuse\n' "${PROBE_ADDRESS}"
+        printf '%s\n' "${ruleset_ranges}"
+        if [ "${DEFAULTACTION}" = "allow" ]; then ruleset_last="accept"; fi
+        ;;
+    esac
+    printf '\t\t%s\n' "${ruleset_last}"
     printf '\t}\n'
-  fi
+  done
   printf '}\n'
 }
 
-# load MODE: loads the ruleset of MODE; on failure sets FW_ERROR.
-load() {
-  ruleset "$1" >"$RUN/rules.nft"
-  if ! fw_err=$(nft -f "$RUN/rules.nft" 2>&1); then
-    FW_ERROR="loading the $1 rules failed: $(printf '%s\n' "$fw_err" | sed '/^$/d' | head -n 1)"
-    return 1
-  fi
+# Prints the only configuration dnsmasq reads: the recorded resolvers as its upstream servers, 127.0.0.1 as its only
+# address, the user dnsmasq with the group $1, and one nftset line per domain that names the learned sets of that
+# domain's verdict. A domain both allowed and denied gets the denied line alone.
+# Deviation from shell-style.md (Options are data), which the feature's design records under Goals, "Option values
+# reach the generated files only in validated form": this file is generated from option values, because dnsmasq
+# takes its domains from a configuration file. Of an option, only domains reach it, each in lower case and after
+# every label matched domain_names, which cannot carry a dnsmasq directive; presets select fixed names.
+dnsmasq_conf() {
+  printf '# Written by %s/apply.sh at every start; dnsmasq reads no other configuration.\n' "${SHARE_DIR}"
+  printf '%s\n' no-resolv no-hosts "listen-address=${LOCAL_RESOLVER}" bind-interfaces user=dnsmasq "group=$1" \
+    "pid-file=${DNSMASQ_PID_FILE}"
+  for dnsmasq_conf_resolver in ${resolvers}; do
+    printf 'server=%s\n' "${dnsmasq_conf_resolver}"
+  done
+  dnsmasq_conf_sets="#${TABLE_FAMILY}#${TABLE_NAME}#"
+  dnsmasq_conf_allowed="$(
+    sort -u <<EOF
+${preset_domain_list}
+${allowed_domain_list}
+EOF
+  )"
+  for dnsmasq_conf_domain in ${dnsmasq_conf_allowed}; do
+    case "${NL}${denied_domain_list}${NL}" in
+      *"${NL}${dnsmasq_conf_domain}${NL}"*) continue ;;
+    esac
+    printf 'nftset=/%s/4%sallowed_learned4,6%sallowed_learned6\n' "${dnsmasq_conf_domain}" "${dnsmasq_conf_sets}" \
+      "${dnsmasq_conf_sets}"
+  done
+  for dnsmasq_conf_domain in ${denied_domain_list}; do
+    printf 'nftset=/%s/4%sdenied_learned4,6%sdenied_learned6\n' "${dnsmasq_conf_domain}" "${dnsmasq_conf_sets}" \
+      "${dnsmasq_conf_sets}"
+  done
 }
 
-# lookup_meta_host: one lookup of api.github.com through the recorded resolvers, bounded at 5
-# seconds; sets PIN4, PIN6 (for the pinned table) and PIN_RESOLVE (for curl --resolve).
-lookup_meta_host() {
-  fw_addrs=$(timeout 5 getent ahosts "$META_HOST" 2>/dev/null | awk '{ print $1 }' | sort -u) || fw_addrs=
-  if [ -z "$fw_addrs" ]; then
-    FW_ERROR="the lookup of $META_HOST returned no address within 5 seconds"
-    return 1
-  fi
-  fw_checked FW_PIN_LINES "$(printf '%s\n' "$fw_addrs" | fw_join)" fw_check_cidrs address "address of $META_HOST" \
-    || return 1
-  PIN4=$(addresses 4 "$FW_PIN_LINES")
-  PIN6=$(addresses 6 "$FW_PIN_LINES")
-  PIN_RESOLVE=$(printf '%s\n' "$FW_PIN_LINES" | awk '
-    $1 == 4 { sub(/\/32$/, "", $3); print $3 }
-    $1 == 6 { sub(/\/128$/, "", $3); print "[" $3 "]" }' | fw_join)
+# Ends a start at which no rule can be loaded at all, for the reason $1: without NET_ADMIN or without nftables in
+# the kernel, outbound traffic stays unrestricted under both failure modes. Records the start as not applied.
+end_not_applied() {
+  trap - EXIT
+  # From here on, a failing command no longer stops the script: the record is attempted and the status stays 0.
+  set +e
+  log "$1; outbound traffic is unrestricted"
+  write_record not-applied "$1"
+  exit 0
 }
 
-# fetch_meta: fetches the GitHub ranges over HTTPS, pinned to the looked-up addresses, at most 20
-# seconds and 2 MiB per attempt, retried once only after a connection error or a timeout; sets
-# GITHUB_LINES and GITHUB_RANGES, or FW_ERROR.
-fetch_meta() {
-  fw_try=1
-  while :; do
-    rm -f "$RUN/meta.json" "$RUN/meta.headers" "$RUN/meta.err" "$RUN/meta.rc"
-    {
-      fw_rc=0
-      curl -q -sS --proto =https --max-time 20 --max-filesize "$META_MAX_BYTES" \
-        --resolve "$META_HOST:443:$PIN_RESOLVE" -D "$RUN/meta.headers" -o - "$META_URL" 2>"$RUN/meta.err" \
-        || fw_rc=$?
-      echo "$fw_rc" >"$RUN/meta.rc"
-    } | head -c $((META_MAX_BYTES + 1)) >"$RUN/meta.json"
-    fw_rc=
-    IFS= read -r fw_rc <"$RUN/meta.rc" || true
-    fw_curl_error=$(sed '/^$/d' "$RUN/meta.err" | tail -n 1)
-    fw_size=$(wc -c <"$RUN/meta.json" | tr -d ' ')
-    if [ "$fw_size" -gt "$META_MAX_BYTES" ]; then
-      FW_ERROR="the response of $META_URL is larger than 2 MiB"
-      return 1
+# Keeps the failure $* for the moment the closed table is in place, unless an earlier one is kept already.
+defer_failure() {
+  if [ -z "${deferred_failure}" ]; then deferred_failure="$*"; fi
+}
+
+# Ends a start that cannot apply the rules in full, for the reason $*: with failureMode warn it removes the
+# feature's table, otherwise it leaves the closed table in place; it records the start as failed.
+# Deviation from shell-style.md (Logging and failure), which the feature's design records under Goals, "The
+# entrypoint always exits zero": this script defines no `fail` that exits 1, and this handler has a name of its own.
+# The result of a start reaches the developer through the start record and check.sh, never through the status of
+# the entrypoint, so a tool that stops at a failing entrypoint still runs the container's command.
+end_failed_start() {
+  trap - EXIT
+  # From here on, a failing command no longer stops the script: every step below is attempted, the record is
+  # written last, and the status stays 0.
+  set +e
+  end_failed_start_reason="$*"
+  log "the start failed: ${end_failed_start_reason}"
+  stop_dnsmasq
+  if [ -n "${resolvers}" ]; then write_nameservers "${resolvers}"; fi
+  if [ "${FAILUREMODE}" = "warn" ]; then
+    if nft list table "${TABLE_FAMILY}" "${TABLE_NAME}" >/dev/null 2>&1; then
+      nft delete table "${TABLE_FAMILY}" "${TABLE_NAME}"
     fi
-    case $fw_rc in
-      0) break ;;
+    log "failureMode warn: the feature's rules are removed, so outbound traffic is unrestricted"
+  else
+    load_table closed
+    if [ -n "${load_error}" ]; then
+      log "${load_error}"
+    else
+      log "failureMode closed: only loopback and the DNS resolvers are reachable"
+    fi
+  fi
+  write_record failed "${end_failed_start_reason}"
+  exit 0
+}
+
+# Runs when the script stops anywhere it did not end the start itself: Requirement: Failure mode of the feature's
+# spec applies to any stop, so the start is a failed one.
+handle_exit() {
+  end_failed_start "the start-time script stopped unexpectedly while ${step}"
+}
+
+# Ends the start when the script does not run as root: it can then load no rule and write no start record, so
+# outbound traffic stays unrestricted and check.sh reports the missing record.
+require_root() {
+  step="checking for root"
+  require_root_uid="$(id -u)"
+  if [ "${require_root_uid}" = "0" ]; then return 0; fi
+  trap - EXIT
+  log "not running as root, so no rule can be loaded and no start record written; outbound traffic is unrestricted"
+  exit 0
+}
+
+# Creates the run and state directories and sets start_time.
+prepare_state() {
+  step="preparing ${RUN_DIR} and ${STATE_DIR}"
+  mkdir --parents "${RUN_DIR}" "${STATE_DIR}"
+  IFS= read -r prepare_state_stat </proc/1/stat
+  set -f
+  # The start time is field 22 of /proc/1/stat, the twentieth after the command name, which stands in parentheses
+  # and may hold spaces; check.sh reads it the same way. The fields are split on purpose.
+  # shellcheck disable=SC2086
+  set -- ${prepare_state_stat##*) }
+  set +f
+  start_time="${20}"
+}
+
+# Stops the dnsmasq an earlier run of this script started, if it still runs, and waits at most 5 seconds for it to
+# go, so that its port is free again.
+stop_dnsmasq() {
+  step="stopping the resolver of an earlier start"
+  if [ ! -s "${DNSMASQ_PID_FILE}" ]; then return 0; fi
+  IFS= read -r stop_dnsmasq_pid <"${DNSMASQ_PID_FILE}"
+  rm -f "${DNSMASQ_PID_FILE}"
+  # The pid file outlives a restart of the container, after which its number may belong to another process: only a
+  # process named dnsmasq is stopped.
+  if [ ! -r "/proc/${stop_dnsmasq_pid}/comm" ]; then return 0; fi
+  IFS= read -r stop_dnsmasq_name <"/proc/${stop_dnsmasq_pid}/comm"
+  if [ "${stop_dnsmasq_name}" != "dnsmasq" ]; then return 0; fi
+  if ! proc_alive "${stop_dnsmasq_pid}"; then return 0; fi
+  # A process that ended in between leaves nothing to wait for.
+  kill "${stop_dnsmasq_pid}" || return 0
+  stop_dnsmasq_naps=0
+  while proc_alive "${stop_dnsmasq_pid}" && [ "${stop_dnsmasq_naps}" -lt 25 ]; do
+    nap
+    stop_dnsmasq_naps=$((stop_dnsmasq_naps + 1))
+  done
+}
+
+# Sets resolvers, resolvers4, and resolvers6 to the container's own resolvers and writes them back into
+# /etc/resolv.conf. The resolvers are recorded in RESOLVERS_FILE the first time, before the feature ever rewrites
+# the file, and again whenever Docker has regenerated it.
+record_resolvers() {
+  step="recording the resolvers of ${RESOLV_CONF}"
+  record_resolvers_current="$(awk '$1 == "nameserver" && NF >= 2 { print $2 }' "${RESOLV_CONF}")"
+  record_resolvers_current="$(join_lines "${record_resolvers_current}" " ")"
+  record_resolvers_recorded=""
+  if [ -s "${RESOLVERS_FILE}" ]; then IFS= read -r record_resolvers_recorded <"${RESOLVERS_FILE}"; fi
+  # A file that names dnsmasq alone was left by an earlier start of this container: the record holds its resolvers.
+  # Any other content is Docker's, and is recorded.
+  record_resolvers_found="${record_resolvers_current}"
+  if [ "${record_resolvers_current}" = "${LOCAL_RESOLVER}" ] && [ -n "${record_resolvers_recorded}" ]; then
+    record_resolvers_found="${record_resolvers_recorded}"
+  fi
+  if [ -z "${record_resolvers_found}" ]; then
+    defer_failure "${RESOLV_CONF} names no nameserver; give the container a DNS server"
+    return 0
+  fi
+  record_resolvers_entries=""
+  for record_resolvers_address in ${record_resolvers_found}; do
+    if [ "${record_resolvers_address}" = "${LOCAL_RESOLVER}" ]; then
+      defer_failure "${RESOLV_CONF} names ${LOCAL_RESOLVER}, where the feature's resolver listens;" \
+        "give the container a DNS server at another address"
+      return 0
+    fi
+    record_resolvers_entries="${record_resolvers_entries}${record_resolvers_address}${NL}"
+  done
+  if ! record_resolvers_lines="$(cidr_lines address nameserver "${record_resolvers_entries}")"; then
+    defer_failure "${record_resolvers_lines}"
+    return 0
+  fi
+  if [ "${record_resolvers_found}" != "${record_resolvers_recorded}" ]; then
+    printf '%s\n' "${record_resolvers_found}" >"${RESOLVERS_FILE}"
+  fi
+  resolvers="${record_resolvers_found}"
+  resolvers4="$(set_body 4 "${record_resolvers_lines}")"
+  resolvers6="$(set_body 6 "${record_resolvers_lines}")"
+  write_nameservers "${resolvers}"
+}
+
+# Replaces the feature's table with the ruleset of the mode $1 (closed, pinned, or full) in one transaction. Sets
+# load_error to the reason when nft refuses the ruleset, and empties it otherwise.
+load_table() {
+  step="loading the $1 rules"
+  load_error=""
+  ruleset "$1" >"${RULES_FILE}"
+  if ! load_table_output="$(nft --file "${RULES_FILE}" 2>&1)"; then
+    load_error="loading the $1 rules failed: ${load_table_output%%"${NL}"*}"
+  fi
+}
+
+# Looks META_HOST up once through the recorded resolvers, within 5 seconds, and sets meta_addresses4,
+# meta_addresses6, and meta_resolve to the addresses it returned; the fetch connects to no other address.
+lookup_meta_host() {
+  step="looking up ${META_HOST}"
+  log "looking up ${META_HOST} through the recorded resolvers (${resolvers})"
+  if ! lookup_meta_host_answer="$(timeout 5 getent ahosts "${META_HOST}")"; then lookup_meta_host_answer=""; fi
+  # getent prints one line per address and socket type, the address first.
+  lookup_meta_host_addresses="$(
+    awk 'NF && !($1 in seen) { seen[$1] = 1; print $1 }' <<EOF
+${lookup_meta_host_answer}
+EOF
+  )"
+  if [ -z "${lookup_meta_host_addresses}" ]; then
+    end_failed_start "the lookup of ${META_HOST} returned no address within 5 seconds;" \
+      "check that the container's DNS resolvers (${resolvers}) answer"
+  fi
+  if ! lookup_meta_host_lines="$(cidr_lines address "address of ${META_HOST}" "${lookup_meta_host_addresses}")"; then
+    end_failed_start "${lookup_meta_host_lines}"
+  fi
+  meta_addresses4="$(set_body 4 "${lookup_meta_host_lines}")"
+  meta_addresses6="$(set_body 6 "${lookup_meta_host_lines}")"
+  # curl takes the addresses of one host as a comma-separated list, an IPv6 address in brackets.
+  meta_resolve="$(
+    awk '
+      $1 == 4 { sub(/\/32$/, "", $3); printf "%s%s", separator, $3; separator = "," }
+      $1 == 6 { sub(/\/128$/, "", $3); printf "%s[%s]", separator, $3; separator = "," }' <<EOF
+${lookup_meta_host_lines}
+EOF
+  )"
+}
+
+# Fetches META_URL to META_FILE over HTTPS, relying on TLS alone, since GitHub publishes no checksum or signature
+# for it: from the looked-up addresses only, without following a redirect, at most 20 seconds and 2 MiB per attempt,
+# and at most two attempts.
+fetch_meta() {
+  step="fetching ${META_URL}"
+  log "fetching ${META_URL} from ${meta_resolve} to ${META_FILE}"
+  for fetch_meta_attempt in 1 2; do
+    rm -f "${META_FILE}" "${META_HEADERS_FILE}"
+    if fetch_meta_error="$(
+      curl --disable --silent --show-error --proto '=https' --max-time 20 --max-filesize "${META_MAX_BYTES}" \
+        --resolve "${META_HOST}:443:${meta_resolve}" --dump-header "${META_HEADERS_FILE}" --output "${META_FILE}" \
+        "${META_URL}" 2>&1
+    )"; then
+      fetch_meta_status=0
+    else
+      fetch_meta_status=$?
+    fi
+    case "${fetch_meta_status}" in
+      # Known failure mode, a connection error or a timeout: curl could not connect (7), ran out of time (28),
+      # failed the TLS handshake (35), got an empty reply (52), or failed while sending (55) or receiving (56).
+      # The fetch is tried once more. No other status is retried, an HTTP error status least of all.
       7 | 28 | 35 | 52 | 55 | 56)
-        if [ $fw_try -lt 2 ]; then
-          log "fetching $META_URL failed ($fw_curl_error); retrying once"
-          fw_try=2
-          continue
+        if [ "${fetch_meta_attempt}" = "1" ]; then
+          log "fetching ${META_URL} failed (${fetch_meta_error}); trying once more"
         fi
-        FW_ERROR="fetching $META_URL failed twice: $fw_curl_error"
-        return 1
         ;;
-      63)
-        FW_ERROR="the response of $META_URL is larger than 2 MiB"
-        return 1
-        ;;
-      *)
-        FW_ERROR="fetching $META_URL failed: ${fw_curl_error:-curl exit status $fw_rc}"
-        return 1
-        ;;
+      *) break ;;
     esac
   done
-  fw_status=$(awk 'toupper(substr($1, 1, 5)) == "HTTP/" { code = $2 } END { print code }' "$RUN/meta.headers")
-  if [ "$fw_status" != 200 ]; then
-    if awk 'tolower($1) == "x-ratelimit-remaining:" && $2 + 0 == 0 { found = 1 } END { exit !found }' \
-      "$RUN/meta.headers" && { [ "$fw_status" = 403 ] || [ "$fw_status" = 429 ]; }; then
-      FW_ERROR="GitHub's API rate limit is exhausted (HTTP $fw_status from $META_URL);"
-      FW_ERROR="$FW_ERROR a start after the limit resets fetches again"
-    else
-      FW_ERROR="$META_URL answered HTTP ${fw_status:-without a status}"
-    fi
-    return 1
+  fetch_meta_fix="check that the container reaches ${META_HOST} on port 443"
+  case "${fetch_meta_status}" in
+    0) ;;
+    7 | 28 | 35 | 52 | 55 | 56)
+      end_failed_start "fetching ${META_URL} failed twice: ${fetch_meta_error}; ${fetch_meta_fix}"
+      ;;
+    # curl refuses a response that announces more than --max-filesize.
+    63) end_failed_start "the response of ${META_URL} is larger than 2 MiB" ;;
+    *) end_failed_start "fetching ${META_URL} failed: ${fetch_meta_error}; ${fetch_meta_fix}" ;;
+  esac
+  # curl before 8.4.0, as on debian:12, applies --max-filesize only to a response that announces its length.
+  fetch_meta_size="$(wc -c <"${META_FILE}")"
+  if [ "${fetch_meta_size}" -gt "${META_MAX_BYTES}" ]; then
+    end_failed_start "the response of ${META_URL} is larger than 2 MiB"
   fi
-  if ! GITHUB_LINES=$(fw_meta_ranges "$RUN/meta.json"); then
-    FW_ERROR=$(printf '%s\n' "$GITHUB_LINES" | tail -n 1)
-    GITHUB_LINES=
-    return 1
-  fi
-  GITHUB_RANGES="$(printf '%s\n' "$GITHUB_LINES" | awk 'NF' | wc -l | tr -d ' ') ranges from $META_URL"
+  # The last status line counts, and the rate limit's header, whatever the letter case of its name.
+  fetch_meta_http="$(
+    awk 'toupper(substr($1, 1, 5)) == "HTTP/" { code = $2 } END { print code }' "${META_HEADERS_FILE}"
+  )"
+  if [ "${fetch_meta_http}" = "200" ]; then return 0; fi
+  fetch_meta_remaining="$(
+    awk 'tolower($1) == "x-ratelimit-remaining:" { remaining = $2 + 0 } END { print remaining }' "${META_HEADERS_FILE}"
+  )"
+  case "${fetch_meta_http}:${fetch_meta_remaining}" in
+    403:0 | 429:0)
+      end_failed_start "the rate limit of GitHub's API is exhausted (HTTP ${fetch_meta_http} from ${META_URL});" \
+        "wait until the limit resets"
+      ;;
+  esac
+  end_failed_start "${META_URL} answered HTTP ${fetch_meta_http:-without a status}"
 }
 
-# dnsmasq_conf GROUP: the resolver's only configuration: the recorded resolvers upstream, 127.0.0.1
-# only, and one nftset line per domain naming its own verdict's learned sets; a domain both allowed
-# and denied gets only the denied line.
-dnsmasq_conf() {
-  printf '# Written by %s/apply.sh at every start; dnsmasq reads no other configuration.\n' "$SHARE"
-  printf '%s\n' no-resolv no-hosts listen-address=127.0.0.1 bind-interfaces user=dnsmasq "group=$1" \
-    "pid-file=$RUN/dnsmasq.pid"
-  for fw_r in $RESOLVERS; do printf 'server=%s\n' "$fw_r"; done
-  {
-    for fw_p in $FW_PRESETS; do fw_preset_domains "$fw_p"; done
-    printf '%s\n' "$FW_ALLOWED_DOMAINS"
-  } | awk -v denied="$(printf '%s\n' "$FW_DENIED_DOMAINS" | fw_join)" '
-    BEGIN { n = split(denied, d, ","); for (i = 1; i <= n; i++) skip[d[i]] = 1 }
-    NF && !($0 in skip) && !($0 in seen) {
-      seen[$0] = 1
-      printf "nftset=/%s/4#inet#firewall#allowed_learned4,6#inet#firewall#allowed_learned6\n", $0
-    }'
-  printf '%s\n' "$FW_DENIED_DOMAINS" | awk 'NF {
-    printf "nftset=/%s/4#inet#firewall#denied_learned4,6#inet#firewall#denied_learned6\n", $0
-  }'
-}
-
-# dns_listening: a UDP socket is bound to 127.0.0.1:53 (little-endian hex, as on amd64 and arm64).
-dns_listening() {
-  awk '$2 == "0100007F:0035" { found = 1 } END { exit !found }' /proc/net/udp
-}
-
-# start_dnsmasq: starts the resolver and waits at most 5 seconds for it to listen.
+# Starts dnsmasq from its own configuration and waits at most 5 seconds until it listens. dnsmasq binds its address
+# itself, so a port another process holds ends the start here, before /etc/resolv.conf names dnsmasq.
 start_dnsmasq() {
-  if ! fw_group=$(id -gn dnsmasq 2>/dev/null); then
-    FW_ERROR="the dnsmasq user is missing"
-    return 1
+  step="starting the resolver"
+  if ! start_dnsmasq_group="$(id -gn dnsmasq 2>/dev/null)"; then
+    end_failed_start "the image has no dnsmasq user, which the resolver runs as; rebuild the container image"
   fi
-  dnsmasq_conf "$fw_group" >"$RUN/dnsmasq.conf.tmp"
-  chmod 0644 "$RUN/dnsmasq.conf.tmp"
-  mv -f "$RUN/dnsmasq.conf.tmp" "$RUN/dnsmasq.conf"
-  rm -f "$RUN/dnsmasq.pid"
-  if ! timeout 5 dnsmasq --conf-file="$RUN/dnsmasq.conf" </dev/null >"$RUN/dnsmasq.err" 2>&1; then
-    FW_ERROR="the resolver could not start: $(sed '/^$/d' "$RUN/dnsmasq.err" | head -n 1)"
-    return 1
+  dnsmasq_conf "${start_dnsmasq_group}" >"${DNSMASQ_CONF_FILE}"
+  rm -f "${DNSMASQ_PID_FILE}"
+  if ! timeout 5 dnsmasq --conf-file="${DNSMASQ_CONF_FILE}" </dev/null >"${DNSMASQ_ERROR_FILE}" 2>&1; then
+    # dnsmasq starts its message with an empty line.
+    start_dnsmasq_error="$(awk 'NF { print; exit }' "${DNSMASQ_ERROR_FILE}")"
+    end_failed_start "the resolver (dnsmasq) could not start: ${start_dnsmasq_error};" \
+      "no other process may listen on ${LOCAL_RESOLVER} port 53"
   fi
-  fw_i=0
-  while [ $fw_i -lt 25 ]; do
-    fw_pid=
-    if [ -s "$RUN/dnsmasq.pid" ]; then IFS= read -r fw_pid <"$RUN/dnsmasq.pid" || true; fi
-    if [ -n "$fw_pid" ] && proc_alive "$fw_pid" && dns_listening; then return 0; fi
+  start_dnsmasq_naps=0
+  while [ "${start_dnsmasq_naps}" -lt 25 ]; do
+    start_dnsmasq_pid=""
+    if [ -s "${DNSMASQ_PID_FILE}" ]; then IFS= read -r start_dnsmasq_pid <"${DNSMASQ_PID_FILE}"; fi
+    # A UDP socket bound to 127.0.0.1:53, as /proc/net/udp writes it on a little-endian machine (amd64, arm64).
+    if [ -n "${start_dnsmasq_pid}" ] && proc_alive "${start_dnsmasq_pid}" \
+      && awk '$2 == "0100007F:0035" { found = 1 } END { exit !found }' /proc/net/udp; then
+      return 0
+    fi
     nap
-    fw_i=$((fw_i + 1))
+    start_dnsmasq_naps=$((start_dnsmasq_naps + 1))
   done
-  FW_ERROR="the resolver did not listen on 127.0.0.1:53 within 5 seconds"
-  return 1
+  end_failed_start "the resolver (dnsmasq) did not listen on ${LOCAL_RESOLVER} port 53 within 5 seconds"
 }
 
-# fail REASON: handles a failed start by failureMode and records it; exits.
-fail() {
-  trap - EXIT
-  log "the start failed: $1"
-  stop_dnsmasq || true
-  if [ "$RESOLVERS_OK" = 1 ]; then write_nameservers "$RESOLVERS" || log "restoring /etc/resolv.conf failed"; fi
-  if [ "$OPT_FAILURE_MODE" = warn ]; then
-    nft delete table inet firewall 2>/dev/null || true
-    log "failureMode warn: the feature's rules are removed, outbound traffic is unrestricted"
-  elif load closed; then
-    log "failureMode closed: only loopback and the DNS resolvers are reachable"
-  else
-    log "$FW_ERROR"
+main() {
+  trap handle_exit EXIT
+  require_root
+  prepare_state
+  if ! read_options "${OPTIONS_FILE}"; then
+    defer_failure "${reason}"
+  elif ! validate_options; then
+    defer_failure "the options in ${OPTIONS_FILE} are not valid: ${reason}"
   fi
-  record failed "$1"
-  exit 0
-}
+  stop_dnsmasq
+  record_resolvers
 
-# on_exit: a command failed where the script did not expect it; the start is a failure.
-on_exit() {
-  [ "$RECORDED" = 1 ] || fail "the start-time script stopped unexpectedly while $STEP"
-}
+  # The closed table is the first ruleset of every start, whatever else is wrong with it.
+  load_table closed
+  if [ -n "${load_error}" ]; then end_not_applied "${load_error}"; fi
+  if [ -n "${deferred_failure}" ]; then end_failed_start "${deferred_failure}"; fi
 
-RECORDED=0
-RESOLVERS_OK=0
-RESOLVERS=
-RES4=
-RES6=
-PIN4=
-PIN6=
-PIN_RESOLVE=
-ENTRIES=
-GITHUB_LINES=
-GITHUB_RANGES="not fetched"
-FW_PRESETS=
-FW_ALLOWED_DOMAINS=
-FW_ALLOWED_CIDRS=
-FW_DENIED_DOMAINS=
-FW_DENIED_CIDRS=
+  # GitHub's ranges only allow, so they are fetched only where the github preset is selected and unlisted traffic is
+  # refused.
+  case "${DEFAULTACTION}:${NL}${preset_list}${NL}" in
+    deny:*"${NL}github${NL}"*)
+      lookup_meta_host
+      load_table pinned
+      if [ -n "${load_error}" ]; then end_failed_start "${load_error}"; fi
+      fetch_meta
+      step="validating the ranges of ${META_URL}"
+      if ! github_cidr_lines="$(meta_ranges "${META_FILE}")"; then end_failed_start "${github_cidr_lines}"; fi
+      main_count="$(
+        awk 'NF { count++ } END { print count + 0 }' <<EOF
+${github_cidr_lines}
+EOF
+      )"
+      github_ranges="${main_count} ranges from ${META_URL}"
+      ;;
+  esac
 
-if [ "$(id -u)" != 0 ]; then
-  log "not running as root, so no rule can be loaded; outbound traffic is unrestricted"
-  exit 0
-fi
-mkdir -p "$RUN" "$STATE"
-chmod 0755 "$RUN" "$STATE"
-START=$(pid1_start) || START=unknown
+  # dnsmasq starts only after this load, which creates the learned sets anew, and /etc/resolv.conf names dnsmasq
+  # only once it listens.
+  load_table full
+  if [ -n "${load_error}" ]; then end_failed_start "${load_error}"; fi
+  start_dnsmasq
+  step="pointing ${RESOLV_CONF} at the resolver"
+  write_nameservers "${LOCAL_RESOLVER}"
 
-STEP="reading the options"
-OPTIONS_ERROR=
-if ! { fw_read_options "$SHARE/options" && fw_validate_options; }; then
-  OPTIONS_ERROR="invalid configuration in $SHARE/options: $FW_ERROR"
-fi
-trap on_exit EXIT
-
-STEP="stopping the resolver of an earlier run"
-stop_dnsmasq
-
-STEP="recording the resolvers"
-RESOLVER_ERROR=
-if setup_resolvers; then
-  RESOLVERS_OK=1
-  write_nameservers "$RESOLVERS" || RESOLVER_ERROR="rewriting /etc/resolv.conf failed"
-else
-  RESOLVER_ERROR=$FW_ERROR
-fi
-
-STEP="loading the closed rules"
-if ! load closed; then
-  # No rule can be loaded at all (no NET_ADMIN, or no nftables support in the kernel).
   trap - EXIT
-  log "$FW_ERROR; outbound traffic is unrestricted"
-  record not-applied "$FW_ERROR"
-  exit 0
-fi
-[ -z "$OPTIONS_ERROR" ] || fail "$OPTIONS_ERROR"
-[ -z "$RESOLVER_ERROR" ] || fail "$RESOLVER_ERROR"
+  write_record applied ""
+  log "applied (defaultAction=${DEFAULTACTION}, presets=${PRESETS}, GitHub ranges: ${github_ranges})"
+}
 
-if [ "$OPT_DEFAULT_ACTION" = deny ] && printf '%s\n' "$FW_PRESETS" | grep -qx github; then
-  STEP="looking up $META_HOST"
-  lookup_meta_host || fail "$FW_ERROR"
-  STEP="loading the closed rules with $META_HOST"
-  load pinned || fail "$FW_ERROR"
-  STEP="fetching $META_URL"
-  fetch_meta || fail "$FW_ERROR"
-fi
-
-STEP="loading the rules"
-ENTRIES=$(
-  {
-    printf '%s\n' "$FW_ALLOWED_CIDRS" "$GITHUB_LINES" | awk 'NF == 3 { print "allow", $0 }'
-    printf '%s\n' "$FW_DENIED_CIDRS" | awk 'NF == 3 { print "deny", $0 }'
-  } | sort -u
-)
-load full || fail "$FW_ERROR"
-
-STEP="starting the resolver"
-start_dnsmasq || fail "$FW_ERROR"
-
-STEP="pointing /etc/resolv.conf at the resolver"
-write_nameservers 127.0.0.1 || fail "rewriting /etc/resolv.conf failed"
-
-trap - EXIT
-record applied ""
-log "applied (defaultAction=$OPT_DEFAULT_ACTION, presets=$OPT_PRESETS, GitHub ranges: $GITHUB_RANGES)"
+main "$@"
