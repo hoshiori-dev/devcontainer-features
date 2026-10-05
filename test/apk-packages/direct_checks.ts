@@ -233,8 +233,9 @@ interface Check {
 const EMPTY_LISTS = ["", " , ,\t, ", ","];
 
 /**
- * Each refusal runs offline with a valid entry beside it: exit 1 naming the entry then shows that validation came
- * before the apk check and before any index fetch, which would fail offline with another status and message.
+ * Each refusal runs offline with a valid entry beside it. The message naming the entry, not the exit status, shows
+ * that validation came before the apk check and before any index refresh: offline, a refresh also exits 1, with
+ * another message.
  */
 async function refuses(c: Container, t: Asserter, entries: string[]): Promise<void> {
     const state = await c.state();
