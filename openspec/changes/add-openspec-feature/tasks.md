@@ -2,22 +2,22 @@
 
 ## 1. Feature
 
-- [ ] 1.1 Scaffold `src/openspec/` and `test/openspec/` with `just new-feature openspec` and verify that the generated
+- [x] 1.1 Scaffold `src/openspec/` and `test/openspec/` with `just new-feature openspec` and verify that the generated
       `devcontainer-feature.json` declares exactly the options `version` (`string`, default `"latest"`),
       `disableUpdateCheck` (`boolean`, default `true`), and `disableTelemetry` (`boolean`, default `false`), as the
       Option requirements state
-- [ ] 1.2 Complete `src/openspec/devcontainer-feature.json`: version `1.0.0`, `name`, a one-sentence `description`,
+- [x] 1.2 Complete `src/openspec/devcontainer-feature.json`: version `1.0.0`, `name`, a one-sentence `description`,
       `documentationURL`, a description per option, the `version` proposals `["latest","1.13.1"]`, and `dependsOn`
       `ghcr.io/devcontainers/features/node:2` with options `{}` (design, Options and Decisions - Runtime); verify with
       `just validate` and `just spec-check`, and by reading the file for the absence of `installsAfter`, `mounts`,
       `capAdd`, `privileged`, `securityOpt`, `init`, `entrypoint`, `containerEnv`, and lifecycle commands
-- [ ] 1.3 Write the checks of `src/openspec/install.sh` that run before any network access (`#!/usr/bin/env bash`,
+- [x] 1.3 Write the checks of `src/openspec/install.sh` that run before any network access (`#!/usr/bin/env bash`,
       `set -euo pipefail`, `umask 022`), in the design's order: the distribution (`ID` or `ID_LIKE` naming `debian`) and
       the architecture (amd64 or arm64), each failure naming what was found; the `version` format (`latest` or one exact
       version), the failure saying that only `latest` or an exact version is accepted; Node.js on `PATH`, the failure
       naming 20.19.0; npm on `PATH` at 10.8.2 or newer, the failure naming the required version and the one found;
       verify with `shellcheck` and by running each failure in a throwaway container (tasks 7.1, 7.5, 7.6)
-- [ ] 1.4 Write the download settings and the version selection of `install.sh`: every Node.js and npm call under
+- [x] 1.4 Write the download settings and the version selection of `install.sh`: every Node.js and npm call under
       `env -i` with `PATH` and a `HOME` in a temporary directory that a trap removes; the npm flags of design - Goals
       (registry, `--strict-ssl=true`, two distinct empty configuration files, `--ignore-scripts`, `--engine-strict`,
       `--no-audit`, `--no-update-notifier`, a cache in the temporary directory); one read of
@@ -26,7 +26,7 @@
       have a publish time that parses as a date; the found Node.js compared with the selected version's `engines.node`;
       verify with `shellcheck`, by review against design - Goals (no other download tool, no OS package, no URL outside
       the URL inventory, no switch that weakens verification), and by the runs of tasks 7.1, 7.3, 7.4, and 7.5
-- [ ] 1.5 Write the install, verification, and replacement of `install.sh`: `npm install` of the selected version with
+- [x] 1.5 Write the install, verification, and replacement of `install.sh`: `npm install` of the selected version with
       `--before=<its publish time>` into a staging directory next to `/usr/local/lib/openspec`; the lockfile checks (the
       entry `node_modules/@fission-ai/openspec` at exactly the selected version and without an alias `name`, every other
       entry's `resolved` under `https://registry.npmjs.org/`, the failure naming the entry); `npm audit signatures` on
@@ -36,7 +36,7 @@
       exports `OPENSPEC_NO_UPDATE_CHECK=1` and `OPENSPEC_TELEMETRY=0` only when the option is true and the caller has
       not set the variable; verify with `shellcheck`, by review against design - Goals, and by a build on `debian:12` in
       which `openspec --version` prints the selected version
-- [ ] 1.6 Write `src/openspec/NOTES.md`: telemetry first, with its endpoint and the option that turns it off; the update
+- [x] 1.6 Write `src/openspec/NOTES.md`: telemetry first, with its endpoint and the option that turns it off; the update
       check and why it is off by default (an `npm install -g` copy shadows the wrapper); what is verified; the hosts a
       build needs, and that a private registry, mirror, proxy, or added certificate authority is not supported; a
       consumer's own `node:2` entry with other options, and the pinned install-time Node.js; the intermittent audit
@@ -72,7 +72,7 @@
 
 ## 3. Repository README
 
-- [ ] 3.1 Add the `openspec` row to the table under "## Features" in the root `README.md`, with the id linking to
+- [x] 3.1 Add the `openspec` row to the table under "## Features" in the root `README.md`, with the id linking to
       `src/openspec/` and a one-sentence description; verify with `deno fmt --check README.md` and by reading the
       section
 
@@ -82,7 +82,7 @@ The work of sections 1 to 3 is on the branch as it was written before `.agents/k
 section brings `src/openspec/install.sh` to that guide and to the package as revised on 2026-10-05 (design, Goals and
 Decisions of 2026-10-05).
 
-- [ ] 4.1 Rebuild `src/openspec/install.sh` on the bash skeleton of `.agents/knowledge/shell-style.md` (Skeletons): the
+- [x] 4.1 Rebuild `src/openspec/install.sh` on the bash skeleton of `.agents/knowledge/shell-style.md` (Skeletons): the
       header naming what is installed (the npm package `@fission-ai/openspec` and its dependencies), from where
       (`https://registry.npmjs.org/`), and to which paths (`/usr/local/lib/openspec` and `/usr/local/bin/openspec`),
       that it runs as root at image build time, and the variables `VERSION`, `DISABLEUPDATECHECK`, and
@@ -99,7 +99,7 @@ Decisions of 2026-10-05).
       `shellcheck -o require-variable-braces,require-double-brackets src/openspec/install.sh` reporting nothing, by
       reading that no command stands outside a function except `main "$@"`, and with a review of `git diff -w` against
       design - Goals
-- [ ] 4.2 Validate every option in one step that follows the platform step, with anchored `[[ … =~ ^…$ ]]` matches:
+- [x] 4.2 Validate every option in one step that follows the platform step, with anchored `[[ … =~ ^…$ ]]` matches:
       `version` against `latest` or the exact-version pattern, `disableUpdateCheck` and `disableTelemetry` against
       `true` or `false`, each failure naming the option and the value, each variable `readonly` once it is validated;
       create the staging directory only after the platform, option, Node.js, npm, and `setpriv` checks passed (today it
@@ -108,7 +108,7 @@ Decisions of 2026-10-05).
 - [ ] 4.3 Remove the check of the configuration npm reports: the `npm config list --json` call and the inline Node.js
       program that reads its output (design, Decisions of 2026-10-05); verify by reading that the read of the registry
       document follows the `setpriv` check, and with `just test openspec`
-- [ ] 4.4 Print every line through `log` (`openspec: …`, stdout) or `fail` (`openspec: error: …`, stderr, exit 1), with
+- [x] 4.4 Print every line through `log` (`openspec: …`, stdout) or `fail` (`openspec: error: …`, stderr, exit 1), with
       `printf`, and give the failures of the two inline Node.js programs the same form; start messages in lower case
       without a trailing period; word every failure a developer can fix as `<reason>; <how to fix it>`, keeping what its
       scenario names (the distribution or architecture found, the accepted forms of `version`, the option and the value
@@ -216,17 +216,17 @@ optional checks" is `shellcheck -o require-variable-braces,require-double-bracke
 
 ## 6. Version and documentation
 
-- [ ] 6.1 Rewrite "What is verified" in `src/openspec/NOTES.md` to what a developer acts on: the source of every
+- [x] 6.1 Rewrite "What is verified" in `src/openspec/NOTES.md` to what a developer acts on: the source of every
       package, the hash, signature, and attestation checks and that a failure fails the build, the dependency bound and
       its cost, and that no install script runs; remove the statements on what rests on TLS alone, on the Node.js
       feature as the start of the chain of trust, and on its group-writable installation, which stay in the spec and in
       design - Risks; remove the sentence on the npmrc built into the Node.js installation from "Build requirements and
       known failures"; verify by reading both sections against design - Decisions of 2026-10-05
-- [ ] 6.2 Read `src/openspec/NOTES.md` and the option descriptions in `src/openspec/devcontainer-feature.json` as a
+- [x] 6.2 Read `src/openspec/NOTES.md` and the option descriptions in `src/openspec/devcontainer-feature.json` as a
       developer configuring the feature (`.agents/knowledge/feature-authoring.md`, User documentation): correct grammar
       and unclear wording, keep each limitation only if the feature has it today, and make each configuration constraint
       name the option or setting it concerns; verify by reading the README that task 6.3 generates from top to bottom
-- [ ] 6.3 Keep `version` `1.0.0` in `src/openspec/devcontainer-feature.json`, as the feature is unreleased
+- [x] 6.3 Keep `version` `1.0.0` in `src/openspec/devcontainer-feature.json`, as the feature is unreleased
       (`.agents/knowledge/feature-authoring.md`, Versions), and regenerate `src/openspec/README.md` with `just docs`;
       verify with `just validate` and `just docs-check`
 
@@ -236,17 +236,25 @@ Each run executes the staged `src/openspec/install.sh` as section 4 leaves it, u
 environment variables, on amd64 (design, Decisions - Tests); the exact command and its result go to the PR's Validation
 section.
 
-- [ ] 7.1 In a container kept from `just test openspec --preserve` on `debian:12`: "Unknown version" (`9.9.9`),
+Record of 2026-10-05: the dev container CLI could not run on the machine that day, so tasks 7.1 to 7.4 ran in containers
+of an image prepared by hand, in place of a container kept from `just test openspec --preserve`: `debian:12` with
+`ghcr.io/devcontainers/features/node` 2.1.0 installed by its own `install.sh` with its default options, then this
+feature's `install.sh` with `version` `1.13.1`, `disableUpdateCheck` false, and `disableTelemetry` true. The `debian:12`
+build that tasks 1.5 and 4.4 name is this feature's `install.sh` run in a container of that image without the second
+step. Task 7.6 is open for its architecture run: no qemu handler for ppc64le is registered on the machine, and the PR's
+Validation section records the two substitutes that were run; task 7.7 waits for that run.
+
+- [x] 7.1 In a container kept from `just test openspec --preserve` on `debian:12`: "Unknown version" (`9.9.9`),
       "Malformed version" (an empty value, `^1.7.0`, `1`, `beta`), "Invalid disableUpdateCheck" and "Invalid
       disableTelemetry" (`yes`, `TRUE`, `1`, and an empty value for each), and "Same options twice"; verify the stated
       message and exit status of each failure, that the malformed and invalid values fail without a request, that the
       installed version, wrapper, and prefix are the same before and after each failure, and that the second identical
       install succeeds and prints the same version
-- [ ] 7.2 "Verification failure", signing keys unreachable: in a container started with
+- [x] 7.2 "Verification failure", signing keys unreachable: in a container started with
       `--add-host tuf-repo-cdn.sigstore.dev:127.0.0.1` from an image committed from such a kept container, installing a
       version other than the one present; verify that the install fails naming the signature verification and that
       `openspec --version`, the wrapper, and the prefix are unchanged
-- [ ] 7.3 "Verification failure" and "Package altered during the install only", altered registry answers: with
+- [x] 7.3 "Verification failure" and "Package altered during the install only", altered registry answers: with
       `registry.npmjs.org` mapped to a local TLS proxy that forwards to the registry and a `node` wrapper first on
       `PATH` that also trusts the proxy's test certificate authority, one run each in which the proxy alters, for one
       dependency, its tarball (`EINTEGRITY`); its tarball and `dist.integrity` in every answer (invalid registry
@@ -254,12 +262,12 @@ section.
       pointing to another host that serves the same bytes (the lockfile check, naming the entry); and one run that
       alters `dist-tags.latest` to a value that is not an exact version (fails before npm installs anything); verify
       that each run fails as stated and leaves `openspec --version`, the wrapper, and the prefix unchanged
-- [ ] 7.4 "Certificate checking weakened by the environment": the same proxy without the `node` wrapper, with
+- [x] 7.4 "Certificate checking weakened by the environment": the same proxy without the `node` wrapper, with
       `NODE_EXTRA_CA_CERTS` naming the test certificate authority, `NODE_OPTIONS=--use-openssl-ca` with `SSL_CERT_FILE`
       naming it, `NODE_TLS_REJECT_UNAUTHORIZED=0`, and `npm_config_strict_ssl=false` in the environment; verify that the
       install fails on the proxy's certificate at the registry document read, with a message saying that the build's
       proxy and certificate variables and the user, global, and project npm configuration are not used
-- [ ] 7.5 "No Node.js" in a plain `debian:12` container; "Node.js too old" in `node:20.18-bookworm-slim`; "npm missing
+- [x] 7.5 "No Node.js" in a plain `debian:12` container; "Node.js too old" in `node:20.18-bookworm-slim`; "npm missing
       or too old" in `node:20.19.0-bookworm-slim` with its npm replaced by 10.8.1, and again with npm taken off `PATH`;
       verify the stated message of each, and after "No Node.js" that nothing of the feature is under `/usr/local/lib` or
       `/usr/local/bin`
