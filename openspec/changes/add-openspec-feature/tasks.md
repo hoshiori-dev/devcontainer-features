@@ -48,19 +48,19 @@
 - [x] 2.1 Write `test/openspec/compatibility.json` with `mcr.microsoft.com/devcontainers/base:ubuntu24.04` (`amd64`,
       `arm64`, `remoteUser` `vscode`) and `debian:12` (`amd64`, `arm64`); verify with `just validate` and against
       design - Security review surface, Supported images
-- [ ] 2.2 Write `test/openspec/test.sh` for the default options: "Fresh container" before anything runs `openspec` (no
+- [x] 2.2 Write `test/openspec/test.sh` for the default options: "Fresh container" before anything runs `openspec` (no
       OpenSpec configuration, npm cache, or npm log of the build in the remote user's home, no `openspec/` directory or
       agent skill files in the workspace); `command -v openspec` resolving to the root-owned wrapper, the root-owned
       prefix holding `package.json`, `package-lock.json`, and `node_modules/`; "Omitted version" and "Verified install"
       (`openspec --version`, as the remote user, equal to the registry's `latest` read at test time); "Omitted
       disableUpdateCheck", "Caller's update-check value wins", and "Omitted disableTelemetry" through the environment
       probe; verify with `shellcheck` and `just test openspec`
-- [ ] 2.3 Write `test/openspec/duplicate.sh` ("Different options the second time"): after a first install with `version`
+- [x] 2.3 Write `test/openspec/duplicate.sh` ("Different options the second time"): after a first install with `version`
       `1.13.1`, `disableUpdateCheck` false, and `disableTelemetry` true and a second with the defaults,
       `openspec --version` prints the registry's `latest`, the probe shows the second install's environment, and exactly
       one installation is reachable (one `openspec` on `PATH`, no staging directory left); verify with `shellcheck` and
       `just test openspec`
-- [ ] 2.4 Write `test/openspec/scenarios.json` and its scripts, each scenario once per compatibility image: non-default
+- [x] 2.4 Write `test/openspec/scenarios.json` and its scripts, each scenario once per compatibility image: non-default
       options (`version` `1.13.2`, `disableUpdateCheck` false, `disableTelemetry` true: "Exact version", "Dependency
       released later" by comparing the registry publish time of every `package-lock.json` entry with that of the
       installed OpenSpec version, "Update check left to the user", "Telemetry disabled", "Caller's telemetry value
@@ -105,7 +105,7 @@ Decisions of 2026-10-05).
       create the staging directory only after the platform, option, Node.js, npm, and `setpriv` checks passed (today it
       is created before the last three), so the npm version probe names an empty directory in the temporary directory
       with `--prefix` in place of the staging tree; verify with the runs of tasks 7.1 and 7.5
-- [ ] 4.3 Remove the check of the configuration npm reports: the `npm config list --json` call and the inline Node.js
+- [x] 4.3 Remove the check of the configuration npm reports: the `npm config list --json` call and the inline Node.js
       program that reads its output (design, Decisions of 2026-10-05); verify by reading that the read of the registry
       document follows the `setpriv` check, and with `just test openspec`
 - [x] 4.4 Print every line through `log` (`openspec: …`, stdout) or `fail` (`openspec: error: …`, stderr, exit 1), with
@@ -120,7 +120,7 @@ Decisions of 2026-10-05).
       `npm audit signatures`, the replacement of the prefix, and the writing of the wrapper, with what design - Goals
       lists for each; name the failure mode in a comment above the `EINTEGRITY` branch and above the roll-back of the
       prefix; verify by the runs of section 7 and by reading the log of a `debian:12` build
-- [ ] 4.5 Run npm through one function that holds the clean environment and the flags that never vary, in place of the
+- [x] 4.5 Run npm through one function that holds the clean environment and the flags that never vary, in place of the
       `NPM_FLAGS` array, with `--prefix` passed by every call, an empty directory in the temporary directory for the
       version probe and the staging tree afterwards, so no call reads a project `npmrc` from the build's working
       directory (design - Goals); use GNU long options (`env --ignore-environment`, `mktemp --directory`,
@@ -154,7 +154,7 @@ reason for the subshell and says so.
 
 - [x] 5.1 Add `"scenarioArchitectures": ["amd64", "arm64"]` to `test/openspec/compatibility.json`; verify with
       `just validate` and with `just affected` listing a scenario job for `openspec` on amd64 and on arm64
-- [ ] 5.2 Reduce `test/openspec/lib.sh` to what several scripts share, in the common form: the constants `PREFIX_DIR`,
+- [x] 5.2 Reduce `test/openspec/lib.sh` to what several scripts share, in the common form: the constants `PREFIX_DIR`,
       `WRAPPER`, and `REGISTRY`; the probe call as the one helper; and assertions named after what they assert that take
       the expected value as an argument, in place of the value helpers `seen_env`, `seen_node`, and `installed_version`
       (for example `openspec_sees <variable> <state> [env arguments]`, `openspec_runs_on <path>`, and
@@ -163,7 +163,7 @@ reason for the subshell and says so.
       leaves the file; `home_without_openspec`, `home_without_npm_traces`, and `workspace_untouched` move to `test.sh`
       (task 5.3); verify with shellcheck with the optional checks, `just test openspec`, and
       `just test-scenarios openspec`
-- [ ] 5.3 Restyle `test/openspec/test.sh` in the common form: `latest` read once at the top, inline, under a comment
+- [x] 5.3 Restyle `test/openspec/test.sh` in the common form: `latest` read once at the top, inline, under a comment
       saying that it is the version the registry names when the test runs and that a release between build and test
       fails once; `root_owned`, `home_without_openspec`, `home_without_npm_traces`, and `workspace_untouched` defined
       right before their first check, each saving the output of `find` and checking its status before testing it,
@@ -178,7 +178,7 @@ reason for the subshell and says so.
       variable in separate checks; the leftover check under the words of Requirement "Install twice", and the two checks
       repeated after `openspec` ran under the words of "Fresh container" with a comment saying that they repeat it after
       the CLI ran (design, Open Questions); verify with shellcheck with the optional checks and `just test openspec`
-- [ ] 5.4 Restyle `test/openspec/duplicate.sh` in the common form: the header states the two installs (`version`
+- [x] 5.4 Restyle `test/openspec/duplicate.sh` in the common form: the header states the two installs (`version`
       `1.13.1`, `disableUpdateCheck` false, `disableTelemetry` true, then `latest`, true, false); in place of the check
       "the two installs name different versions", a precondition that stops the script with a message saying that
       "Different options the second time" would not run when `VERSION`, `DISABLEUPDATECHECK`, `DISABLETELEMETRY`, or
@@ -191,7 +191,7 @@ reason for the subshell and says so.
       `openspec`, for the check of `PATH` and for the leftover check (design, Open Questions)), and the check of the
       installed package's version in the words of Requirement "Install the requested version"; verify with shellcheck
       with the optional checks and `just test openspec`
-- [ ] 5.5 Give `test/openspec/non_default_options_ubuntu.sh` and `non_default_options_debian.sh` their own checks in the
+- [x] 5.5 Give `test/openspec/non_default_options_ubuntu.sh` and `non_default_options_debian.sh` their own checks in the
       common form, each sourcing only `dev-container-features-test-lib` and `lib.sh`, and delete
       `test/openspec/non_default_options.sh`: one behavior per check, so "Update check left to the user" and "Telemetry
       disabled" are separate checks; each label in the words of the scenario its check covers ("Exact version",
@@ -200,7 +200,7 @@ reason for the subshell and says so.
       in place of the check "a dependency has a later release, which the bound kept out", a precondition that stops the
       script with a message when the report of `publish_times.cjs` holds no `kept out:` line; verify with shellcheck
       with the optional checks on both scripts and `just test-scenarios openspec`
-- [ ] 5.6 Give `test/openspec/node_switched_ubuntu.sh` and `node_switched_debian.sh` their own checks in the common
+- [x] 5.6 Give `test/openspec/node_switched_ubuntu.sh` and `node_switched_debian.sh` their own checks in the common
       form, each sourcing only `dev-container-features-test-lib` and `lib.sh`, and delete
       `test/openspec/node_switched.sh`: `OTHER_NODE` as a `readonly` constant; `switch_node` and `current_node` defined
       in each script, `switch_node` run as a plain command instead of a check, under a comment giving the reason its
@@ -213,7 +213,7 @@ reason for the subshell and says so.
       "Current Node.js switched later" through `openspec_reports_version` and `openspec_runs_on`, one for the version
       `openspec --version` still prints, also with the current Node.js first on `PATH`, and one for the Node.js it runs
       on; verify with shellcheck with the optional checks on both scripts and `just test-scenarios openspec`
-- [ ] 5.7 Give `test/openspec/image_registry_ubuntu.sh` and `image_registry_debian.sh` their own checks in the common
+- [x] 5.7 Give `test/openspec/image_registry_ubuntu.sh` and `image_registry_debian.sh` their own checks in the common
       form, each sourcing only `dev-container-features-test-lib` and `lib.sh`, and delete
       `test/openspec/image_registry.sh`: in place of the check "root's npm configuration names another registry for the
       @fission-ai scope", a precondition that stops the script with a message; the registry check in the words of
@@ -292,9 +292,9 @@ the design's run was changed to an image an amd64 host runs without emulation.
 - [x] 8.2 Run `shellcheck -o require-variable-braces,require-double-brackets` on `src/openspec/install.sh` and every
       `test/openspec/*.sh` and verify it reports nothing; verify by reading that each remaining `# shellcheck disable`
       and each deliberate deviation has its reason on the line above
-- [ ] 8.3 Run `just test openspec` and verify the autogenerated and install-twice tests pass on every image of the
+- [x] 8.3 Run `just test openspec` and verify the autogenerated and install-twice tests pass on every image of the
       compatibility list (arm64 in CI)
-- [ ] 8.4 Run `just test-scenarios openspec` and verify every scenario passes (arm64 in CI, job
+- [x] 8.4 Run `just test-scenarios openspec` and verify every scenario passes (arm64 in CI, job
       `scenarios (openspec, arm64)`)
-- [ ] 8.5 Record each Acceptance item and each scenario of the delta spec with its test or local run, image,
+- [x] 8.5 Record each Acceptance item and each scenario of the delta spec with its test or local run, image,
       architecture, and result in the PR's Validation section
