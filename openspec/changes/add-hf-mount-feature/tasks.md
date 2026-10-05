@@ -171,7 +171,7 @@
 - [x] 9.2 Re-run the hand checks of tasks 3.1 to 3.4 against the rebuilt `install.sh`; verify that each message still
       names what its scenario requires, that `/usr/local/bin` is left as each scenario says, and that the install-twice
       scenarios give the results of 3.4; repeat 3.5 only if an installed file or the `runArgs` in `NOTES.md` changed
-- [ ] 9.3 Run `just check` and verify it passes, and that
+- [x] 9.3 Run `just check` and verify it passes, and that
       `shellcheck -o require-variable-braces,require-double-brackets` reports nothing on `src/hf-mount/install.sh` and
       every `test/hf-mount/*.sh`; then review those scripts against `.agents/knowledge/shell-style.md` and verify that
       every deliberate deviation carries its reason on the line above
