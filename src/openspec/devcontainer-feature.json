@@ -1,0 +1,28 @@
+{
+  "id": "openspec",
+  "version": "1.0.0",
+  "name": "OpenSpec",
+  "description": "Installs the OpenSpec CLI (openspec) from the npm registry, verifying every package's integrity hash and registry signature, on a Node.js runtime it brings in as a dependency.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/openspec",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "1.13.1"],
+      "default": "latest",
+      "description": "The OpenSpec version to install: 'latest' (the version the npm registry names as latest at build time) or one exact published version such as 1.13.1. Any other value, such as a range, fails the build."
+    },
+    "disableUpdateCheck": {
+      "type": "boolean",
+      "default": true,
+      "description": "Run openspec with OPENSPEC_NO_UPDATE_CHECK=1, which skips the version check inside `openspec update`, unless the caller's environment already sets that variable."
+    },
+    "disableTelemetry": {
+      "type": "boolean",
+      "default": false,
+      "description": "Run openspec with OPENSPEC_TELEMETRY=0, which turns its usage telemetry off, unless the caller's environment already sets that variable."
+    }
+  },
+  "dependsOn": {
+    "ghcr.io/devcontainers/features/node:2": {}
+  }
+}
