@@ -214,4 +214,4 @@
       Questions section; verify by reading `test/hf-mount/test.sh` for the unchanged `root:root 755` comparison, its
       spec-worded label, and its comment, by reading `src/hf-mount/NOTES.md` for the `--fuse-owner-only` sentence, and
       by searching the design and the prose of this file for a sentence that still calls a question open
-- [ ] 10.6 Run `just check` on the committed tree and verify it passes
+- [x] 10.6 Run `just check` on the committed tree and verify it passes
