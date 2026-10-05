@@ -217,7 +217,10 @@ Deno.test("base metadata that is not valid JSONC fails the check, naming the fil
         await repo.commit("break a");
         await repo.git("checkout", "--quiet", "topic");
         await repo.write("src/a/install.sh", "#!/bin/sh\necho changed\n");
-        await assertRejects(() => repo.check(), Error, "src/a/devcontainer-feature.json on main is not valid JSONC");
+        const problems = await repo.check();
+        assertEquals(problems.length, 1);
+        assert(problems[0].startsWith("src/a/devcontainer-feature.json: "), problems[0]);
+        assert(problems[0].includes("src/a/devcontainer-feature.json on main is not valid JSONC"), problems[0]);
     });
 });
 

@@ -30,9 +30,9 @@ runs:
     - name: Install OpenSpec
       if: inputs.openspec == 'true'
       shell: bash
-      # Same permissions as .devcontainer/setup.sh grants the local install. edge.openspec.dev is the only host
-      # OpenSpec contacts, for its anonymous telemetry, which the scripts turn off with OPENSPEC_TELEMETRY=0; the
-      # host stays allowed so Deno never stops at a permission prompt.
+      # Same permissions as .devcontainer/setup.sh grants the local install. edge.openspec.dev is the one host Deno lets
+      # OpenSpec reach: its anonymous telemetry, which the scripts turn off with OPENSPEC_TELEMETRY=0. It stays allowed
+      # so Deno never stops at a permission prompt. The update check (registry.npmjs.org) is off and not allowed.
       run: >-
         deno install --global --force
         --allow-read --allow-write --allow-env --allow-sys=cpus,homedir,uid --allow-net=edge.openspec.dev

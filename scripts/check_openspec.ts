@@ -231,7 +231,10 @@ export async function generatedProblems(): Promise<GeneratedResult> {
     try {
         for (const path of (await git(["ls-files", "-z"])).split("\0").filter(Boolean)) {
             const info = await Deno.lstat(path).catch((error) => {
-                if (error instanceof Deno.errors.NotFound) return undefined; // deleted in the working tree
+                // Deleted in the working tree, or a parent directory replaced by a file.
+                if (error instanceof Deno.errors.NotFound || error instanceof Deno.errors.NotADirectory) {
+                    return undefined;
+                }
                 throw error;
             });
             if (!info || info.isSymlink) continue;

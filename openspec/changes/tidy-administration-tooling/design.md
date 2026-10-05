@@ -39,9 +39,11 @@
   `verify` has already validated the same commit, so this only fires on a state that should not exist. Rejected: keeping
   the warning, which can leave a published version untagged while the job passes.
 - **Base reads in the version bump check.** `readBaseJsonc` checks first whether the path exists in the base commit
-  (`git cat-file -e`): a missing path means a new feature; any other git error, or base metadata that is not valid
-  JSONC, is an error. The compatibility condition gets a named boolean. Rejected: treating every failed `git show` as a
-  new feature, which skips the bump check for the wrong reason.
+  (`git rev-parse --verify`): a missing path means a new feature; any other git error, or base metadata that is not
+  valid JSONC, is a problem reported like the others. The compatibility condition gets a named boolean. Rejected:
+  treating every failed `git show` as a new feature, which skips the bump check for the wrong reason; `git cat-file -e`,
+  planned first, which reports a path whose object is missing the same way as a missing path (found during
+  implementation).
 - **Release hardening.** `setup-tools` gains a `just` input, default `"true"`; `publish` passes `"false"`. Jobs that
   only read the repository check out with `persist-credentials: false`. `publish` keeps its credentials for the tag
   push. Rejected: moving checkout after tool installation in `publish` (the composite action lives in the checkout);

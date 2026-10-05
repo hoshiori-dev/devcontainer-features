@@ -23,7 +23,6 @@ runs:
       run: |
         git fetch --no-tags --depth 1 origin "${BASE_SHA}"
         # FILES is a space-separated list of paths, left unquoted so the shell splits it into one path per word.
-        # shellcheck disable=SC2086
         for file in ${FILES}; do
           if ! git cat-file -e "${BASE_SHA}:${file}" 2>/dev/null; then
             printf "::notice::The base commit has no %s yet; checking with this branch's copies.\n" "${file}"

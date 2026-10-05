@@ -380,9 +380,9 @@ Deno.test(
 );
 
 Deno.test("optionProblems reports problems that exist only once archived, and skips a refused feature", async () => {
-    const main = versionSpec("Requirements", "latest");
+    const mainSpec = versionSpec("Requirements", "latest");
     const renamed = await optionRun({
-        "openspec/specs/demo/spec.md": main,
+        "openspec/specs/demo/spec.md": mainSpec,
         "openspec/changes/rename-x/specs/demo/spec.md": "## RENAMED Requirements\n\n- FROM: `### Requirement: A`\n",
         "openspec/changes/rename-x/tasks.md": "- [ ] 1.1 x\n",
         "src/demo/devcontainer-feature.json": DEMO_JSON("1"),
@@ -393,7 +393,7 @@ Deno.test("optionProblems reports problems that exist only once archived, and sk
         'Option requirement "install": no Default row',
     ]);
     const refused = await optionRun({
-        "openspec/specs/demo/spec.md": main,
+        "openspec/specs/demo/spec.md": mainSpec,
         "openspec/changes/refused-x/specs/demo/spec.md": versionSpec("MODIFIED Requirements", "1"),
         "openspec/changes/refused-x/tasks.md": "- [ ] 1.1 x\n",
         "src/demo/devcontainer-feature.json": DEMO_JSON("1"),

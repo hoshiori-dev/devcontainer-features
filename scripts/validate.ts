@@ -514,7 +514,15 @@ export async function checkVersionBumps(model: RepoModel, base: string, root = "
         const feature = model.features.get(id);
         const head = feature?.json?.version;
         if (typeof head !== "string" || !RELEASE_VERSION.test(head)) continue; // reported by checkFeatures
-        const old = await readBaseJsonc(base, `src/${id}/devcontainer-feature.json`, root, "fail");
+        const metadataPath = `src/${id}/devcontainer-feature.json`;
+        let old: { found: boolean; value?: unknown };
+        try {
+            old = await readBaseJsonc(base, metadataPath, root, "fail");
+        } catch (error) {
+            // Reported like every other problem, so CI annotates the file and the remaining problems still print.
+            problems.push({ file: metadataPath, message: error instanceof Error ? error.message : String(error) });
+            continue;
+        }
         if (!old.found) continue; // new feature
         const baseVersion = (old.value as { version?: unknown } | null | undefined)?.version;
         if (typeof baseVersion !== "string" || !tryParse(baseVersion)) {
