@@ -24,7 +24,7 @@ no_staging_file() {
     if [[ -e "${entry}" ]]; then return 1; fi
   done
 }
-check "no staging file is left in /usr/local/bin" no_staging_file
+check "no partially written executable is left in /usr/local/bin" no_staging_file
 
 # Root owns both directories; a non-root remote user writes them through group deno, root as their owner.
 tools_access() {

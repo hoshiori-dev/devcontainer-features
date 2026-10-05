@@ -29,12 +29,12 @@
 
 - [x] 2.1 Restyle `test/deno/test.sh` as design.md (Test restyle) says and verify with
       `shellcheck -o require-variable-braces,require-double-brackets test/deno/test.sh`
-- [x] 2.2 Restyle `test/deno/duplicate.sh` (premise as a comment) and `test/deno/exact_version.sh`, with the
+- [x] 2.2 Restyle `test/deno/duplicate.sh` and `test/deno/exact_version.sh` (each premise as a comment), with the
       `tools_access` label in the words of Requirement "Shared location for global tools"; verify with shellcheck as in
       task 2.1
-- [x] 2.3 Restyle `test/deno/fedora_remote_user.sh`, `test/deno/uid_remap.sh`, `test/deno/prerequisites_present.sh`,
-      `test/deno/reinstall_latest.sh`, and `test/deno/reinstall_same_version.sh`; verify with shellcheck as in task 2.1
-      and by review of the embedded script of `uid_remap.sh`
+- [x] 2.3 Restyle `test/deno/fedora_remote_user.sh` (premise as a comment), `test/deno/uid_remap.sh`,
+      `test/deno/prerequisites_present.sh`, `test/deno/reinstall_latest.sh`, and `test/deno/reinstall_same_version.sh`;
+      verify with shellcheck as in task 2.1 and by review of the embedded script of `uid_remap.sh`
 - [x] 2.4 Restyle `test/deno/group_conflicts.sh`, keep its asserted substrings, add the delta scenarios "Group command
       missing" and "Group prepared in the image", and verify by running it by hand on the host
 

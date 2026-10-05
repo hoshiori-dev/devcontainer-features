@@ -226,14 +226,16 @@ requirement in NOTES.md only, which leaves a failure condition outside the spec.
 - Every test script uses `set -euo pipefail`, braces, `[[ ]]`, two-space indentation, `case` statements laid out as the
   guide asks, and lines within 120 characters; `fedora_remote_user.sh` separates its setup from its checks with blank
   lines, like the other scripts. Environment variables a check compares are expanded with an empty default, so an unset
-  variable fails its check instead of aborting the script before `reportResults`. A command substitution in a check's
+  variable is reported as that check's failure instead of an unbound-variable abort. A command substitution in a check's
   arguments (`readlink -f "$(command -v deno)"`) stays, since its failure fails that check.
 - Each label states one behavior in the spec's words; `tools_access` keeps its assertions under a label from Requirement
   "Shared location for global tools", and helpers are named after what they assert (`fedora_remote_user.sh`,
   `uid_remap.sh`). `uid_remap.sh` keeps one root process across the remap, which the test needs.
 - Every script that reads the latest-release pointer at run time says why in a comment, as `test.sh` already does.
 - `duplicate.sh` states its premise (the CLI installs the first non-default proposal, then the default) in a comment
-  instead of a check. Rejected: keeping it as a check, whose label would state the test's setup, not feature behavior.
+  instead of a check, and so do `exact_version.sh` and `fedora_remote_user.sh` for theirs (the checks run as the
+  scenario's `remoteUser`, `vscode` and `devuser`). Rejected: keeping them as checks, whose labels would state the
+  test's setup, not feature behavior.
 - `test.sh` sets its shell options together before the cache helper, keeps the dnf state-file exemptions as a commented
   list, drops the redundant one-level glob (`globstar`'s `dir/**/*` already matches `dir/*`; checked), sends its
   `command -v` probes to `/dev/null`, branches with `if`, and corrects the comment on which images run as root.
