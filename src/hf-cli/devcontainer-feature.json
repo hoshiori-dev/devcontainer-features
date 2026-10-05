@@ -1,6 +1,6 @@
 {
   "id": "hf-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "Hugging Face CLI",
   "description": "Installs the Hugging Face CLI with its standalone installer for the remote user, optionally with the upstream hf-cli agent skill.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/hf-cli",

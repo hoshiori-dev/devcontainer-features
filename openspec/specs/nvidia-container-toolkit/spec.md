@@ -113,7 +113,7 @@ The feature SHALL accept the option `configureDocker` as declared here: when it 
 NVIDIA runtime with a Docker daemon installed in the image as "Register the NVIDIA runtime with Docker" states, or, when
 no Docker daemon is installed, installs the toolkit, prints a message that it skipped the Docker configuration, and
 succeeds without creating `/etc/docker/daemon.json`; when it is disabled, the feature does not create or change
-`/etc/docker/daemon.json`.
+`/etc/docker/daemon.json`; and any value other than `true` or `false`, including an empty value, fails the build.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -137,6 +137,12 @@ succeeds without creating `/etc/docker/daemon.json`; when it is disabled, the fe
 
 - **WHEN** the feature is installed with `configureDocker` disabled on an image with a Docker daemon
 - **THEN** `/etc/docker/daemon.json` is neither created nor changed
+
+#### Scenario: Invalid configureDocker
+
+- **WHEN** the feature is installed with `configureDocker` set to a value that is neither `true` nor `false`, such as
+  `yes`, `TRUE`, `1`, or an empty value
+- **THEN** the feature fails the build with a message naming the value, before it changes the image
 
 ### Requirement: Register the NVIDIA runtime with Docker
 
