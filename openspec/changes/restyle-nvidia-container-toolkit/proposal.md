@@ -36,9 +36,9 @@ None.
 
 ## Impact
 
-- Feature ids touched: nvidia-container-toolkit changes from 1.0.0 to 1.0.1 (PATCH): the restyle and the new
-  `configureDocker` validation are fixes under `.agents/knowledge/feature-authoring.md` (Versions); no option, default,
-  supported image, or install location changes.
+- Feature ids touched: nvidia-container-toolkit changes from 1.0.0 to 1.0.1 (PATCH, confirmed by the maintainer): the
+  restyle and the new `configureDocker` validation are fixes under `.agents/knowledge/feature-authoring.md` (Versions);
+  no option, default, supported image, or install location changes.
 - Files touched after approval: `src/nvidia-container-toolkit/install.sh`,
   `src/nvidia-container-toolkit/devcontainer-feature.json` (version only), and the shell scripts under
   `test/nvidia-container-toolkit/` (`test.sh`, `duplicate.sh`, `helpers.sh`, and the nine scenario scripts).

@@ -218,9 +218,20 @@ zypper-only line.
 Alternatives rejected: one check per repository-file property (more checks restating one fact); narrowing the dnf label
 instead of checking the URL; a literal expected version (the newest release moves).
 
+### Package decisions
+
+The maintainer closed the package deliberation on 2026-10-05 and approved the package with these decisions:
+
+- An explicitly empty `configureDocker` fails the build like any other value that is not `true` or `false`, as the
+  delta's Scenario "Invalid configureDocker" states; it does not fall back to the default.
+- The version bump is PATCH (1.0.0 to 1.0.1): the restyle and the new `configureDocker` validation are fixes.
+- None of the optional improvements below is adopted.
+- Every other decision of this design stands as drafted.
+
 ## Optional improvements offered, not adopted
 
-The audit suggested these; none is required by the guide or a confirmed finding. Each can be added at the package gate.
+The audit suggested these; none is required by the guide or a confirmed finding. The maintainer adopted none of them
+when closing the package gate (Package decisions); each stays available to a later change.
 
 - **`--retry 3` on the key download**: rides out a transient network failure, with a comment naming it. Trade-off:
   changes the download invocation in a change that otherwise keeps it fixed, and a slow failure takes longer.
@@ -248,8 +259,8 @@ The audit suggested these; none is required by the guide or a confirmed finding.
 - [Copying the skeleton's default line changes `version` validation] → `${VERSION-latest}` stays; the manual run for
   "Malformed version" includes an empty value.
 - [Builds that passed `yes`, `1`, `TRUE`, or an empty `configureDocker` now fail] → They silently skipped or applied the
-  Docker step before; the failure names the value and the fix. PATCH treats this as a fix; a maintainer may prefer
-  MINOR.
+  Docker step before; the failure names the value and the fix. The maintainer confirmed PATCH at the package gate: the
+  validation is a fix.
 - [Test-asserted strings drift] → The `mktemp` template, the repository file content, the key paths, and the repository
   id `nvidia-container-toolkit` that the tests query stay as they are.
 - [Positional parameters] → The feature takes no arguments; `main "$@"` passes none, and the helpers that read `$1` are
