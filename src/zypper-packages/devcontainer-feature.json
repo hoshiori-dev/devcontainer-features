@@ -1,6 +1,6 @@
 {
   "id": "zypper-packages",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "ZYPPER packages",
   "description": "Installs listed system packages from the repositories the image already enables.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/zypper-packages",

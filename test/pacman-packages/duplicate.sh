@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Install-twice test: pacman-packages is installed once with a non-default `packages` from its
-# proposals, then once with the defaults. Option values arrive as PACKAGES and PACKAGES__DEFAULT.
-# Scenarios "Listed packages are installed" (with the proposals list), "Different list on the second
-# install" (the second, default list is empty), and "Caches are removed".
-set -e
+# Install-twice test: pacman-packages is installed with packages=bc,tree and cleanup=packages, then with the defaults,
+# an empty list and cleanup=all. Scenarios "Listed packages are installed" and "Only package files are cleaned" for the
+# first install, and "Omitted packages" for the second, whose default cleanup=all must remove nothing.
+set -euo pipefail
 
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
@@ -13,32 +12,19 @@ installed() {
 }
 
 no_package_files() {
-  [ -z "$(find /var/cache/pacman/pkg -mindepth 1 -print -quit)" ]
+  [[ -z "$(find /var/cache/pacman/pkg -mindepth 1 -print -quit)" ]]
 }
 
-no_sync_databases() {
-  [ -z "$(find /var/lib/pacman/sync -mindepth 1 -print -quit)" ]
+sync_databases_remain() {
+  [[ -n "$(find /var/lib/pacman/sync -name '*.db' -print -quit)" ]]
 }
 
-check "the first install had a non-empty list" test -n "${PACKAGES//[ ,]/}"
-IFS=, read -r -a entries <<<"$PACKAGES"
-for entry in "${entries[@]}"; do
-  entry="${entry//[[:space:]]/}"
-  [ -n "$entry" ] || continue
-  check "$entry from the first install is installed" installed "$entry"
-done
-# The second invocation's empty default list is a no-op, so the first cleanup
-# policy determines cache state. The control checks cover two non-empty lists.
-case ${CLEANUP:-all} in
-  all)
-    check "package files are cleaned" no_package_files
-    check "metadata is cleaned" no_sync_databases
-    ;;
-  packages)
-    check "package files are cleaned" no_package_files
-    check "metadata survives the empty second invocation" bash -c 'find /var/lib/pacman/sync -name "*.db" | grep -q .'
-    ;;
-  none) ;;
-esac
+# The devcontainer CLI gives the first install, for each option, the `proposals` entry or `enum` value at index 1 when
+# the default is empty or sits at index 0: packages=bc,tree and cleanup=packages. Re-check the literals below when the
+# CLI's selection, the proposals, or the enum order changes.
+check "bc from the first install is installed" installed bc
+check "tree from the first install is installed" installed tree
+check "package files are removed from /var/cache/pacman/pkg" no_package_files
+check "sync databases remain in /var/lib/pacman/sync after the empty second install" sync_databases_remain
 
 reportResults
