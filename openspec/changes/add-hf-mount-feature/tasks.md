@@ -182,3 +182,23 @@
       (arm64 runs only in CI) and that every required check but `spec-archived` is green
 - [x] 9.7 Record each Acceptance item and each scenario with its test or hand check, image, architecture, and result in
       the PR's Validation section
+
+## 10. Review follow-up
+
+- [x] 10.1 In `resolve_release` of `src/hf-mount/install.sh`, add `--fail` to the latest-release request, so that it
+      fails on an HTTP error status as the design's Goals state for every request (the redirect is still read, not
+      followed), and give the `curl` exit status of an HTTP error its own message naming the URL and the status; verify
+      with `shellcheck`, also with `-o require-variable-braces,require-double-brackets`, reporting nothing, with a
+      default install in throwaway `debian:12` and `ubuntu:22.04` containers that resolves `latest` and leaves the three
+      binaries in place, with a copy of the script whose latest-release URL names a path that answers 404 (exit 1 with
+      that message, no download in the log, no mount helper installed, `/usr/local/bin` left as it was), and with the
+      copy of task 3.2 whose repository has no release, which must still end with the message of "Latest release cannot
+      be resolved"
+- [x] 10.2 In the design's Goals (TLS alone, never weakened), state what the feature does about certificate checking and
+      no more: it passes no flag, uses no configuration file, and sets no environment variable that relaxes it, and it
+      leaves the build environment's own certificate settings as the image provides them; add the hand check of task
+      10.1 to the design's Hand checks; change no behavior; verify by reading `install.sh` for such a flag, file, or
+      variable, by one `curl` request each with `CURL_CA_BUNDLE` and with `SSL_CERT_FILE` set to `/dev/null`, and by
+      searching `NOTES.md`, the proposal, the delta spec, this file, and the rest of the design for the stronger claim
+- [x] 10.3 Run `just docs` and verify that `src/hf-mount/README.md` does not change, and run `just check` and verify it
+      passes
