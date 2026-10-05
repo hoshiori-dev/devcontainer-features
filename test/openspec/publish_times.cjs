@@ -17,7 +17,7 @@ function registryDocument(name) {
     if (!documents.has(name)) {
         documents.set(
             name,
-            fetch(REGISTRY + name.replace("/", "%2f"), { redirect: "error" }).then((response) => {
+            fetch(REGISTRY + name.replaceAll("/", "%2f"), { redirect: "error" }).then((response) => {
                 if (response.status !== 200) throw new Error(`${name}: the registry answered ${response.status}`);
                 return response.json();
             }),
