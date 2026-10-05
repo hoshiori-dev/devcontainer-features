@@ -46,9 +46,10 @@ up:
 
 - NFS: passwordless `sudo`. `hf-mount` runs `mount.nfs` and `umount` through `sudo -n`.
 - FUSE: `user_allow_other` on a line of its own in `/etc/fuse.conf`, because `hf-mount` mounts with `allow_other`; or
-  pass `--fuse-owner-only`, which restricts the mount to the mounting user and needs no change to `/etc/fuse.conf`. With
-  `hf-mount` 0.13.1 on a Linux 6.18 host, a `--fuse-owner-only` mount started but refused every access, including the
-  mounting user's; if the mount point answers `Permission denied`, use `user_allow_other` instead.
+  pass `--fuse-owner-only`, which restricts the mount to the mounting user and needs no change to `/etc/fuse.conf`. In
+  this feature's hand checks (`hf-mount` 0.10.0, 0.12.0, and 0.13.1 on one WSL2 host), a `--fuse-owner-only` mount
+  started but refused every access, the mounting user's included, whether root or `vscode` had mounted; if the mount
+  point answers `Permission denied`, use `user_allow_other` instead.
 
 ## Downloads
 
