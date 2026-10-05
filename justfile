@@ -10,7 +10,7 @@ set positional-arguments
 default:
     @just --list
 
-# Everything CI checks without containers: formatting, shell scripts, Deno scripts, metadata and versions, specs, READMEs
+# Everything CI checks without containers: formatting, shell scripts, Deno scripts, metadata, versions, specs, READMEs
 check: lint scripts-check validate spec-check docs-check
 
 # Check formatting (deno fmt) and shell scripts (shellcheck); the pre-commit hooks run on each commit
@@ -18,6 +18,7 @@ lint:
     deno fmt --check
     git ls-files -z '*.sh' | xargs -0 --no-run-if-empty shellcheck
 
+# --allow-env=LOG_TOKENS,LOG_STREAM: npm:yaml reads both to decide whether to print debug output.
 # Type-check, lint, and unit-test the Deno scripts
 scripts-check:
     deno check scripts/ .agents/skills/github-project-workflow/scripts/
@@ -30,7 +31,7 @@ validate base="origin/main":
 
 # Strict-validate OpenSpec specs and changes; check config.yaml rules, feature options, and generated files
 spec-check:
-    OPENSPEC_NO_UPDATE_CHECK=1 openspec validate --all --strict --no-interactive
+    OPENSPEC_NO_UPDATE_CHECK=1 OPENSPEC_TELEMETRY=0 openspec validate --all --strict --no-interactive
     ./scripts/check_openspec.ts
 
 # List unarchived OpenSpec changes; --ready shows the verdict CI gives a ready PR
@@ -61,7 +62,7 @@ docs:
 docs-check:
     ./scripts/docs.ts --check
 
-# Scaffold src/<id> and test/<id> for a new feature (after its OpenSpec change exists)
+# Scaffold src/<id> and test/<id> for a new feature (after its OpenSpec change exists); add --posix for POSIX sh
 new-feature id *args:
     ./scripts/new_feature.ts "$1" "${@:2}"
 

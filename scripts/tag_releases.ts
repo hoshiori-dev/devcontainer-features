@@ -25,16 +25,30 @@ if (import.meta.main) {
         for await (const entry of Deno.readDir("src")) if (entry.isDirectory) ids.push(entry.name);
     }
     const missing: string[] = [];
+    // verify has validated this commit, so an unreadable file or version means a state that should not exist:
+    // fail before tagging anything rather than leave a published version untagged while the job passes.
+    const problems: string[] = [];
     for (const id of ids.sort()) {
-        const version = await readJsonc(join("src", id, "devcontainer-feature.json"))
-            .then((json) => (json as { version?: unknown } | null)?.version)
-            .catch(() => undefined);
+        const path = join("src", id, "devcontainer-feature.json");
+        let json: unknown;
+        try {
+            json = await readJsonc(path);
+        } catch (error) {
+            problems.push(`cannot read or parse ${path}: ${error instanceof Error ? error.message : error}`);
+            continue;
+        }
+        const version = (json as { version?: unknown } | null)?.version;
         if (typeof version !== "string") {
-            console.error(`warning: src/${id}/devcontainer-feature.json has no readable version; not tagged.`);
+            problems.push(`${path} has no string "version"`);
             continue;
         }
         const tag = releaseTag(id, version);
         if (!remote.has(tag)) missing.push(tag);
+    }
+    if (problems.length > 0) {
+        for (const problem of problems) console.error(`error: ${problem}`);
+        console.error("error: no tag was created; fix the metadata and rerun the release workflow.");
+        Deno.exit(1);
     }
     if (missing.length === 0) {
         console.log("Every published version is already tagged.");

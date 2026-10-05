@@ -1,4 +1,5 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write=/tmp --allow-run=git,openspec --allow-env=LOG_TOKENS,LOG_STREAM
+// --allow-env=LOG_TOKENS,LOG_STREAM: npm:yaml reads both to decide whether to print debug output.
 // Three checks OpenSpec's own validator does not make (.agents/knowledge/spec-workflow.md):
 // - openspec/config.yaml holds no rule OpenSpec would drop. OpenSpec 1.13.2 replaces an invalid
 //   `rules` field with a warning on stderr: a rule that is not a string — an unquoted rule with a
@@ -100,16 +101,6 @@ export async function configProblems(path: string): Promise<string[]> {
     return ruleProblems(config);
 }
 
-/** The script fails when any check found a problem or `openspec init` itself failed. */
-export function exitCode(
-    configProblems: string[],
-    generatedProblems: string[],
-    initFailed: boolean,
-    optionProblems: string[],
-): number {
-    return initFailed || generatedProblems.length > 0 || configProblems.length > 0 || optionProblems.length > 0 ? 1 : 0;
-}
-
 /** Spec files that may hold Option requirements: main specs and the deltas of active changes. */
 async function specFiles(root: string): Promise<string[]> {
     const files: string[] = [];
@@ -131,7 +122,7 @@ async function openspecArchive(dir: string, change: string): Promise<string | un
     const archive = await new Deno.Command("openspec", {
         args: ["archive", change, "-y"],
         cwd: dir,
-        env: { OPENSPEC_NO_UPDATE_CHECK: "1" },
+        env: { OPENSPEC_NO_UPDATE_CHECK: "1", OPENSPEC_TELEMETRY: "0" },
         stdout: "piped",
         stderr: "piped",
     }).output();
@@ -228,32 +219,24 @@ async function readOrUndefined(path: string): Promise<string | undefined> {
     return await exists(path) ? await Deno.readTextFile(path) : undefined;
 }
 
-if (import.meta.main) {
-    const config = await configProblems(CONFIG);
-    for (const problem of config) console.error(`- ${CONFIG}: ${problem}`);
-    if (config.length > 0) {
-        console.error(
-            `Fix ${CONFIG}: OpenSpec only warns on stderr and goes on without these rules (.agents/knowledge/spec-workflow.md).`,
-        );
-    }
+export type GeneratedResult = { problems: string[]; initFailed: boolean };
 
-    const options = await optionProblems();
-    for (const problem of options) console.error(`- ${problem}`);
-    if (options.length > 0) {
-        console.error(
-            "Make each devcontainer-feature.json declare exactly the options its spec states, or fix the Option " +
-                "requirement (.agents/knowledge/spec-workflow.md, Option requirements).",
-        );
-    }
-
+/** Problems with OpenSpec's generated files, and whether `openspec init` itself failed (its stderr is printed here). */
+export async function generatedProblems(): Promise<GeneratedResult> {
     const problems: string[] = [];
     if (await exists(UPDATE_MARKER)) problems.push(`${UPDATE_MARKER} exists (left by \`openspec update\`); delete it`);
 
     const temp = await Deno.makeTempDir({ dir: "/tmp", prefix: "openspec-check-" });
-    let failed = false;
+    let initFailed = false;
     try {
         for (const path of (await git(["ls-files", "-z"])).split("\0").filter(Boolean)) {
-            const info = await Deno.lstat(path).catch(() => undefined); // undefined: deleted in the working tree
+            const info = await Deno.lstat(path).catch((error) => {
+                // Deleted in the working tree, or a parent directory replaced by a file.
+                if (error instanceof Deno.errors.NotFound || error instanceof Deno.errors.NotADirectory) {
+                    return undefined;
+                }
+                throw error;
+            });
             if (!info || info.isSymlink) continue;
             const target = join(temp, path);
             await Deno.mkdir(dirname(target), { recursive: true });
@@ -262,14 +245,14 @@ if (import.meta.main) {
         const init = await new Deno.Command("openspec", {
             args: ["init", "--tools", "claude", "--no-animation"],
             cwd: temp,
-            env: { OPENSPEC_NO_UPDATE_CHECK: "1" },
+            env: { OPENSPEC_NO_UPDATE_CHECK: "1", OPENSPEC_TELEMETRY: "0" },
             stdout: "null",
             stderr: "piped",
         }).output();
         if (!init.success) {
             console.error(new TextDecoder().decode(init.stderr));
             console.error("error: `openspec init --tools claude` failed in a copy of the repository; see above.");
-            failed = true;
+            initFailed = true;
         } else {
             for (const root of GENERATED) {
                 if (!(await exists(join(temp, root)))) continue;
@@ -285,15 +268,58 @@ if (import.meta.main) {
     } finally {
         await Deno.remove(temp, { recursive: true });
     }
-    if (problems.length > 0) {
-        for (const problem of problems) console.error(`- ${problem}`);
+    return { problems, initFailed };
+}
+
+/** The checks the script runs, in order; tests replace them so they need no OpenSpec. */
+export type Checks = {
+    config: () => Promise<string[]>;
+    options: () => Promise<string[]>;
+    generated: () => Promise<GeneratedResult>;
+};
+
+const CHECKS: Checks = {
+    config: () => configProblems(CONFIG),
+    options: () => optionProblems(),
+    generated: generatedProblems,
+};
+
+/**
+ * Runs the checks, printing each problem and its fix on stderr and each passing check on stdout, and returns the exit
+ * code: 1 when any check found a problem or `openspec init` itself failed, else 0.
+ */
+export async function main(checks: Checks = CHECKS): Promise<number> {
+    const config = await checks.config();
+    for (const problem of config) console.error(`- ${CONFIG}: ${problem}`);
+    if (config.length > 0) {
+        console.error(
+            `Fix ${CONFIG}: OpenSpec only warns on stderr and goes on without these rules ` +
+                "(.agents/knowledge/spec-workflow.md).",
+        );
+    }
+
+    const options = await checks.options();
+    for (const problem of options) console.error(`- ${problem}`);
+    if (options.length > 0) {
+        console.error(
+            "Make each devcontainer-feature.json declare exactly the options its spec states, or fix the Option " +
+                "requirement (.agents/knowledge/spec-workflow.md, Option requirements).",
+        );
+    }
+
+    const generated = await checks.generated();
+    if (generated.problems.length > 0) {
+        for (const problem of generated.problems) console.error(`- ${problem}`);
         console.error(
             "Regenerate with `openspec init --tools claude` (never `openspec update`) and commit the result; see " +
                 ".agents/knowledge/spec-workflow.md.",
         );
     }
+    const generatedCurrent = !generated.initFailed && generated.problems.length === 0;
     if (config.length === 0) console.log(`${CONFIG}: every rule reaches OpenSpec`);
     if (options.length === 0) console.log("Option requirements are readable and every feature's options match them");
-    if (!failed && problems.length === 0) console.log("OpenSpec's generated files are current");
-    Deno.exit(exitCode(config, problems, failed, options));
+    if (generatedCurrent) console.log("OpenSpec's generated files are current");
+    return config.length === 0 && options.length === 0 && generatedCurrent ? 0 : 1;
 }
+
+if (import.meta.main) Deno.exit(await main());

@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-tools
       - id: base
         uses: ./.github/actions/base-checks
@@ -31,7 +33,7 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: ./scripts/check_title.ts "$TITLE"
+        run: ./scripts/check_title.ts "${TITLE}"
 
   pr-checklist:
     # Dependabot writes its own description; its PRs change no behavior and carry no spec.
@@ -39,6 +41,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-tools
       - id: base
         uses: ./.github/actions/base-checks
@@ -51,6 +55,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-tools
       - id: base
         uses: ./.github/actions/base-checks
@@ -61,4 +67,8 @@ jobs:
           DRAFT: ${{ github.event.pull_request.draft }}
           ROOT: ${{ steps.base.outputs.root }}
         run: |
-          if [[ "$DRAFT" == "true" ]]; then "$ROOT/scripts/check_spec_archived.ts"; else "$ROOT/scripts/check_spec_archived.ts" --ready; fi
+          if [[ "${DRAFT}" == "true" ]]; then
+            "${ROOT}/scripts/check_spec_archived.ts"
+          else
+            "${ROOT}/scripts/check_spec_archived.ts" --ready
+          fi
