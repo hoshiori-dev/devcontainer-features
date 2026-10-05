@@ -18,8 +18,6 @@ if [ "${1-}" != "--clean" ]; then
     /bin/sh /usr/local/share/firewall/apply.sh --clean
 fi
 set -eu
-# Every file this script writes is readable by every user and writable by root alone.
-umask 022
 
 readonly SHARE_DIR="/usr/local/share/firewall"
 readonly OPTIONS_FILE="${SHARE_DIR}/options"
@@ -94,7 +92,7 @@ log() {
 # Waits a fifth of a second. Known failure mode: a sleep that takes no fractional seconds fails, and a full second
 # is waited instead.
 nap() {
-  sleep 0.2 2>/dev/null || sleep 1
+  if ! sleep 0.2 2>/dev/null; then sleep 1; fi
 }
 
 # Whether the process with the ID $1 exists and is not a zombie. An image without an init process leaves a stopped
@@ -311,6 +309,9 @@ defer_failure() {
 # entrypoint always exits zero": this script defines no `fail` that exits 1, and this handler has a name of its own.
 # The result of a start reaches the developer through the start record and check.sh, never through the status of
 # the entrypoint, so a tool that stops at a failing entrypoint still runs the container's command.
+# Deviation from shell-style.md (Functions and structure): the steps call this handler, and it calls the steps
+# stop_dnsmasq and load_table again, one level deeper than main -> step -> helper, because Requirement: Failure mode
+# of the feature's spec asks a failed start for what those steps do.
 end_failed_start() {
   trap - EXIT
   # From here on, a failing command no longer stops the script: every step below is attempted, the record is
@@ -333,7 +334,11 @@ end_failed_start() {
       log "failureMode closed: only loopback and the DNS resolvers are reachable"
     fi
   fi
-  write_record failed "${end_failed_start_reason}"
+  if ! write_record failed "${end_failed_start_reason}"; then
+    # A re-run within one start must not leave the record of its earlier run standing for this one: without a
+    # record, check.sh reports that this start was not applied.
+    rm -f "${RECORD_FILE}"
+  fi
   exit 0
 }
 
@@ -569,6 +574,8 @@ start_dnsmasq() {
 }
 
 main() {
+  # Every file this script writes is readable by every user and writable by root alone.
+  umask 022
   trap handle_exit EXIT
   require_root
   prepare_state
@@ -577,6 +584,7 @@ main() {
   elif ! validate_options; then
     defer_failure "the options in ${OPTIONS_FILE} are not valid: ${reason}"
   fi
+  readonly DEFAULTACTION PRESETS ALLOWEDDOMAINS ALLOWEDCIDRS DENIEDDOMAINS DENIEDCIDRS FAILUREMODE FILTERFORWARD
   stop_dnsmasq
   record_resolvers
 
@@ -612,9 +620,12 @@ EOF
   step="pointing ${RESOLV_CONF} at the resolver"
   write_nameservers "${LOCAL_RESOLVER}"
 
-  trap - EXIT
+  # The handler stays in place until the record is written, so a record that cannot be written ends the start as a
+  # failed one, with status 0, like a stop anywhere above.
+  step="writing the start record"
   write_record applied ""
   log "applied (defaultAction=${DEFAULTACTION}, presets=${PRESETS}, GitHub ranges: ${github_ranges})"
+  trap - EXIT
 }
 
 main "$@"
