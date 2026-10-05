@@ -188,6 +188,16 @@ find_runtime() {
       "use an image that has util-linux"
 }
 
+# Fails when a directory is at the wrapper's path, before any network access and before anything of an earlier
+# installation is touched: the wrapper could not take that path.
+check_wrapper_path() {
+  # A symbolic link is replaced like a file, whatever it points to.
+  if [[ -d "${WRAPPER}" && ! -L "${WRAPPER}" ]]; then
+    fail "${WRAPPER} is a directory, so the command openspec cannot be installed there;" \
+      "remove that directory from the image before this feature is installed"
+  fi
+}
+
 # Reads the package's registry document once, relying on TLS alone and following no redirect, and takes from it the
 # version to install, its publish time, and the Node.js range it requires.
 select_version() {
@@ -398,7 +408,8 @@ replace_installation() {
     if [[ -n "${previous}" ]]; then mv "${previous}/tree" "${PREFIX}"; fi
     fail "cannot move the new installation to ${PREFIX}"
   fi
-  mv --force "${UNFINISHED_WRAPPER}" "${WRAPPER}"
+  # --no-target-directory: the wrapper takes the path itself and is never moved into a directory found there.
+  mv --force --no-target-directory "${UNFINISHED_WRAPPER}" "${WRAPPER}"
   log "installed OpenSpec ${openspec_version} to ${PREFIX}; ${WRAPPER} runs it on ${node_bin}"
 }
 
@@ -409,6 +420,7 @@ main() {
   trap cleanup EXIT
   create_work_dir
   find_runtime
+  check_wrapper_path
   select_version
   install_staged
   check_sources

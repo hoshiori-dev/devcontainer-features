@@ -176,14 +176,16 @@ checked on 2026-09-30 and 2026-10-01 to choose it.
   `install.sh` checks, in this order, the distribution and architecture, every option value (`version`: `latest` or one
   exact version; `disableUpdateCheck` and `disableTelemetry`: `true` or `false`), and the presence of Node.js, of npm
   10.8.2 or newer, and of `setpriv`, all before any network access and before it creates anything outside its temporary
-  directory, the staging directory included (an npm that new runs only on a Node.js that has `fetch`; the spec fixes no
-  order between the platform and the option checks, so the script's stays; `setpriv` is part of the essential util-linux
-  on every distribution the gate admits, so the spec has no scenario for it). Each option takes its default in the form
-  `${NAME-default}`, so an explicitly empty value reaches its check and fails. The message for a missing Node.js names
-  20.19.0, a constant in `install.sh`; the found Node.js is compared with the selected version's `engines.node` before
-  npm installs anything. Checked by `just check`, by `shellcheck -o require-variable-braces,require-double-brackets`
-  reporting nothing for `src/openspec/install.sh` and every `test/openspec/*.sh`, by review of the scripts against the
-  guide, and by the local runs under Decisions - Tests.
+  directory, the staging directory included, and then, still before any network access, that no directory is at the
+  wrapper's path, where the wrapper could not be put; the final move of the wrapper uses `--no-target-directory`, which
+  the `mv` of both listed images has, so it never descends into a directory (an npm that new runs only on a Node.js that
+  has `fetch`; the spec fixes no order between the platform and the option checks, so the script's stays; `setpriv` is
+  part of the essential util-linux on every distribution the gate admits, so the spec has no scenario for it). Each
+  option takes its default in the form `${NAME-default}`, so an explicitly empty value reaches its check and fails. The
+  message for a missing Node.js names 20.19.0, a constant in `install.sh`; the found Node.js is compared with the
+  selected version's `engines.node` before npm installs anything. Checked by `just check`, by
+  `shellcheck -o require-variable-braces,require-double-brackets` reporting nothing for `src/openspec/install.sh` and
+  every `test/openspec/*.sh`, by review of the scripts against the guide, and by the local runs under Decisions - Tests.
 - `install.sh` names its trust surface as readonly constants at the top: the registry URL `https://registry.npmjs.org/`
   and the package name every request of its own is built from, the TUF mirror `https://tuf-repo-cdn.sigstore.dev` that
   the audit's log line and failure hint name (Open Questions), and every path it creates or modifies outside its
@@ -478,6 +480,12 @@ pull request.
   kept, and answers the open question on the proposal's sentence with its option (b), extended to the spec. No script
   changes, and the check of the built-in npmrc stays out. Rejected: keeping the broader sentences and reading them as
   covering only the isolated layers.
+- **A directory at the wrapper's path fails the install.** `mv --force` would put the new wrapper inside it and report
+  success with a command that does not run, after the previous prefix was replaced. `install.sh` fails before any
+  network access, with a message saying to remove the directory, and the final move cannot descend into a directory
+  (Goals). The spec gains no clause: no install of this feature and no listed image produces that state, and the build
+  fails as it does for any image the feature cannot be installed on. Checked by the local run recorded in the PR's
+  Validation section. Rejected: removing the directory — it is not the feature's to delete.
 
 ## URL inventory
 
