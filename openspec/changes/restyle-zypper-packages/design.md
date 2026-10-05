@@ -225,7 +225,8 @@ The header comment of `install.sh` is the shared one as well:
   literals; `x86_64` is right because scenarios run on amd64 only.
 - The glob loops of `controls_*.sh` become helpers named after what they assert (parsed metadata remains, no package
   file remains), still globs, since the images have no `find`; their loop variables are named after what they hold and
-  are `local`.
+  are `local`. The package-file helper looks one level deeper than the loop it replaces, where Leap keeps its downloads
+  (Risks).
 - `test.sh` loses the unused helper; its `TEMPORARY (#43)` comment becomes `TODO(#43)`, naming the pull request that
   removed Tumbleweed arm64 and records why, and says to restore the combination once upstream fixes the cause (Open
   Questions).
@@ -287,6 +288,10 @@ so none is part of this change.
   failure the log therefore holds the feature's line with zypper's status but not zypper's own text, although the shared
   wording says "reports above". Printing the captured output would take a second command between the call and `fail`,
   against the `|| fail` decision; it is left as it is.
+- [Depth of the package cache] → libzypp stores a downloaded package in `<alias>/<arch>` below
+  `/var/cache/zypp/packages` on `opensuse/tumbleweed` and in `<alias>/%2E%2E/<arch>` on `opensuse/leap:16.0` (seen with
+  `zypper install --download-only` on 2026-10-05). The loop of 1.0.0 reached two levels, so on Leap it passed with a
+  package file present; the helper reaches three and fails there.
 - [Case patterns] → An unquoted `<` or `>` in a pattern is a syntax error, and an unquoted `${name}` in `${1#…}` is a
   pattern; both stay quoted.
 - [Ranges depend on `LC_ALL=C`] → Moving the check outside the `C` block would let a bracket range admit non-ASCII

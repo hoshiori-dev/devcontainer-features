@@ -13,10 +13,12 @@ parsed_metadata_remains() {
   return 1
 }
 
-# Succeeds when the package cache holds no package file, at either depth libzypp stores them.
+# Succeeds when the package cache holds no package file one to three levels below it: libzypp stores a download in
+# <alias>/<arch> on Tumbleweed and in <alias>/%2E%2E/<arch> on Leap 16.0.
 no_package_file_remains() {
   local package_file
-  for package_file in /var/cache/zypp/packages/*/*.rpm /var/cache/zypp/packages/*/*/*.rpm; do
+  local packages_dir="/var/cache/zypp/packages"
+  for package_file in "${packages_dir}"/*/*.rpm "${packages_dir}"/*/*/*.rpm "${packages_dir}"/*/*/*/*.rpm; do
     if [[ -f "${package_file}" ]]; then return 1; fi
   done
   return 0
