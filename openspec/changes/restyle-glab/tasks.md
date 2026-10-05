@@ -58,7 +58,7 @@
 - [x] 4.2 Re-run the manual checks design.md (Goals) lists for the failure scenarios, with the empty `version` and a
       failing package-manager command added; verify each prints the part its scenario requires and leaves
       `/usr/local/bin/glab` as the scenario says
-- [ ] 4.3 Run `just test glab` and `just test-scenarios glab` through the PR's container test jobs, which run them per
+- [x] 4.3 Run `just test glab` and `just test-scenarios glab` through the PR's container test jobs, which run them per
       image on amd64 and arm64; verify every job is green
-- [ ] 4.4 Record the results of 4.1 to 4.3 and of every Acceptance item in the PR's Validation section; verify each item
+- [x] 4.4 Record the results of 4.1 to 4.3 and of every Acceptance item in the PR's Validation section; verify each item
       of the proposal's `## Acceptance` is named there with its result
