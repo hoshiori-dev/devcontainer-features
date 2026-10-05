@@ -43,7 +43,8 @@ Research for this change, re-checked against upstream on 2026-09-30; items marke
   `ubuntu:22.04` (2.35), `fedora:44` (2.43) have amd64 and arm64 manifests; `debian:11` and `ubuntu:20.04` have 2.31.
   `nfs-common` and `fuse3` (Debian, Ubuntu) and `nfs-utils` and `fuse3` (Fedora) exist for both architectures.
 - The base image tags `ubuntu24.04` and `noble` name one image (version 3.0.8, built 2026-09-10); the hyphenated
-  `ubuntu-24.04` that `scripts/new_feature.ts` writes names another, version 2.0.5, built 2025-10-16 (2026-10-01).
+  `ubuntu-24.04`, which `scripts/new_feature.ts` wrote into a new `compatibility.json` until #48, names another, version
+  2.0.5, built 2025-10-16 (2026-10-01).
 - `hf-mount` reads `HF_TOKEN` or `--token-file` itself, so the feature needs no credential and no `hf-cli` dependency.
 
 ## Goals / Non-Goals
@@ -68,13 +69,18 @@ Research for this change, re-checked against upstream on 2026-09-30; items marke
 - No credential. No request carries a token or any other credential, and the feature reads none from its environment.
   Checked by review.
 - One request resolves `latest`, and each selected binary takes one download; a pinned `version` makes no other request.
-  Checked by review.
-- Nothing changes before the platform checks pass. No package is installed and nothing is downloaded until the
-  architecture, C library (glibc 2.34 or later), distribution, and `version` checks pass; no mount-dependency package is
-  installed until every download has completed; and no binary is installed until those packages are in place, so a
-  package failure leaves `/usr/local/bin` unchanged. The entry point is POSIX `sh` so an image without bash, such as
-  Alpine, still gets the clear message. Checked by review, by `shellcheck` in `just check` (which takes the `sh` dialect
-  from the shebang), and by the platform hand checks.
+  No request is retried: the `--retry 3` of the skeleton in `.agents/knowledge/shell-style.md` is not taken over
+  (Optional improvements offered, not adopted). Checked by review.
+- Nothing changes before the platform checks pass. No package is installed and nothing is downloaded until every option
+  value (`version`, `backend`, `installMountDependencies`) is validated and the architecture, C library (glibc 2.34 or
+  later), and distribution checks pass; the glibc check comes before the distribution check, as the spec's "musl-based
+  image" scenario needs; no mount-dependency package is installed until every download has completed; and no binary is
+  installed until those packages are in place, so a package failure leaves `/usr/local/bin` unchanged. The entry point
+  is POSIX `sh`, a deliberate deviation from the bash recommendation of `.agents/knowledge/shell-style.md` (Choosing
+  bash or POSIX sh): every compatibility image ships bash, but the spec's "musl-based image" scenario requires the
+  feature's own message on Alpine, which ships none, and a bash entry point would end there with the shell lookup error.
+  The header of `install.sh` gives the same reason. Checked by review, by `shellcheck` in `just check` (which takes the
+  `sh` dialect from the shebang), and by the platform hand checks.
 - Idempotent and additive, as the spec's Installing twice requirement states: every selected binary is downloaded and
   replaced by `install` with mode `0755` on each install, and none is skipped, since the feature compares no checksum
   and so cannot tell whether an installed file is the requested release; nothing is removed. Checked by `duplicate.sh`
@@ -152,15 +158,54 @@ All three options are new. Where this table and the delta spec's Option requirem
   `hf-mount <MAJOR.MINOR.PATCH>` form only; `test.sh` makes no network request, since `latest` can move between build
   and test), `hf-mount status`, the backend files, `mount.nfs` or `fusermount3` presence, no `hf-mount` process (read
   from `/proc/*/comm`, so no `procps` is needed), and no uncommented `user_allow_other` in `/etc/fuse.conf`.
-  `duplicate.sh` asserts the spec's "Non-default options, then the defaults". Scenarios, on `debian:12` amd64, cover
+  `duplicate.sh` asserts the spec's "Non-default options, then the defaults". Its three checks of the first install's
+  options become a precondition: when the harness did not pass a `version` other than the default, `backend` `nfs`, and
+  `installMountDependencies` `false`, the script stops with a message naming the option that differs, so a reordered
+  enum or a changed proposal cannot silently change what the test shows. Scenarios, on `debian:12` amd64, cover
   `backend` `nfs` and `fuse`, `installMountDependencies` disabled, and a pinned `version`. Everything else is a hand
   check (below).
+
+### Decisions of 2026-10-05
+
+The maintainer decided these points in conversation on 2026-10-05, when the package was revised for the requirements
+added to the knowledge base after its approval of 2026-10-01 (`.agents/knowledge/shell-style.md`, `review-guidance.md`,
+and new sections of `feature-authoring.md` and `testing.md`).
+
+- `install.sh` stays POSIX `sh`, recorded as a deliberate deviation from the bash recommendation, with its reason under
+  Goals (Nothing changes before the platform checks pass); the tests stay bash, since they run only on the compatibility
+  images. Rejected: bash for `install.sh`, with which the spec's "musl-based image" scenario could not hold.
+- One request per resolution and per binary, without a retry (Goals). Rejected: taking over the skeleton's `--retry 3`
+  (Optional improvements offered, not adopted).
+- The delta spec states that a `backend` value outside its enum and an `installMountDependencies` value that is neither
+  `true` nor `false` fail the install before anything is downloaded, each with a scenario ("Invalid backend", "Invalid
+  installMountDependencies"); both are hand checks, which also gain an explicitly empty `version`, a value that already
+  falls under "Malformed version" (Hand checks). Rejected: leaving the spec silent and the failures to the guide's rule
+  alone.
+- The three checks of the first install's options in `duplicate.sh` become a precondition that stops the script with a
+  message, as the glab restyle did (Tests). Rejected: keeping them as checks, whose labels would state the test's setup
+  and not a behavior the spec states; removing them in favor of a comment, which would let a changed proposal silently
+  change what the test shows.
+- The spec's "Omitted backend" scenario says that `command -v hf-mount` resolves, following symbolic links, to
+  `/usr/local/bin/hf-mount`: on `fedora:44`, `/usr/local/sbin` is a link to `/usr/local/bin` and comes first on `PATH`,
+  so the command names `/usr/local/sbin/hf-mount` there. Rejected: leaving the scenario as it was and noting the fact
+  only in Context.
+
+## Optional improvements offered, not adopted
+
+The audit of 2026-10-05 raised this; the guide does not require it. The maintainer did not adopt it (Decisions of
+2026-10-05), so it stays out of this change.
+
+- **`--retry 3` on the latest-release request and the downloads**, as the skeleton's `fetch` has it. Gain: rides out a
+  transient network error. Cost: up to four attempts where the Goals bound one request per resolution and per binary,
+  and a slower failure when the source is down; today a failed request fails the build and the job is re-run (Risks).
 
 ## Hand checks
 
 How each spec scenario outside the container tests is provoked; results go to the PR's Validation section.
 
-- Version: `version` set to `v0.13.1`, `0.13`, and `9.9.9`.
+- Version: `version` set to `v0.13.1`, `0.13`, the empty string, and `9.9.9`.
+- Options: `backend` set to a value outside its enum, and `installMountDependencies` set to a value that is neither
+  `true` nor `false`. Each run must fail before anything is downloaded or installed.
 - Downloads: copies of `install.sh` with a binary name altered ("Asset missing from the release", whose 404 also shows
   "HTTP error") and with the latest-release URL naming a repository that has no release ("Latest release cannot be
   resolved"). Each run must leave `/usr/local/bin` as it was. The non-HTTPS redirect of "HTTP error" is checked by
@@ -182,6 +227,15 @@ How each spec scenario outside the container tests is provoked; results go to th
   Risks.
 - Credentials: none. No request carries a credential and the feature reads none; no option carries one, and Hugging Face
   tokens stay with `hf-mount` at run time.
+- Trust (`.agents/knowledge/feature-authoring.md`, Developer trust and readability): no option value is executed.
+  `version` only forms the release URL, `backend` and `installMountDependencies` select fixed branches, and every option
+  value is validated before anything changes (`.agents/knowledge/shell-style.md`, Options are data). No option changes
+  what the container may do: the `runArgs` a mount needs are written by the user in `devcontainer.json`, where a
+  reviewer sees them. The default `installMountDependencies=true` installs distribution packages whose mount helpers are
+  setuid root (`mount.nfs` and `fusermount3`, mode 4755 on all four compatibility images, amd64, 2026-10-05), together
+  with those packages' own dependencies, among them `rpcbind` and `keyutils` on every image and `python3` on the Debian
+  and Ubuntu ones; the option's description names the packages, and `false` installs none of them. The build log names
+  each download URL and the resolved release, and no credential.
 - User-scoped setup: none. The feature writes no per-user state, does not use `_REMOTE_USER` or `_CONTAINER_USER`, and
   leaves `/etc/fuse.conf` and the sudo configuration untouched.
 - Idempotency: additive, as the spec's Installing twice requirement states and the Goals bound it.
@@ -209,8 +263,8 @@ How each spec scenario outside the container tests is provoked; results go to th
 | `fedora:44`                                        | amd64, arm64 | —          | The dnf path (`nfs-utils`)                     |
 
 Excluded: `alpine` (musl), `debian:11` and `ubuntu:20.04` (glibc 2.31). `fedora:44` is included by the maintainer's
-decision (2026-10-01). The first entry names the maintained tag `ubuntu24.04`, not the `ubuntu-24.04` that
-`scripts/new_feature.ts` writes into a new `compatibility.json` (Context).
+decision (2026-10-01). The first entry names the maintained tag `ubuntu24.04`, not the hyphenated `ubuntu-24.04`
+(Context).
 
 ## URL inventory
 
@@ -250,3 +304,51 @@ has no `dependsOn` or `installsAfter`.
 - [`nfs-common` pulls `rpcbind`, whose maintainer scripts were not yet run inside a container build] → The default
   install on every compatibility image exercises it; a failure there is resolved before the PR is marked ready.
 - [Each backend is about 27 MB, so `both` adds about 55 MB] → `backend` narrows it.
+
+## Open Questions
+
+The revision of 2026-10-05 left three points to the maintainer. The package is written for option A of each, so
+"accepted as written" closes a question with A.
+
+1. **A Goal that names the shell style guide.** Raised by `.agents/knowledge/shell-style.md` (Applying the guide): new
+   files follow the guide, and each file written is also run through
+   `shellcheck -o require-variable-braces,require-double-brackets`. The Goals hold no bound that names the guide. They
+   record the POSIX entry point, a deliberate deviation, with its reason; what follows from it, a short option kept
+   before the glibc check where BusyBox has no long form (`id -u`), is marked in the script only, and the stricter check
+   of question 2 is one more deviation. The audit's findings disagree on whether a design has to say more.
+   - A (as written): no such Goal. The guide applies on its own, and the tasks carry the review against it and the two
+     optional `shellcheck` checks. No file changes.
+   - B: one more Goal in this file, as the restyle designs carry it: "Shell style. `install.sh` and every script under
+     `test/hf-mount/` follow `.agents/knowledge/shell-style.md`; each deliberate deviation is marked in the script by a
+     comment giving its reason. Checked by review against the guide, by `just check`, and by
+     `shellcheck -o require-variable-braces,require-double-brackets` on each script." No other file changes.
+
+   Recommendation: A. B adds one bullet and no work, at the cost of restating a knowledge-base rule in the design.
+2. **The ownership check of `test.sh` is stricter than the spec.** Raised by `.agents/knowledge/shell-style.md` (Tests):
+   a check's label states one behavior in the words of the spec, and its command verifies exactly that behavior. The
+   spec's "Daemon and selected backends are installed" says each installed binary is owned by root and executable by
+   every user; the check compares owner, group, and mode with `root:root 755`, which is how `install` leaves each binary
+   under the Goals (Idempotent and additive).
+   - A (as written): the check keeps its command and takes its label from the spec's words, under a comment saying that
+     it is stricter than the spec and why. Changes `test/hf-mount/test.sh` only (label and comment).
+   - B: the command narrows to owner root and executable by every user, so label and command match exactly. Changes
+     `test/hf-mount/test.sh` and weakens the check.
+   - C: the delta spec's "Daemon and selected backends are installed" states group root and mode `0755`, and the label
+     quotes it. Changes the delta spec and `test/hf-mount/test.sh` (label).
+
+   Recommendation: A. No check is weakened and the spec promises no more than a consumer relies on; the deno restyle
+   kept a literal owner, group, and mode comparison under a spec-worded label in the same way.
+3. **Whether `NOTES.md` names the download tools.** Raised by `.agents/knowledge/feature-authoring.md` (User
+   documentation): the notes are checked for clear wording, actual limitations, and configuration constraints. The
+   `NOTES.md` content bounds under Decisions do not include the packages the feature installs to download the binaries,
+   and "What is installed" in `src/hf-mount/NOTES.md` does not mention that `curl` and `ca-certificates` are installed
+   from the image's repositories when the image lacks them, the packages the spec's "Mount dependencies follow the
+   selected backends" allows for downloading the binaries.
+   - A (as written): the content bounds stay as they are; the notes are reviewed against the User documentation section
+     without a prescribed addition. No file changes beyond what that review finds.
+   - B: the content bounds gain "the download tools the install adds when the image lacks them", `src/hf-mount/NOTES.md`
+     gains one sentence under "What is installed", and `src/hf-mount/README.md` is regenerated. The notes of glab, deno,
+     and uv carry such a sentence.
+
+   Recommendation: A. The rule asks for limitations and constraints, and this is neither; B costs one sentence and
+   matches the three merged features.

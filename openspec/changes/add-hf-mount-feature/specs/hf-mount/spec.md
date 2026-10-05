@@ -51,7 +51,8 @@ anything is downloaded, and a release that does not exist fails the install with
 ### Requirement: Option backend
 
 The feature SHALL accept the option `backend` as declared here and install the backends it selects next to the daemon in
-`/usr/local/bin`: `hf-mount-nfs` for `nfs`, `hf-mount-fuse` for `fuse`, and both for `both`.
+`/usr/local/bin`: `hf-mount-nfs` for `nfs`, `hf-mount-fuse` for `fuse`, and both for `both`; any other value fails the
+install before anything is downloaded.
 
 | Field   | Value                   |
 | ------- | ----------------------- |
@@ -63,7 +64,8 @@ The feature SHALL accept the option `backend` as declared here and install the b
 
 - **WHEN** the feature is installed without `backend`, or with `backend` set to `both`
 - **THEN** `/usr/local/bin/hf-mount`, `/usr/local/bin/hf-mount-nfs`, and `/usr/local/bin/hf-mount-fuse` exist, are
-  executable by the remote user, and `command -v hf-mount` resolves to `/usr/local/bin/hf-mount`
+  executable by the remote user, and `command -v hf-mount` resolves, following symbolic links, to
+  `/usr/local/bin/hf-mount`
 
 #### Scenario: Only the NFS backend selected
 
@@ -75,11 +77,17 @@ The feature SHALL accept the option `backend` as declared here and install the b
 - **WHEN** the feature is installed with `backend` set to `fuse` on an image that has no `hf-mount-nfs`
 - **THEN** `/usr/local/bin/hf-mount` and `/usr/local/bin/hf-mount-fuse` exist and no `hf-mount-nfs` is installed
 
+#### Scenario: Invalid backend
+
+- **WHEN** the feature is installed with `backend` set to a value that is not `nfs`, `fuse`, or `both`
+- **THEN** the install fails with a message naming the accepted values, and nothing is downloaded or installed
+
 ### Requirement: Option installMountDependencies
 
 The feature SHALL accept the option `installMountDependencies` as declared here: when it is enabled, the feature
 installs the mount helpers of the selected backends as "Mount dependencies follow the selected backends" states, and
-when it is disabled, installs no mount-helper package.
+when it is disabled, installs no mount-helper package; a value that is neither `true` nor `false` fails the install
+before anything is downloaded.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -96,6 +104,11 @@ when it is disabled, installs no mount-helper package.
 - **WHEN** the feature is installed with `installMountDependencies` disabled on an image without `mount.nfs` and
   `fusermount3`
 - **THEN** the binaries are installed, and neither `mount.nfs` nor `fusermount3` is present afterwards
+
+#### Scenario: Invalid installMountDependencies
+
+- **WHEN** the feature is installed with `installMountDependencies` set to a value that is neither `true` nor `false`
+- **THEN** the install fails with a message naming the accepted values, and nothing is downloaded or installed
 
 ### Requirement: Daemon and selected backends are installed
 
