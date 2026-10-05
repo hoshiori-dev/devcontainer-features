@@ -27,7 +27,10 @@ the same rules.
   command runs, and runs an unprivileged start check that fails loudly when the firewall is not in force. The remote
   user gains no privilege.
 - The feature's documentation states that it is a guardrail, not a security boundary: root, `sudo`, or access to a
-  Docker daemon inside the container can remove or bypass the rules, and DNS lookups remain possible.
+  Docker daemon inside the container can remove or bypass the rules, and DNS lookups remain possible. It also states two
+  limits of the configurations it supports: the entrypoint has to run as root, since a start under another user loads no
+  rule and leaves no start record, and on a user-defined network with DNS servers configured for the container or the
+  Docker daemon only the names Docker itself answers resolve.
 - The repository's root `README.md` lists `firewall` under "Features", linked to `src/firewall/` with a one-sentence
   description, in place of "No features have been published yet."
 
@@ -76,7 +79,8 @@ None.
   description, and no longer says "No features have been published yet."; this row is written by hand, unlike the
   generated `src/firewall/README.md`.
 - `NOTES.md` states what Requirement: Guardrail, not a security boundary says `NOTES.md` SHALL state, the nested Docker
-  exception named in Requirement: Forwarded traffic, and the metadata the feature adds.
+  exception named in Requirement: Forwarded traffic, the limitation named in Requirement: DNS only to the container's
+  resolvers, that the entrypoint has to run as root (Requirement: Failure mode), and the metadata the feature adds.
 - `shellcheck -o require-variable-braces,require-double-brackets` reports nothing on any `*.sh` under `src/firewall/` or
   `test/firewall/`, and a review of those scripts against `.agents/knowledge/shell-style.md` finds no unmarked
   deviation; every deliberate one carries a comment giving its reason.

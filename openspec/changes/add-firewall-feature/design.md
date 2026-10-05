@@ -53,6 +53,18 @@ Research for this change, checked on 2026-09-30; see `proposal.md` for the motiv
   `deniedDomains` `registry.npmjs.org`, a nested container on a user-defined network is refused `registry.npmjs.org` on
   its first request and reaches `github.com`; on the default bridge no name resolves. A host other than Azure was not
   observed: that `dockerd` runs without `--dns` there follows from `docker-init.sh`.
+- **DNS servers configured for a dev container on a user-defined network** (observed on 2026-10-05 on `debian:12` with
+  `presets` `npm`). On a user-defined network, Docker's `/etc/resolv.conf` names only `127.0.0.11`. When DNS servers are
+  configured for the container (`docker run --dns`, `dns:` in a Compose file) or for the daemon, the embedded resolver
+  forwards to them from the container's own network namespace, and the generated file names them only in a comment
+  (`# ExtServers: [8.8.8.8]`). With `--dns 8.8.8.8` the start is applied and the check passes, `registry.npmjs.org` does
+  not resolve, and a sibling container's name, which Docker answers itself, does; a rule added by hand that accepts DNS
+  to `8.8.8.8` makes every name resolve. Without configured servers Docker forwards from the host's namespace, and on
+  the default bridge `/etc/resolv.conf` names the configured servers, so every name resolves in both.
+- **A start under an entrypoint that does not run as root** (observed on 2026-10-05 on `debian:12`). `apply.sh` run as
+  uid 65534 logs one line and ends with status 0, no `/run/firewall` exists, and outbound traffic is unrestricted; the
+  check ends after its 90 seconds with one error line that names the missing record, and with a non-zero status under
+  `failureMode` `closed`.
 - **Prior art** (`anthropics/claude-code`, `.devcontainer/`): `runArgs` add `NET_ADMIN` and `NET_RAW`;
   `postStartCommand: sudo /usr/local/bin/init-firewall.sh` with a sudoers line for that script; the script flushes the
   filter, nat, and mangle tables, restores Docker's DNS NAT rules, builds an ipset from GitHub meta `web`, `api`, `git`
@@ -197,8 +209,9 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   lines change, and the file is rewritten in place because it is a bind mount. Checked: the `rerun` scenario and a
   restart recorded in the PR's Validation section.
 - **A record per start.** The start record carries the start time of the container's PID 1, which the unprivileged check
-  can read from `/proc`; it is written atomically under `/run/firewall/` with mode `0644`. Checked: the `rerun` scenario
-  covers "Stale record".
+  can read from `/proc`; it is written atomically under `/run/firewall/` with mode `0644`. Root alone can write that
+  directory, so a start under an entrypoint that does not run as root leaves no record, and the check reports it from
+  the missing record (Decisions of 2026-10-05). Checked: the `rerun` scenario covers "Stale record".
 - **Validated options, twice.** `install.sh` validates every option value and fails the build; the start-time script
   validates the stored configuration again and treats an invalid one as a failure. Checked: a failing build cannot be a
   scenario, so the PR's Validation section records `devcontainer build` runs with an unknown preset, a malformed CIDR, a
@@ -249,11 +262,10 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
   `.agents/knowledge/shell-style.md` as written. The only deliberate deviations are the ones this design names, each
   marked in the script by a comment that gives its reason: option values in the two generated files, the entrypoint's
   exit status, and the re-execution under `env -i` (the Goals above that state them), and the labels of the checks that
-  verify a Goal (Test coverage). Two more kinds are marked the same way: each `# shellcheck disable` a script keeps for
-  one line, which the guide counts as a deviation, and the labels of the three checks that assert a test's premise, for
-  as long as Open Questions 13 stands as written. Checked:
-  `shellcheck -o require-variable-braces,require-double-brackets` reports nothing on those files, and a review against
-  the guide, rule by rule.
+  verify a Goal (Test coverage). One more kind is marked the same way: each `# shellcheck disable` a script keeps for
+  one line, which the guide counts as a deviation. A test's premise is a precondition that stops the script, not a
+  check, so it is no deviation (Test coverage). Checked: `shellcheck -o require-variable-braces,require-double-brackets`
+  reports nothing on those files, and a review against the guide, rule by rule.
 
 **Non-Goals:**
 
@@ -269,7 +281,11 @@ and `fedora:44` the current Fedora (same digest as `latest`); both and `debian:1
 - A nested container reaching an allowed domain (maintainer decision of 2026-10-01) or, from the same cause, being
   refused a denied one (Open Questions): the feature protects the dev container's own traffic, and nested Docker is an
   exception `NOTES.md` records (Decisions: Nested Docker).
-- Filtering by DNS name (every name resolves), by TLS SNI, or through an HTTP proxy.
+- Filtering by DNS name (names resolve whatever the options say), by TLS SNI, or through an HTTP proxy.
+- Name resolution through DNS servers configured for a dev container on a user-defined network, or for its daemon: there
+  only the names Docker itself answers resolve, and `NOTES.md` states the limitation (Decisions of 2026-10-05).
+- A record of a start whose entrypoint does not run as root: no rule is loaded and no record written, and `NOTES.md`
+  says that the entrypoint has to run as root (Decisions of 2026-10-05).
 - A denylist that holds against a process avoiding the container's resolver: `deniedDomains` refuses only addresses
   learned from lookups of denied names, so literal addresses, DNS over HTTPS, and names that are not denied pass it
   where `defaultAction` is `allow`.
@@ -483,6 +499,11 @@ own, and setting variables named like the options, then runs the check with a `P
 `ENV` and `BASH_ENV` set. `fetch_fails` also re-runs the script after an unprivileged process binds `127.0.0.1:53`. A
 "Validation" entry is a run recorded in the PR's Validation section.
 
+A test's premise is a precondition, not a check: when it does not hold, the script stops with exit status 1 and a
+message saying which premise failed. `duplicate.sh` has one, before its first check: the harness gave the first install
+`defaultAction` `allow` and `presets` `npm` and the second `deny` and `github`. `rerun` has two, before its re-run:
+`/etc/resolv.conf` still names the stopped resolver, and the table of the test's own exists.
+
 Some checks verify a Goal that no spec scenario states: that `/etc/resolv.conf` names the local resolver after an
 applied start and that the recorded resolvers are the record's (Resolvers recorded once per container), the resolver's
 command line and configuration (dnsmasq runs only from its own configuration), the order of the rules (Chains), the
@@ -529,7 +550,7 @@ behavior and these are invariants of the approach.
 | Allowed name inside a denied range, Allowed subdomain of a denied domain                                                                    | `denied_domains` (`raw.githubusercontent.com`)                                                                                                |
 | Denied domain refused                                                                                                                       | `denied_domains` (`registry.npmjs.org` resolves and is refused)                                                                               |
 | Denied subdomain of an allowed domain, Denied name inside an allowed range                                                                  | `denied_in_range` (`raw.githubusercontent.com` refused, `github.com` reachable)                                                               |
-| Rules cannot be loaded                                                                                                                      | `fetch_fails` (table deleted, script re-run under `setpriv` without `CAP_NET_ADMIN`)                                                          |
+| Rules cannot be loaded                                                                                                                      | `fetch_fails` (table deleted, script re-run under `setpriv` without `CAP_NET_ADMIN`); Validation: `apply.sh` run as a user other than root    |
 | Resolver port taken                                                                                                                         | `fetch_fails` (port held by an unprivileged process, script re-run: failed record, closed table, `resolv.conf` naming the recorded resolvers) |
 | Firewall in force                                                                                                                           | `test.sh` (the check as the remote user)                                                                                                      |
 | Stale record                                                                                                                                | `rerun` (record's start time set to an earlier one, check run)                                                                                |
@@ -548,7 +569,8 @@ behavior and these are invariants of the approach.
 ### Decisions of 2026-10-05
 
 The maintainer decided these points in conversation on 2026-10-05, when the package was revised for the requirements
-added to the knowledge base after its approval (Context). The answers settle these points and nothing else: the revised
+added to the knowledge base after its approval (Context). The last seven entries answer the questions that were open as
+Open Questions 9 to 15, each with the number it had there. The answers settle these points and nothing else: the revised
 package returns to the package gate.
 
 - **Option values in the generated ruleset and resolver configuration.** The approach stays and is recorded as the one
@@ -580,6 +602,46 @@ package returns to the package gate.
   security boundary says `NOTES.md` SHALL state, the nested Docker exception, and the metadata the feature adds;
   `NOTES.md` is trimmed to that and keeps every statement other approved text binds to the documentation. Rejected:
   keeping the full list of ways around the rules in `NOTES.md`.
+- **A failed check in `checks.sh`** (question 9). `.agents/knowledge/shell-style.md` (Choosing bash or POSIX sh) asks a
+  POSIX test for a stand-in with the library's `check` / `reportResults` interface and leaves the status of a failed
+  check open. `check` records the failure and returns 1, as the CLI's library does, so under `set -e` a POSIX test and a
+  bash scenario both stop at their first failed check. Rejected: recording the failure and going on, as
+  `test/glab/checks.sh` does, which gives `test.sh` and `duplicate.sh` other semantics than the scenario scripts.
+- **One file for the assertions both dialects use** (question 10). `test/firewall/checks.sh`, POSIX `sh`, holds the
+  stand-in and the shared assertions with the helpers they call. `test.sh` and `duplicate.sh` source it alone, the
+  scenario scripts source it after the CLI's library, and it defines `check` and `reportResults` only when the library
+  has not, under a comment giving that reason. Rejected: the stand-in alone in `checks.sh` with the shared assertions in
+  a second POSIX file, which adds a file and a source line to every test; no shared file for the scenario scripts, which
+  repeats about fifteen short functions across twelve scripts.
+- **`/var/lib/apt/lists` is a named constant** (question 11). `install.sh` empties that directory after
+  `apt-get install`, and `.agents/knowledge/shell-style.md` (Options are data) asks for a readonly constant for every
+  path the feature creates or modifies outside a temporary directory; the rule is read literally. Rejected: leaving it
+  unnamed as a path the package manager owns, as the uv restyle did.
+- **No log line for start-time steps that neither change the image nor use the network** (question 12). `apply.sh` logs
+  one line for the lookup of `api.github.com` and one for the fetch, each naming its source, beside a retry, a failed
+  start, and the result; the table loads, the rewrites of `/etc/resolv.conf`, and the resolver's start get no line of
+  their own. Rejected: one line for each of those steps, which adds up to six lines to the container log of every start.
+- **A test's premise is a precondition** (question 13). The three assertions of a premise (in `duplicate.sh`, that the
+  first install used other options; in `rerun`, that `/etc/resolv.conf` still names the stopped resolver and that a
+  table of the test's own exists) stop the script with exit status 1 and a message, in the place where each stood as a
+  check, with its condition unchanged (Test coverage); the same answer as in the changes `add-hf-mount-feature` and
+  `add-openspec-feature`. Rejected: keeping them as checks under labels the spec does not state, each marked as a
+  deviation from the guide.
+- **DNS servers configured for a dev container on a user-defined network: a documented limitation** (question 14). There
+  the rules refuse the queries Docker's embedded resolver forwards from the container's namespace, so only the names
+  Docker itself answers resolve (Context). The rules and the resolver handling stay as they are, `NOTES.md` says not to
+  configure such servers and what works instead, and Requirement: DNS only to the container's resolvers promises that
+  every name resolves only where Docker forwards lookups from the host's namespace or `/etc/resolv.conf` names the
+  configured servers. Rejected: reading the servers from the `# ExtServers:` comment of the generated `/etc/resolv.conf`
+  and accepting DNS to them, which depends on the form of that comment and lets a process in the container query those
+  servers directly, past the sets dnsmasq fills.
+- **A start under an entrypoint that does not run as root: no record, a documented limitation** (question 15). The
+  record's directory has to stay unwritable for the remote user, who may be the entrypoint's user, so such a start loads
+  no rule and writes no record, and the check reports it from the missing record (Context). `NOTES.md` says that the
+  entrypoint has to run as root and to name the unprivileged user with `remoteUser`, and Requirement: Failure mode, its
+  Scenario: Rules cannot be loaded, and Requirement: Start record readable by the remote user say the same; "recorded as
+  not applied" stays for a start that runs as root without `NET_ADMIN`. Rejected: a place where such a start can record,
+  which the entrypoint's user, and so possibly the remote user, could write.
 
 ## Optional improvements offered, not adopted
 
@@ -651,7 +713,12 @@ hosts the tests connect to (Goals: Test destinations). Verified column: a read-o
 - [dnsmasq exits after start, and every lookup fails until the next start] → Documented in `NOTES.md`; the check runs
   only once per start and does not see it.
 - [A kernel without `nf_tables`, a runtime that drops `capAdd` (`wslc`), or a non-root container user prevents loading]
-  → Egress is then unrestricted in both modes (spec); the check fails in `closed` mode and warns in `warn` mode.
+  → Egress is then unrestricted in both modes (spec); the check fails in `closed` mode and warns in `warn` mode. A
+  non-root container user also leaves no record, so the check reports only after its 90 seconds, from the missing
+  record; `NOTES.md` says that the entrypoint has to run as root.
+- [On a user-defined network with DNS servers configured for the container or the daemon, only the names Docker itself
+  answers resolve, although the start is applied and the check passes] → Accepted as a limitation of the supported
+  network configurations (Decisions of 2026-10-05); `NOTES.md` says not to configure them and what works instead.
 - [A failing check skips the user's later lifecycle commands] → Intended in `closed` mode, stated in `NOTES.md`; `warn`
   avoids it.
 - [Docker keeps the rewritten `resolv.conf` across restarts, so a network change leaves stale recorded resolvers] → The
@@ -710,91 +777,5 @@ answer changes the named part before approval.
    containers (Context), which was found afterwards. Alternative: treat nested lookups in the feature, which that
    decision set aside as complex.
 
-Questions 9 to 13 were raised on 2026-10-05, by requirements the knowledge base gained after the questions above were
-answered (Context). Each names the rule that raises it. No text of the proposal or the delta spec depends on them; the
-first answer of each is what sections 5 and 6 of `tasks.md` are written to.
-
-9. **What `check` in `checks.sh` does after a failed check.** `.agents/knowledge/shell-style.md` (Choosing bash or POSIX
-   sh) asks a POSIX test for a stand-in "with the same `check` / `reportResults` interface" and leaves the status of a
-   failed check open. As written: `check` records the failure and returns 1, as the stand-in on the branch and the CLI's
-   library do, so under `set -e` a POSIX test and a bash scenario both stop at their first failed check; the uv restyle
-   chose this for a feature with tests in both dialects. Alternative: record the failure and go on, as
-   `test/glab/checks.sh` and the stand-in that `just new-feature --posix` generates do, which changes
-   `test/firewall/checks.sh` (tasks 6.1) and gives `test.sh` and `duplicate.sh` other semantics than the scenario
-   scripts. Recommended: as written.
-10. **Where the assertions both dialects use live.** `.agents/knowledge/testing.md` (Layout) names `test/<id>/checks.sh`
-    as the file a POSIX test sources, and `.agents/knowledge/shell-style.md` (Tests) lets a shared helper file hold only
-    assertions several scripts use; neither says what a bash scenario sources beside the CLI's library. As written: one
-    POSIX file, `test/firewall/checks.sh`, holds the stand-in and the shared assertions with the helpers they call.
-    `test.sh` and `duplicate.sh` source it alone, the scenario scripts source it after the library, and it defines
-    `check` and `reportResults` only when the library has not, under a comment giving that reason: the file on the
-    branch, renamed and reduced to assertions. Alternatives: the stand-in alone in `checks.sh` and the shared assertions
-    in a second POSIX file every test sources, which adds a file and a source line to `test.sh` and `duplicate.sh`; or
-    no shared file for the scenario scripts, each repeating the assertions it uses as the uv restyle did, which repeats
-    about fifteen short functions across twelve scripts. Either changes tasks 6.1 to 6.3 and 6.5 and nothing under
-    `src/firewall/`. Recommended: as written.
-11. **`/var/lib/apt/lists` as a named constant.** `.agents/knowledge/shell-style.md` (Options are data) asks for a
-    readonly constant for "every path the feature creates or modifies outside a temporary directory", and `install.sh`
-    empties that directory after `apt-get install`. As written: `install.sh` names it, the rule read literally, as the
-    glab and hf-cli restyles did. Alternative: leave it unnamed as a path the package manager owns, as the uv restyle
-    did, which changes tasks 5.1 only. Recommended: as written.
-12. **Log lines for start-time steps that neither change the image nor use the network.**
-    `.agents/knowledge/shell-style.md` (Logging and failure) asks for one line "for every step that changes the image or
-    uses the network". At a start nothing changes the image, and only the lookup of `api.github.com` and the fetch use
-    the network. As written: `apply.sh` logs one line for the lookup and one for the fetch, each naming its source,
-    beside what it logs on the branch (a retry, a failed start, the result); the table loads, the rewrites of
-    `/etc/resolv.conf`, and the resolver's start get no line of their own, the reading on which the uv restyle left its
-    repair of a runtime volume without one. Alternative: one line for each of those steps too, which changes tasks 5.3
-    and adds up to six lines to the container log of every start. Recommended: as written.
-13. **Checks that assert a test's premise.** `.agents/knowledge/shell-style.md` (Tests) says a check's label states one
-    behavior in the words of the spec. `duplicate.sh` checks that "the first install used other options", and the
-    `rerun` scenario checks, before its re-run, that "resolv.conf still names the stopped resolver" and that "a table of
-    the test's own exists"; none of the three is a behavior of the feature. As written: all three stay checks, as they
-    are on the branch, each labelled as the premise it asserts and marked in the script as a deviation with that reason,
-    as the checks of a Goal are (Decisions of 2026-10-05), and `duplicate.sh` compares the harness's values with
-    literals. Alternative: preconditions that stop the script with a message and are no longer checks, which changes
-    tasks 6.3 and 6.5, removes three check lines, and takes the premise checks out of the deviations that Goals: Scripts
-    follow the shell style guide lists. The glab restyle decided this for its `duplicate.sh` and rejected keeping such
-    checks under labels the spec does not state, and on 2026-10-05 the maintainer chose the precondition for the same
-    point in the changes `add-hf-mount-feature` and `add-openspec-feature`; that answer was not given for this change,
-    so it is not written in. With `check` returning 1 (question 9), a failed premise stops the script under either
-    answer. Recommended: the alternative, so that the three changes treat a test's premise alike. Setup steps the branch
-    wraps in `check` (holding the resolver's port, importing the nested image) assert nothing and become plain commands
-    under the same rule; this question is about the three assertions only.
-
-Questions 14 and 15 were raised on 2026-10-05 by hand runs against the scripts as sections 5 to 8 of `tasks.md` leave
-them; tasks 3.8 and 3.1 had recorded both as open. Each names the requirement at stake. No text of the proposal or the
-delta spec is changed for them; the first answer of each is what `NOTES.md` states.
-
-14. **DNS servers configured for a dev container on a user-defined network.** Requirement: DNS only to the container's
-    resolvers says that DNS traffic to an address `/etc/resolv.conf` does not name is refused, and that every name still
-    resolves. On a user-defined network, Docker's `/etc/resolv.conf` names only `127.0.0.11`. When DNS servers are
-    configured for the container (`docker run --dns`, `dns:` in a Compose file) or for the daemon, the embedded resolver
-    forwards to them from the container's own network namespace, so the rules refuse those queries and the two sentences
-    cannot both hold. Observed on `debian:12` with `--dns 8.8.8.8` and `presets` `npm`: the start is applied and the
-    check passes, `registry.npmjs.org` does not resolve, and a sibling container's name, which Docker answers itself,
-    does; a rule added by hand that accepts DNS to `8.8.8.8` makes every name resolve. Without configured servers Docker
-    forwards from the host's namespace, and on the default bridge `/etc/resolv.conf` names the configured servers, so
-    every name resolves in both. As written: a documented limitation of the supported network configurations. `NOTES.md`
-    says not to configure DNS servers for a dev container on a user-defined network and what works instead; the rules
-    and the resolver handling stay as they are. Alternative: extend the resolver handling to the servers Docker forwards
-    to, which the generated `/etc/resolv.conf` names only in a comment (`# ExtServers: [8.8.8.8]`). The start-time
-    script would read that comment and accept DNS to those addresses. This widens "the resolvers named in
-    `/etc/resolv.conf`" in the requirement and adds a scenario to it, depends on the form of that comment, and lets a
-    process in the container query those servers directly, past the sets dnsmasq fills. Recommended: as written.
-15. **A start under an entrypoint that does not run as root.** Requirement: Failure mode, Scenario: Rules cannot be
-    loaded, says that such a start "is recorded as not applied", and Requirement: Start record readable by the remote
-    user says that each start writes a record. The record lives in `/run/firewall/`, which root alone can write (Goals:
-    A record per start), and it has to stay unwritable for the remote user, who may be the entrypoint's user. So such a
-    start writes no record. Observed on `debian:12`: `apply.sh` run as uid 65534 logs one line and ends with status 0,
-    no `/run/firewall` exists, outbound traffic is unrestricted, and the check ends after its 90 seconds with one error
-    line that names the missing record, and with a non-zero status under `failureMode` `closed`. Requirement: Start
-    check holds, since it names a missing record beside a failed and a not-applied one. As written: a documented
-    limitation. `NOTES.md` says that the entrypoint has to run as root, that otherwise no rule is loaded and no record
-    written, what the check then reports, and to keep the container's user at root and name the unprivileged user with
-    `remoteUser`. The scenario's "recorded as not applied" holds for a start without `NET_ADMIN`; for a start without
-    root, the check reports the start as not applied from the missing record. Alternative: change what the delta spec
-    states, so that the scenario and the record requirement say a start without root leaves no record and the check
-    reports it; or give such a start a place to record, which the entrypoint's user, and so possibly the remote user,
-    could then write, against Requirement: Start record readable by the remote user. Recommended: as written, with the
-    scenario's wording corrected when the delta spec is next revised.
+Questions 9 to 15, raised on 2026-10-05, are answered under Decisions (Decisions of 2026-10-05), where each entry names
+the number it had here.
