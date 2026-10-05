@@ -1,0 +1,7 @@
+{
+  "$schema": "../compatibility.schema.json",
+  "images": [
+    { "image": "alpine:3.24", "arch": ["amd64", "arm64"] },
+    { "image": "alpine:3.22", "arch": ["amd64", "arm64"] }
+  ]
+}
