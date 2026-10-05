@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Scenario: version pinned to 1.14.0, the oldest release in the stable index, which has known vulnerabilities.
-set -e
+set -euo pipefail
 
 # shellcheck source=/dev/null
 source dev-container-features-test-lib

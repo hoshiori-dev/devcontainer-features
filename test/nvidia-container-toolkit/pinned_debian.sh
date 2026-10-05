@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Scenario: version pinned to 1.19.1, an exact release older than the newest, on the image scenarios.json names.
-set -e
+set -euo pipefail
 
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
