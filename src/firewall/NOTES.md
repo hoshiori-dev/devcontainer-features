@@ -91,13 +91,14 @@ the Internet.
   source, https://code.claude.com/docs/en/network-config, also lists `claude.com`, `mcp-proxy.anthropic.com`,
   `downloads.claude.ai`, `storage.googleapis.com`, `bridge.claudeusercontent.com`, `*.frame.claudeusercontent.com`,
   `formulae.brew.sh` (Homebrew installs only), `code.claude.com`, and, as optional, `*-review.googlesource.com` and two
-  Datadog telemetry hosts.
+  Datadog telemetry hosts. It lists `github.com`, `raw.githubusercontent.com`, and `registry.npmjs.org` as well, which
+  the `github` and `npm` presets cover.
 - The `vscode` preset (`update.code.visualstudio.com`, `vscode.download.prss.microsoft.com`, `vscode-cdn.net`,
   `marketplace.visualstudio.com`, `gallery.vsassets.io`, `gallerycdn.vsassets.io`) covers VS Code Server and Marketplace
   downloads only. Its source, https://code.visualstudio.com/docs/setup/network, also lists `code.visualstudio.com`,
   `go.microsoft.com`, `rink.hockeyapp.net`, `vsmarketplacebadges.dev`, `download.visualstudio.microsoft.com`,
   `vscode-sync.trafficmanager.net`, `vscode-sync-insiders.trafficmanager.net`, `vscode.dev`, `*.vscode-unpkg.net`, and
-  `default.exp-tas.com`.
+  `default.exp-tas.com`. It lists `raw.githubusercontent.com` as well, which the `github` preset covers.
 - Sibling Compose services: allow a service by its name in `allowedDomains` (Docker's embedded DNS answers it through
   the feature's resolver) or its subnet in `allowedCidrs`. The container's own subnets are not allowed automatically,
   since that would also open the Docker host's gateway address.
@@ -134,8 +135,8 @@ to them too, but **a nested container is not guaranteed to reach an allowed doma
 - GitHub allows 60 unauthenticated requests per hour per IP address. A start that is rate-limited fails with that reason
   in the start check's output; a start after the limit resets fetches again.
 - If dnsmasq exits after a successful start, name lookups fail until the next start; the recorded result stays.
-- When no rule can be loaded at all (no `NET_ADMIN`, for example with a runtime that drops `capAdd`, an entrypoint that
-  does not run as root, or a kernel without nftables), outbound traffic is unrestricted and the start check reports it.
+- When no rule can be loaded at all (no `NET_ADMIN`, for example with a runtime that drops `capAdd`, or a kernel without
+  nftables), outbound traffic is unrestricted and the start check reports it.
 - The entrypoint has to run as root. If the container's user is not root (`containerUser`, or the image's `USER`), the
   entrypoint loads no rule and cannot write the start record either, so the start check waits its 90 seconds and then
   reports that the record is missing. Leave the container's user at root and name the unprivileged user with
