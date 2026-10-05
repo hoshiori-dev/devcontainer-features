@@ -12,7 +12,7 @@ metadata_remains() {
   [[ -n "${found}" ]]
 }
 
-package_files_are_removed() {
+no_package_file_is_left() {
   local found
   found="$(find /var/cache/dnf /var/cache/libdnf5 -name '*.rpm' 2>/dev/null || true)"
   [[ -z "${found}" ]]
@@ -23,6 +23,6 @@ check "Listed packages are installed: file is installed" rpm -q file
 check "Only package files are cleaned: repository metadata remains" metadata_remains
 # dnf's default keepcache=0 deletes each downloaded package after the transaction, so this check only shows that no
 # package file is left; no test plants one to see `dnf clean packages` remove it.
-check "Only package files are cleaned: no package file is left in the cache" package_files_are_removed
+check "Only package files are cleaned: no package file is left in the cache" no_package_file_is_left
 
 reportResults
