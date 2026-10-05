@@ -132,8 +132,10 @@ The pacman-check step (`require_pacman`, named as in the sibling installers) rea
 `/etc/os-release` in a subshell (with the guide's `shellcheck source` directive), guarded by `[ -r /etc/os-release ]`
 and by `if ! <variable>="$(…)"`, and assigns it to a variable named with the step's prefix (POSIX has no `local`) before
 calling `fail`; the fallback stays "an unidentified distribution". The guard keeps a file that fails to source from
-aborting the script with a status other than 1 and without the `pacman` message. Output differs from today's only when
-`PRETTY_NAME` holds escaped quotes or other shell syntax, which are now interpreted instead of stripped.
+aborting the script with a status other than 1 and without the `pacman` message. The file is now executed in a subshell,
+as the guide prescribes, so the output differs from today's when the file holds more than plain assignments: shell
+syntax in `PRETTY_NAME` is interpreted instead of stripped, a command in the file runs, and a file that fails to source
+gives the fallback text after the shell's own error line.
 
 - Rejected: keeping `sed | tr`. A pipeline's status would decide the fallback, and it spawns two tools for what the
   guide's subshell read does.
