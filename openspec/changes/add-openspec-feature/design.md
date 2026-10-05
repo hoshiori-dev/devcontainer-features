@@ -116,8 +116,10 @@ checked on 2026-09-30 and 2026-10-01 to choose it.
 
 - `openspec` lives in a root-owned prefix `/usr/local/lib/openspec`, installed there as an npm project tree
   (`package.json`, `package-lock.json`, `node_modules/`), and is reached only through the root-owned wrapper
-  `/usr/local/bin/openspec`. Checked by `test.sh` (the path `command -v openspec` resolves to, ownership, and a non-root
-  remote user running it) and `duplicate.sh`.
+  `/usr/local/bin/openspec`. The two locations and their ownership are the spec's (Install the requested version,
+  Scenario "Installed locations"); the npm project tree and the wrapper are how this design reaches them. Checked by
+  `test.sh`, under labels in the words of that scenario (the path `command -v openspec` resolves to, ownership, and a
+  non-root remote user running it), and by `duplicate.sh`.
 - All network access at build time goes through the dependency's Node.js and npm, to the hosts in the URL inventory
   only; the feature adds no OS package and no other download tool. Checked by review of `install.sh` against the URL
   inventory.
@@ -125,12 +127,13 @@ checked on 2026-09-30 and 2026-10-01 to choose it.
   environment, so no `NODE_*`, `npm_config_*` (any letter case), proxy, or certificate variable reaches them. npm runs
   with `--registry=https://registry.npmjs.org/`, `--strict-ssl=true`, `--userconfig` and `--globalconfig` set to two
   distinct empty files in that temporary directory, `--ignore-scripts`, `--engine-strict`, `--no-audit`,
-  `--no-update-notifier`, and a cache in that temporary directory, which is removed on exit, success or failure. Before
-  the first download, the configuration npm reports under those flags (`npm config list --json`) must show `strict-ssl`
-  true, that registry, `ca`, `cafile`, `proxy`, and `https-proxy` null, and no key ending in `:registry`, or the install
-  fails naming the key; this covers the npmrc built into npm, which no flag replaces. Checked by review of `install.sh`,
-  by a `build` scenario whose Dockerfile writes `@fission-ai:registry=` with an unreachable host into root's `~/.npmrc`
-  and still installs, by the certificate-settings runs under Decisions - Tests, and by `test.sh` asserting the remote
+  `--no-update-notifier`, and a cache in that temporary directory, which is removed on exit, success or failure. Every
+  npm call names its project directory with `--prefix`, an empty directory in that temporary directory until the staging
+  tree exists and the staging tree afterwards, so npm reads no project `npmrc` from the build's working directory. A
+  failed registry read or npm install says that the build's proxy and certificate variables and the user, global, and
+  project npm configuration are not used (Non-Goals). Checked by review of `install.sh`, by a `build` scenario whose
+  Dockerfile writes `@fission-ai:registry=` with an unreachable host into root's `~/.npmrc` and still installs, by the
+  certificate-settings run under Decisions - Tests, whose message is recorded, and by `test.sh` asserting the remote
   user's home holds no npm cache or log from the build.
 - The registry document is read once, with Node.js `fetch` and `redirect: 'error'`. `latest` is its `dist-tags.latest`;
   the selected version must match the exact-version pattern the `version` option is checked against, be a key of
@@ -153,17 +156,49 @@ checked on 2026-09-30 and 2026-10-01 to choose it.
 - The wrapper `exec`s the Node.js binary resolved (symlinks followed) from `PATH` at install time with the package's
   `bin/openspec.js`, passes the caller's environment through unchanged, and exports `OPENSPEC_NO_UPDATE_CHECK` /
   `OPENSPEC_TELEMETRY` only when the option is true and the variable is unset (`${VAR+set}` test, so an empty value
-  counts as set). Checked by the option scenarios with the environment probe under Decisions - Tests, and by a scenario
-  that switches nvm's default after the build.
-- Every install replaces the prefix and rewrites the wrapper; there is no skip for an already installed version. Checked
-  by `duplicate.sh`: with the `version` proposals under Options, the first install is always 1.13.1 and the second the
-  newer `latest`, which exercises the replacement on every run.
-- `install.sh` uses `#!/usr/bin/env bash` with `set -euo pipefail` (bash is in every listed image) and checks, in this
-  order, the distribution and architecture, the `version` format, and the presence of Node.js and of npm 10.8.2 or
-  newer, all before any network access (an npm that new runs only on a Node.js that has `fetch`); the message for a
-  missing Node.js names 20.19.0, a constant in `install.sh`; the found Node.js is compared with the selected version's
-  `engines.node` before npm installs anything. Checked by shellcheck in `just check` and the local runs under
-  Decisions - Tests.
+  counts as set). No option value is written into the wrapper: each boolean option only decides whether one fixed line
+  is present, the selected version does not appear in it, and the only text that varies is the resolved Node.js path,
+  written as one single-quoted word. `install.sh` itself runs the literal command `node` under its clean environment for
+  the version probe, the registry read, and the lockfile checks; the resolved path is data, written into the wrapper and
+  the log, and is passed to `setpriv` only for the `openspec --version` check, which must run the binary the wrapper
+  pins, under a comment that marks that call. Checked by review of the wrapper's here-document and of the Node.js calls
+  in `install.sh`, by the option scenarios with the environment probe under Decisions - Tests, and by a scenario that
+  switches nvm's default after the build.
+- Every install replaces the prefix and rewrites the wrapper; there is no skip for an already installed version. This
+  departs on purpose from "skip an install when the requested version is already present" in
+  `.agents/knowledge/feature-authoring.md` (Idempotency): a skip would keep a tree this run did not verify and would
+  still have to rewrite the wrapper for changed options, and one path is easier to audit than two. Checked by
+  `duplicate.sh`: with the `version` proposals under Options, the first install is always 1.13.1 and the second the
+  newer `latest`, which exercises the replacement on every run; the script stops with a message when its inputs are not
+  these (Decisions - Tests).
+- `install.sh` and every shell script under `test/openspec/` follow `.agents/knowledge/shell-style.md`; bash
+  (`#!/usr/bin/env bash` with `set -euo pipefail`) is the dialect because every listed image ships it. `main` of
+  `install.sh` checks, in this order, the distribution and architecture, every option value (`version`: `latest` or one
+  exact version; `disableUpdateCheck` and `disableTelemetry`: `true` or `false`), and the presence of Node.js, of npm
+  10.8.2 or newer, and of `setpriv`, all before any network access and before it creates anything outside its temporary
+  directory, the staging directory included (an npm that new runs only on a Node.js that has `fetch`; the spec fixes no
+  order between the platform and the option checks, so the script's stays; `setpriv` is part of the essential util-linux
+  on every distribution the gate admits, so the spec has no scenario for it). Each option takes its default in the form
+  `${NAME-default}`, so an explicitly empty value reaches its check and fails. The message for a missing Node.js names
+  20.19.0, a constant in `install.sh`; the found Node.js is compared with the selected version's `engines.node` before
+  npm installs anything. Checked by `just check`, by `shellcheck -o require-variable-braces,require-double-brackets`
+  reporting nothing for `src/openspec/install.sh` and every `test/openspec/*.sh`, by review of the scripts against the
+  guide, and by the local runs under Decisions - Tests.
+- `install.sh` names its trust surface as readonly constants at the top: the registry URL `https://registry.npmjs.org/`
+  and the package name every request of its own is built from, the TUF mirror `https://tuf-repo-cdn.sigstore.dev` that
+  the audit's log line and failure hint name (Open Questions), and every path it creates or modifies outside its
+  temporary directory: the prefix `/usr/local/lib/openspec`, the wrapper `/usr/local/bin/openspec`, the staging
+  directory `/usr/local/lib/openspec.staging.XXXXXX`, the set-aside copy of a previous prefix
+  `/usr/local/lib/openspec.previous.XXXXXX`, and the unfinished wrapper `/usr/local/bin/openspec.new`; the last three
+  are removed on every exit. No constant takes the name of an `/etc/os-release` key. Checked by review: outside the
+  header comment and the constants, `install.sh` holds no `https://` and no `/usr/local` literal.
+- Log and failure lines follow `.agents/knowledge/shell-style.md` (Logging and failure) with the prefixes `openspec:`
+  and `openspec: error:`, the failures the inline Node.js programs print included; npm's own output is not prefixed.
+  Each failure a developer can fix keeps the content its spec scenario names. One log line precedes each step that uses
+  the network or changes the image: the read of the registry document (its URL), `npm install` (package, version,
+  publish-time bound, registry, staging directory), `npm audit signatures` (the registry and the TUF mirror), the
+  replacement of the prefix, and the writing of the wrapper. Checked by the local runs under Decisions - Tests and by
+  reading the build log of `just test openspec`.
 - The build-time `openspec --version` check runs the staged tree as uid and gid 65534 without supplementary groups
   (`setpriv --reuid=65534 --regid=65534 --clear-groups --no-new-privs`), under `env -i` with `PATH`,
   `OPENSPEC_TELEMETRY=0`, `OPENSPEC_NO_UPDATE_CHECK=1`, and `HOME` and `XDG_CONFIG_HOME` pointing into the temporary
@@ -185,11 +220,11 @@ checked on 2026-09-30 and 2026-10-01 to choose it.
 
 All three options are new; the delta spec's Option requirements are normative.
 
-| Name                 | Type      | Default    | Enum or proposals               | Meaning                                                                    |
-| -------------------- | --------- | ---------- | ------------------------------- | -------------------------------------------------------------------------- |
-| `version`            | `string`  | `"latest"` | proposals `["latest","1.13.1"]` | OpenSpec version to install: `latest` or one exact published version       |
-| `disableUpdateCheck` | `boolean` | `true`     | none                            | Run `openspec` with `OPENSPEC_NO_UPDATE_CHECK=1` unless the caller sets it |
-| `disableTelemetry`   | `boolean` | `false`    | none                            | Run `openspec` with `OPENSPEC_TELEMETRY=0` unless the caller sets it       |
+| Name                 | Type      | Default    | Enum or proposals               | Meaning                                                                                                                           |
+| -------------------- | --------- | ---------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `version`            | `string`  | `"latest"` | proposals `["latest","1.13.1"]` | OpenSpec version to install: `latest` or one exact published version; any other value, an empty one included, fails               |
+| `disableUpdateCheck` | `boolean` | `true`     | none                            | Run `openspec` with `OPENSPEC_NO_UPDATE_CHECK=1` unless the caller sets it; `true` or `false`, any other value, even empty, fails |
+| `disableTelemetry`   | `boolean` | `false`    | none                            | Run `openspec` with `OPENSPEC_TELEMETRY=0` unless the caller sets it; `true` or `false`, any other value, even empty, fails       |
 
 Defaults:
 
@@ -213,6 +248,9 @@ Rejected option shapes:
   installed.
 - A registry or mirror option — the source is pinned to the one the spec names (Non-Goals, Risks).
 - A Node.js version option — the Node.js feature chooses it (Non-Goals).
+- Accepting `yes`, `1`, or another case of `true` for a boolean option, or reading an empty value of any option as its
+  default — guessing what the developer meant, which `.agents/knowledge/shell-style.md` (Logging and failure) forbids;
+  the spec defines no alternative form for any option, so `install.sh` rewrites none.
 
 ## Decisions
 
@@ -220,10 +258,10 @@ Rejected option shapes:
   chose Node.js; it is upstream's primary install path, `npm audit signatures` verifies registry signatures and
   provenance, and the Node.js feature is first-party and maintained. `{}` accepts that feature's defaults, including
   `nodeGypDependencies` (apt build tools) and pnpm `latest`; other options would make a consumer's own `node:2` `{}`
-  entry a second Node.js install. Rejected: Deno through this repository's planned `deno` feature (#16) with upstream's
-  permission set — sandboxed, but not yet published and outside the maintainer's choice; a Node.js binary downloaded by
-  this feature — would duplicate the Node.js feature and its verification; `installsAfter` instead of `dependsOn` — a
-  consumer would have to add Node.js by hand.
+  entry a second Node.js install. Rejected: Deno through this repository's `deno` feature with upstream's permission set
+  — sandboxed, but outside the maintainer's choice; a Node.js binary downloaded by this feature — would duplicate the
+  Node.js feature and its verification; `installsAfter` instead of `dependsOn` — a consumer would have to add Node.js by
+  hand.
 - **Dedicated prefix instead of `npm install -g`.** A global install lands in nvm's per-version prefix, so it disappears
   from `PATH` when the current Node.js changes, and `npm audit signatures` refuses global trees. A project tree in
   `/usr/local/lib/openspec` survives nvm switches and can be audited. Rejected: `npm install -g --prefix` — installs
@@ -267,8 +305,10 @@ Rejected option shapes:
   of one `version` differ, and unknown to npm 10.
 - **A clean environment instead of a deny-list.** `env -i` with `PATH` and `HOME` keeps out every variable that changes
   how Node.js or npm check certificates, pick a registry, or load code, and makes the lookup and npm treat proxies the
-  same way. Rejected: unsetting the known variables (`NODE_TLS_REJECT_UNAUTHORIZED`, `NODE_EXTRA_CA_CERTS`,
-  `NODE_OPTIONS`, `npm_config_*`) — misses any variable a later Node.js or npm adds.
+  same way. This is not a boundary against the image: `PATH` passes, so a `node` or `npm` the image puts first is run as
+  it is (Risks). It stays because one `env -i` call gives every build the same registry and the same certificate checks.
+  Rejected: unsetting the known variables (`NODE_TLS_REJECT_UNAUTHORIZED`, `NODE_EXTRA_CA_CERTS`, `NODE_OPTIONS`,
+  `npm_config_*`) — misses any variable a later Node.js or npm adds.
 - **Build-time check as an unprivileged user.** `openspec --version` is the only package code the build runs, and
   `--ignore-scripts` does not stop code that runs when a module loads. Running it as uid 65534 keeps a compromised
   dependency from acting as root in the image build; the same code still runs as the remote user on first use, which no
@@ -290,6 +330,20 @@ Rejected option shapes:
   Node.js feature does not support (Alpine), that dependency fails before the gate runs.
 - **Tests.** CI (`test.sh`, `duplicate.sh`, `scenarios.json`, all on `compatibility.json` images) covers the scenarios
   whose build succeeds:
+  - `test.sh` and `duplicate.sh` run on every listed image and architecture; the scenarios run on amd64 and arm64, which
+    `compatibility.json` selects with `"scenarioArchitectures": ["amd64", "arm64"]` (`.agents/knowledge/testing.md`,
+    Compatibility list), so every scenario the Acceptance points to is shown on both.
+  - Each scenario script carries its own checks and sources only `dev-container-features-test-lib` and the feature's
+    shared assertion file, `lib.sh`; the two images of one scenario repeat their check lines.
+  - `lib.sh` holds only assertions that several scripts use, named after what they assert (the environment an `openspec`
+    process sees, the Node.js it runs on, the version `openspec` reports, the version of the installed package, every
+    package from the public registry, one installation), and the probe call those assertions share; each script that
+    needs the registry's `latest` reads it itself, under a comment saying why it is computed at run time.
+  - A test states its own premise as a precondition that stops the script with a message, not as a check: the option
+    values of the two installs in `duplicate.sh` (`1.13.1`, false, true, then `latest`, true, false), another registry
+    for the `@fission-ai` scope in root's npm configuration in the registry scenario, a later release in range for a
+    dependency of 1.13.2 in the exact-version scenario, and, after the switch, a current Node.js other than the one
+    `openspec` was installed with. A setup action, installing and switching Node.js with nvm, runs as a plain command.
   - Option values are read with an environment probe, `NODE_OPTIONS=--require=<probe.cjs> openspec --version`, where the
     probe prints the `OPENSPEC_*` variables and exits before OpenSpec loads (observed with 1.13.2). No test runs any
     other `openspec` command than `--version` and the probe, and the "Fresh container" checks of the home directory run
@@ -302,9 +356,10 @@ Rejected option shapes:
 
   The scenarios that fail the build, and "Same options twice", are shown in the PR's Validation section by running the
   staged `src/openspec/install.sh` as root with the option environment variables, on amd64:
-  - Unknown (`9.9.9`) and malformed (`^1.7.0`, `1`, `beta`) versions, and "Same options twice": in a container kept from
-    `just test openspec --preserve` on `debian:12`; the installed version, wrapper, and prefix are compared before and
-    after.
+  - Unknown (`9.9.9`) and malformed (an empty value, `^1.7.0`, `1`, `beta`) versions, an invalid `disableUpdateCheck`
+    and an invalid `disableTelemetry` (`yes`, `TRUE`, `1`, an empty value), and "Same options twice": in a container
+    kept from `just test openspec --preserve` on `debian:12`; the installed version, wrapper, and prefix are compared
+    before and after.
   - Verification failure, signing keys unreachable: in a container started with
     `--add-host tuf-repo-cdn.sigstore.dev:127.0.0.1` (the audit then fails, Context) from an image committed from such a
     kept container, installing a version other than the one present; the earlier `openspec --version` is unchanged
@@ -321,10 +376,11 @@ Rejected option shapes:
   - Certificate settings: the same proxy without the `node` wrapper, with `NODE_EXTRA_CA_CERTS` naming the test
     certificate authority, `NODE_OPTIONS=--use-openssl-ca` with `SSL_CERT_FILE` naming it,
     `NODE_TLS_REJECT_UNAUTHORIZED=0`, and `npm_config_strict_ssl=false` in the environment (the build fails on the
-    proxy's certificate at the registry document read; that npm's requests ignore the same settings rests on Context,
-    npm configuration, and on review of the `env -i` calls); and, without the proxy, a `cafile` line written into the
-    npmrc built into npm (the build fails before any download, naming the key).
-  - No Node.js: a plain `debian:12` container.
+    proxy's certificate at the registry document read, with a message saying that the build's proxy and certificate
+    variables and the user, global, and project npm configuration are not used; that npm's requests ignore the same
+    settings rests on Context, npm configuration, and on review of the `env -i` calls).
+  - No Node.js: a plain `debian:12` container; nothing of the feature is under `/usr/local/lib` or `/usr/local/bin`
+    afterwards.
   - Node.js too old: a Debian 12 image with Node.js 20.18 on `PATH` (the official `node:20.18-bookworm-slim`).
   - npm missing or too old: the official `node:20.19.0-bookworm-slim` with its npm replaced by 10.8.1, and again with
     npm taken off `PATH`.
@@ -348,12 +404,64 @@ Rejected option shapes:
 - **Metadata:** `dependsOn` `ghcr.io/devcontainers/features/node:2` (the runtime; justified above). No `installsAfter`,
   `containerEnv`, `mounts`, `capAdd`, `privileged`, `securityOpt`, `init`, `entrypoint`, or lifecycle command: the
   feature needs no privilege beyond the root build step and does nothing at start.
-- **Idempotency:** one prefix, replaced as a whole on every install; the wrapper overwritten; the temporary directory
-  removed by a trap. Outcome: spec, Install twice.
+- **Configuration:** the three options are the whole customization surface, and none takes a path, a URL, a command, or
+  a user. `version` is matched as a whole against `latest` or the exact-version pattern before anything uses it and
+  reaches Node.js and npm only as a quoted argument; the two booleans are matched against `true` and `false` and select
+  fixed lines of the wrapper. No option value is evaluated or written into a script the feature generates (the wrapper),
+  and no option changes a privilege or a download source, so an ordinary-looking value cannot trigger execution, a
+  privilege change, or data exposure beyond what its description states (`.agents/knowledge/feature-authoring.md`,
+  Developer trust and readability). What `"openspec": {}` does beyond installing the CLI: it installs Node.js through
+  `dependsOn` with that feature's defaults, an installation the remote user can write through the `nvm` group
+  (Decisions - Runtime; Risks); it leaves OpenSpec's telemetry on (Options; Risks); and it turns the update check off.
+  The dependency and both defaults are in the metadata, and NOTES.md states the telemetry default first.
+- **Idempotency:** one prefix, replaced as a whole on every install; the wrapper overwritten; the temporary directory,
+  the staging directory, the set-aside previous prefix, and the unfinished wrapper removed by a trap. Outcome: spec,
+  Install twice.
 - **Supported images (planned `test/openspec/compatibility.json`):** `mcr.microsoft.com/devcontainers/base:ubuntu24.04`
   (amd64, arm64; `remoteUser` `vscode`) and `debian:12` (amd64, arm64); both publish both architectures, and both are
-  within what the Node.js feature supports.
+  within what the Node.js feature supports; `scenarioArchitectures` selects both architectures for the scenarios.
 - **Failure behavior:** spec scenarios; how each is shown: Decisions - Tests.
+
+### Decisions of 2026-10-05
+
+The maintainer decided these points in conversation on 2026-10-05, when the package was revised for the requirements
+added to the knowledge base after its approval (`.agents/knowledge/shell-style.md`,
+`.agents/knowledge/review-guidance.md`, and the sections of `feature-authoring.md` and `testing.md` added since). They
+settle the points named here and do not close the package gate for the revised package.
+
+- **The image's download settings stay ignored.** Requirement "Ignore the image's download settings" stays, with the one
+  edit the next point names; the clean environment is not a boundary against the image and is kept for what it gives
+  every build (A clean environment instead of a deny-list). Rejected: narrowing or dropping the requirement.
+- **No check of the npmrc built into npm.** The requirement ends at the feature's Node.js and npm calls, Scenario
+  "Certificate settings built into npm" is removed, and "regardless of any registry configured in the image" stays as
+  approved; what that leaves is under Risks. Rejected: keeping a check that only a prepared image reaches.
+- **An invalid boolean value fails the build.** Both boolean Option requirements say that any value other than `true` or
+  `false`, an empty one included, fails, each with a scenario (Options; Goals). Rejected: stating it only in this
+  design.
+- **An explicitly empty `version` fails.** Scenario "Malformed version" lists the empty value. Rejected: stating it only
+  as a bound of this design.
+- **NOTES.md carries no threat analysis.** What rests on TLS alone, the Node.js feature as the start of the chain of
+  trust, and its group-writable installation stay in the spec and under Risks and leave NOTES.md, whose "What is
+  verified" says what a developer acts on. Rejected: keeping the three statements in NOTES.md.
+- **The scenarios run on both architectures.** `test/openspec/compatibility.json` declares `scenarioArchitectures` amd64
+  and arm64, so the Acceptance holds as approved (Tests). Rejected: narrowing the Acceptance to amd64.
+- **The installed locations are in the spec.** Requirement "Install the requested version" names
+  `/usr/local/lib/openspec` and `/usr/local/bin/openspec`, owned by root and writable only by root, with Scenario
+  "Installed locations", so the tests' labels have the spec's words (Goals). Rejected: keeping the checks as marked
+  deviations labelled in this design's words.
+- **A test's premise is a precondition.** A check of a test's own premise becomes a precondition that stops the script
+  with a message, and a setup action runs as a plain command (Tests). Rejected: comments only.
+- **Each scenario script carries its own checks.** It sources only the test library and the feature's shared assertion
+  file (Tests). Rejected: keeping the shared scenario bodies as a marked deviation.
+- **The shared test file holds only assertions.** Each script that needs the registry's `latest` reads it itself
+  (Tests). Rejected: keeping value helpers there as a marked deviation.
+- **`install.sh` runs the literal command `node`.** The resolved path is data, passed to `setpriv` only for the version
+  check that must run the binary the wrapper pins (Goals). Rejected: keeping the variable in every call.
+- **No skip for an already installed version.** Every install replaces the prefix, for the reason Goals gives. Rejected:
+  skipping when the lockfile already holds the selected version.
+- **The security review surface assesses the configuration.** It gains the bullet on whether ordinary option values can
+  trigger execution, a privilege change, or data exposure (Security review surface, Configuration). Rejected: leaving
+  the assessment out of the design.
 
 ## URL inventory
 
@@ -400,7 +508,11 @@ The Node.js feature's own downloads (nvm, Node.js, pnpm, and apt packages) belon
   for the `nvm` group, which the remote user joins, so "root-owned" covers the prefix and the wrapper, not the Node.js
   binary the wrapper runs; that matters when root runs `openspec` later. `PATH` is the one variable the feature lets
   through, so a `node` or `npm` that the image or an earlier feature put first on `PATH` is run as it is, with the
-  certificate authorities and code it brings. NOTES.md names the bootstrap and the group-writable installation.
+  certificate authorities and code it brings.
+- [An npmrc built into the Node.js installation sets a certificate authority, a proxy, or a scoped registry] → Part of
+  the Node.js installation the feature trusts as it is, and no flag replaces that file (Context, npm configuration). The
+  lockfile check still fails an entry whose `resolved` URL is outside `https://registry.npmjs.org/`; a scoped registry
+  that keeps tarball URLs on that host is not detected.
 - [The build cannot switch to uid 65534, for example in a user namespace that does not map it] → The build fails at the
   `openspec --version` check instead of running package code as root; there is no fallback.
 - [npm 10.9.9, which Node.js 22 ships, intermittently fails the audit on valid attestations (Context, npm's verifier)] →
@@ -421,6 +533,50 @@ The Node.js feature's own downloads (nvm, Node.js, pnpm, and apt packages) belon
   check that prints that command is off by default; NOTES.md says so.
 - [Telemetry is on unless the consumer opts out, and goes to a PostHog-operated endpoint on upstream's domain] →
   Upstream's default, kept (Options). NOTES.md states it first, with the endpoint and the option that turns it off.
-- [First feature of the repository] → Validation, test staging, the CI matrix, and the Release workflow run on a real
-  feature for the first time; failures there are fixed in the PR that surfaces them, as harness changes with their own
-  review.
+
+## Open Questions
+
+Three points of the revision are outside the decisions of 2026-10-05. The package is written for the first option of
+each, and the tasks that depend on one name it; "accepted as written" closes all three that way.
+
+- **Whether `install.sh` names the TUF mirror.** Raised by `.agents/knowledge/shell-style.md`, Logging and failure (a
+  step that uses the network logs from where) and Options are data (every external URL is a readonly constant). npm
+  requests `https://tuf-repo-cdn.sigstore.dev` during `npm audit signatures`; `install.sh` on the branch never names it.
+  The package says: the audit's log line and its failure hint name the mirror, so it is a readonly constant (Goals).
+  - (a) As written. Changes `src/openspec/install.sh` only: one constant, used in one log line and one failure message.
+  - (b) Keep the URL out of the script: the log line names only the registry, the failure hint points to npm's report,
+    and Goals loses the mirror from the trust-surface and log-line bullets.
+
+  Recommendation: (a), the reading that leaves no network step without its source in the log.
+- **Two groups of checks that have no sentence of their own in the spec.** Raised by `.agents/knowledge/shell-style.md`,
+  Tests (a label states one behavior in the words of the spec). `test.sh` and `duplicate.sh` check that no staging
+  directory, set-aside prefix, or unfinished wrapper is left next to the installation, and `test.sh` repeats two "Fresh
+  container" checks after `openspec --version` and the probe ran. The spec says "exactly one OpenSpec installation SHALL
+  remain reachable as `openspec`" (Install twice) and states "Fresh container" for a started container; it has no
+  sentence on what an install leaves behind or on what running the installed CLI writes.
+  - (a) As written. Both groups stay: the first under the words of Requirement "Install twice", read as one installation
+    with nothing staged or set aside next to it, the second under the words of "Fresh container" with a comment saying
+    that it repeats the check after `openspec` ran. Changes `test/openspec/test.sh` and `test/openspec/duplicate.sh`
+    only (labels and one comment).
+  - (b) The spec gains a sentence in Requirement "Install twice" that nothing else of an install remains next to the
+    installed locations, whether the install succeeds or fails, with a scenario, as `restyle-glab` did with "Leave no
+    build residue"; the labels of the first group quote it. Changes `specs/openspec/spec.md`, the test labels, and one
+    more failing local run under Decisions - Tests.
+  - (c) Drop one or both groups from the tests and leave them to review of `install.sh`. Changes `test/openspec/test.sh`
+    and `test/openspec/duplicate.sh`, and removes checks the tests carry today.
+
+  Recommendation: (a), which keeps every check the tests have today and adds no contract.
+- **Whether the proposal's sentence on the image's npm configuration is narrowed.** Raised by the decision to drop the
+  check of the npmrc built into npm. proposal.md - What Changes says that "the image's environment and npm configuration
+  cannot redirect its downloads or weaken their certificate checking". Without the check, a certificate authority, a
+  proxy, or a scoped registry in the npmrc built into the Node.js installation stays in effect (Risks). The decision
+  names the spec's "regardless of any registry configured in the image" as staying and does not name this sentence.
+  - (a) As written. The sentence stays as approved and is read as the spec's phrase is: the built-in npmrc is part of
+    the Node.js installation the feature trusts as it is. Changes no file.
+  - (b) The sentence takes the scope of Requirement "Ignore the image's download settings": "the build's environment and
+    the user, global, and project npm configuration cannot redirect its downloads or weaken their certificate checking".
+    Changes `proposal.md`, and the first statement under "What is verified" in `src/openspec/NOTES.md`, which is worded
+    the same way.
+
+  Recommendation: (a), the reading the decision gave the spec's phrase; (b) if the proposal should say it without that
+  reading.

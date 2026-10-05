@@ -23,6 +23,9 @@ requires from the package's registry document at https://registry.npmjs.org/@fis
 and following no redirect; that document only selects what is installed, and the packages are then verified as "Verify
 every installed package" requires. The build SHALL fail when the registry names anything other than an exact version as
 `latest`, and when the package installed as `@fission-ai/openspec` is not that package at exactly the selected version.
+The feature SHALL install the package and its dependencies under `/usr/local/lib/openspec` and SHALL install the command
+`openspec` at `/usr/local/bin/openspec`; that file and everything under that directory SHALL be owned by root and
+writable only by root.
 
 #### Scenario: Registry configured in the image
 
@@ -30,6 +33,13 @@ every installed package" requires. The build SHALL fail when the registry names 
   for the `@fission-ai` scope, before the feature is installed
 - **THEN** every package the feature installs is downloaded from https://registry.npmjs.org/, or the build fails with a
   message naming the package that came from elsewhere
+
+#### Scenario: Installed locations
+
+- **WHEN** the feature is installed
+- **THEN** `command -v openspec` resolves to `/usr/local/bin/openspec`, the package `@fission-ai/openspec` and its
+  dependencies are under `/usr/local/lib/openspec`, and that file and everything under that directory are owned by root
+  and writable only by root
 
 ### Requirement: Option version
 
@@ -60,8 +70,8 @@ pre-release suffix).
 
 #### Scenario: Malformed version
 
-- **WHEN** the feature is installed with `version` set to a range, a partial version, or a dist-tag other than `latest`
-  (for example `^1.7.0`, `1`, or `beta`)
+- **WHEN** the feature is installed with `version` set to an empty value, a range, a partial version, or a dist-tag
+  other than `latest` (for example `^1.7.0`, `1`, or `beta`)
 - **THEN** the build fails before downloading anything, with a message saying that only `latest` or an exact version is
   accepted
 
@@ -116,8 +126,7 @@ run, and the only package code that runs SHALL be `openspec --version`, as an un
 The feature SHALL make its build-time requests with full certificate checking against the certificate authorities of the
 Node.js found on `PATH`, which it trusts as it is, and nothing else the image holds SHALL change that: no environment
 variable of the build other than `PATH`, and no user, global, or project npm configuration, SHALL reach the feature's
-Node.js and npm calls, and a certificate authority, proxy, or scoped registry set in the npm configuration built into
-the Node.js installation SHALL fail the build before any package is downloaded.
+Node.js and npm calls.
 
 #### Scenario: Certificate checking weakened by the environment
 
@@ -125,12 +134,6 @@ the Node.js installation SHALL fail the build before any package is downloaded.
   example `NODE_TLS_REJECT_UNAUTHORIZED=0`, `NODE_EXTRA_CA_CERTS`, `NODE_OPTIONS`, or `npm_config_strict_ssl=false`)
 - **THEN** the feature's requests ignore them, and a registry certificate that only those settings would accept fails
   the build
-
-#### Scenario: Certificate settings built into npm
-
-- **WHEN** the npm configuration built into the Node.js installation sets a certificate authority, a proxy, or a scoped
-  registry
-- **THEN** the build fails before any package is downloaded, with a message naming the setting
 
 ### Requirement: Run on a supported Node.js
 
@@ -168,7 +171,7 @@ The feature SHALL accept the option `disableUpdateCheck` as declared here and, w
 with `OPENSPEC_NO_UPDATE_CHECK=1`, the variable upstream's CLI reference
 (https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md) defines, unless `OPENSPEC_NO_UPDATE_CHECK` is already set
 in the caller's environment, in which case the caller's value SHALL be kept; while it is false, the feature SHALL NOT
-set `OPENSPEC_NO_UPDATE_CHECK`.
+set `OPENSPEC_NO_UPDATE_CHECK`; any value other than `true` or `false`, including an empty value, SHALL fail the build.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -199,13 +202,19 @@ set `OPENSPEC_NO_UPDATE_CHECK`.
 - **THEN** the `openspec` process sees `OPENSPEC_NO_UPDATE_CHECK` exactly as the caller's environment has it, unset when
   the caller has not set it
 
+#### Scenario: Invalid disableUpdateCheck
+
+- **WHEN** the feature is installed with `disableUpdateCheck` set to a value that is neither `true` nor `false`, such as
+  `yes`, `TRUE`, `1`, or an empty value
+- **THEN** the build fails before downloading anything, with a message naming the option and the value
+
 ### Requirement: Option disableTelemetry
 
 The feature SHALL accept the option `disableTelemetry` as declared here and, while it is true, SHALL run `openspec` with
 `OPENSPEC_TELEMETRY=0`, the variable upstream's CLI reference
 (https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md) defines, unless `OPENSPEC_TELEMETRY` is already set in
 the caller's environment, in which case the caller's value SHALL be kept; while it is false, the feature SHALL NOT set
-`OPENSPEC_TELEMETRY`.
+`OPENSPEC_TELEMETRY`; any value other than `true` or `false`, including an empty value, SHALL fail the build.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -234,6 +243,12 @@ the caller's environment, in which case the caller's value SHALL be kept; while 
 - **WHEN** the feature is installed with `disableTelemetry` false
 - **THEN** the `openspec` process sees `OPENSPEC_TELEMETRY` exactly as the caller's environment has it, unset when the
   caller has not set it
+
+#### Scenario: Invalid disableTelemetry
+
+- **WHEN** the feature is installed with `disableTelemetry` set to a value that is neither `true` nor `false`, such as
+  `yes`, `TRUE`, `1`, or an empty value
+- **THEN** the build fails before downloading anything, with a message naming the option and the value
 
 ### Requirement: Leave the workspace and home untouched
 

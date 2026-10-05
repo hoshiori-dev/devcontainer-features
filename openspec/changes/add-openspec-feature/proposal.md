@@ -24,8 +24,8 @@ the update check and telemetry settable as options.
   at build or at start.
 - The supported images are the ones in `test/openspec/compatibility.json`; any other distribution or architecture fails
   the build with a message naming it.
-- The repository's root `README.md` lists the feature under "## Features": one row with the id `openspec` linking to
-  `src/openspec/` and a one-sentence description, replacing "No features have been published yet.".
+- The repository's root `README.md` lists the feature in the table under "## Features": one added row with the id
+  `openspec` linking to `src/openspec/` and a one-sentence description.
 
 ## Capabilities
 
@@ -48,8 +48,6 @@ None.
 - Canary membership (`test/canary.json`) is left to the maintainer; this change does not touch it.
 - Dependencies: a `dependsOn` on `ghcr.io/devcontainers/features/node` at its current major; network access to
   `registry.npmjs.org` and `tuf-repo-cdn.sigstore.dev` at build time (see design.md - URL inventory).
-- This is the repository's first feature: the first run of `just validate`, `just test`, the CI test matrix, and the
-  Release workflow against a real `src/<id>/`.
 - Out of scope: running `openspec init` or `openspec update` in the workspace, and replacing this repository's own
   `.devcontainer/` setup.
 
@@ -60,16 +58,16 @@ None.
 - Every scenario of the `openspec` delta spec (`specs/openspec/spec.md`) whose build succeeds, except "Same options
   twice", passes on every image and architecture in `test/openspec/compatibility.json`, through `test.sh`,
   `duplicate.sh`, and the scenarios in `scenarios.json`.
-- Each scenario of the delta spec whose build fails (unknown or malformed version, verification failure, weakened
-  certificate checking, missing or too old Node.js or npm, unsupported distribution or architecture), and "Same options
-  twice", which the dev container CLI cannot run because it merges identical feature entries, is shown with its stated
-  outcome in the PR's Validation section, by the local method design.md - Decisions - Tests names for it.
+- Each scenario of the delta spec whose build fails (unknown or malformed version, an invalid `disableUpdateCheck` or
+  `disableTelemetry` value, verification failure, weakened certificate checking, missing or too old Node.js or npm,
+  unsupported distribution or architecture), and "Same options twice", which the dev container CLI cannot run because it
+  merges identical feature entries, is shown with its stated outcome in the PR's Validation section, by the local method
+  design.md - Decisions - Tests names for it.
 - `devcontainer-feature.json` declares exactly the options the delta spec names and exactly the `dependsOn` the design
   names, and no `mounts`, `capAdd`, `privileged`, `securityOpt`, `init`, `entrypoint`, `containerEnv`, or lifecycle
   command.
-- The root `README.md` "## Features" section holds one row for `openspec`, its id linking to `src/openspec/`, with a
-  one-sentence description, and no longer says "No features have been published yet."; this is separate from the
-  generated `src/openspec/README.md`.
+- The root `README.md` "## Features" table holds one row for `openspec`, its id linking to `src/openspec/`, with a
+  one-sentence description; this is separate from the generated `src/openspec/README.md`.
 - `openspec/specs/openspec/spec.md` exists after archive, and `just check` passes with `src/openspec/` in place.
 
 **Stays true:**
