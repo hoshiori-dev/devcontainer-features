@@ -32,7 +32,7 @@
       sudoers entry or group membership for the remote user (No sudoers entry), bounding set of Docker's default plus
       `NET_ADMIN` (Metadata of a built container), owner and mode of every file the start-time script reads, and the
       range validator against fixture responses (Implausible range); verify `shellcheck` is clean.
-- [ ] 2.4 Write `test/firewall/duplicate.sh` (POSIX `sh`): after an install with non-default options (without the
+- [x] 2.4 Write `test/firewall/duplicate.sh` (POSIX `sh`): after an install with non-default options (without the
       `github` preset, `defaultAction` `allow`, denied entries) and a second one with defaults, the options file and the
       current start record hold only the defaults and the defaults' rules are in force (Different options the second
       time); verify `shellcheck` is clean. Blocked on a maintainer decision: `duplicate.sh` is written and passes, but
@@ -279,9 +279,9 @@ start check.
 - [x] 8.3 Re-run, against the rebuilt scripts, the builds of 2.6 and the checks of 3.8, adding the hand runs of 5.2 for
       a list value with a line break; verify that each ends as its scenario states and that every build that must fail
       ends with one `firewall: error:` line naming what its scenario requires.
-- [ ] 8.4 Run `just test firewall` and `just test-scenarios firewall` through the PR's container test jobs, which run
+- [x] 8.4 Run `just test firewall` and `just test-scenarios firewall` through the PR's container test jobs, which run
       the first per compatibility image on amd64 and arm64 and the scenarios on amd64; verify every job is green, with
       the GitHub fetches within design.md's budget.
-- [ ] 8.5 Verify `just affected` selects only `firewall`, and record the results of 8.1 to 8.4 and every Acceptance item
+- [x] 8.5 Verify `just affected` selects only `firewall`, and record the results of 8.1 to 8.4 and every Acceptance item
       of proposal.md, with the scenarios it points to, in the PR's Validation section; verify each item of the
       proposal's `## Acceptance` is named there with its result.
