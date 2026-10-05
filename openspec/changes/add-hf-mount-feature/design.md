@@ -58,10 +58,13 @@ Research for this change, re-checked against upstream on 2026-09-30; items marke
 
 - TLS alone, never weakened. Upstream publishes nothing to verify against, so no download is checked beyond TLS (spec:
   Downloads come from the upstream GitHub release and rely on TLS alone). Every request fails on an HTTP error status
-  and on a non-HTTPS URL or redirect (`--proto =https` and `--proto-redir =https`), and no flag, configuration file, or
-  environment variable relaxes certificate checking. Download redirects are followed without pinning their host, since
-  GitHub has served release downloads from both `release-assets.githubusercontent.com` and
-  `objects.githubusercontent.com`. Checked by review of the `curl` flags.
+  (`--fail`) and on a non-HTTPS URL or redirect (`--proto =https` and `--proto-redir =https`). The feature passes no
+  flag, uses no configuration file (`--disable`), and sets no environment variable that relaxes certificate checking. It
+  leaves the build environment's own certificate settings as the image provides them, among them the variables `curl`
+  reads itself, such as `CURL_CA_BUNDLE` and `SSL_CERT_FILE`: a Feature is not a sandbox against the image's
+  configuration (`.agents/knowledge/feature-authoring.md`, Developer trust and readability). Download redirects are
+  followed without pinning their host, since GitHub has served release downloads from both
+  `release-assets.githubusercontent.com` and `objects.githubusercontent.com`. Checked by review of the `curl` flags.
 - All or nothing. All selected assets are downloaded into a temporary directory before any of them is installed, and a
   transfer that `curl` reports as failed or incomplete fails the run, so a failing run replaces nothing. Checked by
   review of `install.sh` and by the hand checks below.
@@ -212,9 +215,10 @@ How each spec scenario outside the container tests is provoked; results go to th
 - Options: `backend` set to a value outside its enum, and `installMountDependencies` set to a value that is neither
   `true` nor `false`. Each run must fail before anything is downloaded or installed.
 - Downloads: copies of `install.sh` with a binary name altered ("Asset missing from the release", whose 404 also shows
-  "HTTP error") and with the latest-release URL naming a repository that has no release ("Latest release cannot be
-  resolved"). Each run must leave `/usr/local/bin` as it was. The non-HTTPS redirect of "HTTP error" is checked by
-  review of the `curl` flags.
+  "HTTP error"), with the latest-release URL naming a repository that has no release ("Latest release cannot be
+  resolved"), and with the latest-release URL naming a path that answers 404 ("HTTP error" on that request). Each run
+  must leave `/usr/local/bin` as it was. The non-HTTPS redirect of "HTTP error" is checked by review of the `curl`
+  flags.
 - Platforms: `alpine` (musl), `debian:11` (glibc 2.31), a glibc 2.34 or later image of another distribution such as
   `rockylinux:9` (RHEL 9, glibc 2.34), and a third architecture under emulation where available, otherwise a copy of
   `install.sh` with the detected architecture altered.
