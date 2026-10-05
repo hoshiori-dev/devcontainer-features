@@ -308,8 +308,9 @@ for (const [entry, value] of Object.entries(packages)) {
     if (entry === "") continue;
     if (typeof value.resolved !== "string" || !value.resolved.startsWith(registry)) {
         fail(
-            `${entry} was resolved from ${JSON.stringify(value.resolved)}, not from ${registry}; ` +
-                "remove the registry that the npmrc built into the Node.js installation sets for it",
+            `${entry} was resolved from ${JSON.stringify(value.resolved)}, not from ${registry}; check that the ` +
+                `build reaches ${registry} directly and that the npmrc built into the Node.js installation sets no ` +
+                "registry for this package, and build again",
         );
     }
 }
