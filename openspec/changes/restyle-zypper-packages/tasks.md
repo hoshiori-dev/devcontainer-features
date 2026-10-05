@@ -43,8 +43,8 @@
 - [x] 3.1 Run `just check` and confirm it passes
 - [x] 3.2 Run `test/zypper-packages/control_checks.ts`, unchanged, on the amd64 images of the compatibility list and
       confirm every check passes, except the Tumbleweed pin-below check that may report not run
-- [ ] 3.3 Confirm that `just test zypper-packages` passes on every image and architecture of the compatibility list in
+- [x] 3.3 Confirm that `just test zypper-packages` passes on every image and architecture of the compatibility list in
       CI
-- [ ] 3.4 Confirm that `just test-scenarios zypper-packages` passes in CI
-- [ ] 3.5 Record the results of 3.1 to 3.4 in the PR's Validation section; verify that the section names each Acceptance
+- [x] 3.4 Confirm that `just test-scenarios zypper-packages` passes in CI
+- [x] 3.5 Record the results of 3.1 to 3.4 in the PR's Validation section; verify that the section names each Acceptance
       item of proposal.md with its result
