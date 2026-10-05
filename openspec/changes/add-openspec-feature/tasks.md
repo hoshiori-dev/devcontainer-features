@@ -250,7 +250,9 @@ of an image prepared by hand, in place of a container kept from `just test opens
 feature's `install.sh` with `version` `1.13.1`, `disableUpdateCheck` false, and `disableTelemetry` true. The `debian:12`
 build that tasks 1.5 and 4.4 name is this feature's `install.sh` run in a container of that image without the second
 step. Task 7.6 is open for its architecture run: no qemu handler for ppc64le is registered on the machine, and the PR's
-Validation section records the two substitutes that were run; task 7.7 waits for that run.
+Validation section records the two substitutes that were run; task 7.7 waits for that run. Tasks 1.3 and 4.4, which name
+the runs of this section, rest for the architecture failure on the first substitute: `debian:12` run with
+`--platform linux/386`, where the script found `i686`.
 
 - [x] 7.1 In a container kept from `just test openspec --preserve` on `debian:12`: "Unknown version" (`9.9.9`),
       "Malformed version" (an empty value, `^1.7.0`, `1`, `beta`), "Invalid disableUpdateCheck" and "Invalid
