@@ -112,7 +112,7 @@ check "the volume keeps its owner, group, and modes after the failed change of o
   [ "$(volume_state)" = "${foreign_state}" ]
 
 # Volume filled under another UID: the repair with the image's passwordless sudo.
-check "the creation continues and repairs the volume with passwordless sudo" "${REPAIR}"
+check "the creation continues on a volume that another UID filled, with passwordless sudo" "${REPAIR}"
 check "the remote user owns everything in the volume and all of it has the group uv" \
   user_owns_everything_with_group_uv
 check "the repair preserves ordinary permission bits" [ "$(volume_modes)" = "${modes_before}" ]
@@ -135,7 +135,7 @@ sudo chmod 2775 "${special_dir}"
 sudo chmod 6755 "${special_file}"
 
 check "the foreign executable has mode 6755 before the repair" [ "$(stat -c %a "${special_file}")" = 6755 ]
-check "the creation continues and repairs the special-bit fixture" "${REPAIR}"
+check "the creation continues on a volume with a foreign setuid and setgid executable" "${REPAIR}"
 check "the ownership change clears the executable's setuid and setgid bits to mode 0755" \
   [ "$(stat -c %a "${special_file}")" = 755 ]
 check "the directory stays 2775" [ "$(stat -c %a "${special_dir}")" = 2775 ]
@@ -163,7 +163,7 @@ check "nothing in the volume changes" [ "$(volume_state)" = "${fitting_state}" ]
 sudo mkdir -p "${VOLUME_DIR}/cache/deep/root"
 sudo touch "${VOLUME_DIR}/cache/deep/root/file"
 
-check "the creation continues and repairs the files that root left" "${REPAIR}"
+check "the creation continues on a volume with a file that root left" "${REPAIR}"
 check "the remote user owns the file that root left" \
   [ "$(stat -c %u "${VOLUME_DIR}/cache/deep/root/file")" = "$(id -u)" ]
 

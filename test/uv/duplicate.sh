@@ -57,7 +57,7 @@ check "uvx --version reports the second install's release" reports_release uvx "
 for lock in "${SHARE_DIR}/tools/.lock" "${SHARE_DIR}/python/.lock"; do
   check "${lock} is not writable by every user" lacks_mode_bits "${lock}" 0002
   if [ "$(id -u)" = "0" ]; then
-    check "${lock} is writable by root only" lacks_mode_bits "${lock}" 0020
+    check "${lock} is not writable by its group" lacks_mode_bits "${lock}" 0020
   fi
 done
 
