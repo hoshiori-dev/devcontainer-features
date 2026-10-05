@@ -44,5 +44,5 @@
 
 ## 6. Integration
 
-- [ ] 6.1 Run `just check` and confirm it passes and CI on the PR is green; record the results in the PR's Validation
+- [x] 6.1 Run `just check` and confirm it passes and CI on the PR is green; record the results in the PR's Validation
       section
