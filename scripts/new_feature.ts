@@ -13,7 +13,7 @@ import { activeChanges } from "./check_spec_archived.ts";
 
 export const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** A default inside `"${VAR:-...}"`: backslash, double quote, dollar, backtick, and closing brace escaped. */
+/** A default inside `"${VAR-...}"`: backslash, double quote, dollar, backtick, and closing brace escaped. */
 function shellQuoted(value: string): string {
     return value.replace(/[\\"$`}]/g, (c) => `\\${c}`);
 }
@@ -37,7 +37,7 @@ export function scaffold(id: string, name: string, options: Map<string, OptionCo
     };
     const variables = [...options].map(([option, contract]) => {
         const variable = optionVariable(option);
-        return `${variable}="\${${variable}:-${shellQuoted(String(contract.default))}}"`;
+        return `${variable}="\${${variable}-${shellQuoted(String(contract.default))}}"`;
     });
     const optionLines = [...options.keys()].map((option) => `#   ${option}: ${optionVariable(option)}`).join("\n");
     const optionVariables = options.size > 0
