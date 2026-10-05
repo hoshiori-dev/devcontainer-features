@@ -1,6 +1,6 @@
 {
   "id": "nvidia-container-toolkit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "NVIDIA Container Toolkit",
   "description": "Installs the NVIDIA Container Toolkit from NVIDIA's signed package repository and registers the nvidia runtime with a Docker daemon in the dev container.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/nvidia-container-toolkit",

@@ -2,7 +2,9 @@
 // Exercises a proxy-only install and a real devcontainer rebuild with a populated uv volume.
 // Usage: ./test/hf-cli/integration_checks.ts ROOT_PIP_IMAGE UBUNTU_UV_IMAGE ROOT_UV_IMAGE
 const [rootImage, ubuntuImage, rootUvImage] = Deno.args;
-if (!rootImage || !ubuntuImage || !rootUvImage) throw new Error("Supply the tested root and Ubuntu images.");
+if (!rootImage || !ubuntuImage || !rootUvImage) {
+    throw new Error("Supply three tested images: ROOT_PIP_IMAGE UBUNTU_UV_IMAGE ROOT_UV_IMAGE.");
+}
 const source = await Deno.realPath("src/hf-cli/install.sh");
 const scratch = await Deno.makeTempDir({ prefix: "hf-cli-integration-" });
 const prefix = `hf-cli-${crypto.randomUUID().slice(0, 8)}`;
@@ -57,7 +59,7 @@ ENTRYPOINT ["tinyproxy", "-d"]
         );
         // The tools write failures on stderr; the saved log proves it was the feature's first download.
         const failureLog = await Deno.readTextFile(`${scratch}/without-proxy-${client}.log`);
-        if (!failureLog.includes("Cannot fetch") || failure.includes("Installed hf")) {
+        if (!failureLog.includes("cannot fetch") || failure.includes("installed hf")) {
             throw new Error("Expected download failure without proxy.");
         }
         await run("docker", [
