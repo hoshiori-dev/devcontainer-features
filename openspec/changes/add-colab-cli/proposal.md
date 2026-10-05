@@ -28,6 +28,9 @@ New `src/colab-cli/` and `test/colab-cli/` directories, with an initial feature 
 README. The dependency is `ghcr.io/hoshiori-dev/devcontainer-features/uv:1`; its implementation and version remain
 unchanged. No authentication, remote Colab resources, or repository infrastructure changes are included.
 
+An additional scenario under `test/_global/` verifies that explicitly configured uv options and runtime integration
+remain effective when uv and colab-cli are selected together.
+
 ## Acceptance
 
 **Becomes true**

@@ -21,6 +21,12 @@
       Acceptance item and scenario in the PR Validation section with CI evidence, then mark ready under the approved
       package gate.
 
+## 4. Explicit uv configuration
+
+- [ ] 4.1 Add the `uv_and_colab_cli` global scenario selecting both features with a fixed uv version and configured
+      tools; verify the version, tools, runtime environment, volume, login shells, and non-root tool management with
+      `just test-global`, `just check`, and CI, then update the PR Validation section.
+
 ## Verification references
 
 The [proposal's Acceptance](proposal.md#acceptance) remains the acceptance authority. The following map identifies test

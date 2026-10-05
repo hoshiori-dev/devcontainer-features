@@ -85,6 +85,12 @@ provide glibc hosts for CPython and package wheels without adding native build p
 images. Other distributions, including Alpine, are outside the initial matrix; broad uv support alone does not prove the
 CLI's dependency wheels work on every libc and image.
 
+The `uv_and_colab_cli` global scenario selects both features on the Ubuntu image as `vscode`, pinning uv to 0.12.16 and
+configuring two build-time tools. It checks that colab-cli's dependency declaration preserves the explicit uv version
+and tools, as well as uv's runtime variables, tool directories, writable volume, and login-shell integration. Managing
+one configured tool must leave the other tool and colab runnable. This verifies the existing uv contract without
+changing either feature's installation behavior or the global test infrastructure.
+
 ## Risks / Trade-offs
 
 - Upstream may raise its Python minimum above 3.12: latest then fails clearly; a future change can review interpreter
