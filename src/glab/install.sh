@@ -151,7 +151,8 @@ install_prerequisites() {
   done
   case "${pm}" in
     apt-get)
-      # Known failure mode: dpkg-query exits 1 for a package dpkg has no record of, which means not installed.
+      # Known failure mode: dpkg-query exits 1 for a package dpkg has no record of. Any failed query counts as not
+      # installed.
       if ! install_prerequisites_status="$(
         dpkg-query --show --showformat '${Status}' ca-certificates 2>/dev/null
       )"; then

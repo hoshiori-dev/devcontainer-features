@@ -235,13 +235,14 @@ feature's issue tracker, since the fix is almost always in the developer's confi
   That removes the three SC2086 disables and runs the same commands.
 - Each presence check branches with `if`, since the guide keeps `||` lists for guards.
 - The `ca-certificates` probe saves the `dpkg-query` output and matches it with `case` on `*'install ok installed'*`.
-  Its command substitution stands in an `if` condition, and an exit 1 counts as not installed, under a comment naming
-  that known failure mode: dpkg has no record of the package (Context). The `rpm` and `apk` probes stay single commands
-  sent to `/dev/null`.
+  Its command substitution stands in an `if` condition, and a failed query counts as not installed, under a comment
+  naming the known failure mode: `dpkg-query` exits 1 when dpkg has no record of the package (Context). The `rpm` and
+  `apk` probes stay single commands sent to `/dev/null`.
 - Rejected: `|| fail` on the whole prerequisites step, which would switch `set -e` off inside it; keeping the string
-  with one reason comment per disable; an exact `=` comparison of the `dpkg-query` status, which would treat
-  `hold ok installed` as missing and run `apt-get` where nothing runs today; `status=$(…) || status=''`, the audit's
-  form, which uses `||` as a branch.
+  with one reason comment per disable; an exact `=` comparison of the `dpkg-query` status, which would replace the
+  substring match of `main`'s `grep` with another test for no gain (verified on the Ubuntu base: a held package reports
+  `hold ok installed`, counts as missing under either test, and `apt-get` runs for it today as well);
+  `status=$(…) || status=''`, the audit's form, which uses `||` as a branch.
 
 ### Log lines
 
