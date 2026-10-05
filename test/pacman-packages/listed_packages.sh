@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Scenario listed_packages (scenarios.json): spec scenarios "Listed packages are installed", "Missing
-# database is downloaded" (the image ships no sync database), "Installation runs without a terminal"
-# (the CLI builds without one), and "Caches are removed". jq needs oniguruma, which the image lacks.
-set -e
+# Scenario listed_packages (scenarios.json): spec scenarios "Listed packages are installed", "Missing database is
+# downloaded" (the image ships no sync database), "Installation runs without a terminal" (the CLI builds without one),
+# and "Caches are removed". jq needs oniguruma, which the image lacks.
+set -euo pipefail
 
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
@@ -12,11 +12,11 @@ installed() {
 }
 
 no_package_files() {
-  [ -z "$(find /var/cache/pacman/pkg -mindepth 1 -print -quit)" ]
+  [[ -z "$(find /var/cache/pacman/pkg -mindepth 1 -print -quit)" ]]
 }
 
 no_sync_databases() {
-  [ -z "$(find /var/lib/pacman/sync -mindepth 1 -print -quit)" ]
+  [[ -z "$(find /var/lib/pacman/sync -mindepth 1 -print -quit)" ]]
 }
 
 check "bc is installed" installed bc
