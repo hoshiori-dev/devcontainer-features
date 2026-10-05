@@ -4,7 +4,7 @@
 // Use preserved default pip images and explicit uv combination images.
 const [rootImage, ubuntuImage, rootUvImage] = Deno.args;
 if (!rootImage || !ubuntuImage || !rootUvImage) {
-    throw new Error("Supply a tested root image and a tested Ubuntu image.");
+    throw new Error("Supply three tested images: ROOT_PIP_IMAGE UBUNTU_PIP_IMAGE ROOT_UV_IMAGE.");
 }
 const source = await Deno.realPath("src/hf-cli/install.sh");
 const results = await Deno.makeTempDir({ prefix: "hf-cli-observations-" });
@@ -51,7 +51,7 @@ await observation(
 await observation(
     "unsupported-arch",
     `${clean}printf '#!/bin/sh\necho riscv64\n' > /usr/local/sbin/uname; chmod +x /usr/local/sbin/uname; VERSION=1.33.0 ${install}`,
-    "Unsupported architecture: riscv64",
+    'unsupported architecture "riscv64"',
     rootImage,
     "none",
 );
@@ -72,15 +72,19 @@ await observation(
 await observation(
     "unreachable-latest",
     `${clean}VERSION=latest ${install}`,
-    "https://pypi.org/pypi/huggingface_hub/json",
+    "cannot fetch https://pypi.org/pypi/huggingface_hub/json",
     rootImage,
     "none",
 );
-await observation("missing-tag", `${clean}VERSION=9.9.9 ${install}`, "refs/tags/v9.9.9");
+await observation(
+    "missing-tag",
+    `${clean}VERSION=9.9.9 ${install}`,
+    "refs/tags/v9.9.9/utils/installers/install.sh failed: HTTP 404",
+);
 await observation(
     "unsupported-distribution",
     `VERSION=1.33.0 ${install}`,
-    "Unsupported distribution",
+    "unsupported distribution",
     "fedora:44",
     "none",
 );
