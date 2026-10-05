@@ -1,0 +1,18 @@
+{
+  "id": "colab-cli",
+  "version": "1.0.0",
+  "name": "Google Colab CLI",
+  "description": "Installs the Google Colab CLI with uv and isolated Python 3.12 for the remote user.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/colab-cli",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "proposals": ["latest", "0.7.2"],
+      "description": "The google-colab-cli release: latest stable at build time, or an exact MAJOR.MINOR.PATCH."
+    }
+  },
+  "dependsOn": {
+    "ghcr.io/hoshiori-dev/devcontainer-features/uv:1": {}
+  }
+}

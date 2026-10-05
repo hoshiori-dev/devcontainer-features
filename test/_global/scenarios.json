@@ -6,5 +6,16 @@
       "ghcr.io/hoshiori-dev/devcontainer-features/uv:1": {},
       "ghcr.io/hoshiori-dev/devcontainer-features/hf-cli:1": {}
     }
+  },
+  "uv_and_colab_cli": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "ghcr.io/hoshiori-dev/devcontainer-features/uv:1": {
+        "version": "0.12.16",
+        "toolsToInstall": "pycowsay,cowsay>=6"
+      },
+      "ghcr.io/hoshiori-dev/devcontainer-features/colab-cli:1": { "version": "0.7.2" }
+    }
   }
 }

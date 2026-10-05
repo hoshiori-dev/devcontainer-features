@@ -1,0 +1,18 @@
+{
+  "pinned_release": {
+    "image": "debian:12",
+    "features": { "colab-cli": { "version": "0.7.2" } }
+  },
+  "redirected_sources": {
+    "build": { "dockerfile": "Dockerfile" },
+    "features": { "colab-cli": { "version": "0.7.2" } }
+  },
+  "changed_uid": {
+    "build": { "dockerfile": "Dockerfile" },
+    "remoteUser": "developer",
+    "features": {
+      "ghcr.io/hoshiori-dev/devcontainer-features/uv:1": { "toolsToInstall": "pycowsay" },
+      "colab-cli": { "version": "0.7.2" }
+    }
+  }
+}
