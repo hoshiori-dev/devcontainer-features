@@ -33,6 +33,9 @@ the verified #52 audit:
   time carry no comment (`test.sh:9`, `duplicate.sh:7`, `install_skill.sh:5`, `first_party_python.sh:5`); the
   startup-file assertion is a multi-line heredoc passed to `check`; `as_root` and `no_uv_settings` are one-line
   functions, and `as_root` holds a one-line `if` with two commands.
+- `test/_global/uv_and_hf_cli.sh`, the one global scenario script, installs `uv` and `hf-cli` together and has the same
+  style gaps: `set -e` only, 3 SC2250 findings, one line over 120 characters, and three checks that pass `[ … ]` to
+  `check`. The `uv` restyle (#80) does not name it.
 - The remote user and home come from `${_REMOTE_USER:-root}` and `${_REMOTE_USER_HOME:-…}`: the tooling's variables, not
   options, where an empty value means root and its passwd home, as the spec's "Remote user is root or unset" needs.
 - The hand-run Deno runners match `install.sh` output case-sensitively. `direct_checks.ts` expects `MAJOR.MINOR.PATCH`,
@@ -58,8 +61,9 @@ the verified #52 audit:
   timeout. Checked by review and by the `missing-tag` and `unreachable-latest` observations of `direct_checks.ts`.
 - Every substring a runner asserts either stays in the message or changes in the same commit as the runner. Checked by
   running `direct_checks.ts` and `integration_checks.ts`.
-- The test restyle keeps each assertion: the number of `check` calls per file and each command's meaning stay. Checked
-  by review of the diff and by `just test hf-cli`, `just test-scenarios hf-cli`.
+- The test restyle keeps each assertion: the number of `check` calls per file and each command's meaning stay, in
+  `test/hf-cli/` and in `test/_global/uv_and_hf_cli.sh`. Checked by review of the diff and by `just test hf-cli`,
+  `just test-scenarios hf-cli`, `just test-global`.
 - Style: the guide's rules hold for every shell file touched. Checked by `just check` and
   `shellcheck -o require-variable-braces,require-double-brackets` on each.
 
@@ -67,10 +71,9 @@ the verified #52 audit:
 
 - Any option, metadata other than the version, `NOTES.md`, compatibility, or scenario change. `NOTES.md` stays accurate:
   the log still records the version, tag, and SHA-256, and messages still print no proxy value.
-- `test/_global/uv_and_hf_cli.sh`: outside the issue's scope (`src/hf-cli/`, `test/hf-cli/`) and shared with the `uv`
-  feature; it keeps its style until a change that owns it restyles the whole file.
+- `test/_global/scenarios.json` and anything of the `uv` feature: this change owns only the global scenario's script.
 - `hash_checks.ts` (no message dependency), moving the runners into CI (#50), and adding `.shellcheckrc`.
-- The audit's optional items, listed below for the maintainer to pick.
+- The audit's optional items, listed below: the maintainer adopted none of them at the package gate.
 
 ## Options
 
@@ -217,6 +220,13 @@ unclear failure).
   Ubuntu ship `venv` support separately), the world-readable work directory (the remote user reads the installer, the
   constraint file, and the shim through `runuser`), the working directory change, and the existing-venv recovery. The
   comment that only restates the platform checks' purpose is dropped.
+- The `cd` into the remote home stays, and its comment states what the line guarantees: commands run through `runuser`
+  start in a directory the remote user owns. Implementation could not confirm a failure the line prevents: the `1.0.0`
+  script without the line, started as root from `/root` (mode `0700`, which the remote user cannot enter) on
+  `mcr.microsoft.com/devcontainers/base:ubuntu24.04` with remote user `vscode` and `version` `1.33.0`, completed the
+  installer run with pip, the installer run with uv, the installer's skill step, and the skill-only generation.
+  Rejected: removing the line (one run of one release proves no other release or tool is safe without it, and the
+  restyle promises the same install steps); a comment naming a failure nobody observed.
 
 ### Tests
 
@@ -233,11 +243,18 @@ unclear failure).
 - No check is added or dropped, and each keeps its command's meaning; `test.sh:37` stays after the root run it guards.
 - `direct_checks.ts` and `integration_checks.ts` change only their expected substrings, the negative success check (now
   the new final line), and their argument errors, which name all three images.
+- This change owns `test/_global/uv_and_hf_cli.sh` and restyles it by the same rules as the feature's own tests:
+  `set -euo pipefail`, braces, lines within 120 characters, `test` for the comparisons passed to `check`, `${NAME-}` for
+  the environment variable the `uv` feature sets, and labels in the words of the two specs it exercises. Its eight
+  checks and their meaning stay. Rejected: leaving it to the `uv` restyle (#80 does not name it, and `hf-cli` is the
+  feature whose install the script observes on top of `uv`); a later change of its own (the file would keep the old
+  style with no owner).
 
 ## Optional improvements offered, not adopted
 
-The audit suggested these; none is required by the guide or a confirmed investigation item. Each can be added at the
-package gate without changing the rest of the design.
+The audit suggested these; none is required by the guide or a confirmed investigation item. The maintainer closed the
+package deliberation on 2026-10-05 without adopting any of them, so none is implemented; they stay listed as candidates
+for a later change.
 
 - Retry the two feature requests on connection errors and timeouts, up to 3 times, never on an HTTP answer. Benefit:
   survives transient network failures. Cost: a real outage fails later; more helper logic to audit.
@@ -269,7 +286,8 @@ package gate without changing the rest of the design.
 - [`readonly VERSION` before the os-release subshell makes every build fail] → readonly only in `main` after the
   platform step; the default test fails at once if this regresses.
 - [Reassigning a readonly `VERSION` when resolving `latest`] → the resolved version has its own global.
-- [Copying a `:-` default would accept empty values] → `-` stays; the optional observation above can guard it.
+- [Copying a `:-` default would accept empty values] → `-` stays; review checks both defaults, and the local behavior
+  check runs an empty `version` once. The optional observation that would guard it permanently is not adopted.
 - [`return 0` in the floor check is load-bearing today] → removed only together with the `if` rewrite.
 - [`-n` instead of `-v` in the proxy list, or substring matching of `ID_LIKE`, would change behavior] → the decisions
   fix `-v` and word matching; review checks both.
@@ -309,9 +327,11 @@ in `test.sh`).
 
 ## Open Questions
 
-- The reason for `cd` into the remote home before running commands as the remote user is not recorded anywhere and could
-  not be confirmed from the upstream installer. The comment states the reason implementation confirms; failing that, it
-  states what the line guarantees: commands run through `runuser` start in a directory the remote user owns. Only the
-  comment depends on the answer.
-- `test/_global/uv_and_hf_cli.sh` is left out (Non-Goals), and the `uv` restyle (#80) does not name it either, so no
-  restyle owns it yet. The maintainer decides whether this change, the `uv` change, or a later one restyles it.
+None. The maintainer decided the draft's two questions when closing the package deliberation on 2026-10-05:
+
+- The reason for `cd` into the remote home: the comment states the guarantee, because implementation confirmed no
+  failure without the line (Decisions, Commands and comments).
+- The owner of `test/_global/uv_and_hf_cli.sh`: this change (Decisions, Tests).
+
+The draft's cause line for download failures (HTTP status, refused redirect, or exception class) is adopted as written
+in Decisions, Download failures, and every other decision of the draft stands.
