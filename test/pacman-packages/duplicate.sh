@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
-# Install-twice test: apt-packages is installed once with a non-default `packages` from its
+# Install-twice test: pacman-packages is installed once with a non-default `packages` from its
 # proposals, then once with the defaults. Option values arrive as PACKAGES and PACKAGES__DEFAULT.
-# Scenarios "Listed packages are installed" (with the proposals list) and "Caches are removed".
+# Scenarios "Listed packages are installed" (with the proposals list), "Different list on the second
+# install" (the second, default list is empty), and "Caches are removed".
 set -e
 
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
 
 installed() {
-  [ "$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null)" = "install ok installed" ]
+  pacman -Qq "$1" >/dev/null 2>&1
 }
 
 no_package_files() {
-  [ -z "$(find /var/cache/apt/archives -name '*.deb' -print -quit)" ]
+  [ -z "$(find /var/cache/pacman/pkg -mindepth 1 -print -quit)" ]
 }
 
-no_index_files() {
-  [ -z "$(find /var/lib/apt/lists -type f ! -name lock -print -quit)" ]
+no_sync_databases() {
+  [ -z "$(find /var/lib/pacman/sync -mindepth 1 -print -quit)" ]
 }
 
 check "the first install had a non-empty list" test -n "${PACKAGES//[ ,]/}"
@@ -31,11 +32,11 @@ done
 case ${CLEANUP:-all} in
   all)
     check "package files are cleaned" no_package_files
-    check "metadata is cleaned" no_index_files
+    check "metadata is cleaned" no_sync_databases
     ;;
   packages)
     check "package files are cleaned" no_package_files
-    check "metadata survives the empty second invocation" bash -c 'find /var/lib/apt/lists -name "*_Packages*" | grep -q .'
+    check "metadata survives the empty second invocation" bash -c 'find /var/lib/pacman/sync -name "*.db" | grep -q .'
     ;;
   none) ;;
 esac

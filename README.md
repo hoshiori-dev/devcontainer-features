@@ -27,6 +27,7 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 | [`hf-cli`](src/hf-cli/)                                     | Installs the Hugging Face CLI with its standalone installer for the remote user, optionally with its agent skill.                          |
 | [`nvidia-container-toolkit`](src/nvidia-container-toolkit/) | Installs the NVIDIA Container Toolkit from NVIDIA's signed repository and registers its runtime with a Docker daemon in the dev container. |
 | [uv](src/uv/)                                               | Installs Astral's uv and uvx, optionally Python command-line tools, and keeps uv's interpreters and cache on a per-container volume.       |
+| [pacman-packages](src/pacman-packages/)                     | Installs listed system packages with pacman.                                                                                               |
 | [zypper-packages](src/zypper-packages/)                     | Installs listed system packages with zypper.                                                                                               |
 
 ## Development
