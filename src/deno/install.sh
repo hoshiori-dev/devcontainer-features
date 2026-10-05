@@ -8,6 +8,7 @@ set -euo pipefail
 readonly BIN_DIR="/usr/local/bin"
 readonly TOOLS_ROOT="/usr/local/share/deno"
 readonly PROFILE_SCRIPT="/etc/profile.d/deno.sh"
+readonly APT_LISTS_DIR="/var/lib/apt/lists"
 readonly LATEST_URL="https://dl.deno.land/release-latest.txt"
 readonly RELEASES_URL="https://github.com/denoland/deno/releases/download"
 
@@ -45,7 +46,7 @@ cleanup() {
   case "${manager_ran}" in
     apt-get)
       apt-get clean
-      rm --recursive --force /var/lib/apt/lists/*
+      rm --recursive --force "${APT_LISTS_DIR:?}"/*
       ;;
     dnf) dnf clean all ;;
     zypper) zypper --non-interactive clean --all ;;
@@ -128,7 +129,7 @@ check_platform() {
     fail "glibc ${glibc_version} found, and Deno needs glibc 2.27 or newer; use an image with a newer glibc"
   fi
 
-  machine="$(uname -m)"
+  machine="$(uname --machine)"
   case "${machine}" in
     x86_64) target=x86_64-unknown-linux-gnu ;;
     aarch64 | arm64) target=aarch64-unknown-linux-gnu ;;
@@ -151,17 +152,17 @@ validate_version() {
 # Decides whether the tools directories go to group deno (a non-root remote user that exists) and sets tools_user, then
 # fails on a group conflict or a missing group command, all before prerequisites or downloads change the image.
 check_tools_group() {
-  local uid entry account _password gid members member _account_uid primary_gid _rest user_gid user_groups
+  local uid entry account _password gid members member _account_uid primary_gid _rest user_gid
   local member_list=()
   if [[ -z "${_REMOTE_USER:-}" || "${_REMOTE_USER}" == root ]]; then return; fi
-  if ! uid="$(id -u -- "${_REMOTE_USER}" 2>/dev/null)"; then return; fi
+  if ! uid="$(id --user -- "${_REMOTE_USER}" 2>/dev/null)"; then return; fi
   if [[ "${uid}" == 0 ]]; then return; fi
   tools_user="${_REMOTE_USER}"
 
   # Every getent failure counts as "no group": groupadd then fails loudly if the group exists after all.
   if entry="$(getent group deno)"; then
     IFS=: read -r account _password gid members <<<"${entry}"
-    user_gid="$(id -g -- "${tools_user}")"
+    user_gid="$(id --group -- "${tools_user}")"
     [[ "${gid}" != "${user_gid}" ]] \
       || fail "group deno is the primary group of '${tools_user}';" \
         "use a separate primary group so UID/GID remapping preserves tools access"
@@ -180,15 +181,13 @@ check_tools_group() {
       || fail "groupadd is missing, and group deno does not exist for remote user '${tools_user}';" \
         "add groupadd to the image, or create group deno with '${tools_user}' in it"
   fi
-  user_groups="$(id -nG -- "${tools_user}")"
-  case " ${user_groups} " in
-    *" deno "*) ;;
-    *)
-      command -v usermod >/dev/null 2>&1 \
-        || fail "usermod is missing, and remote user '${tools_user}' is not in group deno;" \
-          "add usermod to the image, or create group deno with '${tools_user}' in it"
-      ;;
-  esac
+  # The list id prints decides, not id's status, so id stays inside the test: GNU id exits 1 when one of the user's
+  # GIDs has no group entry, yet prints every group, and such a user installs.
+  if [[ " $(id --name --groups -- "${tools_user}") " != *" deno "* ]]; then
+    command -v usermod >/dev/null 2>&1 \
+      || fail "usermod is missing, and remote user '${tools_user}' is not in group deno;" \
+        "add usermod to the image, or create group deno with '${tools_user}' in it"
+  fi
 }
 
 # Installs curl, a CA certificate bundle, and unzip with the family's package manager when one of them is missing.
@@ -279,26 +278,22 @@ resolve_version() {
 setup_tools_root() {
   local group=root
   local mode=0755
-  local user_groups
   if [[ -n "${tools_user}" ]]; then
     # Every getent failure counts as "no group": groupadd then fails loudly if the group exists after all.
     if ! getent group deno >/dev/null; then
       log "creating group deno"
       groupadd --system deno || fail "groupadd --system deno failed; check the image's group database"
     fi
-    user_groups="$(id -nG -- "${tools_user}")"
-    case " ${user_groups} " in
-      *" deno "*) ;;
-      *)
-        log "adding ${tools_user} to group deno"
-        usermod --append --groups deno "${tools_user}" \
-          || fail "usermod could not add ${tools_user} to group deno; check the image's account database"
-        ;;
-    esac
+    # As in check_tools_group, the list id prints decides, not id's status.
+    if [[ " $(id --name --groups -- "${tools_user}") " != *" deno "* ]]; then
+      log "adding ${tools_user} to group deno"
+      usermod --append --groups deno "${tools_user}" \
+        || fail "usermod could not add ${tools_user} to group deno; check the image's account database"
+    fi
     group=deno
     mode=2775
   fi
-  mkdir --parents "${TOOLS_ROOT}/bin" /etc/profile.d
+  mkdir --parents "${TOOLS_ROOT}/bin" "${PROFILE_SCRIPT%/*}"
   chown --no-dereference -- "root:${group}" "${TOOLS_ROOT}" "${TOOLS_ROOT}/bin"
   chmod "${mode}" "${TOOLS_ROOT}" "${TOOLS_ROOT}/bin"
   log "writing ${PROFILE_SCRIPT}"

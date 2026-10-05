@@ -13,9 +13,9 @@
       a guard; verify by review that every curl call keeps the flags listed in design.md (Goals) and that
       `grep -rn 'https\?://' src/deno` matches the URL inventory
 - [x] 1.3 Return the resolved version, the expected hashes, and the actual hashes through globals or bare assignments
-      instead of command substitutions of functions, and assign `id -g`, `id -nG`, and the existing executable's
-      reported version to variables first; verify by review and by a `docker run` install whose `latest resolves to`
-      line appears on stdout
+      instead of command substitutions of functions, assign `id -g` and the existing executable's reported version to
+      variables first, and keep the group list of `id` inside the membership test with its reason comment; verify by
+      review and by a `docker run` install whose `latest resolves to` line appears on stdout
 - [x] 1.4 Decide the group path once, add the `groupadd` and `usermod` precondition after the conflict rules, and guard
       the package-manager calls, `unzip`, `groupadd`, and `usermod` with `|| fail`; verify with the delta scenarios of
       task 2.4

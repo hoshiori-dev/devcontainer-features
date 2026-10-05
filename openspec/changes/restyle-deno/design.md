@@ -155,11 +155,17 @@ and `getent`, which change nothing.
 - Results come back through globals or through a bare assignment of the command itself, never through a function inside
   a command substitution: the resolved version, the expected hashes, and the actual hashes. A failing `sha256sum` then
   stops with its own error instead of reporting a checksum mismatch, and the `latest` log line goes to stdout. Command
-  substitutions inside arguments (`id -g` inside `[[ ]]`, `id -nG` as a `case` subject, the existing executable's
-  reported version inside the same-version test) are assigned to a variable first. Curl's saved stderr may stay
-  substituted into the `fail` message that reports it: a failing read only shortens a message that fails the build
-  anyway. Rejected: `shopt -s inherit_errexit`, which changes `errexit` for the whole script in a way a reader of one
-  function cannot see.
+  substitutions inside arguments (`id -g` inside `[[ ]]`, the existing executable's reported version inside the
+  same-version test) are assigned to a variable first. Curl's saved stderr may stay substituted into the `fail` message
+  that reports it: a failing read only shortens a message that fails the build anyway. Rejected:
+  `shopt -s inherit_errexit`, which changes `errexit` for the whole script in a way a reader of one function cannot see.
+- The group list of the remote user is the exception: `id --name --groups` stays substituted inside the membership test,
+  in the up-front check and in the setup, with a comment giving the reason. GNU `id` exits 1 when one of the user's GIDs
+  has no group entry and still prints every group, so the printed list decides, as it did when the call was a `case`
+  subject. Checked in `debian:12` with `devuser:x:4242:4242` in `/etc/passwd` and no group 4242: the script at `main`
+  and the restyled one both install, create group `deno`, and add the user. Rejected: a bare assignment, whose status
+  would stop that build under `set -e` with only `id`'s message, a failure this change does not name. Rejected: reading
+  membership from the members field of `getent group deno`, which replaces the lookup the script uses today.
 - `reported_version` stays a probe that prints nothing when the executable cannot run, with a comment that an existing
   `deno` that cannot run is treated as a different version and replaced.
 - The `getent group deno` probe keeps reading every failure as "no group", with a comment naming the consequence:
@@ -189,7 +195,8 @@ requirement in NOTES.md only, which leaves a failure condition outside the spec.
   install `latest` for `"version": ""`, contradicting the spec. Rejected: validating `version` before the platform step,
   which would change which message wins when both fail and would move `readonly` into `main`, for no gain.
 - Constants: `BIN_DIR`, `TOOLS_ROOT`, `LATEST_URL`, and `RELEASES_URL` stay, `PROFILE_SCRIPT` names
-  `/etc/profile.d/deno.sh`, and the mutable globals become `family` and `target`. No constant takes the name of an
+  `/etc/profile.d/deno.sh` and its directory is derived from it, `APT_LISTS_DIR` names `/var/lib/apt/lists`, whose
+  content the cleanup removes, and the mutable globals become `family` and `target`. No constant takes the name of an
   `/etc/os-release` key.
 
 ### Unchanged image content and process handling
