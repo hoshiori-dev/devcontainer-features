@@ -1,0 +1,3 @@
+# The two optional checks .agents/knowledge/shell-style.md relies on.
+enable=require-variable-braces
+enable=require-double-brackets
