@@ -36,9 +36,10 @@ in_world() {
   grep -Fqx -- "$1" /etc/apk/world
 }
 
-# /var/cache/apk, which the supported images ship empty, holds nothing.
-cache_empty() {
-  [ -z "$(ls -A /var/cache/apk)" ]
+# /var/cache/apk, which the supported images ship empty, still holds nothing.
+cache_left_empty() {
+  cache_left_empty_entries="$(ls -A /var/cache/apk)" || return 1
+  [ -z "${cache_left_empty_entries}" ]
 }
 
 # No temporary package cache or work directory of install.sh is left.

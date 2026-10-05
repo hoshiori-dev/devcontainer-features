@@ -16,7 +16,7 @@ check "file from the first install is installed" installed file
 check "file is a line of apk's world" in_world file
 check "tree from the first install is installed" installed tree
 check "tree is a line of apk's world" in_world tree
-check "/var/cache/apk is empty" cache_empty
+check "/var/cache/apk is left as it was, empty" cache_left_empty
 check "no temporary directory of the feature is left" no_temporary_dir
 
 reportResults

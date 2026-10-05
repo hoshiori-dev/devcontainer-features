@@ -179,8 +179,9 @@ developer who can read one installer's output can read the others'. It replaces 
   are named in camelCase, and a value in effect or suggested is written `<option>=<value>`.
 - A log line for a step that a control selects ends with `(<option>=<value>)`.
 - `<status>` is apk's exit status: `$?` written in the argument of the `fail` directly right of `||`.
-- A message whose source line would pass 120 columns is split at `;` followed by a space, or before the trailing
-  parenthesis, into two arguments; the printed line is the same while `IFS` is the default.
+- A message whose source line would pass 120 columns is split at `;` followed by a space, before the trailing
+  parenthesis, or, where neither fits, after a comma, into two arguments; the printed line is the same while `IFS` is
+  the default.
 - No text of the feature contains `fetch`, `Downloading`, `Retrieving repository`, `signature`, or `conflict`, so a
   check that looks for apk's own words stays meaningful.
 
@@ -277,7 +278,8 @@ shared ones (more machinery for an order apk ignores).
 - Comments: the header names the five option variables and gives "Alpine images ship no bash" as the POSIX reason; one
   sentence above the apk call helper, `remove_temporary_dirs`, and the `HUP`/`INT`/`TERM` traps (they make a signal exit
   through the `EXIT` trap so temporary directories are removed); the reason comments for `LC_ALL=C`, the spelled-out
-  character sets, the fresh work directory, and the cache age stay or are added. No other comment is added.
+  character sets, the fresh work directory, and the cache age stay or are added. A constant or function whose name does
+  not say everything gets the one-sentence comment the guide asks for.
 
 Rejected: long options for `rm` and `cp` (fail on BusyBox); dropping the signal traps (temporary directories could
 survive an interrupted build).
@@ -292,7 +294,7 @@ Rejected: an anchored digit-pattern rewrite of `networkTimeout` (offered below; 
 ### Test scripts
 
 - `test/apk-packages/checks.sh` (`# shellcheck shell=sh`, no shebang, not executable) holds the POSIX `check` /
-  `reportResults` stand-in and the assertions several scripts use (`installed`, `in_world`, `cache_empty`, and
+  `reportResults` stand-in and the assertions several scripts use (`installed`, `in_world`, `cache_left_empty`, and
   `no_feature_dir` under its new name, below), with prefixed function variables and braced expansions. Scripts source it
   as `. "$(dirname "$0")/checks.sh"`, as `test/glab/` does, with the sourcing directive the guide exempts.
 - `duplicate.sh` asserts `file` and `tree` as literals, with a comment that the CLI derives the first install from
@@ -304,9 +306,11 @@ Rejected: an anchored digit-pattern rewrite of `networkTimeout` (offered below; 
 - The four `controls_*.sh` use labeled checks in the words of "Only package files are cleaned" and "Feature cleanup is
   disabled", report every result, and test files with glob loops instead of `find … | grep`; their header says the other
   controls in the scenario are a smoke combination this script does not assert. Scenario keys stay.
-- `test.sh` and the scenario scripts keep their checks and labels, except one: the check labeled "no directory of the
+- `test.sh` and the scenario scripts keep their checks and labels, except two. The check labeled "no directory of the
   feature is left" looks only for `${TMPDIR:-/tmp}/apk-packages.*`, so its label and helper name say "temporary
-  directory" (the guide's rule that a check's command verifies exactly its label). Only the shared code moves.
+  directory" (the guide's rule that a check's command verifies exactly its label). The check on `/var/cache/apk` is
+  labeled in the words of "Clean package caches" ("left as it was, empty"), and its helper assigns the listing before
+  testing it, so a failing `ls` fails the check instead of reading as an empty cache. Only the shared code moves.
 - `direct_checks.ts` 235-238: the comment says the message assertion, not the status, proves validation ran first.
 - `control_checks.ts`: `PATH` is passed as its own `--env` argument instead of a fake control, the no-op ternary becomes
   `"file"`, the shebang adds `--check`, and the listener binds `127.0.0.1` with `--allow-net=127.0.0.1`, after checking

@@ -86,7 +86,7 @@ run_apk() {
 # cleanup=all and the work directory.
 remove_temporary_dirs() {
   cd /
-  if [ "${CLEANUP}" = all ] && [ -n "${cache_dir}" ]; then rm -rf -- "${cache_dir}"; fi
+  if [ "${CLEANUP}" = "all" ] && [ -n "${cache_dir}" ]; then rm -rf -- "${cache_dir}"; fi
   if [ -n "${work_dir}" ]; then rm -rf -- "${work_dir}"; fi
 }
 
@@ -136,7 +136,7 @@ require_apk() {
 # Chooses the package cache and makes a fresh work directory the current directory of the script itself, so that
 # apk add cannot read an entry as a local package file.
 prepare_directories() {
-  if [ "${CLEANUP}" = all ]; then
+  if [ "${CLEANUP}" = "all" ]; then
     cache_dir="$(mktemp --directory "${TMPDIR:-/tmp}/apk-packages.XXXXXX")"
     log "using the temporary package cache ${cache_dir}, removed on exit (cleanup=all)"
   else
@@ -151,7 +151,7 @@ prepare_directories() {
 # Gives apk add an index of every repository: refreshed from the repositories, or with refreshPolicy=never taken
 # from the caches the image already holds.
 refresh_index() {
-  if [ "${REFRESHPOLICY}" = never ]; then
+  if [ "${REFRESHPOLICY}" = "never" ]; then
     log "using the package index the image already holds, copied from ${IMAGE_CACHE_DIR}, ${IMAGE_CACHE_LINK}," \
       "and ${FEATURE_CACHE_DIR} to ${cache_dir} (refreshPolicy=never)"
     for refresh_index_source in "${IMAGE_CACHE_DIR}" "${IMAGE_CACHE_LINK}" "${FEATURE_CACHE_DIR}"; do
@@ -178,7 +178,7 @@ refresh_index() {
 install_packages() {
   log "installing $* from the image's repositories (upgradePackages=${UPGRADEPACKAGES})"
   set -- -- "$@"
-  if [ "${UPGRADEPACKAGES}" = true ]; then set -- --upgrade "$@"; fi
+  if [ "${UPGRADEPACKAGES}" = "true" ]; then set -- --upgrade "$@"; fi
   run_apk add --cache-max-age "${CACHE_MAX_AGE_MINUTES}" "$@" \
     || fail "apk add failed with status $?; fix what apk reports above (entries, repositories, or network)"
 }

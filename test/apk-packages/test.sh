@@ -22,7 +22,7 @@ check "file (a proposals package) is not installed" not_installed file
 check "tree (a proposals package) is not installed" not_installed tree
 check "file is not in apk's world" not_in_world file
 check "tree is not in apk's world" not_in_world tree
-check "/var/cache/apk is empty" cache_empty
+check "/var/cache/apk is left as it was, empty" cache_left_empty
 check "no temporary directory of the feature is left" no_temporary_dir
 
 reportResults

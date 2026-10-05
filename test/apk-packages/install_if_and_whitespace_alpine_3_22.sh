@@ -17,7 +17,7 @@ check "jq-doc, whose install-if conditions are met, is installed" installed jq-d
 check "jq is a line of apk's world" in_world jq
 check "docs is a line of apk's world" in_world docs
 check "jq-doc is not in apk's world" sh -c '! grep -Fqx jq-doc /etc/apk/world'
-check "/var/cache/apk is empty" cache_empty
+check "/var/cache/apk is left as it was, empty" cache_left_empty
 check "no temporary directory of the feature is left" no_temporary_dir
 
 reportResults

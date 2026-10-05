@@ -25,8 +25,8 @@
 ## 2. Test scripts
 
 - [x] 2.1 Add `test/apk-packages/checks.sh` with the POSIX `check` / `reportResults` stand-in and the assertions
-      `installed`, `in_world`, `cache_empty`, and `no_temporary_dir`; verify that it has no shebang, is not executable,
-      and passes both shellcheck runs.
+      `installed`, `in_world`, `cache_left_empty`, and `no_temporary_dir`; verify that it has no shebang, is not
+      executable, and passes both shellcheck runs.
 - [x] 2.2 Make `test.sh` and the `listed_packages_*` and `install_if_and_whitespace_*` scripts source `checks.sh`, with
       the label "no temporary directory of the feature is left"; verify that the other labels and commands are those of
       1.0.0 (`git diff`), and that each script passes in a `docker run` container after the install it tests.
