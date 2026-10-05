@@ -53,7 +53,7 @@
 ## 4. Integration
 
 - [x] 4.1 Run `just check` and verify it passes
-- [ ] 4.2 Run `just test nvidia-container-toolkit` in CI after the push and verify every compatibility image passes
-- [ ] 4.3 Run `just test-scenarios nvidia-container-toolkit` in CI after the push and verify every scenario passes
-- [ ] 4.4 Record the results of 4.1 to 4.3 and of the manual failure runs (empty `version`, `configureDocker` `yes` and
+- [x] 4.2 Run `just test nvidia-container-toolkit` in CI after the push and verify every compatibility image passes
+- [x] 4.3 Run `just test-scenarios nvidia-container-toolkit` in CI after the push and verify every scenario passes
+- [x] 4.4 Record the results of 4.1 to 4.3 and of the manual failure runs (empty `version`, `configureDocker` `yes` and
       empty, a version the repository does not offer, an unsupported distribution) in the PR's Validation section
