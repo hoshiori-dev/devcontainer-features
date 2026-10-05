@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
+
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
-check "the earlier candidate is genuinely Python 3.9" /usr/local/python/current/bin/python3 -c 'import sys; assert sys.version_info[:2] == (3, 9)'
-check "the later usable candidate backs the CLI" "$HOME/.hf-cli/venv/bin/python" -c 'import sys; assert sys.version_info[:2] == (3, 12); assert sys.base_prefix == "/usr/local"'
-check "the old interpreter remains unchanged" /usr/bin/python3 -c 'import sys; assert sys.version_info[:2] == (3, 9)'
-check "the selected interpreter remains accessible after cleanup" hf version
+
+# Succeeds when the interpreter $1 is Python 3.9.
+is_python_3_9() {
+  "$1" -c 'import sys; assert sys.version_info[:2] == (3, 9)'
+}
+check "the earlier candidate is genuinely Python 3.9" is_python_3_9 /usr/local/python/current/bin/python3
+# Succeeds when the CLI's venv was created from the Python 3.12 under /usr/local, the later candidate.
+later_candidate_backs_the_venv() {
+  "${HOME}/.hf-cli/venv/bin/python" - <<'PY'
+import sys
+assert sys.version_info[:2] == (3, 12)
+assert sys.base_prefix == "/usr/local"
+PY
+}
+check "the later usable candidate backs the CLI" later_candidate_backs_the_venv
+check "the old interpreter remains unchanged" is_python_3_9 /usr/bin/python3
+check "hf runs with the later candidate" hf version
 reportResults
