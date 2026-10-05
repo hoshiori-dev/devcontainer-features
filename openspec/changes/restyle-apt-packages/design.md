@@ -239,9 +239,12 @@ No option is added, changed, renamed, or removed, so this design has no option t
   before `fail` uses it, and falls back to `an unidentified distribution` when the file is unreadable or the subshell
   fails (a malformed file, or one assigning a readonly name), with a comment naming that failure mode: a bare assignment
   would otherwise let `set -e` end the run without the message and exit 1 that "Image without apt-get" requires. This
-  removes a pipeline whose status decided the fallback and a command substitution inside `fail`'s argument; the visible
-  difference is limited to a `PRETTY_NAME` that contains quote characters, which is now shown as the shell reads it.
-  Rejected: splitting the `sed | tr` pipeline into two saved steps, which keeps stripping inner quotes with more code.
+  removes a pipeline whose status decided the fallback and a command substitution inside `fail`'s argument; the file is
+  now executed as shell in that subshell, as the guide prescribes, so the output differs from 1.1.0 when the file holds
+  more than plain assignments: quotes and expansions in `PRETTY_NAME` are interpreted instead of stripped or shown
+  literally, a command in the file runs, and a file that fails to source gives `an unidentified distribution` after the
+  shell's own error line. Each of these still ends with the message and exit 1. Rejected: splitting the `sed | tr`
+  pipeline into two saved steps, which keeps stripping inner quotes with more code.
 - **Long options where both images' tools have them.** `apt-get --option … install --yes`, `rm --recursive --force`,
   `grep --fixed-strings --line-regexp --quiet`. `awk -v` stays (mawk rejects `--assign`, probed). Code before the
   `apt-get` check spawns no tool after the inlining. `--option` keeps `Acquire::https::Timeout=<n>` and the subcommand

@@ -5,9 +5,9 @@
 `src/apt-packages/` and `test/apt-packages/` predate `.agents/knowledge/shell-style.md`, and the #52 audit confirmed
 that the feature's failures are hard to act on: refresh and install failures end with APT's exit status and no line from
 the feature, a failing `apt-config` or `apt-cache` is reported as a missing directory, name, or version, the entry
-refusal is a 336-character grammar dump, no option failure shows the value that was given, and the duplicate test
-re-derives its expected values instead of stating them. The package-list features are restyled before their phase 2 and
-phase 3 work (#56, #61), which changes the same `install.sh`, so no file mixes two styles. Implements
+refusal is a grammar dump of over 300 characters, no option failure shows the value that was given, and the duplicate
+test re-derives its expected values instead of stating them. The package-list features are restyled before their phase 2
+and phase 3 work (#56, #61), which changes the same `install.sh`, so no file mixes two styles. Implements
 https://github.com/hoshiori-dev/devcontainer-features/issues/73, part of
 https://github.com/hoshiori-dev/devcontainer-features/issues/52.
 
