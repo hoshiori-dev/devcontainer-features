@@ -45,8 +45,8 @@
 ## 5. Integration
 
 - [x] 5.1 Run `just check` in the worktree and verify it passes
-- [ ] 5.2 Run `just test uv` in CI after the push and verify every compatibility image passes on both architectures
-- [ ] 5.3 Run `just test-scenarios uv` and `just test-scenarios hf-cli` in CI after the push and verify every scenario
+- [x] 5.2 Run `just test uv` in CI after the push and verify every compatibility image passes on both architectures
+- [x] 5.3 Run `just test-scenarios uv` and `just test-scenarios hf-cli` in CI after the push and verify every scenario
       passes
-- [ ] 5.4 Run `just test-global` in CI after the push and verify the global scenarios pass
-- [ ] 5.5 Record the results of 5.1 to 5.4 against each Acceptance item in the PR's Validation section
+- [x] 5.4 Run `just test-global` in CI after the push and verify the global scenarios pass
+- [x] 5.5 Record the results of 5.1 to 5.4 against each Acceptance item in the PR's Validation section
