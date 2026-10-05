@@ -181,8 +181,10 @@ Each failure keeps naming what the spec's scenarios require and gains the fix sh
   image without it.
 - No tool to create the group or add the user: the group, and the user; use an image with `groupadd` or `addgroup`, and
   `usermod` or `addgroup`.
-- Package manager missing or failing (failing is new): the packages and the manager; check the image's package
-  repositories and network access.
+- Package manager failing (new): the packages and the manager; check the image's package repositories and network
+  access.
+- Package manager missing: the packages and the manager; use an image that has it, or one that already has curl, CA
+  certificates, tar, and `sha256sum`.
 - Prerequisites still missing after the install: the packages; install curl, CA certificates, tar, and `sha256sum` in
   the image.
 - `latest` cannot be resolved, or its redirect names no release: the redirect URL and its target; check access to
@@ -247,11 +249,12 @@ The source is renamed to `src/uv/repair_volume.sh`; `install.sh` copies it to
 `/usr/local/share/uv-feature/repair-volume` as before, and `onCreateCommand` is unchanged. The script gets a header, a
 readonly constant for `/var/lib/uv`, the one path it changes, a `main` whose every early exit is `return 0` and whose
 last statement returns 0, and a `warn` that writes to standard error with the prefix `uv: warning:`. It defines neither
-`log` (it prints nothing when nothing is wrong) nor an exiting `fail`; those deviations and the missing `set -e` are
-commented with the spec's reason (creation continues in every case). The `ls` fallback's comment names its failure mode,
-an image without `find` such as `opensuse/leap:16.0`, and `awk` reads the listing from a here-document instead of a
-pipeline. It prints nothing on a volume that fits and for root, as today. Rejected: a bare `return` (returns the last
-test's status 1 and would stop container creation), and `set -e` (the spec requires creation to continue).
+`log` (it prints nothing when nothing is wrong) nor an exiting `fail`; those deviations and the missing `set -e` and
+`set -u` are commented with the spec's reason (creation continues in every case), and the short `sudo -n` with its own
+(Long options). The `ls` fallback's comment names its failure mode, an image without `find` such as
+`opensuse/leap:16.0`, and `awk` reads the listing from a here-document instead of a pipeline. It prints nothing on a
+volume that fits and for root, as today. Rejected: a bare `return` (returns the last test's status 1 and would stop
+container creation), and `set -e` (the spec requires creation to continue).
 
 ### Kept as they are
 

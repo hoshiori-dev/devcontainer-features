@@ -158,7 +158,7 @@ has_ca_bundle() {
 
 # VERSION becomes readonly in main, after the last read of /etc/os-release, which assigns it too.
 validate_version() {
-  if [ "${VERSION}" != latest ] && ! is_release "${VERSION}"; then
+  if [ "${VERSION}" != "latest" ] && ! is_release "${VERSION}"; then
     fail "option version is \"${VERSION}\"; use \"latest\" or a release such as ${MIN_TOOLS_VERSION}"
   fi
 }
@@ -203,7 +203,7 @@ EOF
 
 # Fails when tools are requested with a named release older than MIN_TOOLS_VERSION; resolve_release checks `latest`.
 check_tools_release() {
-  if [ -n "${tools}" ] && [ "${VERSION}" != latest ] && older_than "${VERSION}" "${MIN_TOOLS_VERSION}"; then
+  if [ -n "${tools}" ] && [ "${VERSION}" != "latest" ] && older_than "${VERSION}" "${MIN_TOOLS_VERSION}"; then
     check_tools_release_reason="toolsToInstall needs uv ${MIN_TOOLS_VERSION} or later, which checks the hashes the"
     check_tools_release_reason="${check_tools_release_reason} package index supplies, but version is ${VERSION}"
     fail "${check_tools_release_reason}; set version to ${MIN_TOOLS_VERSION} or later, or to latest"
@@ -266,7 +266,7 @@ check_remote_user() {
   remote_uid="$(id -u "${REMOTE_USER}" 2>/dev/null)" \
     || fail "remote user \"${REMOTE_USER}\" does not exist in the image; set remoteUser to an existing user"
   remote_group="$(id -g "${REMOTE_USER}")"
-  if [ "${remote_uid}" = 0 ]; then return 0; fi
+  if [ "${remote_uid}" = "0" ]; then return 0; fi
 
   uv_group="$(awk -F: '$1 == "uv" {print $3}' /etc/group)"
   if [ -n "${uv_group}" ]; then
@@ -307,7 +307,7 @@ install_missing() {
     install_missing_packages="${install_missing_packages} curl"
   fi
   if ! has_ca_bundle; then
-    if [ "${family}" = zypper ]; then
+    if [ "${family}" = "zypper" ]; then
       install_missing_packages="${install_missing_packages} ca-certificates-mozilla"
     else
       install_missing_packages="${install_missing_packages} ca-certificates"
@@ -325,12 +325,15 @@ install_missing() {
     apt) install_missing_manager=apt-get ;;
     *) install_missing_manager="${family}" ;;
   esac
+  # A missing package manager gets a fix of its own: the repositories and the network are not its problem.
+  install_missing_absent="${install_missing_manager} is not available to install${install_missing_packages}"
+  install_missing_absent="${install_missing_absent}; use an image that has ${install_missing_manager}, or one that"
+  install_missing_absent="${install_missing_absent} already has curl, CA certificates, tar, and sha256sum"
   install_missing_hint="check the image's package repositories and network access"
   install_missing_failure="${install_missing_manager} cannot install${install_missing_packages}"
   install_missing_failure="${install_missing_failure}; ${install_missing_hint}"
   log "installing missing prerequisites with ${family}:${install_missing_packages}"
-  command -v "${install_missing_manager}" >/dev/null 2>&1 \
-    || fail "${install_missing_manager} is not available, so ${install_missing_failure}"
+  command -v "${install_missing_manager}" >/dev/null 2>&1 || fail "${install_missing_absent}"
   case "${family}" in
     apt)
       export DEBIAN_FRONTEND=noninteractive
@@ -380,7 +383,7 @@ install_missing() {
 # Sets release to the release to install: VERSION, or for `latest` the release the redirect of RELEASES_URL/latest
 # names.
 resolve_release() {
-  if [ "${VERSION}" != latest ]; then
+  if [ "${VERSION}" != "latest" ]; then
     release="${VERSION}"
     return 0
   fi
@@ -474,7 +477,7 @@ EOF
 # survives the dev container tooling's change of the user's UID and primary GID. For root: root's group and root-only
 # write.
 set_up_group() {
-  if [ "${remote_uid}" = 0 ]; then
+  if [ "${remote_uid}" = "0" ]; then
     remote_group=0
     dir_mode=0755
     return 0
@@ -562,7 +565,7 @@ install_tools() {
 give_tool_tree() {
   log "giving ${SHARE_DIR} and everything in it to ${REMOTE_USER}:${remote_group}"
   chown --no-dereference --recursive "${REMOTE_USER}:${remote_group}" "${SHARE_DIR}"
-  if [ "${remote_uid}" != 0 ]; then
+  if [ "${remote_uid}" != "0" ]; then
     chmod -R g+w,o-w "${SHARE_DIR}"
   else
     chmod -R go-w "${SHARE_DIR}"
