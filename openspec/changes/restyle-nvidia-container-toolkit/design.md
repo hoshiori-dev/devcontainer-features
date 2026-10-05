@@ -89,7 +89,8 @@ with an `enum` of `"true"` and `"false"` (a type change, MAJOR, for no gain), an
 `main "$@"`. `main` reads as the list of steps; the trap is armed in `main` before the first step that changes the
 image. Platform detection becomes a step with its loop variables `local`; `os_id`, `os_id_like`, `family`, and `arch`
 stay global because later steps and messages read them, and `/etc/os-release` is read in the guide's subshell form with
-`printf`. The header names what is installed, from where, the paths it writes, and the variables `VERSION` and
+`printf`. The header names what is installed, from where, the prerequisites installed from the image's own repositories
+when missing, the paths it writes, the import of the key into the RPM database, and the variables `VERSION` and
 `CONFIGUREDOCKER`; second-install behavior leaves the header. Divider comments are removed; their content becomes
 one-sentence function comments where a name does not say everything, including why an exact version maps to package
 release `-1`, what `cleanup` does, and why `gpgconf --kill` may fail (no gpg-agent may be running). The `|| true` after

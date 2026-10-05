@@ -3,12 +3,13 @@
 # libnvidia-container-tools, libnvidia-container1) with the image's package manager from NVIDIA's stable package
 # repository at https://nvidia.github.io/libnvidia-container/stable, trusting only NVIDIA's signing key, which is
 # downloaded from https://nvidia.github.io/libnvidia-container/gpgkey and checked against its pinned full fingerprint.
+# Installs curl, ca-certificates, and GnuPG from the image's own repositories first, each only when it is missing.
 # Writes the key to /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg (apt) or
-# /etc/pki/rpm-gpg/RPM-GPG-KEY-nvidia-container-toolkit (dnf, zypper), the repository definition to
-# /etc/apt/sources.list.d/nvidia-container-toolkit.list, /etc/yum.repos.d/nvidia-container-toolkit.repo, or
-# /etc/zypp/repos.d/nvidia-container-toolkit.repo, and registers the nvidia runtime in /etc/docker/daemon.json when a
-# Docker daemon is installed. Runs as root at image build time; the options `version` and `configureDocker` arrive as
-# VERSION and CONFIGUREDOCKER.
+# /etc/pki/rpm-gpg/RPM-GPG-KEY-nvidia-container-toolkit (dnf, zypper), where it is also imported into the RPM database,
+# the repository definition to /etc/apt/sources.list.d/nvidia-container-toolkit.list,
+# /etc/yum.repos.d/nvidia-container-toolkit.repo, or /etc/zypp/repos.d/nvidia-container-toolkit.repo, and registers the
+# nvidia runtime in /etc/docker/daemon.json when a Docker daemon is installed. Runs as root at image build time; the
+# options `version` and `configureDocker` arrive as VERSION and CONFIGUREDOCKER.
 set -euo pipefail
 
 readonly KEY_URL="https://nvidia.github.io/libnvidia-container/gpgkey"
