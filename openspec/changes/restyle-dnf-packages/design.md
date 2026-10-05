@@ -75,13 +75,33 @@ feature, re-checked where stated:
 
 ## Decisions
 
+The maintainer closed the package deliberation on 2026-10-05 and approved the package with the decisions below; the
+draft's other decisions stand as written.
+
+### Cross-installer alignment
+
+`dnf-packages` is one of the five package-list installers (`apk-packages`, `apt-packages`, `dnf-packages`,
+`pacman-packages`, `zypper-packages`), which are restyled together under #52. The maintainer decided three points for
+all five:
+
+- The package list's default is `${PACKAGES-}`, never `${PACKAGES:-}`.
+- Every package-manager failure the script handles ends with `|| fail` and exits 1, with the tool's own exit status
+  visible in the message.
+- Header, failure messages, and log lines follow one wording, with the tool and its names substituted. The sections
+  below hold this feature's instantiation, and it replaces the draft's own message and log lists.
+
+The shared wording puts a refused entry or repository alias in single quotes and an option's value in double quotes,
+names options in camelCase, writes a value in effect or suggested as `<option>=<value>`, and ends a log line for a step
+that a control selects with `(<option>=<value>)`. Trimming the host runner (`control_checks.ts`) stays with #50.
+
 ### Dialect stays POSIX sh
 
-`install.sh` stays `#!/bin/sh` with `set -eu`, and the header gives the reason: the package-list installers share one
-POSIX skeleton, and `apk-packages` must be POSIX because Alpine has no bash. The header follows the `apt-packages` and
-`apk-packages` form: what is installed and from where, root at image build time, and `PACKAGES`, `INSTALLWEAKDEPS`,
-`REFRESHPOLICY`, `CLEANUP`, and `NETWORKTIMEOUT` as the variables the options arrive in. Second-install behavior stays
-in the spec.
+`install.sh` stays `#!/bin/sh` with `set -eu`. The header is the one the five package-list installers share
+(Cross-installer alignment): the packages listed in the option `packages` are installed with `dnf` from the image's
+enabled repositories, to the paths the packages define; the script runs as root at image build time; the options arrive
+as `PACKAGES`, `INSTALLWEAKDEPS`, `REFRESHPOLICY`, `CLEANUP`, and `NETWORKTIMEOUT`; and it is POSIX `sh` because an
+empty list must succeed, and a missing `dnf` be reported, on images that ship no bash. Second-install behavior stays in
+the spec.
 
 - Rejected: bash. All three images have it and the guide recommends it, but it would split the shared skeleton, and the
   guide allows POSIX for the package-list installers.
@@ -105,11 +125,12 @@ parameters; `main` then passes them to `install_packages "$@"`.
 ### Options: existing default forms, readonly after validation
 
 All five option defaults move to the top. The controls keep `${NAME-default}`, so an explicitly empty value still fails.
-`PACKAGES` changes from `${PACKAGES:-}` to `${PACKAGES-}`, the guide's form, with the same result because the default is
-empty. A one-line comment above the defaults says why the forms differ: an explicitly empty control is invalid and so is
-not defaulted, while an empty `packages` is the documented no-op. The four controls become readonly at the end of
-`validate_options`, `PACKAGES` after the entry loop. An empty `networkTimeout` is accepted by a `[ -z … ]` test ahead of
-its `case`, because the guide keeps `case` patterns unquoted and an empty pattern can only be written quoted.
+`PACKAGES` changes from `${PACKAGES:-}` to `${PACKAGES-}`, the guide's form and the one all five package-list installers
+use (Cross-installer alignment), with the same result because the default is empty. A comment above the defaults says
+why a default applies only to an unset option: an explicitly empty control is invalid and reaches validation, while an
+empty `packages` is the documented no-op. The four controls become readonly at the end of `validate_options`, `PACKAGES`
+after the entry loop. An empty `networkTimeout` is accepted by a `[ -z … ]` test ahead of its `case`, because the guide
+keeps `case` patterns unquoted and an empty pattern can only be written quoted.
 
 - Rejected: `${NAME:-default}` for the controls. An empty value would silently take the default, which the spec forbids
   ("Boolean options SHALL accept only `true` or `false`; enum options SHALL accept only their declared values").
@@ -129,59 +150,76 @@ one-line comment in `main` names the spec reason for the `dnf` check following t
 
 ### Failure messages
 
-`fail` prints `dnf-packages: error:` and its arguments (`$*`) to stderr and exits 1. Each message names the reason,
-echoes the refused value in double quotes, and says how to fix it; the reason and the fix are shown here as two spans,
-joined in the output by a semicolon and a space:
+`fail` prints `dnf-packages: error:` and its arguments (`$*`) to stderr and exits 1. The messages are this feature's
+instantiation of the wording the five package-list installers share (Cross-installer alignment). Each reads
+`<reason>; <how to fix it>`, in lower case and without a trailing period; a value an option "is" stands in double
+quotes, an entry in single quotes, and `<status>` is `dnf`'s exit status. The text after `dnf-packages: error:`:
 
-- Invalid `installWeakDeps`: `option installWeakDeps is "<value>"`; `use true or false`.
-- Invalid `refreshPolicy`: `option refreshPolicy is "<value>"`; `use default, always, or never`.
-- Invalid `cleanup`: `option cleanup is "<value>"`; `use all, packages, or none`.
-- Malformed `networkTimeout`: `option networkTimeout is "<value>"`;
-  `use empty or a whole number of seconds without a leading zero`.
-- `networkTimeout` out of range: `option networkTimeout is "<value>"`; `use a number of seconds from 1 through 3600`.
-- Refused entry: `entry "<entry>" in option packages is refused`;
-  `use a package name, version, or architecture, not a path, .rpm file, option, pattern, or shell character`.
-- No `dnf`: `dnf was not found on this image (<system>)`;
-  `use a Fedora or RHEL-compatible image with dnf, as images with only microdnf are not supported`.
-- Failed `dnf install`: `dnf could not install <entries>`;
-  `see dnf's messages above and check the entries against the image's enabled repositories`.
+- Invalid `installWeakDeps`: `option installWeakDeps is "<value>"; use true or false`
+- Invalid `refreshPolicy`: `option refreshPolicy is "<value>"; use default, always, or never`
+- Invalid `cleanup`: `option cleanup is "<value>"; use all, packages, or none`
+- Invalid `networkTimeout`, malformed or out of range:
+  `option networkTimeout is "<value>"; leave it empty or use whole seconds from 1 through 3600 without a leading zero`
+- Refused entry:
+  `refusing the entry '<entry>': not a package name with an optional version or architecture; start with an ASCII letter or digit, use only ASCII letters, digits, and . _ + - : ~ ^, and do not end in .rpm`
+- No `dnf`:
+  `dnf was not found on this image (<distribution>); use a Fedora or RHEL-compatible image, which provides dnf (images with only microdnf are not supported)`
+- Failed `dnf install`:
+  `dnf install failed with status <status>; fix what dnf reports above (entries, repositories, or network)`
+- Failed `dnf clean`: `dnf clean failed with status <status>; fix what dnf reports above, or use cleanup=none`
 
 The camelCase option names, the entry, `was not found`, `dnf`, `Fedora`, `RHEL-compatible`, and `microdnf` stay, so the
 spec's "a message naming the option", "a message naming that entry", and "Image without dnf" scenarios and the texts
-`control_checks.ts` asserts all still hold. The `networkTimeout` checks keep the length test ahead of the numeric
-comparison, so a 24-digit value never reaches integer arithmetic.
+`control_checks.ts` asserts all still hold. No message contains `fetch`, `Downloading`, or `Retrieving repository`, the
+words `control_checks.ts` (line 182) takes as proof that a `refreshPolicy=never` miss fetched metadata, so that check
+still judges `dnf`'s output alone. Both failing `networkTimeout` branches print the one message, with the fix held in a
+variable as the guide's POSIX skeleton does; the length test stays ahead of the numeric comparison, so a 24-digit value
+never reaches integer arithmetic. A source line that would pass 120 characters splits its message after the semicolon
+into two arguments of `fail`, which `$*` joins with a space again.
 
 - Rejected: keeping the sentence form with a new prefix. The guide requires lower case, no trailing period, and
   `<reason>; <how to fix it>`.
 - Rejected: messages without the refused value. Echoing it shows the developer what the feature received after the CLI's
   own shell evaluation.
+- Rejected: the draft's own wording, including two `networkTimeout` messages and a refusal that lists the refused kinds
+  (paths, options, patterns). One wording across the five installers is easier to learn, and the character rule in the
+  refusal already excludes those kinds.
 
-### Guard on dnf install only
+### Guards on dnf install and dnf clean
 
-`dnf install` ends with `|| fail` (message above). Its status on failure becomes 1 instead of `dnf`'s own non-zero
-status; every failure scenario of the spec asks only for a non-zero status. `dnf clean` stays under `set -e`: its
-failure is not a configuration the developer can fix. No retry is added, since the spec keeps the retry policy native
-("Network timeout is scoped to installation").
+`dnf install` and each `dnf clean` call end with `|| fail` (messages above), so every `dnf` failure the script handles
+exits with status 1 (Cross-installer alignment). `dnf`'s own status is written into the message, as `$?` in the `fail`
+argument directly right of `||`, where it still holds the failed command's status. Every failure scenario of the spec
+asks only for a non-zero status. No retry is added, since the spec keeps the retry policy native ("Network timeout is
+scoped to installation").
 
 - Rejected: a retry around `dnf install`. It changes behavior the spec leaves to `dnf`.
-- Rejected: `|| fail` on `dnf clean`. It would only replace `dnf`'s message with a less specific one.
+- Rejected: leaving `dnf clean` to `set -e`, as the draft did. Its failure would end the build with `dnf`'s status and
+  without the fix the developer has, `cleanup=none`.
+- Rejected: exiting with `dnf`'s own status. One status for every failure the feature reports is simpler to rely on, and
+  the message keeps the number.
 
 ### Log lines
 
-`log` prints `dnf-packages:` and its arguments to stdout. The lines after that prefix:
+`log` prints `dnf-packages:` and its arguments to stdout. The lines follow the shared wording (Cross-installer
+alignment); after that prefix they read:
 
 - Empty list: `no packages listed; nothing to do`, without the trailing period it has today.
-- Before `dnf install`: `installing <entries> with dnf from the image's enabled repositories`, followed by the controls
-  in effect, `(installWeakDeps=<v>, refreshPolicy=<v>, networkTimeout=<v>)`.
-- Before `dnf clean all`: `removing downloaded packages and repository metadata from dnf's cache (cleanup=all)`.
-- Before `dnf clean packages`: `removing downloaded packages from dnf's cache (cleanup=packages)`.
+- Before `dnf install`:
+  `installing <entries> from the image's enabled repositories (installWeakDeps=<value>, refreshPolicy=<value>)`
+- Before `dnf clean all`: `removing downloaded packages and the repository metadata from dnf's cache (cleanup=all)`
+- Before `dnf clean packages`: `removing downloaded packages from dnf's cache (cleanup=packages)`
 
-`<entries>` are the accepted entries separated by spaces; the allowlist holds no space or control character, so the list
-is unambiguous. An empty `networkTimeout` shows as `inherited`, the spec's word. `cleanup=none` logs nothing, because it
-changes nothing. `dnf`'s own output stays visible.
+`<entries>` are the accepted entries separated by spaces, logged before any `dnf` option is prepended; the allowlist
+holds no space or control character, so the list is unambiguous. `dnf` has no separate refresh step, so `refreshPolicy`
+is a control of the install call and stands in its parenthesis next to `installWeakDeps`. `networkTimeout` is not
+logged: it selects no step, and `dnf`'s arguments carry it. `cleanup=none` logs nothing, because it changes nothing.
+`dnf`'s own output stays visible.
 
 - Rejected: logging `dnf`'s full argument list. It repeats what `dnf` prints and buries the entries.
 - Rejected: a line for `cleanup=none`. The guide asks for lines for steps that change the image or use the network.
+- Rejected: `networkTimeout=<value>` in the install line, as the draft had it, with `inherited` for an empty value. The
+  shared wording names only the controls that select what the step does.
 
 ### System name in the missing-dnf message
 
@@ -238,14 +276,18 @@ https://dnf5.readthedocs.io/en/latest/dnf5.8.html; read on 2026-10-05).
   `check`.
 - `test.sh` drops its unused helper. `duplicate.sh` keeps the two "stays installed" checks with labels from "Installing
   the feature twice" and drops "bc runs" and "file runs", which assert behavior no scenario states.
+- The maintainer confirmed at the package gate that `controls_*` become bash tests that source the CLI's test library,
+  like every other test script of the feature.
 - Rejected: keeping `controls_*` POSIX with a stand-in like `test/glab/checks.sh`. Every image has bash, and one form
   for all scripts of the feature is easier to read.
 - Rejected: relabelling the run checks in `duplicate.sh`. No spec scenario says a package runs.
 
 ## Optional improvements offered, not adopted
 
-The audit suggested these; none is required by the guide or a confirmed #52 item. The maintainer may pick any at the
-package gate.
+The audit suggested these; none is required by the guide or a confirmed #52 item. They were offered at the package gate,
+and the maintainer adopted none of them (2026-10-05). The script has one `networkTimeout` message all the same: the
+shared wording (Cross-installer alignment) defines one, with its own text, so the first item below is settled by that
+decision and not by this list.
 
 - **One `networkTimeout` message.** Merge the two messages into one with the reason `option networkTimeout is "<value>"`
   and the fix `use empty or a whole number from 1 through 3600 without leading zeros`. Simpler to read and to test; the
@@ -268,13 +310,13 @@ package gate.
 - **Check that omitted packages load no metadata.** `test.sh` could assert that no `repomd.xml` exists. The images held
   no metadata on 2026-09-30 (archived design, Context); the check would fail if a base image started shipping some.
 - **Drop the `sed` and `tr` links from `control_checks.ts`'s no-manager `PATH`.** They are unused once the system name
-  comes from builtins. Harmless as they are, and the file is #50's to replace.
+  comes from builtins. Harmless as they are, and the file is #50's to replace; trimming it stays with #50.
 
 ## Risks / Trade-offs
 
 - [`control_checks.ts` asserts message and argument texts] → The messages keep the option name, the entry, and
-  `was not found`, the timeout pair is unchanged, and the runner is run by hand on the three amd64 images with its
-  result in the PR's Validation section.
+  `was not found`, hold none of the words its cache-miss check looks for, the timeout pair is unchanged, and the runner
+  is run by hand on the three amd64 images with its result in the PR's Validation section.
 - [A restyle tempted by the guide's "validate first" moves the `dnf` check ahead of the empty-list exit] → The order is
   a decision above, and `control_checks.ts`'s no-manager check, which expects an empty list to succeed without `dnf`,
   fails if it moves.
@@ -288,9 +330,11 @@ package gate.
   split again.
 - [Tests under `pipefail`] → Cache probes look at `find`'s output; no helper with a pipeline runs in the shell that sets
   `pipefail`.
-- [A failed `dnf install` now exits 1 instead of `dnf`'s own status] → The spec asks only for a non-zero status; a
-  caller loses dnf4's documented distinction between status 1, 3 (unhandled error), and 200 (lock problem), which no
-  supported use relies on.
+- [A failed `dnf install` or `dnf clean` now exits 1 instead of `dnf`'s own status] → The spec asks only for a non-zero
+  status; the exit status no longer carries dnf4's documented distinction between 1, 3 (unhandled error), and 200 (lock
+  problem), which no supported use relies on, and the message states `dnf`'s status.
+- [A failed `dnf clean` after a successful install now gets a feature message] → The build failed before as well,
+  through `set -e`; the message adds `cleanup=none` as the way to keep the installed packages without the cleaning.
 - [Message wording changes] → Build logs read differently; no spec text or CI test matches the old wording.
 - [An invalid control value is echoed raw] → It goes through `printf %s` to stderr and is never evaluated; a value with
   a newline or an escape sequence prints as given, which is the developer's own configuration.
