@@ -231,6 +231,13 @@ failure mode, so the status stays 1 as "Image without dnf" requires. The file is
 options are readonly; it assigns none of their names. The probe uses only builtins, so it works on `control_checks.ts`'s
 no-manager `PATH`.
 
+The file is now executed in a subshell, as the guide prescribes, so the name in the message differs from 1.0.0's
+wherever sourcing the file differs from extracting the text with `sed`: a command in the file runs; expansions and
+escapes in `PRETTY_NAME` are interpreted instead of copied; the last of a repeated key wins, and an indented key counts;
+what the file prints becomes part of the name; an `exit` in the file ends the read and gives
+`an unidentified distribution`; and a file that fails to source gives `an unidentified distribution` after the shell's
+own error line. The status is 1 in every one of these cases.
+
 - Rejected: keeping `sed | tr`. A pipeline's status decides the fallback.
 - Rejected: no fallback. A broken `/etc/os-release` would end the run with status 2 and without the message.
 - Rejected: dropping the system name. It helps the developer see which image the feature ran on.
