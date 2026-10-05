@@ -3,7 +3,8 @@
 The feature installs the upstream [`hf-mount`](https://github.com/huggingface/hf-mount) daemon as
 `/usr/local/bin/hf-mount` and, next to it, the backends `backend` selects: `hf-mount-nfs`, `hf-mount-fuse`, or both.
 With `installMountDependencies` enabled it also installs the mount helpers of those backends from the image's own
-repositories: `nfs-common` (Debian, Ubuntu) or `nfs-utils` (Fedora) for NFS, and `fuse3` for FUSE.
+repositories: `nfs-common` (Debian, Ubuntu) or `nfs-utils` (Fedora) for NFS, and `fuse3` for FUSE. To download the
+binaries, it installs `curl` and `ca-certificates` from the image's repositories when the image lacks them.
 
 It installs tools only. It starts no mount and no `hf-mount` process, grants the container no privilege, capability, or
 device, leaves `/etc/fuse.conf` and the sudo configuration as they are, and reads or stores no Hugging Face credential:
