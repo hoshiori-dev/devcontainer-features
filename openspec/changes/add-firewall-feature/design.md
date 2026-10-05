@@ -630,7 +630,8 @@ hosts the tests connect to (Goals: Test destinations). Verified column: a read-o
 - [The remote user of the usual base image has passwordless `sudo`] → Non-Goals; `NOTES.md` states it first.
 - [Sibling Compose services and the Docker host are refused unless allowed] → `NOTES.md` shows allowing a service name
   through `allowedDomains` (resolved by Docker's embedded DNS through dnsmasq) or its subnet through `allowedCidrs`; a
-  scenario proves the service-name path or `NOTES.md` drops it. See Open Questions.
+  hand run recorded in the PR's Validation section proves the service-name path, because the harness cannot start a
+  sibling container (Test coverage), or `NOTES.md` drops it. See Open Questions.
 - [A nested container is refused an allowed domain when its lookups do not pass through dnsmasq: under a nested daemon
   with its own DNS servers (docker-in-docker's `azureDnsAutoDetection` on Azure hosts), and on the default bridge, whose
   containers otherwise get `8.8.8.8`, which is refused] → Not guaranteed (Decisions: Nested Docker); `NOTES.md` states
@@ -760,3 +761,40 @@ first answer of each is what sections 5 and 6 of `tasks.md` are written to.
     answer. Recommended: the alternative, so that the three changes treat a test's premise alike. Setup steps the branch
     wraps in `check` (holding the resolver's port, importing the nested image) assert nothing and become plain commands
     under the same rule; this question is about the three assertions only.
+
+Questions 14 and 15 were raised on 2026-10-05 by hand runs against the scripts as sections 5 to 8 of `tasks.md` leave
+them; tasks 3.8 and 3.1 had recorded both as open. Each names the requirement at stake. No text of the proposal or the
+delta spec is changed for them; the first answer of each is what `NOTES.md` states.
+
+14. **DNS servers configured for a dev container on a user-defined network.** Requirement: DNS only to the container's
+    resolvers says that DNS traffic to an address `/etc/resolv.conf` does not name is refused, and that every name still
+    resolves. On a user-defined network, Docker's `/etc/resolv.conf` names only `127.0.0.11`. When DNS servers are
+    configured for the container (`docker run --dns`, `dns:` in a Compose file) or for the daemon, the embedded resolver
+    forwards to them from the container's own network namespace, so the rules refuse those queries and the two sentences
+    cannot both hold. Observed on `debian:12` with `--dns 8.8.8.8` and `presets` `npm`: the start is applied and the
+    check passes, `registry.npmjs.org` does not resolve, and a sibling container's name, which Docker answers itself,
+    does; a rule added by hand that accepts DNS to `8.8.8.8` makes every name resolve. Without configured servers Docker
+    forwards from the host's namespace, and on the default bridge `/etc/resolv.conf` names the configured servers, so
+    every name resolves in both. As written: a documented limitation of the supported network configurations. `NOTES.md`
+    says not to configure DNS servers for a dev container on a user-defined network and what works instead; the rules
+    and the resolver handling stay as they are. Alternative: extend the resolver handling to the servers Docker forwards
+    to, which the generated `/etc/resolv.conf` names only in a comment (`# ExtServers: [8.8.8.8]`). The start-time
+    script would read that comment and accept DNS to those addresses. This widens "the resolvers named in
+    `/etc/resolv.conf`" in the requirement and adds a scenario to it, depends on the form of that comment, and lets a
+    process in the container query those servers directly, past the sets dnsmasq fills. Recommended: as written.
+15. **A start under an entrypoint that does not run as root.** Requirement: Failure mode, Scenario: Rules cannot be
+    loaded, says that such a start "is recorded as not applied", and Requirement: Start record readable by the remote
+    user says that each start writes a record. The record lives in `/run/firewall/`, which root alone can write (Goals:
+    A record per start), and it has to stay unwritable for the remote user, who may be the entrypoint's user. So such a
+    start writes no record. Observed on `debian:12`: `apply.sh` run as uid 65534 logs one line and ends with status 0,
+    no `/run/firewall` exists, outbound traffic is unrestricted, and the check ends after its 90 seconds with one error
+    line that names the missing record, and with a non-zero status under `failureMode` `closed`. Requirement: Start
+    check holds, since it names a missing record beside a failed and a not-applied one. As written: a documented
+    limitation. `NOTES.md` says that the entrypoint has to run as root, that otherwise no rule is loaded and no record
+    written, what the check then reports, and to keep the container's user at root and name the unprivileged user with
+    `remoteUser`. The scenario's "recorded as not applied" holds for a start without `NET_ADMIN`; for a start without
+    root, the check reports the start as not applied from the missing record. Alternative: change what the delta spec
+    states, so that the scenario and the record requirement say a start without root leaves no record and the check
+    reports it; or give such a start a place to record, which the entrypoint's user, and so possibly the remote user,
+    could then write, against Requirement: Start record readable by the remote user. Recommended: as written, with the
+    scenario's wording corrected when the delta spec is next revised.

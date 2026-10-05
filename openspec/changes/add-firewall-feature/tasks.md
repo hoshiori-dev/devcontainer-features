@@ -109,7 +109,7 @@ Sections 5 to 8 bring the implementation to the requirements the knowledge base 
 earlier work. Nothing the delta spec fixes changes: no option, rule, file location, record field, or exit status of the
 start check.
 
-- [ ] 5.1 Rebuild `src/firewall/install.sh` on the POSIX skeleton of `.agents/knowledge/shell-style.md`, with the same
+- [x] 5.1 Rebuild `src/firewall/install.sh` on the POSIX skeleton of `.agents/knowledge/shell-style.md`, with the same
       packages, files, and order of checks (the distribution, then the options): a header naming the packages, the
       image's repositories, `/usr/local/share/firewall`, and each option with the variable it arrives in, without
       second-install behavior; readonly constants for the paths it creates or modifies (`/usr/local/share/firewall`, and
@@ -129,7 +129,7 @@ start check.
       plain container of each compatibility image, and hand runs with an unknown preset, an explicitly empty
       `defaultAction`, and an unsupported distribution, each ending in one `firewall: error: <reason>; <how to fix it>`
       line before any package is installed.
-- [ ] 5.2 Restyle the library `src/firewall/scripts/common.sh`: `# shellcheck shell=sh` alone on the first line and no
+- [x] 5.2 Restyle the library `src/firewall/scripts/common.sh`: `# shellcheck shell=sh` alone on the first line and no
       per-file disable; readonly constants; the option variables under the names `install.sh` gives them and lower-case
       names for the other mutable globals; function-local variables prefixed with the function's full name; no `eval`
       and no checker passed by name, each list validated by a direct call that assigns its output; every list split on
@@ -143,7 +143,7 @@ start check.
       validator under dash and BusyBox ash against the rejected values and fixtures `test.sh` uses, and hand runs
       showing that `presets` with a line break between `github` and `npm` is rejected, that the same value with a comma
       before the line break is accepted, and that `Example.COM` in `allowedDomains` is accepted.
-- [ ] 5.3 Rebuild `src/firewall/scripts/apply.sh` on the POSIX skeleton, with the same order of loads, the same
+- [x] 5.3 Rebuild `src/firewall/scripts/apply.sh` on the POSIX skeleton, with the same order of loads, the same
       rulesets, and the same record: the `env -i` re-execution kept as the first lines, under a comment marking it as
       the layout deviation of design.md (Goals: The check ignores its environment); readonly constants for the trust
       surface (the meta URL and host, the probe address, `/usr/local/share/firewall`, `/run/firewall` and each file
@@ -167,7 +167,7 @@ start check.
       the closed, pinned, and full rulesets, and a container built on `debian:12` whose first start is recorded as
       applied with the chains it had before the rebuild and whose re-run with outbound HTTPS dropped ends with status 0
       and a failed record (the scenarios run in 8.4).
-- [ ] 5.4 Rebuild `src/firewall/scripts/check.sh` on the POSIX skeleton: the `env -i` re-execution first, under its
+- [x] 5.4 Rebuild `src/firewall/scripts/check.sh` on the POSIX skeleton: the `env -i` re-execution first, under its
       deviation comment, then `set -eu` in place of `set -u`; readonly constants for the record, the options file, the
       probe URL, and the wait; `log` and `fail` with the `firewall:` and `firewall: error:` prefixes, and the warning of
       `failureMode` `warn` on standard error as `firewall: warning: …` with exit status 0; `main "$@"` as the list of
@@ -248,7 +248,7 @@ start check.
 
 ## 7. Version and documentation
 
-- [ ] 7.1 Revise `src/firewall/NOTES.md` for human developers (`.agents/knowledge/feature-authoring.md`, User
+- [x] 7.1 Revise `src/firewall/NOTES.md` for human developers (`.agents/knowledge/feature-authoring.md`, User
       documentation) and to the proposal's Acceptance item on it: open with the privilege assumption (a remote user
       without root, passwordless `sudo`, or access to a Docker daemon; `vscode` of the Dev Containers base images has
       passwordless `sudo`) and bring the `vscode` preset constraint into the first lines (design.md, Non-Goals and Open
@@ -263,7 +263,7 @@ start check.
       delta spec (Requirements: Allowed domains, Presets, Forwarded traffic, Start record readable by the remote user,
       Guardrail, not a security boundary) and every statement design.md's Non-Goals and Risks assign to `NOTES.md` is
       still present, and that `just docs-check` passes.
-- [ ] 7.2 Leave the version in `src/firewall/devcontainer-feature.json` at `1.0.0` (the feature is unreleased;
+- [x] 7.2 Leave the version in `src/firewall/devcontainer-feature.json` at `1.0.0` (the feature is unreleased;
       `.agents/knowledge/feature-authoring.md`, Versions) and `test/firewall/compatibility.json` as task 1.2 wrote it.
       Verify that `jq -r .version src/firewall/devcontainer-feature.json` prints `1.0.0`, that the compatibility list
       still holds the four images on `amd64` and `arm64`, and that `just validate` passes.
