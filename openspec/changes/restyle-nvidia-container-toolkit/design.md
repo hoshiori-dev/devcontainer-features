@@ -48,8 +48,8 @@ this feature and were confirmed against the code at `f64470a`.
 **Goals:**
 
 - The repository files come from per-family here-documents whose output is byte-identical to today's. Checked by
-  `repository_file_is_expected` (whole-file comparison after this change) in `test.sh` and the pinned scenarios on every
-  family.
+  `repository_file_is_expected` (whole-file comparison after this change, apart from trailing newlines) in `test.sh` and
+  the pinned scenarios on every family.
 - The key download keeps its curl semantics (`--proto '=https'`, fail on HTTP errors, follow redirects) and the URL
   constants keep their values. Checked by reviewing the diff of `install.sh` against the URL inventory below.
 - `VERSION` keeps `${VERSION-latest}` and becomes readonly only after `/etc/os-release` has been read. Checked by
@@ -204,17 +204,26 @@ zypper-only line.
   `helpers.sh` become readonly; `CANDIDATE` becomes `candidate`, with a comment at the assignment saying why it is
   computed at run time. The `seq` loop in `docker_in_docker.sh` stays (see the offered list).
 - The repository query that yields the expected version lets the package manager's stderr through and is no longer
-  masked with `|| true`, so a failed query stops the test with the package manager's reason.
+  masked with `|| true`, so a failed query stops the test with the package manager's reason. apt-get and dnf need an
+  option for that: against a repository that cannot be reached, `apt-get update` warns and exits 0, leaving the
+  installed version as the candidate, and dnf5 skips the repository, prints nothing, and exits 0. The query therefore
+  runs `apt-get update -o APT::Update::Error-Mode=any` and
+  `dnf repoquery --setopt=nvidia-container-toolkit.skip_if_unavailable=false`; `zypper refresh` fails by itself (checked
+  2026-10-05 on `debian:12`, the Ubuntu 24.04 base image, `fedora:44`, and Leap 16.0 with the repository host made
+  unresolvable).
 - No check's result depends on a pipeline whose writer can be cut off: output is captured in a variable before it is
   matched, instead of piping into `grep -q`.
 - `repository_listed` moves into `test.sh`; its dnf branch checks the base URL dnf reports for NVIDIA's repository,
   which dnf5 on `fedora:44` prints as `Base URL` in `dnf repo info` (checked 2026-10-05).
-- `repository_file_is_expected` compares the whole file with a literal expected text per family; `|| { …; }` guards
-  become `if` blocks.
+- `repository_file_is_expected` compares the whole file with a literal expected text per family, apart from trailing
+  newlines: both sides pass through command substitution, which strips them, and `fedora:44` and Leap 16.0 ship no
+  `cmp`. `|| { …; }` guards become `if` blocks.
 - `docker_disabled.sh` tests the daemon's presence with `[[ … || … ]]` instead of `test … -o …`.
 - `duplicate.sh` states its reason inline and cites the archived design path.
 - `no_temporary_gnupghome` stays, with a comment that it guards `install.sh`'s cleanup of its temporary GnuPG home.
-- Labels keep their meaning; each states one behavior.
+- Labels keep their meaning and each states one behavior, in the spec's words where a spec sentence states it. A check
+  that no spec sentence states (a scenario's precondition, the single repository definition, the temporary GnuPG home)
+  carries a comment saying what it checks.
 
 Alternatives rejected: one check per repository-file property (more checks restating one fact); narrowing the dnf label
 instead of checking the URL; a literal expected version (the newest release moves).
@@ -270,7 +279,8 @@ when closing the package gate (Package decisions); each stays available to a lat
   precedes the feature's message.
 - [`pipefail` in tests surfaces a cut-off writer as a failure] → Outputs are captured before matching.
 - [An unmasked repository query makes a transient network failure stop the test script] → Intended: the failure shows
-  its cause instead of a misleading "no expected version".
+  its cause instead of a misleading "no expected version". On apt the failure of any repository `apt-get update`
+  refreshes stops it, the image's own included.
 - [`dnf repo info` is dnf5 syntax] → Fedora 44 is the only dnf image; dnf4 hosts are attempted but not tested.
 - [Long options] → Every compatibility image uses GNU tools; Alpine fails detection before any command runs.
 - [A readonly constant named like an `/etc/os-release` key aborts the read] → The new constants `DNF_REPO_FILE` and

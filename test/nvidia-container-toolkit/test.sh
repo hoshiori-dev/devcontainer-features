@@ -40,7 +40,7 @@ check "nvidia-container-cli runs for the remote user" nvidia-container-cli --ver
 check "all four packages are at the newest version in NVIDIA's repository (${candidate:-none})" \
   packages_at "${candidate}"
 check "nvidia-ctk reports the newest version" ctk_reports "${candidate%-*}"
-check "the source definition names NVIDIA's stable repository, signature checks, and the local key" \
+check "the configured repository is NVIDIA's stable repository, signature-checked against a local copy of the key" \
   repository_file_is_expected
 check "the package manager lists NVIDIA's stable repository for this architecture" repository_listed
 check "NVIDIA's repository is defined once" repository_defined_once

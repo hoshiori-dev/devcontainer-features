@@ -28,7 +28,7 @@ check "the first install received version ${VERSION:-unset}, not the newest (${c
 check "all four packages end at the newest version the second install selected" packages_at "${candidate}"
 check "nvidia-ctk reports the newest version" ctk_reports "${candidate%-*}"
 check "NVIDIA's repository is defined once" repository_defined_once
-check "the source definition names NVIDIA's stable repository, signature checks, and the local key" \
+check "the configured repository is NVIDIA's stable repository, signature-checked against a local copy of the key" \
   repository_file_is_expected
 check "the key file holds only NVIDIA's pinned key" key_is_pinned
 check "no temporary GNUPGHOME remains" no_temporary_gnupghome

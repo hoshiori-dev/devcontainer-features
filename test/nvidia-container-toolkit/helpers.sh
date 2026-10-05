@@ -76,13 +76,18 @@ newest_candidate() {
   local listing
   case "$(toolkit_family)" in
     apt)
-      as_root apt-get update >/dev/null || return
+      # Error-Mode=any makes apt-get update fail when a repository cannot be fetched; by default it warns and exits 0,
+      # and the candidate would then be the installed version.
+      as_root apt-get update -o APT::Update::Error-Mode=any >/dev/null || return
       listing="$(apt-cache policy nvidia-container-toolkit)" || return
       awk '$1 == "Candidate:" { print $2 }' <<<"${listing}"
       ;;
     dnf)
+      # skip_if_unavailable=false makes dnf fail when it cannot fetch NVIDIA's repository; by default it skips the
+      # repository, prints nothing, and exits 0.
       listing="$(
-        as_root dnf repoquery --quiet --repo nvidia-container-toolkit --qf '%{version}-%{release}\n' \
+        as_root dnf repoquery --quiet --repo nvidia-container-toolkit \
+          --setopt=nvidia-container-toolkit.skip_if_unavailable=false --qf '%{version}-%{release}\n' \
           nvidia-container-toolkit
       )" || return
       sort -V <<<"${listing}" | awk '/^[0-9]/ { newest = $0 } END { print newest }'
@@ -126,8 +131,8 @@ ctk_reports() {
   fi
 }
 
-# The source definition is, as a whole, the one the feature writes: NVIDIA's stable repository for this architecture,
-# with signature checks on and only the local key.
+# The repository configuration is, as a whole apart from trailing newlines, the one the feature writes: NVIDIA's stable
+# repository for this architecture, signature-checked against the local copy of the key alone.
 repository_file_is_expected() {
   local file url expected actual
   file="$(toolkit_repo_file)"
@@ -169,7 +174,9 @@ EOF
   fi
 }
 
-# Exactly one source definition in the image points at NVIDIA's repository.
+# Exactly one source definition in the image points at NVIDIA's repository. No spec sentence states this for one
+# install; it checks the convention that a feature overwrites its files instead of appending to them
+# (feature-authoring.md, Idempotency), which Requirement "Installing twice" calls one consistent installation.
 repository_defined_once() {
   local definitions=()
   # A glob that matches no file stays literal and grep reports it, so grep's messages are dropped; its status does not

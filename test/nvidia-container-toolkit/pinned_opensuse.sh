@@ -11,7 +11,7 @@ check "nvidia-ctk runs for the remote user" nvidia-ctk --version
 check "nvidia-container-cli runs for the remote user" nvidia-container-cli --version
 check "all four packages are at 1.19.1" packages_at "1.19.1-1"
 check "nvidia-ctk reports 1.19.1" ctk_reports "1.19.1"
-check "the source definition names NVIDIA's stable repository, signature checks, and the local key" \
+check "the configured repository is NVIDIA's stable repository, signature-checked against a local copy of the key" \
   repository_file_is_expected
 check "the key file holds only NVIDIA's pinned key" key_is_pinned
 

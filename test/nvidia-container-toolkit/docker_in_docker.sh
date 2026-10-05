@@ -8,7 +8,8 @@ source dev-container-features-test-lib
 # shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
-# The daemon starts with the container, not before the test: wait for it, at most 120 seconds.
+# Precondition of the check that the daemon lists the nvidia runtime, not a behavior of the feature. The daemon starts
+# with the container, not before the test: wait for it, at most 120 seconds.
 docker_daemon_ready() {
   local attempt
   for attempt in $(seq 1 60); do

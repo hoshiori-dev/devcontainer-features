@@ -12,7 +12,7 @@ check "daemon.json registers runtimes.nvidia with path nvidia-container-runtime"
 check "the other runtime is kept" jq -e '.runtimes.custom.path == "/usr/bin/runc"' "${TOOLKIT_DAEMON_JSON}"
 check "the default runtime is unchanged" jq -e '.["default-runtime"] == "custom"' "${TOOLKIT_DAEMON_JSON}"
 check "the log level is kept" jq -e '.["log-level"] == "warn"' "${TOOLKIT_DAEMON_JSON}"
-check "nothing else is added" \
+check "only runtimes.nvidia is added beside the existing settings" \
   jq -e '(keys == ["default-runtime", "log-level", "runtimes"]) and (.runtimes | keys == ["custom", "nvidia"])' \
   "${TOOLKIT_DAEMON_JSON}"
 

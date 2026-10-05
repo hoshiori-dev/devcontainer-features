@@ -34,9 +34,9 @@
 
 - [x] 2.1 Restyle `test/nvidia-container-toolkit/helpers.sh` (readonly constants, braced variables, `printf`, `if`
       blocks instead of `|| { …; }`, output captured before matching, the repository query unmasked with the package
-      manager's stderr let through, `repository_file_is_expected` comparing the whole file with a literal per family,
-      `repository_listed` moved out) and verify that `shellcheck -o require-variable-braces,require-double-brackets`
-      reports nothing for it
+      manager's stderr let through and failing on apt and dnf when the repository cannot be reached,
+      `repository_file_is_expected` comparing the whole file with a literal per family, `repository_listed` moved out)
+      and verify that `shellcheck -o require-variable-braces,require-double-brackets` reports nothing for it
 - [x] 2.2 Restyle `test.sh` with `set -euo pipefail`, `candidate` and its run-time comment, and `repository_listed`
       checking the base URL on every family (dnf through `dnf repo info`); verify with shellcheck as in 2.1 and by
       running the dnf query in `fedora:44` against the repository file the feature writes

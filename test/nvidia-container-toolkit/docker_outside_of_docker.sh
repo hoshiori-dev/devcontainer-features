@@ -13,6 +13,8 @@ no_dockerd() {
   ! PATH="${PATH}:/usr/local/sbin:/usr/sbin:/sbin" command -v dockerd >/dev/null 2>&1
 }
 
+# The first two checks are the preconditions of Scenario "No Docker daemon" (an image without dockerd, including one
+# with only the Docker CLI), not behaviors of the feature: they show that docker-outside-of-docker set that image up.
 check "the Docker CLI is installed" command -v docker
 check "no Docker daemon is installed" no_dockerd
 check "nvidia-ctk runs for the remote user" nvidia-ctk --version
