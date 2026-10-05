@@ -1,0 +1,73 @@
+{
+  "id": "firewall",
+  "version": "1.0.0",
+  "name": "Firewall",
+  "description": "Restricts the container's outbound and forwarded traffic to an allowlist of presets, domains, and CIDRs (or keeps it from a denylist), applied with nftables and dnsmasq at every start. A guardrail, not a security boundary.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/firewall",
+  "options": {
+    "defaultAction": {
+      "type": "string",
+      "enum": [
+        "deny",
+        "allow"
+      ],
+      "default": "deny",
+      "description": "What happens to outbound traffic that no allowed or denied entry matches: deny refuses it (allowlist), allow lets it through (denylist)."
+    },
+    "presets": {
+      "type": "string",
+      "proposals": [
+        "github",
+        "npm",
+        "pypi",
+        "anthropic",
+        "vscode"
+      ],
+      "default": "github",
+      "description": "Comma-separated named destination sets to allow: github, npm, pypi, anthropic, vscode. Empty selects none."
+    },
+    "allowedDomains": {
+      "type": "string",
+      "default": "",
+      "description": "Comma-separated domains to allow, each with every subdomain (no wildcards), for example example.com,registry.example.org."
+    },
+    "allowedCidrs": {
+      "type": "string",
+      "default": "",
+      "description": "Comma-separated IPv4 or IPv6 addresses or CIDRs to allow on every port, for example 10.0.0.5,172.18.0.0/16."
+    },
+    "deniedDomains": {
+      "type": "string",
+      "default": "",
+      "description": "Comma-separated domains to refuse, each with every subdomain (no wildcards); the more specific of an allowed and a denied entry decides."
+    },
+    "deniedCidrs": {
+      "type": "string",
+      "default": "",
+      "description": "Comma-separated IPv4 or IPv6 addresses or CIDRs to refuse on every port; the more specific of an allowed and a denied entry decides."
+    },
+    "failureMode": {
+      "type": "string",
+      "enum": [
+        "closed",
+        "warn"
+      ],
+      "default": "closed",
+      "description": "When the rules cannot be applied in full: closed keeps only loopback and DNS reachable and fails the start check; warn removes the rules and only warns."
+    },
+    "filterForward": {
+      "type": "boolean",
+      "default": true,
+      "description": "Apply the rules to traffic the container forwards, such as that of nested Docker containers."
+    }
+  },
+  "capAdd": [
+    "NET_ADMIN"
+  ],
+  "entrypoint": "/usr/local/share/firewall/apply.sh",
+  "postStartCommand": "/usr/local/share/firewall/check.sh",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/docker-in-docker",
+    "ghcr.io/devcontainers/features/common-utils"
+  ]
+}
