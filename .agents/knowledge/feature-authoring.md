@@ -15,8 +15,8 @@ Read this before creating or editing anything under `src/<id>/`. Behavior of a s
 | `src/<id>/scripts/`                  | Optional helpers `install.sh` calls                                                               |
 
 Everything inside `src/<id>/` ships in the published artifact; nothing outside it does. Start a new feature with
-`just new-feature <id>` once its OpenSpec change exists; it takes the options from the change's Option requirements.
-Then replace every TODO.
+`just new-feature <id>` once its OpenSpec change exists (`--posix` for a POSIX `sh` feature); it takes the options from
+the change's Option requirements. Then replace every TODO.
 
 ## Developer trust and readability
 

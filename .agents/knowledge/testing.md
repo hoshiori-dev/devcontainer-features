@@ -15,7 +15,8 @@ something unexpected (or skipped something you expected). CI job map: `.agents/k
 | `test/canary.json`                       | `{"features": [...]}` — the features CI runs when the test infrastructure itself changes                           |
 
 Test scripts run inside the built container: `source dev-container-features-test-lib`, then `check "<label>" <command>`
-per assertion and `reportResults` last.
+per assertion and `reportResults` last. A POSIX `sh` test sources `test/<id>/checks.sh` instead, a stand-in with the
+same interface, because the library is bash; `just new-feature <id> --posix` generates it.
 
 ## Test intent and readability
 

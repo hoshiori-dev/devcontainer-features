@@ -13,7 +13,7 @@
 - The maintainer chose to include the workflow shell restyle, the `validate.ts` and `check_openspec.ts` refactor, and a
   `--posix` scaffold option in this change.
 - This change and #69 both edit `scripts/new_feature.ts` and `scripts/checks_test.ts`; #69 lands first and this branch
-  is rebased onto it, so the POSIX scaffold uses #69's `${NAME-default}` form.
+  takes it in from `main`, so the POSIX scaffold uses #69's `${NAME-default}` form.
 
 ## Goals / Non-Goals
 

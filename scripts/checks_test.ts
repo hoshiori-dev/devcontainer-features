@@ -137,6 +137,26 @@ Deno.test("scaffold declares exactly the spec's options and reads each one in in
     assert(!bare["src/demo/install.sh"].includes("validate_options"));
 });
 
+Deno.test("scaffold --posix writes POSIX scripts and a sourced stand-in for the test library", () => {
+    const options = new Map([["version", { type: "string" as const, default: "latest" }]]);
+    const files = scaffold("demo", "Demo", options, true);
+    const install = files["src/demo/install.sh"];
+    assert(install.startsWith("#!/bin/sh\n"), install);
+    assert(install.includes("\n# POSIX sh, because TODO: "), install);
+    assert(install.includes("\nset -eu\n"), install);
+    assert(install.includes('VERSION="${VERSION-latest}"'), install);
+    assert(!install.includes("pipefail"), install);
+    for (const test of ["test/demo/test.sh", "test/demo/duplicate.sh"]) {
+        assert(files[test].startsWith("#!/bin/sh\n") && files[test].includes("\nset -eu\n"), files[test]);
+        assert(files[test].includes('\n. "$(dirname "$0")/checks.sh"\n'), files[test]);
+        assert(!files[test].includes("source "), files[test]);
+    }
+    const checks = files["test/demo/checks.sh"];
+    assert(checks.startsWith("# shellcheck shell=sh\n"), checks);
+    assert(checks.includes("\ncheck() {\n") && checks.includes("\nreportResults() {\n"), checks);
+    assert(!("test/demo/checks.sh" in scaffold("demo", "Demo", options)));
+});
+
 Deno.test("releaseTag uses <id>/v<version>", () => {
     assertEquals(releaseTag("node", "1.2.3"), "node/v1.2.3");
 });

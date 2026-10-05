@@ -62,7 +62,7 @@ docs:
 docs-check:
     ./scripts/docs.ts --check
 
-# Scaffold src/<id> and test/<id> for a new feature (after its OpenSpec change exists)
+# Scaffold src/<id> and test/<id> for a new feature (after its OpenSpec change exists); add --posix for POSIX sh
 new-feature id *args:
     ./scripts/new_feature.ts "$1" "${@:2}"
 

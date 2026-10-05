@@ -38,9 +38,9 @@
 
 ## 5. POSIX scaffold
 
-- [ ] 5.1 After #69 merges and this branch is rebased onto it, add `--posix` to `scripts/new_feature.ts` with tests in
-      `scripts/checks_test.ts`; verify a scaffolded POSIX feature passes shellcheck with `require-variable-braces` and
-      `--shell=sh`
+- [x] 5.1 After #69 merges and this branch takes it in from `main`, add `--posix` to `scripts/new_feature.ts` with tests
+      in `scripts/checks_test.ts`; verify a scaffolded POSIX feature passes shellcheck with `require-variable-braces`
+      and `--shell=sh`
 
 ## 6. Integration
 
