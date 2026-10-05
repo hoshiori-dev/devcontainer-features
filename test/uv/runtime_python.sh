@@ -1,71 +1,67 @@
-#!/bin/sh
-# Scenario "runtime_python": defaults on the Ubuntu base image as vscode ("Runtime interpreter on
-# the volume", "Workspace install across filesystems").
-set -e
-
-# The test library is a bash script. Re-execute with bash, adding it from the image's apk
-# repositories on Alpine (inside this test container only).
-if [ -z "${FEATURE_TEST_BASH:-}" ]; then
-    command -v bash >/dev/null 2>&1 || apk add --no-cache bash >/dev/null
-    FEATURE_TEST_BASH=1 exec bash "$0" "$@"
-fi
+#!/usr/bin/env bash
+# Scenario "runtime_python": defaults on the Ubuntu base image as vscode ("Runtime interpreter on the volume",
+# "Workspace install across filesystems").
+set -euo pipefail
 
 # shellcheck source=/dev/null
-. dev-container-features-test-lib
+source dev-container-features-test-lib
 
-VOLUME=/var/lib/uv
-WORK=$(mktemp -d)
-LOG="$WORK/uv.log"
-# A named volume and a bind-mounted workspace can share the runner's backing filesystem.
-# Exercise UV_LINK_MODE across actual filesystems with a temporary cache on Docker's tmpfs.
-CROSS_FS_CACHE=$(mktemp -d /dev/shm/uv-cross-filesystems.XXXXXX)
+readonly VOLUME_DIR="/var/lib/uv"
+
+work_dir="$(mktemp -d)"
+uv_log="${work_dir}/uv.log"
+# A named volume and a bind-mounted workspace can share the runner's backing filesystem, so the test exercises
+# UV_LINK_MODE across actual filesystems with a temporary cache on Docker's tmpfs.
+cross_fs_cache="$(mktemp -d /dev/shm/uv-cross-filesystems.XXXXXX)"
 
 is_empty_dir() {
-    [ -d "$1" ] && [ -z "$(ls -A "$1")" ]
+  [[ -d "$1" && -z "$(ls -A "$1")" ]]
 }
 
+# Whether the interpreter link $1 resolves to an executable below the volume's python directory.
 resolves_to_volume() {
-    target=$(readlink -f "$1")
-    echo "$1 -> $target"
-    case "$target" in
-        "$VOLUME"/python/*) [ -x "$target" ] ;;
-        *) return 1 ;;
-    esac
+  local target
+  target="$(readlink -f "$1")"
+  printf '%s\n' "$1 -> ${target}"
+  [[ "${target}" == "${VOLUME_DIR}"/python/* && -x "${target}" ]]
 }
 
-# Creates the environment $1 and installs a package into it (further arguments go to uv pip
-# install); uv's output, where a link-mode warning would appear, goes to $LOG.
+# Creates the environment $1 and installs pycowsay into it with the cross-filesystem cache; further arguments go to
+# uv pip install. uv's output, where a link-mode warning would appear, goes to uv_log and is printed.
 install_into() {
-    env_dir=$1
-    shift
-    uv venv "$env_dir" || return
-    status=0
-    UV_CACHE_DIR="$CROSS_FS_CACHE" uv pip install --python "$env_dir/bin/python" "$@" pycowsay >"$LOG" 2>&1 || status=$?
-    cat "$LOG"
-    return "$status"
+  local env_dir="$1"
+  shift
+  uv venv "${env_dir}" || return
+  if ! UV_CACHE_DIR="${cross_fs_cache}" uv pip install --python "${env_dir}/bin/python" "$@" pycowsay \
+    >"${uv_log}" 2>&1; then
+    cat "${uv_log}"
+    return 1
+  fi
+  cat "${uv_log}"
 }
 
-no_link_warning() {
-    cat "$LOG"
-    ! grep -Eqi 'hardlink|clone|falling back|link mode' "$LOG"
+no_link_mode_warning() {
+  ! grep -Eqi 'hardlink|clone|falling back|link mode' "${uv_log}"
 }
 
-check "the volume is new and empty" is_empty_dir "$VOLUME"
+check "the volume is new and empty" is_empty_dir "${VOLUME_DIR}"
 
 # Runtime interpreter on the volume.
-check "the remote user creates an environment with a managed interpreter" \
-    uv venv --managed-python "$WORK/venv"
-check "the interpreter was installed under $VOLUME/python" [ -n "$(ls -A "$VOLUME/python")" ]
-check "the environment's interpreter link resolves on the volume" resolves_to_volume "$WORK/venv/bin/python"
+check "the remote user creates a virtual environment with a uv-managed interpreter" \
+  uv venv --managed-python "${work_dir}/venv"
+check "the interpreter is installed under ${VOLUME_DIR}" [ -n "$(ls -A "${VOLUME_DIR}/python")" ]
+check "the environment's interpreter link resolves there" resolves_to_volume "${work_dir}/venv/bin/python"
 
 # Workspace install across filesystems: the working directory is the bind-mounted workspace.
-check "the workspace and the test cache are different filesystems" [ "$(stat -c %d .)" != "$(stat -c %d "$CROSS_FS_CACHE")" ]
-check "a package installs into an environment in the workspace" install_into .venv-uv-first
-check "the install printed no link-mode fallback warning" no_link_warning
-check "a cached package installs offline into another workspace environment" install_into .venv-uv-second --offline
-check "the offline install printed no link-mode fallback warning" no_link_warning
-check "the installed package runs" sh -c './.venv-uv-second/bin/pycowsay hello >/dev/null'
+check "the workspace and the test cache are on different filesystems" \
+  [ "$(stat -c %d .)" != "$(stat -c %d "${cross_fs_cache}")" ]
+check "the remote user installs a package into an environment in the workspace" install_into .venv-uv-first
+check "uv reports no link-mode fallback warning" no_link_mode_warning
+check "the remote user installs the package from the cache into another workspace environment, offline" \
+  install_into .venv-uv-second --offline
+check "uv reports no link-mode fallback warning for the install from the cache" no_link_mode_warning
+check "the installed package runs" ./.venv-uv-second/bin/pycowsay hello
 
-rm -rf .venv-uv-first .venv-uv-second "$WORK" "$CROSS_FS_CACHE"
+rm -rf .venv-uv-first .venv-uv-second "${work_dir}" "${cross_fs_cache}"
 
 reportResults

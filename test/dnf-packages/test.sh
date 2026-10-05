@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-set -eu
+set -euo pipefail
+
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
-installed() { rpm -q "$1" >/dev/null 2>&1; }
-check "empty default installs no bc" bash -c "! rpm -q bc"
-check "empty default installs no file" bash -c "! rpm -q file"
+
+check "Omitted packages: bc is not installed" bash -c '! rpm -q bc'
+check "Omitted packages: file is not installed" bash -c '! rpm -q file'
+
 reportResults

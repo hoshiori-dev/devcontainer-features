@@ -1,85 +1,74 @@
 #!/bin/sh
-# Install-twice test ("Different options"): uv is installed first with non-default options (the
-# second proposal of each option: a pinned version and a tool), then with the defaults. The values
-# arrive as VERSION and TOOLSTOINSTALL, and as VERSION__DEFAULT and TOOLSTOINSTALL__DEFAULT.
-set -e
+# Install-twice test ("Different options"): uv is installed first with non-default options, the second proposal of
+# each option (version 0.12.16, toolsToInstall pycowsay), then with the defaults (version latest, no tools). POSIX sh,
+# because alpine:3.24 ships no bash.
+set -eu
 
-# The test library is a bash script. Re-execute with bash, adding it from the image's apk
-# repositories on Alpine (inside this test container only).
-if [ -z "${FEATURE_TEST_BASH:-}" ]; then
-    command -v bash >/dev/null 2>&1 || apk add --no-cache bash >/dev/null
-    FEATURE_TEST_BASH=1 exec bash "$0" "$@"
-fi
-
+# The path is computed from $0 at run time, so shellcheck cannot follow it.
 # shellcheck source=/dev/null
-. dev-container-features-test-lib
+. "$(dirname "$0")/checks.sh"
 
-VOLUME=/var/lib/uv
+readonly VOLUME_DIR="/var/lib/uv"
+readonly SHARE_DIR="/usr/local/share/uv"
 
 is_mount() {
-    grep -q "^[^ ]* [^ ]* [^ ]* [^ ]* $1 " /proc/self/mountinfo
+  grep -q "^[^ ]* [^ ]* [^ ]* [^ ]* $1 " /proc/self/mountinfo
 }
 
 is_empty_dir() {
-    [ -d "$1" ] && [ -z "$(ls -A "$1")" ]
+  [ -d "$1" ] && [ -z "$(ls -A "$1")" ]
 }
 
-latest_release() {
-    location=$(curl --proto '=https' --tlsv1.2 -fsS -o /dev/null -w '%{redirect_url}' \
-        https://github.com/astral-sh/uv/releases/latest)
-    echo "${location##*/}"
+# Whether `$1 --version` names the release $2 as its second word: "uv 0.12.16 (x86_64-unknown-linux-gnu)".
+reports_release() {
+  reports_release_line="$("$1" --version)"
+  reports_release_rest="${reports_release_line#* }"
+  [ "${reports_release_rest%% *}" = "$2" ]
 }
 
-# The package name of a toolsToInstall entry, without extra or constraint. The proposals' tools
-# install an executable of the same name.
-tool_name() {
-    name=$1
-    for stop in '[' '=' '~' '!' '<' '>' '@'; do
-        name=${name%%"$stop"*}
-    done
-    echo "$name"
+# Whether the file $1 exists and has none of the permission bits of the octal mode $2. stat decides it, because every
+# compatibility image has stat and opensuse/leap:16.0 has no find.
+lacks_mode_bits() {
+  lacks_mode_bits_mode="$(stat -c %a "$1")" || return 1
+  [ "$((0${lacks_mode_bits_mode} & $2))" -eq 0 ]
 }
 
-check "the volume is mounted at $VOLUME" is_mount "$VOLUME"
-check "the volume is still empty after two installs" is_empty_dir "$VOLUME"
+one_group_uv_lists_the_user_once() {
+  one_group_uv_lists_the_user_once_user="$(id -un)"
+  awk -F: -v user="${one_group_uv_lists_the_user_once_user}" '
+    $1 == "uv" { groups++; n = split($4, members, ","); for (i = 1; i <= n; i++) if (members[i] == user) listed++ }
+    END { exit !(groups == 1 && listed == 1) }
+  ' /etc/group
+}
 
-second=${VERSION__DEFAULT:-latest}
-if [ "$second" = latest ]; then
-    second=$(latest_release)
+check "${VOLUME_DIR} is a mount of the volume" is_mount "${VOLUME_DIR}"
+check "the volume holds no files after two installs" is_empty_dir "${VOLUME_DIR}"
+
+# The second install's version is `latest`: the release it names when the test runs cannot be a literal; a release
+# published between the image build and the test fails once.
+latest_url="$(curl --proto '=https' --tlsv1.2 -fsS -o /dev/null -w '%{redirect_url}' \
+  https://github.com/astral-sh/uv/releases/latest)"
+second_release="${latest_url##*/}"
+printf '%s\n' "Expecting uv ${second_release}"
+check "uv --version reports the second install's release" reports_release uv "${second_release}"
+check "uvx --version reports the second install's release" reports_release uvx "${second_release}"
+
+# Nothing writable by every user: uv's lock files, which the first install's tool created.
+for lock in "${SHARE_DIR}/tools/.lock" "${SHARE_DIR}/python/.lock"; do
+  check "${lock} is not writable by every user" lacks_mode_bits "${lock}" 0002
+  if [ "$(id -u)" = "0" ]; then
+    check "${lock} is not writable by its group" lacks_mode_bits "${lock}" 0020
+  fi
+done
+
+# Group after a second install.
+if [ "$(id -u)" != "0" ]; then
+  check "the image has one group uv that lists the remote user once" one_group_uv_lists_the_user_once
+  check "the tool of the first install belongs to the group uv and is writable by its members" \
+    [ "$(stat -c '%G %a' "${SHARE_DIR}/tools/pycowsay")" = "uv 2775" ]
 fi
-echo "First install: version=${VERSION:-} toolsToInstall=${TOOLSTOINSTALL:-}"
-echo "Second install: version=${VERSION__DEFAULT:-} toolsToInstall=${TOOLSTOINSTALL__DEFAULT:-} (uv $second)"
-check "uv reports the second install's release" [ "$(uv --version | cut -d' ' -f2)" = "$second" ]
-check "uvx reports the second install's release" [ "$(uvx --version | cut -d' ' -f2)" = "$second" ]
 
-old_ifs=$IFS
-IFS=,
-set -f
-tools=""
-for entry in ${TOOLSTOINSTALL:-} ${TOOLSTOINSTALL__DEFAULT:-}; do
-    entry=$(echo "$entry" | tr -d '[:space:]')
-    if [ -n "$entry" ]; then
-        tools="$tools $(tool_name "$entry")"
-    fi
-done
-set +f
-IFS=$old_ifs
-for lock in /usr/local/share/uv/tools/.lock /usr/local/share/uv/python/.lock; do
-    mode=$(stat -c %a "$lock")
-    check "lock $lock has no other-write" [ "$((0$mode & 2))" = 0 ]
-    if [ "$(id -u)" = 0 ]; then
-        check "lock $lock has no group-write for root" [ "$((0$mode & 16))" = 0 ]
-    fi
-done
-if [ "$(id -u)" != 0 ]; then
-    # shellcheck disable=SC2016
-    check "exactly one group lists this user once" awk -F: -v user="$(id -un)" '$1 == "uv" {lines++; n=split($4,a,","); for(i=1;i<=n;i++) if(a[i]==user) members++} END {exit !(lines==1 && members==1)}' /etc/group
-    for tool in $tools; do
-        check "retained tool $tool has group write" [ "$(stat -c '%G %a' "/usr/local/share/uv/tools/$tool")" = "uv 2775" ]
-    done
-fi
-for tool in $tools; do
-    check "tool $tool runs by name" sh -c "command -v '$tool' && '$tool' hello >/dev/null"
-done
+# Different options: the first install's tool remains installed after a second install without tools.
+check "the tool of the first install runs by name" pycowsay hello
 
 reportResults
