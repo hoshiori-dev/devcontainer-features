@@ -9,15 +9,15 @@
 
 ## 2. Behavior coverage
 
-- [ ] 2.1 Add the approved compatibility matrix and the default and duplicate tests; verify both images with
+- [x] 2.1 Add the approved compatibility matrix and the default and duplicate tests; verify both images with
       `just test colab-cli`.
-- [ ] 2.2 Add pinned, same-version, changed-version, invalid-input, source-isolation, system-Python, permissions,
+- [x] 2.2 Add pinned, same-version, changed-version, invalid-input, source-isolation, system-Python, permissions,
       empty-volume, and changed-UID coverage; verify scenarios with `just test-scenarios colab-cli` and native
       architecture CI.
 
 ## 3. Review admission
 
-- [ ] 3.1 Run `just check`, `just test colab-cli`, and `just test-scenarios colab-cli`; self-review and record each
+- [x] 3.1 Run `just check`, `just test colab-cli`, and `just test-scenarios colab-cli`; self-review and record each
       Acceptance item and scenario in the PR Validation section with CI evidence, then mark ready under the approved
       package gate.
 
