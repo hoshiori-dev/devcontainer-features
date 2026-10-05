@@ -26,7 +26,18 @@ for entry in "${entries[@]}"; do
   [ -n "$entry" ] || continue
   check "$entry from the first install is installed" installed "$entry"
 done
-check "no downloaded package file is left" no_package_files
-check "no package index file is left" no_index_files
+# The second invocation's empty default list is a no-op, so the first cleanup
+# policy determines cache state. The control checks cover two non-empty lists.
+case ${CLEANUP:-all} in
+  all)
+    check "package files are cleaned" no_package_files
+    check "metadata is cleaned" no_index_files
+    ;;
+  packages)
+    check "package files are cleaned" no_package_files
+    check "metadata survives the empty second invocation" bash -c 'find /var/lib/apt/lists -name "*_Packages*" | grep -q .'
+    ;;
+  none) ;;
+esac
 
 reportResults
