@@ -299,7 +299,8 @@ check "the check exits zero and prints a one-line summary" one_line_summary
 
 # Remote user reads the record. Root, the remote user of three of the images, can write any file.
 check "the start record names the result and the options in effect" record_names_result_and_options
-if [ "$(id -u)" != "0" ]; then
+test_uid="$(id -u)"
+if [ "${test_uid}" != "0" ]; then
   check "writing to the start record is denied" cannot_write_record
 fi
 
