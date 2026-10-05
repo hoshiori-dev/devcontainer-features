@@ -47,26 +47,37 @@ already supplied by uv.
 
 ### Version selection and repeated installation
 
-Pass a validated exact release as `google-colab-cli==<version>`. Resolve `latest` through uv's stable-release resolver,
-using package refresh/upgrade semantics so a repeated build does not retain a stale release. Inspect installed package
-metadata from the tool environment to skip a matching exact version; after installing, verify the selected version and
-help command without calling authentication. A changed version replaces the same tool environment, including a downgrade
-requested by an exact pin. No prerelease selector, URL, arbitrary requirement, or leading `v` is accepted.
+Pass a validated exact release as `google-colab-cli==<version>`. Inspect installed package metadata and the interpreter
+path to skip a matching exact release only when it already uses managed Python 3.12 in the image.
 
-| Option  | Type   | Default  | Enum / proposals               | Meaning                            |
-| ------- | ------ | -------- | ------------------------------ | ---------------------------------- |
-| version | string | `latest` | No enum; propose `latest` only | Stable latest or MAJOR.MINOR.PATCH |
+For `latest`, use uv's package upgrade semantics and compare the installed release against the newest stable release
+listed by `https://pypi.org/simple/google-colab-cli/`. Read that endpoint's JSON representation through the
+[Simple Repository API](https://packaging.python.org/en/latest/specifications/simple-repository-api/). Exclude yanked
+files, prereleases, and development releases when selecting `latest`. For an existing installation with the correct
+interpreter, check the index before invoking uv and skip package installation when the release matches. Verify the
+result after installation as well: if uv selected an older release because the newest one requires a newer Python, fail
+rather than report that older release as `latest`.
 
-`latest` follows the collection's CLI convention. An exact release stays available for reproducible builds; release
-proposals can be added once a test pin is verified during implementation. Additional Python/version/index options would
-widen the contract without helping the requested installation and are excluded.
+Run version and help probes without authentication, then restore permissions, including bytecode directories created by
+those probes. A changed version replaces the same tool environment, including a downgrade requested by an exact pin. No
+prerelease selector, URL, arbitrary requirement, or leading `v` is accepted.
+
+| Option  | Type   | Default  | Enum | Meaning                                    |
+| ------- | ------ | -------- | ---- | ------------------------------------------ |
+| version | string | `latest` | None | Newest stable release or MAJOR.MINOR.PATCH |
+
+The [Option version requirement](specs/colab-cli/spec.md#requirement-option-version) defines the option contract;
+suggested values live in feature metadata. `latest` follows the collection's CLI convention. An exact release stays
+available for reproducible builds. Additional Python/version/index options would widen the contract without helping the
+requested installation and are excluded.
 
 ### Ownership and compatibility
 
 New paths created under uv's shared tree inherit the dependency's remote-user/group model. Restore owner and group
 permissions for the installed tool and newly downloaded interpreters without changing unrelated tool contents or
-world-write permissions. Group write access must survive a remote-user UID change; root installs remain root writable.
-Reuse the dependency's PATH integration, including login shells, rather than adding another profile snippet or symlink.
+granting write access to everyone. Group write access must survive a remote-user UID change; root installations remain
+writable by root. Reuse the dependency's PATH integration, including login shells, rather than adding another profile
+snippet or symlink.
 
 Initially declare `mcr.microsoft.com/devcontainers/base:ubuntu24.04` with remote user `vscode`, and `debian:12` with
 root, both on amd64 and arm64; run scenarios on both architectures. These pairs belong to uv's supported matrix and
