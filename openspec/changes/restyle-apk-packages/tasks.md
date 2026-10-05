@@ -25,11 +25,12 @@
 ## 2. Test scripts
 
 - [x] 2.1 Add `test/apk-packages/checks.sh` with the POSIX `check` / `reportResults` stand-in and the assertions
-      `installed`, `in_world`, `cache_left_empty`, and `no_temporary_dir`; verify that it has no shebang, is not
-      executable, and passes both shellcheck runs.
+      `installed`, `in_world`, `cache_left_empty`, `tree_package_prints_its_version`, and `no_temporary_dir`; verify
+      that it has no shebang, is not executable, and passes both shellcheck runs.
 - [x] 2.2 Make `test.sh` and the `listed_packages_*` and `install_if_and_whitespace_*` scripts source `checks.sh`, with
-      the label "no temporary directory of the feature is left"; verify that the other labels and commands are those of
-      1.0.0 (`git diff`), and that each script passes in a `docker run` container after the install it tests.
+      the label "no temporary directory of the feature is left" and the two relabeled program checks of
+      `listed_packages_*` (design.md, Test scripts); verify that the other labels and commands are those of 1.0.0
+      (`git diff`), and that each script passes in a `docker run` container after the install it tests.
 - [x] 2.3 Make `duplicate.sh` assert `file` and `tree` as literals, without parsing `PACKAGES`, under a header naming
       what it asserts; verify that it passes in a `docker run` container after the two installs the CLI derives.
 - [x] 2.4 Give the four `controls_*.sh` labeled checks in the words of "Only package files are cleaned" and "Feature

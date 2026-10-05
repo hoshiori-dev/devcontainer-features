@@ -254,6 +254,12 @@ back to `an unidentified distribution` when the file is missing, unreadable, fai
 and the name is in a variable before the `fail` that prints it. A failure while reading the name never replaces the
 `apk` message or its exit status 1.
 
+The file is now executed in a subshell, as the guide prescribes, where 1.0.0 only read it as text. So the output differs
+from 1.0.0's when the file holds more than plain assignments: a command in the file runs, expansions and other shell
+syntax in `PRETTY_NAME` are interpreted instead of having their quotes stripped, and a file that fails to source gives
+`an unidentified distribution` after the shell's own error line. This happens only on an image without `apk`, on the way
+to exit status 1.
+
 Rejected: keeping `sed | tr` (a pipeline decides, and quotes inside the value are deleted); `ID` instead of
 `PRETTY_NAME` (less readable, and NOTES.md promises the detected distribution).
 
@@ -294,9 +300,10 @@ Rejected: an anchored digit-pattern rewrite of `networkTimeout` (offered below; 
 ### Test scripts
 
 - `test/apk-packages/checks.sh` (`# shellcheck shell=sh`, no shebang, not executable) holds the POSIX `check` /
-  `reportResults` stand-in and the assertions several scripts use (`installed`, `in_world`, `cache_left_empty`, and
-  `no_feature_dir` under its new name, below), with prefixed function variables and braced expansions. Scripts source it
-  as `. "$(dirname "$0")/checks.sh"`, as `test/glab/` does, with the sourcing directive the guide exempts.
+  `reportResults` stand-in and the assertions several scripts use (`installed`, `in_world`, `cache_left_empty`,
+  `tree_package_prints_its_version`, and `no_feature_dir` under its new name, below), with prefixed function variables
+  and braced expansions. Scripts source it as `. "$(dirname "$0")/checks.sh"`, as `test/glab/` does, with the sourcing
+  directive the guide exempts.
 - `duplicate.sh` asserts `file` and `tree` as literals, with a comment that the CLI derives the first install from
   `proposals[1]`; its header names only what its checks assert: scenario "Listed packages are installed" (the first
   install), scenario "Empty list is a no-op" (the second, default install leaves those packages and world lines), and
@@ -306,11 +313,17 @@ Rejected: an anchored digit-pattern rewrite of `networkTimeout` (offered below; 
 - The four `controls_*.sh` use labeled checks in the words of "Only package files are cleaned" and "Feature cleanup is
   disabled", report every result, and test files with glob loops instead of `find … | grep`; their header says the other
   controls in the scenario are a smoke combination this script does not assert. Scenario keys stay.
-- `test.sh` and the scenario scripts keep their checks and labels, except two. The check labeled "no directory of the
-  feature is left" looks only for `${TMPDIR:-/tmp}/apk-packages.*`, so its label and helper name say "temporary
-  directory" (the guide's rule that a check's command verifies exactly its label). The check on `/var/cache/apk` is
-  labeled in the words of "Clean package caches" ("left as it was, empty"), and its helper assigns the listing before
-  testing it, so a failing `ls` fails the check instead of reading as an empty cache. Only the shared code moves.
+- `test.sh` and the scenario scripts keep their checks and labels, except four. In `listed_packages_*`, "file runs" and
+  "tree runs" are labeled in the words of "Listed packages are installed" ("file, with its dependencies, is installed:
+  it prints its version", and the same for the package's `tree`). `tree --version` alone proves nothing, because the
+  images ship a BusyBox `tree` applet that exits 0 on it, so the check passes only when the output starts with `tree v`,
+  the version line of the package's program; the helper is in `checks.sh` and assigns the output before testing it.
+  `file --version` and `jq --version` exit 127 on the bare images, so those commands stay. The check labeled "no
+  directory of the feature is left" looks only for `${TMPDIR:-/tmp}/apk-packages.*`, so its label and helper name say
+  "temporary directory" (the guide's rule that a check's command verifies exactly its label). The check on
+  `/var/cache/apk` is labeled in the words of "Clean package caches" ("left as it was, empty"), and its helper assigns
+  the listing before testing it, so a failing `ls` fails the check instead of reading as an empty cache. Only the shared
+  code moves.
 - `direct_checks.ts` 235-238: the comment says the message assertion, not the status, proves validation ran first.
 - `control_checks.ts`: `PATH` is passed as its own `--env` argument instead of a fake control, the no-op ternary becomes
   `"file"`, the shebang adds `--check`, and the listener binds `127.0.0.1` with `--allow-net=127.0.0.1`, after checking
@@ -387,8 +400,9 @@ not to the wording the first item offers.
 - [Loopback binding is unreachable from a host-network container in docker-in-docker] → Checked before adopting;
   fallback stated in Decisions.
 - [The distribution name differs for a `PRETTY_NAME` with quotes or escapes, and reading a non-Alpine os-release runs it
-  as shell code] → Only the message text changes; the guide prescribes this form, and the subshell keeps its variables
-  out of the script.
+  as shell code: a command in it runs, expansions apply, and a file that fails to source adds the shell's own error
+  line] → The run still ends with the `apk` message and exit status 1; the guide prescribes this form, and the subshell
+  keeps its variables out of the script.
 - [#58 rewrites the same script] → This change lands first (issue #72, Context).
 
 ## URL inventory

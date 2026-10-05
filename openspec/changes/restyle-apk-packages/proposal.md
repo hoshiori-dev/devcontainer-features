@@ -4,10 +4,10 @@
 
 `src/apk-packages/` and `test/apk-packages/` predate `.agents/knowledge/shell-style.md`, so a developer auditing the
 feature reads a script with no `main`, unbraced variables, no `log` helper, failure messages that end in a period and
-lack a fix, and two package-manager failures that end with apk's own status and no feature message. The #52 audit also
-confirmed scattered paths, an unexplained constant, a pipeline whose status decides, and tests whose intent is hidden by
-defensive parsing and unlabeled checks. The restyle lands before the phase work in #58, which changes the same
-`install.sh`. Implements https://github.com/hoshiori-dev/devcontainer-features/issues/72, part of
+lack a fix, a refresh failure that exits with apk's own status, and an `apk add` failure with no feature message. The
+#52 audit also confirmed scattered paths, an unexplained constant, a pipeline whose status decides, and tests whose
+intent is hidden by defensive parsing and unlabeled checks. The restyle lands before the phase work in #58, which
+changes the same `install.sh`. Implements https://github.com/hoshiori-dev/devcontainer-features/issues/72, part of
 https://github.com/hoshiori-dev/devcontainer-features/issues/52.
 
 ## What Changes
