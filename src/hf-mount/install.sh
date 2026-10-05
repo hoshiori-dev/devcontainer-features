@@ -17,6 +17,8 @@ readonly APT_LISTS_DIR="/var/lib/apt/lists"
 # The upstream binaries need glibc 2.34 or later.
 readonly MIN_GLIBC_MAJOR=2
 readonly MIN_GLIBC_MINOR=34
+# The exit status of curl --fail for an answer with an HTTP status of 400 or above.
+readonly CURL_HTTP_ERROR_STATUS=22
 
 VERSION="${VERSION-latest}"
 BACKEND="${BACKEND-both}"
@@ -192,7 +194,8 @@ install_download_tools() {
 }
 
 # Sets ${release} to the release to install: VERSION, or for "latest" the release that LATEST_URL redirects to. The
-# redirect is read, not followed, and its target must be TAG_URL_PREFIX followed by a release number.
+# redirect is read, not followed, and its target must be TAG_URL_PREFIX followed by a release number. A redirect is
+# no HTTP error, so --fail leaves it readable and fails only an answer with a status of 400 or above.
 resolve_release() {
   if [ "${VERSION}" != "latest" ]; then
     release="${VERSION}"
@@ -200,7 +203,7 @@ resolve_release() {
   fi
   log "reading the latest release from the redirect of ${LATEST_URL}"
   if resolve_release_answer="$(
-    fetch --output /dev/null --write-out '%{http_code} %{redirect_url}' "${LATEST_URL}"
+    fetch --fail --output /dev/null --write-out '%{http_code} %{redirect_url}' "${LATEST_URL}"
   )"; then
     resolve_release_curl_status=0
   else
@@ -208,6 +211,10 @@ resolve_release() {
   fi
   resolve_release_http_status="${resolve_release_answer%% *}"
   resolve_release_target="${resolve_release_answer#* }"
+  if [ "${resolve_release_curl_status}" -eq "${CURL_HTTP_ERROR_STATUS}" ]; then
+    fail "${LATEST_URL} answered HTTP status ${resolve_release_http_status}, an HTTP error;" \
+      "build again later, or set version to a release number"
+  fi
   if [ "${resolve_release_curl_status}" -ne 0 ]; then
     fail "cannot read ${LATEST_URL}: HTTP status ${resolve_release_http_status}," \
       "curl exit status ${resolve_release_curl_status};" \
