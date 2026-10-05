@@ -29,6 +29,9 @@ dividers stand in for the step structure. Defensive handling hides what the test
   for a stated reason. When the latest-release link cannot be read, the test fails instead of continuing with an empty
   value. Each scenario script carries its own checks, and `test/glab/checks.sh` holds only the POSIX stand-in for the
   test library and what more than one test script uses.
+- The `glab` spec states the cleanup the install already performs: no package-manager metadata from the prerequisites
+  and no temporary directory or staged binary of the install is left behind. The tests' cache and leftover checks use
+  its words.
 - Options, download sources, verification, supported images, installed files, and what a second install does stay as
   they are.
 
@@ -40,18 +43,21 @@ None.
 
 ### Modified Capabilities
 
-None. No behavior a Requirement in `openspec/specs/glab/spec.md` covers changes. The rewritten messages keep what the
-scenarios require, so the change sets `skip_specs: true`.
+- `glab`: gains the Requirement "Leave no build residue", which states the package-manager cache cleanup and the removal
+  of the install's temporary directory and staged binary that `install.sh` already performs. No existing Requirement
+  changes, and the rewritten messages keep what the scenarios require.
 
 ## Impact
 
 - Feature `glab`: PATCH, `1.0.0` → `1.0.1`. The change edits files under `src/glab/`, and the only behavior it changes
   is log and failure text, plus the exit status when a package manager fails. feature-authoring.md (Versions) classes
-  these as fixes. No option, default, image, or install location changes.
+  these as fixes. The added Requirement describes behavior the install already has. No option, default, image, or
+  install location changes.
 - Files changed: `src/glab/install.sh`; `src/glab/devcontainer-feature.json` (the version only); `test/glab/checks.sh`,
-  `test.sh`, `duplicate.sh`, and the eight `version_*.sh` scenario scripts.
+  `test.sh`, `duplicate.sh`, and the eight `version_*.sh` scenario scripts; the delta spec `specs/glab/spec.md` of this
+  change, which the archive merges into `openspec/specs/glab/spec.md`.
 - Files unchanged: `src/glab/NOTES.md`; `src/glab/README.md`, which `just docs` regenerates with the same content (it
-  carries no version); `test/glab/scenarios.json`; `test/glab/compatibility.json`; `openspec/specs/glab/spec.md`.
+  carries no version); `test/glab/scenarios.json`; `test/glab/compatibility.json`.
 - Build logs: anyone who matches the old `glab feature:` prefix in a log has to update. Nothing in this repository
   matches it.
 - CI: the PR runs `glab`'s container tests on every image and architecture in its compatibility list. No workflow,
@@ -76,6 +82,8 @@ scenarios require, so the change sets `skip_specs: true`.
 - The last line of a successful install names the installed version and `/usr/local/bin/glab`, and `install.sh` does not
   run the new binary after installing it.
 - The build log still shows the final URL of each download, as `src/glab/NOTES.md` states.
+- The scenarios of the delta spec's "Leave no build residue" hold, and the labels of the tests' cache and leftover
+  checks use that Requirement's words.
 - No test script swallows a failure to read the latest-release link, no scenario script sources another test script, and
   every assertion in `test/glab/checks.sh` is used by more than one test script.
 - `src/glab/devcontainer-feature.json` has version `1.0.1`, and `src/glab/README.md` matches what `just docs` generates.

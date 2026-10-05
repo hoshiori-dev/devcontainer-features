@@ -104,7 +104,8 @@ containers of the compatibility images without network access.
 
 **Non-Goals:**
 
-- Changing the spec, adding an option, or changing behavior beyond the items the audit confirmed.
+- Changing the spec beyond the one added Requirement (One change, one added Requirement), adding an option, or changing
+  behavior beyond the items the audit confirmed.
 - Adding `.shellcheckrc`, or restyling any other feature.
 - Testing the failure scenarios in CI (#50).
 - Changing `NOTES.md`, the scenario keys, `scenarios.json`, or `compatibility.json`.
@@ -112,13 +113,26 @@ containers of the compatibility images without network access.
 
 ## Decisions
 
-### One change, no delta spec
+### Package gate
+
+The maintainer closed the package deliberation on 2026-10-05. Decided there: the tests compute `latest` separately in
+each script that needs it (Test restyle); the spec gains a Requirement for cache cleanup and leftover removal, so the
+two test labels that named unstated conventions use spec words (One change, one added Requirement); none of the other
+improvements the audit offered is adopted (Optional improvements offered, not adopted). The bump stays PATCH.
+
+### One change, one added Requirement
 
 The restyle and the confirmed audit items travel in one change with a PATCH bump. The spec's scenarios already fix what
 each failure message must name, and none of them fixes its wording, prefix, or exit status. No Requirement covers a
-package-manager failure or the content of a log line. Rejected: a delta that fixes the message wording, which would turn
-presentation into a contract every later change must carry; splitting the tests into a separate change, which goes
-against the maintainer's decision of one change per feature.
+package-manager failure or the content of a log line. The delta spec adds one Requirement, "Leave no build residue",
+which states what `install.sh` already does: it empties apt's package lists after `apt-get install`, runs
+`dnf clean all` after `dnf install`, installs with `apk add --no-cache`, and removes its temporary directory and staged
+binary on every exit. It claims nothing about downloaded `.deb` files, which `install.sh` does not remove (the
+`docker-clean` configuration of the Debian and Ubuntu images does). No behavior changes, so the bump stays PATCH.
+Rejected: a delta that fixes the message wording, which would turn presentation into a contract every later change must
+carry; splitting the tests into a separate change, which goes against the maintainer's decision of one change per
+feature; keeping the cache and leftover checks under labels that name repository conventions, marked as deviations from
+"in the words of the spec", which leaves two checks that trace to no Requirement.
 
 ### Script structure
 
@@ -299,8 +313,9 @@ accept the long form; long options on every command, which fails on `alpine:3.24
   `find` or `sudo` fails the check instead of passing it.
 - `test.sh` and `duplicate.sh` each compute `latest` once, at the top, inline, with a comment saying why it is computed
   at run time, so `latest_version` leaves `checks.sh`. A failing request stops the script with `curl`'s own message;
-  when the link does not redirect, the script stops with a message naming the link. No `|| latest=""` remains. Rejected:
-  keeping `latest_version` shared, since it asserts nothing and the guide prefers repeating a few lines.
+  when the link does not redirect, the script stops with a message naming the link. No `|| latest=""` remains. The
+  maintainer accepted the repeated lines at the package gate. Rejected: keeping `latest_version` shared, since it
+  asserts nothing and the guide prefers repeating a few lines.
 - In `duplicate.sh`, the two checks of the harness's option inputs become a precondition: when `VERSION` is not `1.47.0`
   or `VERSION__DEFAULT` is not `latest`, the script stops with a message saying the replace path would not run.
   Rejected: keeping them as checks with behavior labels, which the spec does not state; a comment alone, which would let
@@ -308,15 +323,18 @@ accept the long form; long options on every command, which fails on `alpine:3.24
 - Each of the eight scenario scripts sources only `checks.sh` and carries its own two checks, with the literal
   `1.119.0`. Rejected: keeping the six wrappers, since the guide prefers repeating a few lines to sourcing another test
   script.
-- Labels use the spec's words. The cache check and the leftover check stay, each with a comment naming the convention it
-  checks: feature-authoring.md (`install.sh`, cache cleaning) and the archived design's temporary-file Goal. They are
-  marked as deliberate deviations from "in the words of the spec".
+- Labels use the spec's words. The cache check and the leftover check stay and take their labels from the scenarios of
+  the added Requirement "Leave no build residue": "apt's package lists, dnf's cache, and apk's cache hold no file" and
+  "no temporary directory or staged binary of the install remains" (in `duplicate.sh`, "of the installs"). Neither is a
+  deviation, so neither carries a deviation comment.
 - The `# shellcheck source=/dev/null` before sourcing `checks.sh` gets a reason comment, since the guide's exemption
   names only `dev-container-features-test-lib`.
 
 ## Optional improvements offered, not adopted
 
-The audit suggested these, and none of them is in scope by default. The maintainer may pick any at the package gate.
+The audit suggested these. The maintainer adopted none of them at the package gate on 2026-10-05; the Requirement for
+cache cleanup and leftover removal, offered here too, was decided separately and moved to Decisions (One change, one
+added Requirement).
 
 - **A log line before each network request.** Pro: a hanging request shows what it waits for. Con: two lines per
   download for no new information once a failure message names the URL.
@@ -334,8 +352,6 @@ The audit suggested these, and none of them is in scope by default. The maintain
 - **Running the staged binary before the rename**, failing when it cannot run. Pro: catches a binary that does not
   execute on the image. Con: a new failure path under "Installing twice", which needs a delta spec; one more build-time
   glab run.
-- **A spec Requirement for cache cleanup and leftover removal**, so the two test labels can use spec words. Pro: the
-  checks would trace to the spec. Con: a delta spec for behavior that does not change, and a longer review.
 - **Each two-argument `fail` merged into one string.** Pro: one argument per message. Con: lines run past 120
   characters, and a backslash-newline inside the quotes would put indentation into the message.
 
