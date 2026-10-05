@@ -48,7 +48,7 @@
 - [x] 4.1 Run `just check` and verify it passes
 - [x] 4.2 Run the failure scenarios of the deno spec by hand with `docker run` as root (archived design of
       `add-deno-feature`, Verifying failure scenarios) and verify each message holds the content its scenario names
-- [ ] 4.3 Run `just test deno` in CI after push and verify every compatibility image passes
-- [ ] 4.4 Run `just test-scenarios deno` in CI after push and verify every scenario passes
-- [ ] 4.5 Record the results of tasks 2.4 and 4.1 to 4.4, with the image, input, exit status, and message of each hand
+- [x] 4.3 Run `just test deno` in CI after push and verify every compatibility image passes
+- [x] 4.4 Run `just test-scenarios deno` in CI after push and verify every scenario passes
+- [x] 4.5 Record the results of tasks 2.4 and 4.1 to 4.4, with the image, input, exit status, and message of each hand
       run, in the PR's Validation section
