@@ -1,0 +1,26 @@
+{
+  "id": "hf-mount",
+  "version": "1.0.0",
+  "name": "Hugging Face hf-mount",
+  "description": "Installs the hf-mount daemon and its NFS and FUSE backends from upstream release binaries, to mount Hugging Face Buckets and repositories as local filesystems.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/hf-mount",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "proposals": ["latest", "0.13.1"],
+      "description": "The upstream release to install: latest, or a release number of the form MAJOR.MINOR.PATCH without a leading v."
+    },
+    "backend": {
+      "type": "string",
+      "enum": ["nfs", "fuse", "both"],
+      "default": "both",
+      "description": "The backends installed next to the daemon, which is always installed: hf-mount-nfs, hf-mount-fuse, or both."
+    },
+    "installMountDependencies": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install the mount helpers of the selected backends: nfs-common or nfs-utils for NFS, fuse3 for FUSE."
+    }
+  }
+}
