@@ -556,6 +556,10 @@ start_dnsmasq() {
     # A UDP socket bound to 127.0.0.1:53, as /proc/net/udp writes it on a little-endian machine (amd64, arm64).
     if [ -n "${start_dnsmasq_pid}" ] && proc_alive "${start_dnsmasq_pid}" \
       && awk '$2 == "0100007F:0035" { found = 1 } END { exit !found }' /proc/net/udp; then
+      # dnsmasq gives its pid file to the user it runs as. The next start reads only files that root wrote, so root
+      # writes the file anew.
+      rm -f "${DNSMASQ_PID_FILE}"
+      printf '%s\n' "${start_dnsmasq_pid}" >"${DNSMASQ_PID_FILE}"
       return 0
     fi
     nap
