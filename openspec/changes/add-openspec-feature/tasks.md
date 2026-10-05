@@ -249,10 +249,9 @@ of an image prepared by hand, in place of a container kept from `just test opens
 `ghcr.io/devcontainers/features/node` 2.1.0 installed by its own `install.sh` with its default options, then this
 feature's `install.sh` with `version` `1.13.1`, `disableUpdateCheck` false, and `disableTelemetry` true. The `debian:12`
 build that tasks 1.5 and 4.4 name is this feature's `install.sh` run in a container of that image without the second
-step. Task 7.6 is open for its architecture run: no qemu handler for ppc64le is registered on the machine, and the PR's
-Validation section records the two substitutes that were run; task 7.7 waits for that run. Tasks 1.3 and 4.4, which name
-the runs of this section, rest for the architecture failure on the first substitute: `debian:12` run with
-`--platform linux/386`, where the script found `i686`.
+step. The architecture run of task 7.6 and of tasks 1.3 and 4.4, which name the runs of this section, is `debian:12`
+with `--platform linux/386`, where the script found `i686`: no qemu handler for ppc64le is registered on the machine, so
+the design's run was changed to an image an amd64 host runs without emulation.
 
 - [x] 7.1 In a container kept from `just test openspec --preserve` on `debian:12`: "Unknown version" (`9.9.9`),
       "Malformed version" (an empty value, `^1.7.0`, `1`, `beta`), "Invalid disableUpdateCheck" and "Invalid
@@ -281,10 +280,10 @@ the runs of this section, rest for the architecture failure on the first substit
       or too old" in `node:20.19.0-bookworm-slim` with its npm replaced by 10.8.1, and again with npm taken off `PATH`;
       verify the stated message of each, and after "No Node.js" that nothing of the feature is under `/usr/local/lib` or
       `/usr/local/bin`
-- [ ] 7.6 "Unsupported distribution" in `fedora:44` and "Unsupported architecture" in `debian:12` run with
-      `--platform linux/ppc64le` under qemu user emulation; verify that each fails naming the distribution or
-      architecture found, before any download
-- [ ] 7.7 For every failing run of 7.1 to 7.6, verify that the failure starts with `openspec: error:`, reads
+- [x] 7.6 "Unsupported distribution" in `fedora:44` and "Unsupported architecture" in `debian:12` run with
+      `--platform linux/386` under `linux32`; verify that each fails naming the distribution or architecture found,
+      before any download
+- [x] 7.7 For every failing run of 7.1 to 7.6, verify that the failure starts with `openspec: error:`, reads
       `<reason>; <how to fix it>` where a developer can fix it, and still names what its scenario states
 
 ## 8. Validation

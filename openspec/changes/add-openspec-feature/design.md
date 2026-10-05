@@ -386,8 +386,8 @@ Rejected option shapes:
     npm taken off `PATH`.
   - Unsupported distribution: `fedora:44` (Docker Official Image), which has bash and which the Node.js feature
     supports.
-  - Unsupported architecture: `debian:12` run with `--platform linux/ppc64le` under qemu user emulation registered
-    through binfmt_misc.
+  - Unsupported architecture: `debian:12` run with `--platform linux/386`, with `install.sh` started under `linux32` so
+    that `uname` names the image's `i686`; an amd64 host runs that image without emulation.
 
 ### Security review surface
 
