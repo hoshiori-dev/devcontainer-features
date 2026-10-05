@@ -341,6 +341,6 @@ tasks above stay as the record of the earlier work, also where they name these q
 - [x] 9.6 Run `just docs`; verify that it leaves `src/firewall/README.md` unchanged, since `NOTES.md` and the metadata
       did not change, and that `jq -r .version src/firewall/devcontainer-feature.json` still prints `1.0.0`.
 - [x] 9.7 Run `just check`; verify it passes.
-- [ ] 9.8 Run `just test firewall` and `just test-scenarios firewall` through the PR's container test jobs after the
+- [x] 9.8 Run `just test firewall` and `just test-scenarios firewall` through the PR's container test jobs after the
       push; verify every job is green, with `duplicate.sh` passing its preconditions on each compatibility image and
       `rerun` passing its two.
