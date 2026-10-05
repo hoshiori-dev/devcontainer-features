@@ -25,9 +25,16 @@ check "the package and every one of its dependencies were downloaded from ${REGI
 # was published after OpenSpec 1.13.2, and its report lists as "kept out:" each dependency that has a later release
 # of the same major version, which an install without the bound could have taken.
 report="$(mktemp)"
+# Prints the report whether or not the publish times are within the bound: it is the only place publish_times.cjs
+# names a package published later or a registry request that failed.
+dependencies_published_within_bound() {
+  local status=0
+  node ./publish_times.cjs "${PREFIX_DIR}" "${report}" || status=$?
+  cat "${report}"
+  return "${status}"
+}
 check "the installed version of every dependency is one the registry published no later than OpenSpec 1.13.2" \
-  node ./publish_times.cjs "${PREFIX_DIR}" "${report}"
-cat "${report}"
+  dependencies_published_within_bound
 # The scenario's WHEN: a dependency has a release within upstream's range that the registry published after OpenSpec
 # 1.13.2. Without one, the check above passes with or without the bound.
 if ! grep -q '^kept out: ' "${report}"; then
