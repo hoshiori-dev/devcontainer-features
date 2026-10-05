@@ -31,9 +31,12 @@
 
 ## What is verified
 
-- Every package, OpenSpec and each dependency, is downloaded from `https://registry.npmjs.org/`, whatever registry,
-  proxy, or certificate setting the image's environment or npm configuration holds; the feature's Node.js and npm calls
-  see none of them.
+- Every package, OpenSpec and each dependency, is downloaded from `https://registry.npmjs.org/`. The feature's Node.js
+  and npm calls see no environment variable of the build other than `PATH` and no user, global, or project `.npmrc`, so
+  a registry, proxy, or certificate setting made there has no effect.
+- The `npmrc` built into the Node.js installation (the file `npmrc` in npm's own directory) is not ignored: a
+  certificate authority, proxy, or scoped registry set there stays in effect, so remove such a setting from that file if
+  the downloads must not depend on it.
 - npm checks every package against the `sha512` hash the registry publishes for it, and `npm audit signatures` then
   checks every package's registry signature and each published provenance attestation, with keys from Sigstore's TUF
   repository at `https://tuf-repo-cdn.sigstore.dev`. A package that fails any of these checks fails the build, and an

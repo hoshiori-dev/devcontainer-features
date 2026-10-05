@@ -17,8 +17,10 @@ the update check and telemetry settable as options.
   (`ghcr.io/devcontainers/features/node`), so a consumer adds only `openspec`.
 - Every package it installs is verified against the npm registry's published integrity hash and registry signature
   before `openspec` becomes reachable; a failed verification fails the build.
-- Its dependencies are the versions published no later than the OpenSpec release being installed, and the image's
-  environment and npm configuration cannot redirect its downloads or weaken their certificate checking.
+- Its dependencies are the versions published no later than the OpenSpec release being installed, and the build's
+  environment variables other than `PATH` and the user, global, and project npm configuration cannot redirect its
+  downloads or weaken their certificate checking; the npmrc built into the Node.js installation, which the feature
+  trusts as it is, is not ignored.
 - Two boolean options set the CLI's environment defaults: `disableUpdateCheck` and `disableTelemetry`.
 - The feature changes nothing in the workspace or the user's home: it never runs `openspec init` or `openspec update`,
   at build or at start.

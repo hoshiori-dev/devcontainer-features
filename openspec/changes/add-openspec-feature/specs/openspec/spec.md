@@ -17,15 +17,15 @@ Upstream sources:
 
 The feature SHALL install the npm package `@fission-ai/openspec` at the version the `version` option names, downloading
 it and every one of its dependencies from the public npm registry at https://registry.npmjs.org/, regardless of any
-registry configured in the image, and SHALL make `openspec` runnable from `PATH` by every user of the container, the
-remote user included. The feature SHALL read the version to install, its publish time, and the Node.js version it
-requires from the package's registry document at https://registry.npmjs.org/@fission-ai%2fopenspec, relying on TLS alone
-and following no redirect; that document only selects what is installed, and the packages are then verified as "Verify
-every installed package" requires. The build SHALL fail when the registry names anything other than an exact version as
-`latest`, and when the package installed as `@fission-ai/openspec` is not that package at exactly the selected version.
-The feature SHALL install the package and its dependencies under `/usr/local/lib/openspec` and SHALL install the command
-`openspec` at `/usr/local/bin/openspec`; that file and everything under that directory SHALL be owned by root and
-writable only by root.
+registry the build's environment or the user, global, or project npm configuration names, and SHALL make `openspec`
+runnable from `PATH` by every user of the container, the remote user included. The feature SHALL read the version to
+install, its publish time, and the Node.js version it requires from the package's registry document at
+https://registry.npmjs.org/@fission-ai%2fopenspec, relying on TLS alone and following no redirect; that document only
+selects what is installed, and the packages are then verified as "Verify every installed package" requires. The build
+SHALL fail when the registry names anything other than an exact version as `latest`, and when the package installed as
+`@fission-ai/openspec` is not that package at exactly the selected version. The feature SHALL install the package and
+its dependencies under `/usr/local/lib/openspec` and SHALL install the command `openspec` at `/usr/local/bin/openspec`;
+that file and everything under that directory SHALL be owned by root and writable only by root.
 
 #### Scenario: Registry configured in the image
 
@@ -124,9 +124,10 @@ run, and the only package code that runs SHALL be `openspec --version`, as an un
 ### Requirement: Ignore the image's download settings
 
 The feature SHALL make its build-time requests with full certificate checking against the certificate authorities of the
-Node.js found on `PATH`, which it trusts as it is, and nothing else the image holds SHALL change that: no environment
-variable of the build other than `PATH`, and no user, global, or project npm configuration, SHALL reach the feature's
-Node.js and npm calls.
+Node.js installation found on `PATH`, which it trusts as it is: no environment variable of the build other than `PATH`,
+and no user, global, or project npm configuration, SHALL reach the feature's Node.js and npm calls. The npmrc built into
+that Node.js installation is part of it and is not ignored: a certificate authority, proxy, or scoped registry set there
+stays in effect.
 
 #### Scenario: Certificate checking weakened by the environment
 

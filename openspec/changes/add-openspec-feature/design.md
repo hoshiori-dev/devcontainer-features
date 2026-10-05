@@ -392,8 +392,9 @@ Rejected option shapes:
 ### Security review surface
 
 - **Downloads:** only the npm registry (the package, its dependencies, their attestations) and Sigstore's TUF CDN, all
-  over HTTPS, with the image's environment and npm configuration kept out (Goals); see URL inventory. The feature's own
-  scripts run no `curl | sh`, add no OS package, and add no repository to the image.
+  over HTTPS, with the build's environment other than `PATH` and the user, global, and project npm configuration kept
+  out (Goals) and the npmrc built into the Node.js installation left in effect (Risks); see URL inventory. The feature's
+  own scripts run no `curl | sh`, add no OS package, and add no repository to the image.
 - **Verification:** see Decisions - Verification and Decisions - Dependencies bounded; the source of every package is
   checked in `package-lock.json`, and a failure is fatal and leaves the previous state.
 - **Keys:** none stored in the feature. Registry keys and the Sigstore trust root come through TUF, anchored in the TUF
@@ -462,6 +463,21 @@ settle the points named here and do not close the package gate for the revised p
 - **The security review surface assesses the configuration.** It gains the bullet on whether ordinary option values can
   trigger execution, a privilege change, or data exposure (Security review surface, Configuration). Rejected: leaving
   the assessment out of the design.
+
+### Decisions after the review of the ready pull request
+
+The maintainer decided these points in conversation on 2026-10-05, on comments an automated reviewer left on the ready
+pull request.
+
+- **The claims about ignored npm configuration name the layers the feature isolates.** The spec's Requirements "Install
+  the requested version" and "Ignore the image's download settings", proposal.md - What Changes, Security review
+  surface - Downloads, and "What is verified" in `src/openspec/NOTES.md` say that no environment variable of the build
+  other than `PATH` and no user, global, or project npm configuration reaches the feature's Node.js and npm calls, and
+  that the npmrc built into the Node.js installation is part of the installation the feature trusts as it is and is not
+  ignored (Risks). This replaces "regardless of any registry configured in the image", which the decisions of 2026-10-05
+  kept, and answers the open question on the proposal's sentence with its option (b), extended to the spec. No script
+  changes, and the check of the built-in npmrc stays out. Rejected: keeping the broader sentences and reading them as
+  covering only the isolated layers.
 
 ## URL inventory
 
@@ -536,8 +552,9 @@ The Node.js feature's own downloads (nvm, Node.js, pnpm, and apt packages) belon
 
 ## Open Questions
 
-Three points of the revision are outside the decisions of 2026-10-05. The package is written for the first option of
-each, and the tasks that depend on one name it; "accepted as written" closes all three that way.
+Two points of the revision are outside the decisions of 2026-10-05. The package is written for the first option of each,
+and the tasks that depend on one name it; "accepted as written" closes both that way. A third, on the proposal's
+sentence about the image's npm configuration, is answered under Decisions after the review of the ready pull request.
 
 - **Whether `install.sh` names the TUF mirror.** Raised by `.agents/knowledge/shell-style.md`, Logging and failure (a
   step that uses the network logs from where) and Options are data (every external URL is a readonly constant). npm
@@ -566,17 +583,3 @@ each, and the tasks that depend on one name it; "accepted as written" closes all
     and `test/openspec/duplicate.sh`, and removes checks the tests carry today.
 
   Recommendation: (a), which keeps every check the tests have today and adds no contract.
-- **Whether the proposal's sentence on the image's npm configuration is narrowed.** Raised by the decision to drop the
-  check of the npmrc built into npm. proposal.md - What Changes says that "the image's environment and npm configuration
-  cannot redirect its downloads or weaken their certificate checking". Without the check, a certificate authority, a
-  proxy, or a scoped registry in the npmrc built into the Node.js installation stays in effect (Risks). The decision
-  names the spec's "regardless of any registry configured in the image" as staying and does not name this sentence.
-  - (a) As written. The sentence stays as approved and is read as the spec's phrase is: the built-in npmrc is part of
-    the Node.js installation the feature trusts as it is. Changes no file.
-  - (b) The sentence takes the scope of Requirement "Ignore the image's download settings": "the build's environment and
-    the user, global, and project npm configuration cannot redirect its downloads or weaken their certificate checking".
-    Changes `proposal.md`, and the first statement under "What is verified" in `src/openspec/NOTES.md`, which is worded
-    the same way.
-
-  Recommendation: (a), the reading the decision gave the spec's phrase; (b) if the proposal should say it without that
-  reading.
