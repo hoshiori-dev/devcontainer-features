@@ -142,15 +142,17 @@ condition, constants `readonly` at the top, `printf '%s\n'` for text that holds 
 every `# shellcheck` directive and every other deliberate deviation, except `# shellcheck source=/dev/null` before
 `dev-container-features-test-lib` and `# shellcheck shell=bash` at the top of a sourced file. "shellcheck with the
 optional checks" is `shellcheck -o require-variable-braces,require-double-brackets <file>` reporting nothing.
-`test/openspec/scenarios.json`, the two Dockerfiles, `probe.cjs`, and `publish_times.cjs` stay as they are.
+`test/openspec/scenarios.json`, the two Dockerfiles, and `probe.cjs` stay as they are. `publish_times.cjs` is outside
+the tasks of this section and changed after it was written: 3aedf53 escapes every slash of a package name in the
+registry URL it requests, and 710a6eb changed, in the two `non_default_options_*.sh` scripts, how its report is printed.
 
-Record of 2026-10-05: the dev container CLI could not run on the machine that day, so tasks 5.2 to 5.7 stay open until
-`just test openspec` and `just test-scenarios openspec` ran in CI. Their scripts were run by hand on amd64 in containers
-of `debian:12` and of the Ubuntu base image with `ghcr.io/devcontainers/features/node` 2.1.0 installed by its own
-`install.sh`; the PR's Validation section records those runs. The container run that task 5.6 names for `switch_node`
-was one of them: nvm 0.40.8 installed and switched Node.js with `errexit` and `nounset` on, because its `nvm` function
-turns `errexit` off for its own commands. `switch_node` therefore turns neither option off, and its comment gives the
-reason for the subshell and says so.
+Record of 2026-10-05: the dev container CLI could not run on the machine that day, so tasks 5.2 to 5.7 stayed open and
+were ticked once the pull request's container jobs, which run `just test openspec` and `just test-scenarios openspec`,
+passed. Their scripts were run by hand on amd64 in containers of `debian:12` and of the Ubuntu base image with
+`ghcr.io/devcontainers/features/node` 2.1.0 installed by its own `install.sh`; the PR's Validation section records those
+runs. The container run that task 5.6 names for `switch_node` was one of them: nvm 0.40.8 installed and switched Node.js
+with `errexit` and `nounset` on, because its `nvm` function turns `errexit` off for its own commands. `switch_node`
+therefore turns neither option off, and its comment gives the reason for the subshell and says so.
 
 - [x] 5.1 Add `"scenarioArchitectures": ["amd64", "arm64"]` to `test/openspec/compatibility.json`; verify with
       `just validate` and with `just affected` listing a scenario job for `openspec` on amd64 and on arm64
@@ -301,7 +303,9 @@ the design's run was changed to an image an amd64 host runs without emulation.
 
 ## 9. Review follow-up
 
-Work after the review of the ready pull request (design, Decisions after the review of the ready pull request).
+Work after the review of the ready pull request (design, Decisions after the review of the ready pull request, and, for
+tasks 9.4 to 9.6, Decisions on the open questions). Tasks 4.1, 4.4, 5.3, and 5.4 name "design, Open Questions": that
+section is gone since task 9.4, and its two points are under design - Decisions on the open questions.
 
 - [x] 9.1 Narrow the claims about ignored npm configuration to the layers the feature isolates, without changing a
       script: in `specs/openspec/spec.md`, the phrase "regardless of any registry configured in the image" of
@@ -323,3 +327,21 @@ Work after the review of the ready pull request (design, Decisions after the rev
       line and leaves the prefix, the directory, and the paths next to them as they were; with the directory removed the
       install succeeds; a symbolic link to a directory at the path is replaced by the wrapper
 - [x] 9.3 Run `just check` and verify it passes
+- [x] 9.4 Record the maintainer's answers of 2026-10-05 to the two open questions of `design.md`, both as the package
+      was written, without changing a script, a test, or the delta spec: add "Decisions on the open questions" after the
+      existing decisions, each answer with its rejected alternatives; remove `## Open Questions`; point the Goals bullet
+      on the trust surface to the new section; verify by reading that `src/openspec/install.sh` defines `TUF_MIRROR_URL`
+      once as a readonly constant and uses it only in the log line and the failure hint of `verify_signatures`, with
+      `grep -n 'TUF_MIRROR_URL\|tuf-repo-cdn' src/openspec/install.sh` naming no other line; by reading that
+      `test/openspec/test.sh` and `duplicate.sh` call `single_installation` under a label in the words of Requirement
+      "Install twice" and that `test.sh` repeats two "Fresh container" checks after the CLI ran under a comment that
+      says so; that `git status --short src/openspec test/openspec` prints nothing; that
+      `grep -c '^## Open Questions' design.md` prints 0; and with `just spec-check`
+- [x] 9.5 Bring the preamble of section 5 and its "Record of 2026-10-05" up to date without changing a task's text or
+      tick: `publish_times.cjs` changed after the section was written, and tasks 5.2 to 5.7 were ticked once the pull
+      request's container jobs passed; verify with `git log --oneline -- test/openspec/publish_times.cjs` and
+      `git show --stat` of 3aedf53 and 710a6eb, by reading the message and the diff of 2dedd4c, which ticked those
+      tasks, and that the diff of `tasks.md` against e244fc4 removes or changes no line of tasks 1.1 to 9.3
+- [x] 9.6 Run `just check` and `shellcheck -o require-variable-braces,require-double-brackets` on
+      `src/openspec/install.sh` and every `test/openspec/*.sh`; verify that the first passes and the second reports
+      nothing
