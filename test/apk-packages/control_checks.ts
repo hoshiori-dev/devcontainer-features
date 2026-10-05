@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-run=docker --allow-net=0.0.0.0
+#!/usr/bin/env -S deno run --check --allow-read --allow-run=docker --allow-net=127.0.0.1
 // Direct checks for installation controls. Uses disposable containers and this checkout's
 // read-only feature; expected failures cannot be expressed by the scenario harness.
 // Run without arguments for each supported image on the host architecture, or --image REF.
@@ -101,7 +101,7 @@ class Container {
     }
 }
 const packageName = MANAGER === "apk" || MANAGER === "pacman" ? "tree" : "bc";
-const otherPackage = MANAGER === "apk" || MANAGER === "pacman" ? "file" : "file";
+const otherPackage = "file";
 const tests: { name: string; run: (c: Container) => Promise<void>; network?: string }[] = [
     {
         name:
@@ -160,7 +160,18 @@ const tests: { name: string; run: (c: Container) => Promise<void>; network?: str
                 }
             }
             for (const cleanup of ["all", "packages", "none"]) {
-                await c.succeeds(" ,\t, ", { cleanup, path: "/tmp/stub:/usr/sbin:/usr/bin:/sbin:/bin" });
+                const result = await docker(
+                    "exec",
+                    "--env",
+                    "PATH=/tmp/stub:/usr/sbin:/usr/bin:/sbin:/bin",
+                    "--env",
+                    "PACKAGES= ,\t, ",
+                    "--env",
+                    `CLEANUP=${cleanup}`,
+                    c.name,
+                    "/feature/install.sh",
+                );
+                assert(result.code === 0, `installation failed: ${result.text}`);
             }
             if (["apt", "apk", "dnf"].includes(MANAGER)) {
                 for (const networkTimeout of ["", "1", "3600"]) await c.succeeds("", { networkTimeout });
@@ -293,7 +304,7 @@ chmod +x "/tmp/bin/$1"`,
         name: "Explicit timeout bounds a stalled local repository",
         network: "host",
         async run(c) {
-            const listener = Deno.listen({ hostname: "0.0.0.0", port: 0 });
+            const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
             const connections: Deno.Conn[] = [];
             const accepting = (async () => {
                 try {
