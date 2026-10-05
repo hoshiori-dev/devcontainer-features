@@ -230,7 +230,9 @@ check_uv() {
     return
   fi
   uv_path="$(command -v uv)"
-  uv_output="$(uv --version)"
+  uv_output="$(uv --version)" \
+    || fail "${uv_path} --version failed with status $?;" \
+      "provide uv ${MINIMUM_UV_VERSION} or later, or remove it so that the installer uses pip"
   # "uv 0.12.16 (…)" names the version in its second word.
   uv_version="${uv_output#* }"
   uv_version="${uv_version%% *}"
@@ -409,7 +411,8 @@ verify_install() {
 link_cli() {
   local venv="${remote_home}/${VENV_SUFFIX}"
   log "linking ${LINK_PATH} to ${venv}/bin/hf"
-  ln --symbolic --force --no-dereference "${venv}/bin/hf" "${LINK_PATH}"
+  ln --symbolic --force --no-dereference "${venv}/bin/hf" "${LINK_PATH}" \
+    || fail "cannot link ${LINK_PATH} to ${venv}/bin/hf; make ${LINK_PATH%/*} writable for the build"
   log "installed hf ${resolved_version} for ${remote_user}"
 }
 

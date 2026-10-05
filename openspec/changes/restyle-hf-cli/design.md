@@ -212,7 +212,9 @@ the single sentence (the confirmed unclear failure).
   `python3-venv` heuristic and in the skill-link check may stay inside `[[ … ]]`: its failure only makes the comparison
   false, which is already the right outcome (skip the heuristic, fail with the missing link).
 - `uv --version | awk` and `sha256sum | cut` become an assignment plus parameter expansion, with identical output for
-  well-formed input.
+  well-formed input. A `uv --version` that exits non-zero, and a failing `ln` of `/usr/local/bin/hf`, each end with a
+  `fail` that names the command and the fix, where 1.0.0 ended on the command's own error; the exit status stays
+  non-zero.
 - The installed-version probe is one helper with two call sites: the skip check tolerates failure through an explicit
   `if` with a comment naming the recovered failure mode (an earlier venv that cannot run gets a full reinstall); the
   verification lets the probe's error and status through. Rejected: silencing stderr inside the helper (would hide the
