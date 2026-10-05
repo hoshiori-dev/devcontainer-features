@@ -96,8 +96,11 @@ validate_options() {
 require_zypper() {
   require_zypper_name=""
   if [ -r /etc/os-release ]; then
+    # A file that cannot be sourced leaves the name empty instead of ending the script before its message.
     # shellcheck source=/dev/null
-    require_zypper_name="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")" || require_zypper_name=""
+    if ! require_zypper_name="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")"; then
+      require_zypper_name=""
+    fi
   fi
   if [ -z "${require_zypper_name}" ]; then require_zypper_name="an unidentified distribution"; fi
   command -v zypper >/dev/null 2>&1 \
