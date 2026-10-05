@@ -90,7 +90,7 @@ remove_temporary_dirs() {
   if [ -n "${work_dir}" ]; then rm -rf -- "${work_dir}"; fi
 }
 
-validate_controls() {
+validate_options() {
   case "${REFRESHPOLICY}" in
     default | always | never) ;;
     *) fail "option refreshPolicy is \"${REFRESHPOLICY}\"; use default, always, or never" ;;
@@ -101,13 +101,13 @@ validate_controls() {
     *) fail "option cleanup is \"${CLEANUP}\"; use all, packages, or none" ;;
   esac
   readonly CLEANUP
-  validate_controls_hint="leave it empty or use whole seconds from 1 through 3600 without a leading zero"
+  validate_options_hint="leave it empty or use whole seconds from 1 through 3600 without a leading zero"
   case "${NETWORKTIMEOUT}" in
     "") ;;
-    0* | *[!0123456789]*) fail "option networkTimeout is \"${NETWORKTIMEOUT}\"; ${validate_controls_hint}" ;;
+    0* | *[!0123456789]*) fail "option networkTimeout is \"${NETWORKTIMEOUT}\"; ${validate_options_hint}" ;;
     *)
       if [ "${#NETWORKTIMEOUT}" -gt 4 ] || [ "${NETWORKTIMEOUT}" -gt 3600 ]; then
-        fail "option networkTimeout is \"${NETWORKTIMEOUT}\"; ${validate_controls_hint}"
+        fail "option networkTimeout is \"${NETWORKTIMEOUT}\"; ${validate_options_hint}"
       fi
       ;;
   esac
@@ -124,6 +124,8 @@ require_apk() {
   if command -v apk >/dev/null 2>&1; then return 0; fi
   require_apk_distribution=""
   if [ -r /etc/os-release ]; then
+    # A malformed /etc/os-release, or one that assigns a readonly name, fails the subshell. The message below must
+    # still be the one that ends the run, so the distribution then stays unidentified.
     # shellcheck source=/dev/null
     if ! require_apk_distribution="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")"; then
       require_apk_distribution=""
@@ -206,7 +208,7 @@ main() {
   locale_before="${LC_ALL-}"
   LC_ALL=C
   export LC_ALL
-  validate_controls
+  validate_options
   # The accepted entries are the positional parameters of main: sh has no arrays, and a function cannot change its
   # caller's parameters. `set --` first drops any argument given to install.sh, so only validated entries are left,
   # and each reaches apk as one argument that is never evaluated as shell code.
