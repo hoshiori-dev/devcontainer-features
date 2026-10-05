@@ -9,11 +9,11 @@ set -eu
 # shellcheck source=/dev/null
 . "$(dirname "$0")/checks.sh"
 
-# The CLI gives the first install the second value of an option's enum or proposals, and the second install the
-# default.
+# Whether the harness passed the options this test is written for: the CLI gives the first install the second value
+# of an option's enum or proposals, and the second install the default.
 first_install_used_other_options() {
-  [ "${DEFAULTACTION}" = "allow" ] && [ "${DEFAULTACTION__DEFAULT}" = "deny" ] \
-    && [ "${PRESETS}" = "npm" ] && [ "${PRESETS__DEFAULT}" = "github" ]
+  [ "${DEFAULTACTION-}" = "allow" ] && [ "${DEFAULTACTION__DEFAULT-}" = "deny" ] \
+    && [ "${PRESETS-}" = "npm" ] && [ "${PRESETS__DEFAULT-}" = "github" ]
 }
 
 options_file_holds_defaults() {
@@ -35,10 +35,14 @@ forward_filtered() {
   esac
 }
 
-# Deviation from shell-style.md (Tests): this label states the premise of the test, which is no behavior of the spec
-# (the design's Open Questions 13). Without it, a first install with the defaults would let every check below pass.
-check "premise: the first install used defaultAction allow and presets npm, the second deny and github" \
-  first_install_used_other_options
+# The premise of this test, a precondition and not a check: after a first install with the defaults, every check below
+# would pass without showing anything, so the test stops here.
+if ! first_install_used_other_options; then
+  echo 'the first install must use defaultAction "allow" and presets "npm", and the second "deny" and "github"' >&2
+  printf 'the harness passed "%s" and "%s", then "%s" and "%s"\n' \
+    "${DEFAULTACTION-}" "${PRESETS-}" "${DEFAULTACTION__DEFAULT-}" "${PRESETS__DEFAULT-}" >&2
+  exit 1
+fi
 
 # Different options the second time
 check "the options file holds only the second install's options" options_file_holds_defaults

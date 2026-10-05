@@ -126,9 +126,12 @@ check "after root deletes the feature's rules, a connection to registry.npmjs.or
 
 # The state the re-run meets: a stopped resolver that /etc/resolv.conf still names, and a table of the test's own.
 stop_resolver
-# Deviation from shell-style.md (Tests): the next label and the one after the table state a premise of this test,
-# which is no behavior of the spec (the design's Open Questions 13).
-check "premise: /etc/resolv.conf still names the stopped resolver" names_local_resolver
+# The two premises of the re-run are preconditions and not checks: without either, the checks after the re-run would
+# pass without showing what their labels state, so the test stops here.
+if ! names_local_resolver; then
+  echo "the re-run must meet an /etc/resolv.conf that still names the stopped resolver, but it names another" >&2
+  exit 1
+fi
 nft -f - <<'EOF'
 table inet firewall-test {
   chain out {
@@ -138,7 +141,10 @@ table inet firewall-test {
 }
 EOF
 other_tables >"${work_dir}/other_before.txt"
-check "premise: a table of the test's own exists" grep -q firewall-test "${work_dir}/other_before.txt"
+if ! grep -q firewall-test "${work_dir}/other_before.txt"; then
+  echo "the re-run must meet a table of the test's own, but the other tables hold no firewall-test" >&2
+  exit 1
+fi
 
 # The re-run, with variables named like the options, in the spelling of devcontainer.json and in that of install.sh.
 env defaultAction=allow presets=npm allowedCidrs=0.0.0.0/0 failureMode=warn filterForward=false \
