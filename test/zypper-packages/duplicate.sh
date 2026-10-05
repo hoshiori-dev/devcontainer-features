@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-set -eu
+set -euo pipefail
+
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
-installed() { rpm -q "$1" >/dev/null 2>&1; }
-check "bc survives the empty second invocation" installed bc
-check "file survives the empty second invocation" installed file
-check "bc runs" bash -c "echo 2+3 | bc | grep -qx 5"
-check "file runs" file --version
+
+check "the second installation, with an empty list, leaves bc installed" rpm -q bc
+check "the second installation, with an empty list, leaves file installed" rpm -q file
+check "the second installation, with an empty list, removes nothing: bc still computes 2+3" \
+  bash -c 'echo 2+3 | bc | grep -qx 5'
+check "the second installation, with an empty list, removes nothing: file still reports its version" file --version
+
 reportResults
