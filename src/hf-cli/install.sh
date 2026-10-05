@@ -107,7 +107,9 @@ run_as_user() {
   fi
 }
 
-# Prints the huggingface_hub version in the virtual environment $1, read by its interpreter as the remote user.
+# Prints the huggingface_hub version in the virtual environment $1, read by its interpreter as the remote user. It
+# calls the helper run_as_user, one call deeper than main, step, helper, so that its two call sites, the skip check and
+# the verification, share one command line.
 installed_version() {
   run_as_user "$1/bin/python" -c 'import importlib.metadata; print(importlib.metadata.version("huggingface_hub"))'
 }

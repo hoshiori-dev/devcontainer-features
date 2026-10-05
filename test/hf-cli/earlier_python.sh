@@ -19,5 +19,5 @@ PY
 }
 check "the CLI's virtual environment uses the later usable candidate" later_candidate_backs_the_venv
 check "the old interpreter remains unchanged" is_python_3_9 /usr/bin/python3
-check "hf runs with the later candidate" hf version
+check "hf runs" hf version
 reportResults

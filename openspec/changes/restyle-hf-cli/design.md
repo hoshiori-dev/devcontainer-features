@@ -225,8 +225,9 @@ the single sentence (the confirmed unclear failure).
 - Comments: the header (what, from where, to which paths, root at build time, `VERSION` and `INSTALLSKILL`); one
   sentence for each helper whose name does not say everything; reasons for the `python3-venv` heuristic (Debian and
   Ubuntu ship `venv` support separately), the world-readable work directory (the remote user reads the installer, the
-  constraint file, and the shim through `runuser`), the working directory change, and the existing-venv recovery. The
-  comment that only restates the platform checks' purpose is dropped.
+  constraint file, and the shim through `runuser`), the working directory change, the existing-venv recovery, and the
+  installed-version probe's call of the run-as-user helper. The comment that only restates the platform checks' purpose
+  is dropped.
 - The `cd` into the remote home stays, and its comment states what the line guarantees: commands run through `runuser`
   start in a directory the remote user owns. Implementation could not confirm a failure the line prevents: the `1.0.0`
   script without the line, started as root from `/root` (mode `0700`, which the remote user cannot enter) on
@@ -245,11 +246,14 @@ the single sentence (the confirmed unclear failure).
   string).
 - The three implementation-worded labels are restated in the spec's words, and so are the labels that named a behavior
   in words the spec does not use: in `test.sh` the link's owner and target, the installer's marker, the distribution's
-  `python3`, the apt packages, the update-check variable, and `HF_HUB_OFFLINE`; in `duplicate.sh` the link; in the three
-  Python scenarios the interpreter the virtual environment uses. A comment above each expected value computed at run
-  time says why (latest from PyPI when the test runs; `install_skill` installs latest; the first-party feature's
-  interpreter prefix depends on the Python it installed); the startup-file assertion and other multi-line or over-long
-  assertions become helpers named after the behavior; `as_root` and `no_uv_settings` become multi-line functions.
+  `python3`, the apt packages, the update-check variable, and `HF_HUB_OFFLINE`; in `duplicate.sh` the run after the
+  second install; in the three Python scenarios the interpreter the virtual environment uses. A check whose command is
+  `hf version` is labelled with what that command verifies, that `hf` runs ("hf runs after the second install" in
+  `duplicate.sh`, "hf runs" in `existing_python.sh` and `earlier_python.sh`); the checks beside it verify the release
+  and the interpreter. A comment above each expected value computed at run time says why (latest from PyPI when the test
+  runs; `install_skill` installs latest; the first-party feature's interpreter prefix depends on the Python it
+  installed); the startup-file assertion and other multi-line or over-long assertions become helpers named after the
+  behavior; `as_root` and `no_uv_settings` become multi-line functions.
 - No check is added or dropped, and each keeps its command's meaning; `test.sh:37` stays after the root run it guards.
 - `direct_checks.ts` and `integration_checks.ts` change only their expected substrings, the negative success check (now
   the new final line), and their argument errors, which name all three images.
