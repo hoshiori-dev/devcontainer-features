@@ -188,9 +188,9 @@ checked on 2026-09-30 and 2026-10-01 to choose it.
   every `test/openspec/*.sh`, by review of the scripts against the guide, and by the local runs under Decisions - Tests.
 - `install.sh` names its trust surface as readonly constants at the top: the registry URL `https://registry.npmjs.org/`
   and the package name every request of its own is built from, the TUF mirror `https://tuf-repo-cdn.sigstore.dev` that
-  the audit's log line and failure hint name (Open Questions), and every path it creates or modifies outside its
-  temporary directory: the prefix `/usr/local/lib/openspec`, the wrapper `/usr/local/bin/openspec`, the staging
-  directory `/usr/local/lib/openspec.staging.XXXXXX`, the set-aside copy of a previous prefix
+  the audit's log line and failure hint name (Decisions on the open questions), and every path it creates or modifies
+  outside its temporary directory: the prefix `/usr/local/lib/openspec`, the wrapper `/usr/local/bin/openspec`, the
+  staging directory `/usr/local/lib/openspec.staging.XXXXXX`, the set-aside copy of a previous prefix
   `/usr/local/lib/openspec.previous.XXXXXX`, and the unfinished wrapper `/usr/local/bin/openspec.new`; the last three
   are removed on every exit. No constant takes the name of an `/etc/os-release` key. Checked by review: outside the
   header comment and the constants, `install.sh` holds no `https://` and no `/usr/local` literal.
@@ -487,6 +487,31 @@ pull request.
   fails as it does for any image the feature cannot be installed on. Checked by the local run recorded in the PR's
   Validation section. Rejected: removing the directory — it is not the feature's to delete.
 
+### Decisions on the open questions
+
+The maintainer decided these two points in conversation on 2026-10-05. They were the questions the revision left outside
+the decisions of 2026-10-05, and the package was already written for the answer each got, so no script, test, or spec
+changes. No question is open. Like the decisions above, the answers settle the points named here and do not close the
+package gate for the revised package.
+
+- **`install.sh` names the TUF mirror.** `.agents/knowledge/shell-style.md` asks that a step that uses the network logs
+  from where (Logging and failure) and that every external URL is a readonly constant (Options are data), and npm
+  requests `https://tuf-repo-cdn.sigstore.dev` during `npm audit signatures`. The mirror is a readonly constant that the
+  audit's log line and its failure hint name; the script never passes it to npm (Goals). Rejected: keeping the URL out
+  of the script, with a log line that names only the registry and a failure hint that points to npm's report, which
+  leaves a network step without its source in the log.
+- **The leftover checks and the repeated "Fresh container" checks stay under the labels they have.** The spec says
+  "exactly one OpenSpec installation SHALL remain reachable as `openspec`" (Install twice) and states "Fresh container"
+  for a started container; it has no sentence on what an install leaves behind or on what running the installed CLI
+  writes. `test.sh` and `duplicate.sh` check that no staging directory, set-aside prefix, or unfinished wrapper is left
+  next to the installation, under the words of Requirement "Install twice", read as one installation with nothing staged
+  or set aside next to it; `test.sh` repeats two "Fresh container" checks after `openspec --version` and the probe ran,
+  under the words of "Fresh container", with a comment saying that it repeats them after the CLI ran. Rejected: a
+  sentence in Requirement "Install twice" that nothing else of an install remains next to the installed locations, with
+  a scenario, as `restyle-glab` did with "Leave no build residue", which adds a contract for checks the tests already
+  carry; dropping one or both groups and leaving them to review of `install.sh`, which removes checks the tests carry
+  today.
+
 ## URL inventory
 
 Every URL the feature's scripts access at build time, plus what the installed CLI contacts at run time depending on the
@@ -557,37 +582,3 @@ The Node.js feature's own downloads (nvm, Node.js, pnpm, and apt packages) belon
   check that prints that command is off by default; NOTES.md says so.
 - [Telemetry is on unless the consumer opts out, and goes to a PostHog-operated endpoint on upstream's domain] →
   Upstream's default, kept (Options). NOTES.md states it first, with the endpoint and the option that turns it off.
-
-## Open Questions
-
-Two points of the revision are outside the decisions of 2026-10-05. The package is written for the first option of each,
-and the tasks that depend on one name it; "accepted as written" closes both that way. A third, on the proposal's
-sentence about the image's npm configuration, is answered under Decisions after the review of the ready pull request.
-
-- **Whether `install.sh` names the TUF mirror.** Raised by `.agents/knowledge/shell-style.md`, Logging and failure (a
-  step that uses the network logs from where) and Options are data (every external URL is a readonly constant). npm
-  requests `https://tuf-repo-cdn.sigstore.dev` during `npm audit signatures`; `install.sh` on the branch never names it.
-  The package says: the audit's log line and its failure hint name the mirror, so it is a readonly constant (Goals).
-  - (a) As written. Changes `src/openspec/install.sh` only: one constant, used in one log line and one failure message.
-  - (b) Keep the URL out of the script: the log line names only the registry, the failure hint points to npm's report,
-    and Goals loses the mirror from the trust-surface and log-line bullets.
-
-  Recommendation: (a), the reading that leaves no network step without its source in the log.
-- **Two groups of checks that have no sentence of their own in the spec.** Raised by `.agents/knowledge/shell-style.md`,
-  Tests (a label states one behavior in the words of the spec). `test.sh` and `duplicate.sh` check that no staging
-  directory, set-aside prefix, or unfinished wrapper is left next to the installation, and `test.sh` repeats two "Fresh
-  container" checks after `openspec --version` and the probe ran. The spec says "exactly one OpenSpec installation SHALL
-  remain reachable as `openspec`" (Install twice) and states "Fresh container" for a started container; it has no
-  sentence on what an install leaves behind or on what running the installed CLI writes.
-  - (a) As written. Both groups stay: the first under the words of Requirement "Install twice", read as one installation
-    with nothing staged or set aside next to it, the second under the words of "Fresh container" with a comment saying
-    that it repeats the check after `openspec` ran. Changes `test/openspec/test.sh` and `test/openspec/duplicate.sh`
-    only (labels and one comment).
-  - (b) The spec gains a sentence in Requirement "Install twice" that nothing else of an install remains next to the
-    installed locations, whether the install succeeds or fails, with a scenario, as `restyle-glab` did with "Leave no
-    build residue"; the labels of the first group quote it. Changes `specs/openspec/spec.md`, the test labels, and one
-    more failing local run under Decisions - Tests.
-  - (c) Drop one or both groups from the tests and leave them to review of `install.sh`. Changes `test/openspec/test.sh`
-    and `test/openspec/duplicate.sh`, and removes checks the tests carry today.
-
-  Recommendation: (a), which keeps every check the tests have today and adds no contract.
