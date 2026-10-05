@@ -62,11 +62,30 @@ describe_system() {
 }
 
 has_index() {
-  for list in /var/lib/apt/lists/*_Packages*; do
+  for list in "$lists_dir"/*_Packages*; do
     [ -e "$list" ] && return 0
   done
   return 1
 }
+
+
+# Validate controls before package-manager calls, cache creation, and the empty-list exit.
+INSTALLRECOMMENDS="${INSTALLRECOMMENDS-false}"
+case $INSTALLRECOMMENDS in true | false) ;; *) fail "installRecommends must be true or false." ;; esac
+REFRESHPOLICY="${REFRESHPOLICY-default}"
+case $REFRESHPOLICY in default | always | never) ;; *) fail "refreshPolicy must be one of: default, always, never." ;; esac
+CLEANUP="${CLEANUP-all}"
+case $CLEANUP in all | packages | none) ;; *) fail "cleanup must be one of: all, packages, none." ;; esac
+NETWORKTIMEOUT="${NETWORKTIMEOUT-}"
+case $NETWORKTIMEOUT in
+  "") ;;
+  0* | *[!0123456789]*) fail "networkTimeout must be empty or an integer from 1 through 3600 without leading zeros." ;;
+  *)
+    if [ "${#NETWORKTIMEOUT}" -gt 4 ] || [ "$NETWORKTIMEOUT" -gt 3600 ]; then
+      fail "networkTimeout must be from 1 through 3600."
+    fi
+    ;;
+esac
 
 # Parse and validate every entry before anything else happens; accepted entries become "$@", so each
 # reaches apt-get as one argument and none is ever evaluated as shell code.
@@ -90,11 +109,30 @@ if ! command -v apt-get >/dev/null 2>&1; then
   fail "apt-get was not found on this image ($(describe_system)). This feature supports Debian and Ubuntu images, which provide apt-get."
 fi
 
-if has_index; then
-  echo "apt-packages: using the package index the image already holds."
-else
-  apt-get update --error-on=any
-fi
+# apt-config resolves inherited APT_CONFIG and Dir overrides; its shell output is data,
+# never sourced. An empty/root list directory must not become an unbounded cleanup target.
+lists_dir=$(apt-config shell value Dir::State::lists/d | sed "s/^value='//; s/'$//")
+case $lists_dir in "" | /) fail "APT's effective package index directory must not be empty or root." ;; esac
+
+apt_network() {
+  if [ -n "$NETWORKTIMEOUT" ]; then
+    apt-get -o "Acquire::http::Timeout=$NETWORKTIMEOUT" -o "Acquire::https::Timeout=$NETWORKTIMEOUT" "$@"
+  else
+    apt-get "$@"
+  fi
+}
+
+case $REFRESHPOLICY in
+  always) apt_network update --error-on=any ;;
+  never) has_index || fail "refreshPolicy=never requires a usable cached package index." ;;
+  default)
+    if has_index; then
+      echo "apt-packages: using the package index the image already holds."
+    else
+      apt_network update --error-on=any
+    fi
+    ;;
+esac
 
 # APT treats a trailing '+' on an unknown name or version as an install marker. Check exact names
 # (including virtual packages) and version fields before installing any entry; real names such as
@@ -118,12 +156,16 @@ for entry do
 done
 
 echo "apt-packages: installing $*"
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --no-remove \
+DEBIAN_FRONTEND=noninteractive apt_network install -y --no-remove \
+  -o "APT::Install-Recommends=$INSTALLRECOMMENDS" \
   -o APT::Install-Suggests=false \
   -o APT::Cmd::Pattern-Only=true \
   -o Dpkg::Options::=--force-confdef \
   -o Dpkg::Options::=--force-confold \
   -- "$@"
 
-apt-get clean
-rm -rf /var/lib/apt/lists/*
+case $CLEANUP in
+  all) apt-get clean; rm -rf "${lists_dir:?}"/* ;;
+  packages) apt-get clean ;;
+  none) ;;
+esac
