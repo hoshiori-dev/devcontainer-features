@@ -1,6 +1,6 @@
 {
   "id": "deno",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "Deno",
   "description": "Installs the Deno CLI, verified against its published checksums, with a shared PATH location for tools installed with deno install --global.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/deno",
