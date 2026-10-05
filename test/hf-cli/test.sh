@@ -18,8 +18,10 @@ PY
 installed="$("${venv}/bin/python" -c 'import importlib.metadata; print(importlib.metadata.version("huggingface_hub"))')"
 check "default resolves the latest release" test "${installed}" = "${latest}"
 check "hf runs for the remote user" hf version
-check "hf is exposed by a root-owned system link" test "$(stat -c '%U %F' /usr/local/bin/hf)" = 'root symbolic link'
-check "the link reaches the user's venv" test "$(readlink -f /usr/local/bin/hf)" = "${venv}/bin/hf"
+check "/usr/local/bin/hf is a root-owned symbolic link" \
+  test "$(stat -c '%U %F' /usr/local/bin/hf)" = 'root symbolic link'
+check "/usr/local/bin/hf resolves to hf inside the remote user's ~/.hf-cli/venv" \
+  test "$(readlink -f /usr/local/bin/hf)" = "${venv}/bin/hf"
 # Succeeds when huggingface_hub itself reports that the standalone installer manages its environment.
 environment_is_installer_managed() {
   "${venv}/bin/python" - <<'PY'
@@ -28,7 +30,7 @@ assert installation_method() == "hf_installer"
 PY
 }
 check "the environment is installer-managed" environment_is_installer_managed
-check "the marker exists" test -f "${venv}/.hf_installer_marker"
+check "the venv holds the installer's .hf_installer_marker" test -f "${venv}/.hf_installer_marker"
 check "the installation belongs to the remote user" test -z "$(find "${HOME}/.hf-cli" ! -user "$(id -un)" -print -quit)"
 # Succeeds when the venv holds no distribution named transformers.
 no_transformers_distribution() {
@@ -38,12 +40,12 @@ assert not any(d.metadata["Name"] == "transformers" for d in importlib.metadata.
 PY
 }
 check "no transformers distribution" no_transformers_distribution
-check "the venv uses the system Python" "${venv}/bin/python" -c 'import sys; assert sys.base_prefix == "/usr"'
-check "Python and venv prerequisites are installed" dpkg-query -W python3 python3-venv ca-certificates
+check "the venv uses the distribution's python3" "${venv}/bin/python" -c 'import sys; assert sys.base_prefix == "/usr"'
+check "python3, python3-venv, and ca-certificates are installed" dpkg-query -W python3 python3-venv ca-certificates
 check "no skill by default" test ! -e "${HOME}/.agents/skills/hf-cli"
 check "no Claude skill link by default" test ! -e "${HOME}/.claude/skills/hf-cli"
-check "daily update checks are disabled" test "${HF_HUB_DISABLE_UPDATE_CHECK-}" = 1
-check "offline mode is not forced at runtime" test "${HF_HUB_OFFLINE:-0}" != 1
+check "HF_HUB_DISABLE_UPDATE_CHECK is 1 in the remote user's environment" test "${HF_HUB_DISABLE_UPDATE_CHECK-}" = 1
+check "HF_HUB_OFFLINE=1 is not added to the container environment" test "${HF_HUB_OFFLINE:-0}" != 1
 check "no uv cache in the remote home" test ! -e "${HOME}/.cache/uv"
 check "no pip cache in the remote home" test ! -e "${HOME}/.cache/pip"
 check "no token in the remote home" test ! -e "${HOME}/.cache/huggingface/token"

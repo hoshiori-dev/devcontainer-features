@@ -27,7 +27,7 @@ assert len([d for d in importlib.metadata.distributions() if d.metadata["Name"] 
 PY
 }
 check "only one huggingface_hub distribution remains" only_one_huggingface_hub_distribution
-check "the system link runs the later CLI" hf version
+check "/usr/local/bin/hf runs the later release" hf version
 check "the disabled skill keeps its earlier version" grep -Fq "huggingface_hub v${VERSION}" "${skill_dir}/SKILL.md"
 check "the Claude link remains" test "$(readlink -f "${HOME}/.claude/skills/hf-cli")" = "${skill_dir}"
 check "all venv files belong to the remote user" test -z "$(find "${venv}" ! -user "$(id -un)" -print -quit)"

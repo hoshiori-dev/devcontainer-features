@@ -9,7 +9,7 @@ venv="${HOME}/.hf-cli/venv"
 # interpreter.
 expected="$(/usr/local/python/current/bin/python3 -c 'import sys; print(sys.base_prefix)')"
 actual="$("${venv}/bin/python" -c 'import sys; print(sys.base_prefix)')"
-check "the first-party interpreter backs the CLI" test "${actual}" = "${expected}"
+check "the CLI's virtual environment uses the first-party interpreter" test "${actual}" = "${expected}"
 check "first-party Python still runs" /usr/local/python/current/bin/python3 --version
 # Succeeds when the CLI's interpreter runs in a virtual environment of its own, not in the first-party Python's prefix.
 venv_is_isolated() {

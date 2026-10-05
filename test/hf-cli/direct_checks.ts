@@ -72,11 +72,15 @@ await observation(
 await observation(
     "unreachable-latest",
     `${clean}VERSION=latest ${install}`,
-    "https://pypi.org/pypi/huggingface_hub/json",
+    "cannot fetch https://pypi.org/pypi/huggingface_hub/json",
     rootImage,
     "none",
 );
-await observation("missing-tag", `${clean}VERSION=9.9.9 ${install}`, "refs/tags/v9.9.9");
+await observation(
+    "missing-tag",
+    `${clean}VERSION=9.9.9 ${install}`,
+    "refs/tags/v9.9.9/utils/installers/install.sh failed: HTTP 404",
+);
 await observation(
     "unsupported-distribution",
     `VERSION=1.33.0 ${install}`,

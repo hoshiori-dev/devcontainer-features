@@ -392,15 +392,14 @@ verify_install() {
   actual_version="$(installed_version "${venv}")"
   [[ "${actual_version}" == "${resolved_version}" ]] \
     || fail "installed huggingface_hub ${actual_version} differs from requested ${resolved_version};" \
-      "read the installer's output above"
+      "read the output above"
   [[ -f "${venv}/.hf_installer_marker" ]] \
-    || fail "the installer marker ${venv}/.hf_installer_marker is missing; read the installer's output above"
+    || fail "the installer marker ${venv}/.hf_installer_marker is missing; read the output above"
   if [[ "${INSTALLSKILL}" == true ]]; then
     grep --fixed-strings --quiet --no-messages "huggingface_hub v${resolved_version}" "${skill_dir}/SKILL.md" \
-      || fail "missing skill for huggingface_hub ${resolved_version}: ${skill_dir}/SKILL.md;" \
-        "read the installer's output above"
+      || fail "missing skill for huggingface_hub ${resolved_version}: ${skill_dir}/SKILL.md; read the output above"
     [[ "$(readlink --canonicalize "${claude_link}")" == "${skill_dir}" ]] \
-      || fail "missing skill link ${claude_link} to ${skill_dir}; read the installer's output above"
+      || fail "missing skill link ${claude_link} to ${skill_dir}; read the output above"
   fi
   run_as_user "${venv}/bin/hf" version
 }

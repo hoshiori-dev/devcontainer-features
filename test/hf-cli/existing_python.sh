@@ -8,7 +8,7 @@ source dev-container-features-test-lib
 existing_interpreter_backs_the_venv() {
   "${HOME}/.hf-cli/venv/bin/python" -c 'import sys; assert sys.base_prefix == "/usr/local"'
 }
-check "the existing interpreter backs the CLI" existing_interpreter_backs_the_venv
+check "the CLI's virtual environment uses the existing interpreter" existing_interpreter_backs_the_venv
 check "no distribution Python was added" bash -c '! dpkg-query -W python3 >/dev/null 2>&1'
 check "hf runs with the existing interpreter" hf version
 reportResults
