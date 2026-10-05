@@ -43,7 +43,9 @@ cleanup() {
 }
 
 # Runs curl with the arguments every request of this feature shares: no curl configuration file (--disable must come
-# first), HTTPS only, TLS 1.2 or later, and a connection timeout. It sends no credential and retries nothing.
+# first), HTTPS only, TLS 1.2 or later, and a connection timeout. It sends no credential. It retries nothing, unlike
+# the style guide's fetch: one request resolves the release and one downloads each binary, and a failed request fails
+# the build.
 fetch() {
   curl --disable --silent --show-error --proto '=https' --tlsv1.2 --connect-timeout 30 "$@"
 }
@@ -115,8 +117,8 @@ validate_options() {
   readonly BACKEND INSTALLMOUNTDEPENDENCIES
 }
 
-# Fails unless the machine is x86_64 or aarch64, the architectures upstream publishes binaries for; sets ${arch} to
-# the name the release assets carry.
+# Fails unless the image is a 64-bit x86_64 or aarch64 one, the architectures upstream publishes binaries for; sets
+# ${arch} to the name the release assets carry.
 check_architecture() {
   check_architecture_machine="$(uname --machine)"
   case "${check_architecture_machine}" in
@@ -126,6 +128,12 @@ check_architecture() {
         "use an x86_64 or aarch64 machine, since upstream publishes hf-mount for no other"
       ;;
   esac
+  # uname names the kernel's machine, which stays x86_64 or aarch64 for a 32-bit image run on a 64-bit kernel; the
+  # word size of the image's C library tells the two apart.
+  check_architecture_bits="$(getconf LONG_BIT)"
+  [ "${check_architecture_bits}" = "64" ] \
+    || fail "unsupported architecture \"${check_architecture_bits}-bit image on ${arch}\";" \
+      "use a 64-bit x86_64 or aarch64 image, since upstream publishes hf-mount for no other"
 }
 
 # Fails unless the image's C library is glibc MIN_GLIBC_MAJOR.MIN_GLIBC_MINOR or later.
@@ -190,6 +198,7 @@ resolve_release() {
     release="${VERSION}"
     return 0
   fi
+  log "reading the latest release from the redirect of ${LATEST_URL}"
   if resolve_release_answer="$(
     fetch --output /dev/null --write-out '%{http_code} %{redirect_url}' "${LATEST_URL}"
   )"; then
@@ -210,7 +219,6 @@ resolve_release() {
     || fail "${LATEST_URL} answered HTTP status ${resolve_release_http_status}" \
       "with the redirect target \"${resolve_release_target}\"," \
       "which is not ${TAG_URL_PREFIX}<MAJOR.MINOR.PATCH>; set version to a release number"
-  log "read the latest release ${release} from the redirect of ${LATEST_URL}"
 }
 
 # Downloads the binaries named in "$@" from release ${release} into a new ${work_dir}, each from its exact asset
