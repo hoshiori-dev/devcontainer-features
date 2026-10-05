@@ -77,7 +77,7 @@
 
 ## 6. Install script rework
 
-- [ ] 6.1 Rebuild `src/hf-mount/install.sh` on the POSIX skeleton of `.agents/knowledge/shell-style.md` (Skeletons),
+- [x] 6.1 Rebuild `src/hf-mount/install.sh` on the POSIX skeleton of `.agents/knowledge/shell-style.md` (Skeletons),
       keeping every URL, every `curl` flag (no `--retry`: design, Goals), the order of the checks (root, `version`,
       `backend`, `installMountDependencies`, architecture, glibc, distribution), every package, and every installed
       file: the header without its second-install sentence, naming the variable each option arrives in (`version` as
@@ -93,7 +93,7 @@
       with `shellcheck -o require-variable-braces,require-double-brackets src/hf-mount/install.sh` reporting nothing, a
       review of the layout against the skeleton, and one default install in a throwaway `debian:12` container that
       leaves the three binaries, `mount.nfs`, and `fusermount3` in place
-- [ ] 6.2 In `install.sh`, give the `curl` arguments that the latest-release request and the downloads share
+- [x] 6.2 In `install.sh`, give the `curl` arguments that the latest-release request and the downloads share
       (`--disable` first, then `--silent --show-error --proto '=https' --tlsv1.2 --connect-timeout 30`) one `fetch`
       function; keep calls at `main` → step → helper (today a step calls `install_missing`, which calls `is_installed`);
       branch with `if` wherever a `||` list is not a `fail` or `return` guard (the collection of missing packages, the
@@ -104,7 +104,7 @@
       mode it handles, or remove it where there is none; verify by review, with
       `grep -c 'shellcheck disable' src/hf-mount/install.sh` printing 0, and with a default install in throwaway
       `debian:12` and `fedora:44` containers
-- [ ] 6.3 Reword every failure of `install.sh` to `<reason>; <how to fix it>`, starting in lower case and without a
+- [x] 6.3 Reword every failure of `install.sh` to `<reason>; <how to fix it>`, starting in lower case and without a
       trailing period, keeping what each spec scenario requires the message to name (the accepted forms or values, the
       requested version, the requested URL, the missing asset, the URL and the status, glibc and the found and required
       versions, the architecture, the distribution); end `apt-get update`, `apt-get install`, and `dnf install` with
@@ -113,7 +113,7 @@
       the installation into `/usr/local/bin`); verify with runs of `version` set to `v0.13.1` and of `backend` set to a
       value outside its enum in a throwaway `debian:12` container (each prints one `hf-mount: error:` line holding a
       `;`, exits 1, and leaves `/usr/local/bin` as it was) and by reading the log of a default install
-- [ ] 6.4 Use long options in `install.sh` wherever every compatibility image accepts them (`mktemp --directory`,
+- [x] 6.4 Use long options in `install.sh` wherever every compatibility image accepts them (`mktemp --directory`,
       `rm --recursive --force`, `install --directory --mode`, `install --owner --group --mode`, `apt-get --yes`,
       `dpkg-query --show --showformat`, `dnf --assumeyes`, `rpm --query`), and on the commands that run before the glibc
       check (`id -u`, `uname -m`), which must also run on BusyBox for the "musl-based image" scenario, keep a short
@@ -154,21 +154,21 @@
 
 ## 8. Version and documentation
 
-- [ ] 8.1 Read `src/hf-mount/NOTES.md` against `.agents/knowledge/feature-authoring.md` (User documentation: grammar,
+- [x] 8.1 Read `src/hf-mount/NOTES.md` against `.agents/knowledge/feature-authoring.md` (User documentation: grammar,
       clear wording, actual limitations, configuration constraints, no exhaustive hypothetical caveats) and against what
       the rebuilt `install.sh` does, within the design's `NOTES.md` content bounds (whether the notes also name the
       download tools is the design's Open Questions, 3); regenerate `src/hf-mount/README.md` with `just docs`; verify
       with `just docs-check` and by reading the generated README once as a developer who has not read the spec
-- [ ] 8.2 Keep `version` `1.0.0` in `src/hf-mount/devcontainer-feature.json`, since the feature is unreleased
+- [x] 8.2 Keep `version` `1.0.0` in `src/hf-mount/devcontainer-feature.json`, since the feature is unreleased
       (`.agents/knowledge/feature-authoring.md`, Versions); verify with `just validate`
 
 ## 9. Verification after the rework
 
-- [ ] 9.1 Options, by hand: run `install.sh` with `version` set to the empty string ("Malformed version"), `backend` set
+- [x] 9.1 Options, by hand: run `install.sh` with `version` set to the empty string ("Malformed version"), `backend` set
       to a value outside its enum ("Invalid backend"), and `installMountDependencies` set to a value that is neither
       `true` nor `false` ("Invalid installMountDependencies") in throwaway containers; verify that each fails with the
       message its scenario names, that the log shows no download, and that `/usr/local/bin` is left as it was
-- [ ] 9.2 Re-run the hand checks of tasks 3.1 to 3.4 against the rebuilt `install.sh`; verify that each message still
+- [x] 9.2 Re-run the hand checks of tasks 3.1 to 3.4 against the rebuilt `install.sh`; verify that each message still
       names what its scenario requires, that `/usr/local/bin` is left as each scenario says, and that the install-twice
       scenarios give the results of 3.4; repeat 3.5 only if an installed file or the `runArgs` in `NOTES.md` changed
 - [ ] 9.3 Run `just check` and verify it passes, and that
