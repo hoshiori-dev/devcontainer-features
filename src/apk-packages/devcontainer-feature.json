@@ -1,6 +1,6 @@
 {
   "id": "apk-packages",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "APK packages",
   "description": "Installs a list of system packages with apk from the repositories the Alpine Linux image already configures.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apk-packages",

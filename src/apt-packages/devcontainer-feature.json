@@ -1,6 +1,6 @@
 {
   "id": "apt-packages",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": "APT packages",
   "description": "Installs a list of system packages with apt-get from the repositories the Debian or Ubuntu image already configures.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apt-packages",
