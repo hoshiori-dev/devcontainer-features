@@ -96,14 +96,27 @@ line says otherwise. Line numbers refer to `src/apk-packages/install.sh` at that
 
 **Non-Goals:**
 
-- Behavior a Requirement covers, the options, NOTES.md, the generated README, `scenarios.json`, and `compatibility.json`
-  (unless the maintainer adopts an optional item below).
+- Behavior a Requirement covers, the options, NOTES.md, the generated README, `scenarios.json`, and
+  `compatibility.json`.
 - Distribution detection through `/etc/os-release`: the spec defines support as "`apk` is available" (requirement "Image
   without apk"), so the `apk` check stays the platform check.
 - Removing the generic, multi-manager branches of `control_checks.ts`: #50 replaces the per-feature runners.
 - A `.shellcheckrc` and the other features (issue #72, Out of scope).
 
 ## Decisions
+
+### Outcome of the package gate
+
+The package deliberation closed on 2026-10-05 with these decisions; the sections below carry them.
+
+- The draft's own decisions stand: the value received is shown in option errors, `--no-network` follows the shared
+  options in the offline update, the stalled-endpoint listener binds `127.0.0.1`, and a handled apk failure exits 1.
+- Three decisions cover all five package-list installers (apk, apt, dnf, pacman, zypper): the package list's default is
+  `${PACKAGES-}`, never `${PACKAGES:-}`; every package-manager failure a script handles ends with `|| fail` and exits 1,
+  with the tool's own exit status in the message; and message, log-line, and header wording follows one shared template
+  ("Wording follows the template the five package-list installers share").
+- None of the optional improvements listed at the end is adopted.
+- Trimming the host runners stays with #50.
 
 ### Script structure follows the POSIX skeleton, with `main` owning the entry list
 
@@ -113,8 +126,8 @@ Order: shebang, header, `set -eu`, readonly constants, option defaults, mutable 
 the system and require `apk`, prepare directories, refresh, install, clean. The entry loop stays in `main`: it empties
 `main`'s parameters with `set --`, then calls `trim` and `check_entry` per entry and appends with `set -- "$@" …`,
 because a POSIX function cannot change its caller's positional parameters and the shell has no arrays; a comment above
-the loop says so. `main` passes the list to the install step as arguments, and the install step adds `--` and
-`--upgrade` to its own parameters before logging. The locale switch and its restore bracket the two validations inside
+the loop says so. `main` passes the list to the install step as arguments, and the install step logs the entries, then
+adds `--` and `--upgrade` to its own parameters. The locale switch and its restore bracket the two validations inside
 `main`.
 
 Rejected: an entry-parsing step that prints the entries for `main` to re-split (re-splitting is the hazard the
@@ -155,70 +168,82 @@ patterns with their existing comment.
 Rejected: building the `case` patterns from constants (expansion inside patterns is harder to audit than the literal
 sets).
 
-### Prefixes and wording of every line the script prints
+### Wording follows the template the five package-list installers share
 
-`log` prints `apk-packages: <text>` to stdout, `fail` prints `apk-packages: error: <text>` to stderr and exits 1; both
-take `"$*"`. Every message starts in lower case and has no trailing period. Lines (`<v>` is the value received, printed
-only through `printf '%s'`; `<n>` is apk's status):
+Decided at the package gate together with apt-packages, dnf-packages, pacman-packages, and zypper-packages, so that a
+developer who can read one installer's output can read the others'. It replaces the message list of the draft. Form:
 
-- Refused entry:
-  `apk-packages: error: refusing the entry '<entry>': an entry starts with an ASCII letter or digit and
-  holds only ASCII letters, digits, and . _ + - : ~ = @ < >; list a package or provided name, optionally followed by a
-  version constraint or @tag, without a path, URL, option, conflict marker (!), pattern, or whitespace`
-  (one printed line, built from several source lines).
-- `apk-packages: error: option refreshPolicy is "<v>"; use default, always, or never`
-- `apk-packages: error: option cleanup is "<v>"; use all, packages, or none`
-- `apk-packages: error: option networkTimeout is "<v>"; leave it empty or use whole seconds from 1 through 3600 without
-  a leading zero`
-  (one message replaces today's two)
-- `apk-packages: error: option upgradePackages is "<v>"; use true or false`
-- `apk-packages: no packages listed; nothing to do`
-- `apk-packages: error: apk was not found on <system>; use an Alpine Linux image, which provides apk`
-- `apk-packages: error: refreshPolicy=never needs a usable cached index for every configured repository; keep the
-  indexes in /var/cache/apk, /etc/apk/cache, or /var/cache/apk-packages, or use refreshPolicy=default`
-- `apk-packages: fetching the index of every configured repository` (unchanged)
-- `apk-packages: error: apk update failed with status <n>; make every configured repository reachable and signed by a
-  key in /etc/apk/keys, or remove it from the image`
-- `apk-packages: installing <apk arguments>` (unchanged, still printed after `--` and `--upgrade` are added, so it reads
-  `installing -- file tree` or `installing --upgrade -- file tree`)
-- `apk-packages: error: apk add failed with status <n>; check that every entry names a package, version, or tag the
-  image's repositories offer and that they are reachable`
+- `log` prints `apk-packages: <text>` to stdout, `fail` prints `apk-packages: error: <text>` to stderr and exits 1; both
+  print `"$*"`. Text is lower case with no trailing period, and every failure reads `<reason>; <how to fix it>`.
+- The value an option holds goes in double quotes (`is "<value>"`) and an entry in single quotes (`'<entry>'`). Options
+  are named in camelCase, and a value in effect or suggested is written `<option>=<value>`.
+- A log line for a step that a control selects ends with `(<option>=<value>)`.
+- `<status>` is apk's exit status: `$?` written in the argument of the `fail` directly right of `||`.
+- A message whose source line would pass 120 columns is split at `;` followed by a space, or before the trailing
+  parenthesis, into two arguments; the printed line is the same while `IFS` is the default.
+- No text of the feature contains `fetch`, `Downloading`, `Retrieving repository`, `signature`, or `conflict`, so a
+  check that looks for apk's own words stays meaningful.
 
-Control messages follow the guide skeleton's `option <name> is "<value>"; <fix>`, which states both what is wrong and
-the fix; showing the value helps because the devcontainer CLI has already evaluated the option in a shell (NOTES.md,
-Security).
+Failures, each after `apk-packages: error:` (`<value>` is the value received, printed only through `printf '%s'`;
+`<distribution>` is the image's `PRETTY_NAME` or `an unidentified distribution`):
 
-Rejected: keeping the received value out of control messages (the reason would then be only implied by the fix);
-dropping `was not found` from the `apk` message (`direct_checks.ts` 730 would pass trivially); a message per range
-violation of `networkTimeout` (one message names the whole accepted form).
+- `option refreshPolicy is "<value>"; use default, always, or never`
+- `option cleanup is "<value>"; use all, packages, or none`
+- `option networkTimeout is "<value>"; leave it empty or use whole seconds from 1 through 3600 without a leading zero`
+  (one message replaces 1.0.0's two; both failing branches share the fix through a hint variable, as the guide's
+  skeleton does)
+- `option upgradePackages is "<value>"; use true or false`
+- `refusing the entry '<entry>': not a package name with an optional version constraint or @tag; start with an ASCII letter or digit and use only ASCII letters, digits, and . _ + - : ~ = @ < >`
+- `apk was not found on this image (<distribution>); use an Alpine Linux image, which provides apk`
+- `apk update failed with status <status>; fix what apk reports above (repositories, keys, or network)`
+- `apk update --no-network failed with status <status>; fix the cached package index, or use refreshPolicy=default`
+- `apk add failed with status <status>; fix what apk reports above (entries, repositories, or network)`
 
-### Both apk failures go through `fail`
+Log lines, each after `apk-packages:` (`<cache_dir>` is the package cache in use):
 
-`apk update` (refresh) and `apk add` each end with `|| fail "…"`, so both exit 1 after a feature message. apk's status
-stays visible in the message through `$?` expanded in the argument of that `fail`, which is the status of the apk call
-because nothing runs between them. The `refreshPolicy=never` failure already uses `fail` and keeps it. The apk call
-helper runs exactly one apk command in either branch, so `|| fail` on it does not mask a failing step.
+- `no packages listed; nothing to do`
+- `using the temporary package cache <cache_dir>, removed on exit (cleanup=all)`, or for the other two values
+  `using the package cache /var/cache/apk-packages, kept in the image (cleanup=<value>)`
+- `refreshing the package index from the image's repositories (refreshPolicy=<value>)`
+- `using the package index the image already holds, copied from /var/cache/apk, /etc/apk/cache, and /var/cache/apk-packages to <cache_dir> (refreshPolicy=never)`
+  (a source equal to `<cache_dir>` is skipped as in 1.0.0)
+- `installing <entries> from the image's repositories (upgradePackages=<value>)`, where `<entries>` is the accepted
+  entries joined by spaces, logged before `--` and `--upgrade` are prepended
+- `removing downloaded packages and the package index from <cache_dir> and /var/cache/apk-packages (cleanup=all)`
+- `removing downloaded packages from /var/cache/apk-packages (cleanup=packages)`; `cleanup=none` removes nothing and
+  logs nothing
+
+The empty-list, refresh, and install lines reword lines that 1.0.0 prints; the cache, cached-index, and cleanup lines
+are new, one for each step that changed the image without a line (Context). The temporary work directory gets no line:
+it is created and removed inside one run. apk's own output stays visible. Every substring a host check asserts (Context)
+is kept: `refusing the entry '<entry>'`; `apk update failed` on the default refresh path; `apk` and `Alpine Linux` in
+the `apk` message, which alone holds `was not found`; and the camelCase option name in each control failure. Under
+`refreshPolicy=never` the feature prints the cache line, the cached-index line, and the offline failure, none of which
+matches the cache-miss check's pattern.
+
+The header comment follows the same template: what is installed, with apk, from the image's repositories, to the paths
+the packages define; that it runs as root at image build time and which variable each option arrives in; and
+`POSIX sh, because Alpine images ship no bash.`
+
+Rejected: wording chosen per feature, as the draft had it (five installers would phrase the same failure five ways);
+keeping the received value out of control messages (the reason would then be only implied by the fix); dropping
+`was not found` from the `apk` message (`direct_checks.ts` 730 would pass trivially); a message per range violation of
+`networkTimeout` (one message names the whole accepted form); keeping the list of refused kinds (paths, URLs, options,
+conflict markers) in the refusal (the character rule already excludes them, and `conflict` is a word apk prints itself);
+logging apk's arguments in the install line (`installing --upgrade -- file tree` shows the marker and the flag as if
+they were entries); logging every copied index file (noise; apk's offline update reports what it uses).
+
+### Every apk failure the script handles goes through `fail`
+
+The refresh (`apk update`), the offline verification under `refreshPolicy=never` (`apk update --no-network`), and
+`apk add` each end with `|| fail "…"`, so all three exit 1 after a feature message, as every package-manager failure of
+the five installers does. apk's status stays visible in the message through `$?` expanded in the argument of that
+`fail`, which is the status of the apk call because nothing runs between them. The apk call helper runs exactly one apk
+command in either branch, so `|| fail` on it does not mask a failing step. Cleanup is `rm` under `set -e` and needs no
+message.
 
 Rejected: keeping apk's status as the exit status (a second, hand-written failure path beside `fail`; the spec asks only
 for non-zero); a catch-all trap that rewrites any failure (the guide forbids it).
-
-### One log line per image-changing or network step
-
-Added, each in the step it describes:
-
-- Cache choice: `apk-packages: using the temporary package cache <dir>, removed on exit` for `cleanup=all`, or
-  `apk-packages: using the package cache /var/cache/apk-packages, kept after installation` otherwise.
-- `refreshPolicy=never`:
-  `apk-packages: copying cached indexes from /var/cache/apk, /etc/apk/cache, and /var/cache/apk-packages into <dir>;
-  no index is fetched`
-  (one printed line; `<dir>` is the cache in use, and a source equal to it is skipped as today).
-- Cleanup: `apk-packages: removing the package caches <dir> and /var/cache/apk-packages` for `all`, and
-  `apk-packages: removing package files from /var/cache/apk-packages` for `packages`. `none` changes nothing and logs
-  nothing.
-
-The temporary work directory gets no line: it is created and removed inside one run. apk's own output stays visible.
-
-Rejected: logging every copied index file (noise; apk's offline update reports what it uses).
 
 ### The distribution name comes from `/etc/os-release` in a subshell
 
@@ -293,8 +318,9 @@ guide prefers repeated lines to abstraction across files).
 
 ## Optional improvements offered, not adopted
 
-Each is outside what the guide requires and outside the confirmed audit items; the maintainer may adopt any of them at
-the package gate.
+Each is outside what the guide requires and outside the confirmed audit items. The maintainer adopted none of them at
+the package gate. The install and refresh lines are reworded all the same, by the shared template and to its wording,
+not to the wording the first item offers.
 
 - **Reword the install and refresh lines** to say what, from where, and to where in words (for example
   `installing file tree with apk add --upgrade from the configured repositories`). Clearer to read; changes two lines
@@ -340,8 +366,8 @@ the package gate.
   still printed. A caller that branched on apk's status loses that; none in this repository does.
 - [A reworded message loses an asserted substring] → Goals list them; both host runners run by hand, since CI runs
   neither.
-- [A new `refreshPolicy=never` log line matches the cache-miss check's pattern] → The proposed line contains none of
-  `fetch http`, `fetch https:`, `Downloading`, or `Retrieving repository` ("fetched" is not followed by a URL scheme).
+- [A new `refreshPolicy=never` log line matches the cache-miss check's pattern] → No text of the feature contains
+  `fetch`, `Downloading`, or `Retrieving repository` (wording decision).
 - [Glob loops in `controls_*.sh` see only the top level of `/var/cache/apk-packages`, where `find` searched the whole
   tree] → apk writes indexes and package files at the top level of its cache directory, and the feature's own
   `cleanup=packages` removes only `*.apk` there; the `controls_packages_*` check would miss a package file in a

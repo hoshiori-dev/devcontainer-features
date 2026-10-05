@@ -17,7 +17,11 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/52.
   top, `log` and `fail`, named steps, and `main "$@"`.
 - Every failure message reads `apk-packages: error: <reason>; <how to fix it>`, without a trailing period; an invalid
   control names the option and the value received.
-- A failing `apk update` or `apk add` ends with a feature message and exit status 1 instead of apk's own status.
+- Messages, log lines, and the script's header use the wording the five package-list installers (apk, apt, dnf, pacman,
+  zypper) share, so the empty-list, refresh, and install lines that 1.0.0 prints are reworded; the install line names
+  the entries and the `upgradePackages` value in effect.
+- A failing `apk update`, with or without `--no-network`, or `apk add` ends with a feature message that carries apk's
+  status, and with exit status 1 instead of apk's own status.
 - The steps that change the image but print nothing today (choosing the package cache, using cached indexes under
   `refreshPolicy=never`, and cleanup with `all` or `packages`) each log one line.
 - The "apk not found" message names the image's distribution as the `PRETTY_NAME` of its `/etc/os-release`, quotes
@@ -48,7 +52,7 @@ text or log line, and it requires only a non-zero status for the apk failures wh
 - Files: `src/apk-packages/install.sh`, `src/apk-packages/devcontainer-feature.json` (version only), and under
   `test/apk-packages/`: `test.sh`, `duplicate.sh`, the eight scenario scripts, a new `checks.sh`, `direct_checks.ts`
   (one comment), and `control_checks.ts`. `NOTES.md`, the generated `README.md`, `scenarios.json`, and
-  `compatibility.json` do not change unless the maintainer adopts an optional item from the design.
+  `compatibility.json` do not change.
 - No other feature, harness file, workflow, or dev container file changes.
 
 ## Acceptance
@@ -63,7 +67,8 @@ text or log line, and it requires only a non-zero status for the apk failures wh
   design.md, Decisions).
 - Each image-changing or network step of a run with a non-empty list prints one log line: the package cache in use, the
   index refresh or the use of cached indexes, the install, and the cleanup for `all` and `packages`.
-- A failing `apk update` or `apk add` exits with status 1 after a feature message.
+- A failing `apk update`, with or without `--no-network`, or `apk add` exits with status 1 after a feature message that
+  names apk's status.
 - `src/apk-packages/devcontainer-feature.json` has version `1.0.1`.
 - `test/apk-packages/checks.sh` holds the POSIX stand-in, and every test script reports all its labeled checks before it
   exits; `duplicate.sh` asserts `file` and `tree` as literals.
