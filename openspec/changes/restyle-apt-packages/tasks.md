@@ -51,7 +51,7 @@
 - [x] 3.1 Run `just check` and confirm it passes.
 - [x] 3.2 Run `test/apt-packages/direct_checks.ts` and `test/apt-packages/control_checks.ts` on both compatibility
       images on amd64 and confirm every check passes.
-- [ ] 3.3 Confirm `just test apt-packages` passes on every compatibility image and architecture (CI runs it after the
+- [x] 3.3 Confirm `just test apt-packages` passes on every compatibility image and architecture (CI runs it after the
       push).
-- [ ] 3.4 Confirm `just test-scenarios apt-packages` passes (CI runs it after the push).
-- [ ] 3.5 Record the results of 3.1 to 3.4 and each Acceptance item of the proposal in the PR's Validation section.
+- [x] 3.4 Confirm `just test-scenarios apt-packages` passes (CI runs it after the push).
+- [x] 3.5 Record the results of 3.1 to 3.4 and each Acceptance item of the proposal in the PR's Validation section.
