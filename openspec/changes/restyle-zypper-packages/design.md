@@ -73,10 +73,11 @@ feature:
 
 **Non-Goals:**
 
-- Restoring Tumbleweed arm64 in `compatibility.json`: issue #81 makes it a separate MINOR change.
+- Restoring Tumbleweed arm64 in `compatibility.json`. The maintainer decided on 2026-10-05 that this change does not
+  restore it (Open Questions).
 - Changing `control_checks.ts`; #50 replaces it.
 - Any option, NOTES.md, or `scenarios.json` change, and the phase 2 and phase 3 controls (#59, #63).
-- The optional improvements listed below, unless the maintainer picks them at the package gate.
+- The optional improvements listed below: the maintainer adopted none of them at the package gate.
 
 ## Decisions
 
@@ -87,16 +88,16 @@ No option is added, changed, renamed, or removed, so the design carries no optio
 - **POSIX `sh` stays.** The header, right after the shebang, says that the feature installs the listed packages with
   `zypper` from the repositories the image already enables, that it runs as root at image build time, that the options
   arrive as `PACKAGES`, `INSTALLRECOMMENDS`, `REFRESHPOLICY`, and `CLEANUP`, and that it is POSIX `sh` so that the
-  empty-list success and the missing-`zypper` failure the spec requires also work on images without bash. Rejected:
-  bash, which the guide recommends elsewhere but which would break those two paths on such images and split the shared
-  skeleton.
+  empty-list success and the missing-`zypper` failure the spec requires also work on images without bash. Its wording is
+  the header the five package-list installers share (Messages and logging). Rejected: bash, which the guide recommends
+  elsewhere but which would break those two paths on such images and split the shared skeleton.
 - **Constants and defaults at the top.** `/etc/zypp/zypp.conf`, `/var/cache/zypp`, and the `raw` subdirectory become
   readonly constants named for what they are, libzypp's defaults (for example `ZYPP_CONF_DEFAULT`), and none takes a
   name `/etc/os-release` assigns. The control defaults keep `${NAME-default}` because the spec requires an empty value
-  to fail; `packages` takes `${PACKAGES-}`, the guide's form, which gives the same value. Each control becomes readonly
-  in the step that validates it, and `PACKAGES` once its entries are checked. Rejected: `${NAME:-default}`, which turns
-  an empty control into its default against the spec; naming the constant `ZYPP_CONF`, which would change what `zypper`
-  inherits.
+  to fail; `packages` takes `${PACKAGES-}`, the guide's form, which gives the same value and which the five package-list
+  installers all use, never `${PACKAGES:-}`. Each control becomes readonly in the step that validates it, and `PACKAGES`
+  once its entries are checked. Rejected: `${NAME:-default}`, which turns an empty control into its default against the
+  spec; naming the constant `ZYPP_CONF`, which would change what `zypper` inherits.
 - **`main` as the list of steps.** Steps: validate the controls, check the entries and collect them, exit on an empty
   list, require `zypper`, select metadata (`never`: check cached metadata, then build the parsed cache; otherwise
   refresh), install, clean. `trim` and `check_entry` are helpers; the single-use `describe_system` folds into the
@@ -118,7 +119,7 @@ No option is added, changed, renamed, or removed, so the design carries no optio
   is removed literally.
 - **Guards.** `command -v zypper >/dev/null 2>&1 || …` and `[ … ] || fail …` are guards; everything else branches with
   `if`. A guard that does not fit in 120 characters ends its line with `\` and continues with `|| fail`, indented two
-  spaces; no message text is split.
+  spaces; a message that still does not fit is split as Messages and logging says.
 - **No pipeline decides anything.** The distribution name for the missing-`zypper` message comes from the guide's idiom,
   `/etc/os-release` sourced in a subshell printing `${PRETTY_NAME:-}`, behind the existing readability check, with a
   fallback to an empty name and the existing `an unidentified distribution` default; it is assigned to a variable before
@@ -137,13 +138,24 @@ No option is added, changed, renamed, or removed, so the design carries no optio
 
 ### Messages and logging
 
-`log` writes `zypper-packages: <text>` to stdout; `fail` writes `zypper-packages: error: <text>` to stderr and exits 1.
-Texts start in lower case, have no trailing period, and, where the developer can fix the cause, take the form
-`<reason>; <how to fix it>`. The refusal lead `refusing the entry '<entry>':` stays, shared with the four sibling
-installers. Every text fits one script line of at most 120 characters without being split. The wording below is the
-proposed one; an adjustment during implementation keeps those bounds and the substrings named in Risks.
+`log` writes `zypper-packages: <text>` to stdout; `fail` writes `zypper-packages: error: <text>` to stderr and exits 1;
+both print `"$*"`. The wording is this feature's instantiation of the template the five package-list installers share,
+which the maintainer approved at the package gate on 2026-10-05 and which replaces the wording this design first
+proposed. Its form rules:
 
-Failures, after `zypper-packages: error:`:
+- Text is lower case with no trailing period, and every failure reads `<reason>; <how to fix it>`.
+- A value an option "is" goes in double quotes; an entry or a repository alias goes in single quotes. Every refusal
+  opens with `refusing the entry '<entry>':`, the lead the five installers share.
+- Options are named in camelCase, and a value in effect or suggested is written `<option>=<value>`. A log line for a
+  step that a control selects ends with `(<option>=<value>)`.
+- `<status>` is `$?`, written in the `fail` argument directly right of `||`, where it expands to the status of the
+  command that failed.
+- A message whose source line would pass 120 characters is split after its `;` into two arguments; the output is the
+  same while `IFS` is the default, and the script assigns `IFS` only for single `read` calls.
+- No feature text contains `fetch`, `Downloading`, `Retrieving repository`, `signature`, `conflict`, `is up to date`, or
+  `failed to synchronize`, so a check that looks for zypper's own words cannot pass on the feature's text.
+
+Failures, after `zypper-packages: error:`; `<distribution>` is `PRETTY_NAME`, or `an unidentified distribution`:
 
 - Invalid `installRecommends`: `option installRecommends is "<value>"; use true or false`
 - Invalid `refreshPolicy`: `option refreshPolicy is "<value>"; use default, always, or never`
@@ -152,36 +164,52 @@ Failures, after `zypper-packages: error:`:
   `refusing the entry '<entry>': not a package name; use name, name.arch, name=edition, or name>=edition`
 - Edition with another character (also a second operator):
   `refusing the entry '<entry>': invalid version; use one operator and an edition of A-Z a-z 0-9 . _ + ~ ^ : -`
-- Operator without edition: `refusing the entry '<entry>': no version follows the operator; add an edition or remove it`
+- Operator without edition:
+  `refusing the entry '<entry>': no version follows the operator; add an edition or remove the operator`
 - Entry ending in `.rpm`: `refusing the entry '<entry>': RPM files are not accepted; list the package name instead`
 - No `zypper`: `zypper was not found on this image (<distribution>); use an openSUSE image, which provides zypper`
-- `never`, no enabled repository:
-  `refreshPolicy=never found no enabled repository; enable one, or use default or always`
-- `never`, a repository without cached metadata: `no cached metadata for '<alias>'; use refreshPolicy default or always`
 - Repository listing fails:
-  `cannot list the enabled repositories (zypper status <n>); check the repository configuration`
-- Refresh fails: `refresh failed (zypper status <n>); check the network, or disable the repository zypper names above`
-- Parsed cache build fails: `cached metadata is unusable (zypper status <n>); use refreshPolicy default or always`
-- Install fails: `installing the listed packages failed (zypper status <n>); zypper's message above names the cause`
-- Cleanup fails: `cleaning zypper's caches failed (zypper status <n>); see zypper's message above, or use cleanup none`
+  `zypper repos failed with status <status>; fix what zypper reports above (the image's repository configuration)`
+- `never`, no enabled repository: `refreshPolicy=never needs an enabled repository; enable one in the image`
+- `never`, a repository without cached metadata:
+  `refreshPolicy=never needs cached metadata for '<alias>' in <raw dir>; add it to the image, or use
+  refreshPolicy=default`
+- Parsed cache build fails:
+  `zypper refresh --build-only failed with status <status>; fix the cached repository metadata, or use
+  refreshPolicy=default`
+- Refresh fails:
+  `zypper refresh failed with status <status>; fix what zypper reports above (repositories, keys, or network)`
+- Install fails:
+  `zypper install failed with status <status>; fix what zypper reports above (entries, repositories, or network)`
+- Cleanup fails: `zypper clean failed with status <status>; fix what zypper reports above, or use cleanup=none`
 
-Log lines, after `zypper-packages:`:
+Log lines, after `zypper-packages:`; `<entries>` is the accepted entries joined by spaces, before any option is added:
 
 - Empty list: `no packages listed; nothing to do`
-- Refresh: `refreshing the metadata of every enabled repository`
-- `never` check: `checking the cached metadata of every enabled repository in <raw dir> without refreshing`
-- `never` parsed cache: `building zypper's parsed metadata cache from the cached metadata without refreshing`
-- Install: `installing <entries> from the enabled repositories, recommended packages excluded` (or `included`)
-- Cleanup `all`: `removing downloaded packages and repository metadata from zypper's caches`
-- Cleanup `packages`: `removing downloaded packages from zypper's caches`
+- Refresh: `refreshing the repository metadata from the image's enabled repositories (refreshPolicy=<value>)`
+- `never` check: `using the repository metadata the image already holds in <raw dir> (refreshPolicy=never)`
+- `never` parsed cache: `building zypper's parsed cache from that metadata, without refreshing`
+- Install: `installing <entries> from the image's enabled repositories (installRecommends=<value>)`
+- Cleanup `all`: `removing downloaded packages and the repository metadata from zypper's caches (cleanup=all)`
+- Cleanup `packages`: `removing downloaded packages from zypper's caches (cleanup=packages)`
+
+The header comment of `install.sh` is the shared one as well:
+
+```sh
+# Installs the packages listed in the option `packages` with zypper from the image's enabled repositories, to the paths
+# the packages define. Runs as root at image build time; the options arrive as PACKAGES, INSTALLRECOMMENDS,
+# REFRESHPOLICY, and CLEANUP.
+# POSIX sh, because an empty list must succeed, and a missing zypper be reported, on images that ship no bash.
+```
 
 - **Log lines.** One line before every step that uses the network or changes the image; `cleanup=none` changes nothing
   and logs nothing. `zypper`'s own output stays visible; only the `command -v` probe goes to `/dev/null`.
 - **Explicit `|| fail` on each `zypper` call.** Each guard follows one command, never a multi-command function. The exit
   status becomes 1, and zypper's status is read from `$?` in the `fail` argument, so the number that told failures apart
-  stays in the log. Rejected: leaving the failures to `set -e`, the unclear failure the audit confirmed; re-exiting with
-  zypper's status, which bypasses `fail` and the guide's status 1; retries or exit-code special cases (107, a failed
-  package scriptlet, keeps failing), which no Requirement asks for.
+  stays in the log. The five package-list installers handle every package-manager failure this way. Rejected: leaving
+  the failures to `set -e`, the unclear failure the audit confirmed; re-exiting with zypper's status, which bypasses
+  `fail` and the guide's status 1; retries or exit-code special cases (107, a failed package scriptlet, keeps failing),
+  which no Requirement asks for.
 - **Validation unchanged.** The accepted forms, the refused forms, and the order are exactly today's; only the texts
   change. No new validation is added, so no delta spec is needed.
 
@@ -198,14 +226,16 @@ Log lines, after `zypper-packages:`:
 - The glob loops of `controls_*.sh` become helpers named after what they assert (parsed metadata remains, no package
   file remains), still globs, since the images have no `find`; their loop variables are named after what they hold and
   are `local`.
-- `test.sh` loses the unused helper; its `TEMPORARY (#43)` comment becomes `TODO(#<issue>)` naming the issue that tracks
-  the Tumbleweed arm64 restoration (Open Questions).
+- `test.sh` loses the unused helper; its `TEMPORARY (#43)` comment becomes `TODO(#43)`, naming the pull request that
+  removed Tumbleweed arm64 and records why, and says to restore the combination once upstream fixes the cause (Open
+  Questions).
 - Rejected: one shared helper file across the scenario pairs, which the guide allows only for assertions several scripts
   share and which would hide the few lines each script needs; `find`, which the images lack.
 
 ## Optional improvements offered, not adopted
 
-Each would be an addition to this package if the maintainer picks it at the package gate.
+Each was offered as an addition to this package. The maintainer adopted none of them at the package gate on 2026-10-05,
+so none is part of this change.
 
 - **A `zypper` wrapper for repeated arguments.** `zypper_run() { zypper --non-interactive "$@"; }` would satisfy the
   guide's rule on arguments used more than once (six calls repeat `--non-interactive`). Trade-off: shorter calls and a
@@ -234,7 +264,8 @@ Each would be an addition to this package if the maintainer picks it at the pack
 - [Message text other tools assert] → `control_checks.ts` keeps passing only if the control failures name the camelCase
   option, refusals contain the entry, the missing-`zypper` failure contains `was not found`, `zypper`, and `openSUSE`,
   the `never` output contains none of `Downloading`, `Retrieving repository`, and `fetch http`, and zypper's
-  `is up to date` stays visible. The table above keeps all of them, and the runner is rerun unchanged.
+  `is up to date` stays visible. The messages above keep all of them, and the runner is rerun unchanged. Trimming the
+  runner stays deferred to #50.
 - [Order of checks] → Pulling the `zypper` check ahead of the empty-list exit, as a literal reading of "validate first"
   might, breaks "Omitted packages" on images without `zypper`; checking entries after it breaks the refusal requirement.
   The order is a Goal with its checks.
@@ -246,9 +277,16 @@ Each would be an addition to this package if the maintainer picks it at the pack
 - [Here-document delimiters] → The here-documents that feed the saved `zypper repos` output and the alias list expand
   variables, so their delimiters stay unquoted, unlike the guide's default for fixed text.
 - [Status of the repository listing] → zypper documents status 6 (`ZYPPER_EXIT_NO_REPOS`, zypper.8.txt 1.14.101) for "no
-  repositories are defined"; whether `repos` returns it was not checked. If it does, a `never` run on such an image
-  fails, as today, but with the listing message instead of zypper's status alone; the "no enabled repository" message
-  applies only after a successful listing.
+  repositories are defined", and `repos` returns it on `opensuse/leap:16.0` once every repository and service definition
+  is removed (run on 2026-10-05). A `never` run on such an image fails, as today, but with the listing message instead
+  of zypper's status alone. The "needs an enabled repository" message applies after a successful listing, which is what
+  an image with every repository disabled gives; it suggests no other policy, because `refresh` fails with status 6
+  there as well.
+- [Output of the repository listing] → the listing runs with `--xmlout` and its output is captured, as today, and zypper
+  writes its errors into that XML (seen with a malformed `.repo` file on `opensuse/leap:16.0`, 2026-10-05). On that
+  failure the log therefore holds the feature's line with zypper's status but not zypper's own text, although the shared
+  wording says "reports above". Printing the captured output would take a second command between the call and `fail`,
+  against the `|| fail` decision; it is left as it is.
 - [Case patterns] → An unquoted `<` or `>` in a pattern is a syntax error, and an unquoted `${name}` in `${1#…}` is a
   pattern; both stay quoted.
 - [Ranges depend on `LC_ALL=C`] → Moving the check outside the `C` block would let a bracket range admit non-ASCII
@@ -262,8 +300,9 @@ Each would be an addition to this package if the maintainer picks it at the pack
   shellcheck cannot check in `sh` mode.
 - [Overlap with #59 and #63] → They change the same lines; the maintainer ordered the restyle first, so they start from
   the restyled file.
-- [Cross-installer wording] → The four sibling restyles run in parallel; keeping the shared refusal lead keeps the apk
-  and pacman runners' assertions valid whatever wording each feature chooses after it.
+- [Cross-installer wording] → The four sibling restyles run in parallel and take their wording from the same template,
+  so a later change to one message pattern has to reach all five features; the shared refusal lead keeps the apk and
+  pacman runners' assertions valid.
 
 ## URL inventory
 
@@ -300,8 +339,15 @@ repository, or configuration changes, and the scripts gain no download. The test
 
 ## Open Questions
 
-- The issue number for the `TODO` in `test.sh`. No open or closed issue tracks restoring Tumbleweed arm64 (searched on
-  2026-10-05); #43 is the pull request that removed it. The maintainer opens or names one, and the restyled comment
-  names it; nothing else in the package depends on the number. The current comment and the body of #43 ask to restore
-  the combination on the next `zypper-packages` change, which this restyle is; the package follows issue #81, which
-  makes the restoration a separate MINOR change, so the maintainer confirms that deferral too.
+None open. The maintainer decided these on 2026-10-05, at the package gate:
+
+1. **Tumbleweed arm64 is not restored in this change.** The current `test.sh` comment and the body of #43 ask to restore
+   the combination on the next `zypper-packages` change, which this restyle is. The maintainer judged that upstream has
+   probably not fixed the cause yet, so that request is set aside this time and revisited at a later `zypper-packages`
+   change. `compatibility.json` stays as it is.
+2. **No tracking issue is opened.** The `TODO` in `test.sh` names #43, the pull request that removed the combination and
+   records why.
+3. **None of the optional improvements is adopted.**
+4. **Shared decisions for the five package-list installers.** The package list defaults with `${PACKAGES-}`; every
+   package-manager failure the script handles ends with `|| fail`, exits 1, and shows the tool's own status in its
+   message; message, log-line, and header wording follows the shared template (Messages and logging).

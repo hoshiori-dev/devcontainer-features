@@ -19,7 +19,8 @@ changes the same `install.sh`, so the restyle lands first.
   `.agents/knowledge/shell-style.md`; `install.sh` stays POSIX `sh`, and every line it writes itself starts with
   `zypper-packages:`, failures with `zypper-packages: error:`.
 - Every message starts in lower case without a trailing period, and every failure the developer can fix says how to fix
-  it. Each message still names what the spec says it names: the option, the entry, or `zypper` and openSUSE.
+  it. Each message still names what the spec says it names: the option, the entry, or `zypper` and openSUSE. The wording
+  follows the template the five package-list installers share.
 - The feature logs one line before each step that refreshes, reads, or rebuilds repository metadata, installs, or cleans
   caches.
 - A failing `zypper` call ends with a `zypper-packages: error:` line that names the step, keeps zypper's exit status in
@@ -53,6 +54,8 @@ None. No behavior that a Requirement of `openspec/specs/zypper-packages/spec.md`
 - Not touched: `NOTES.md`, `scenarios.json`, `compatibility.json`, `control_checks.ts` (left to #50), the spec, other
   features, scripts, workflows, and test infrastructure. No other feature depends on `zypper-packages`, and no global
   scenario installs it.
+- Tumbleweed arm64 stays out of `compatibility.json`: #43 asked to restore it on the next `zypper-packages` change, and
+  the maintainer set that request aside for this change (design.md, Open Questions).
 
 ## Acceptance
 
