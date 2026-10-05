@@ -127,6 +127,11 @@ For a non-root remote user, an existing `deno` group SHALL be reused only when i
 than that user and is not any account's primary group. A conflict SHALL fail before package installation or downloads,
 with a message naming the conflicting account, without changing group membership or the tools directories.
 
+For a non-root remote user, the feature SHALL require `groupadd` only when the `deno` group does not exist yet, and
+`usermod` only when that user is not yet a member of the `deno` group. When a command it requires is missing, the
+feature SHALL fail before package installation or downloads, with a message naming the missing command, without changing
+group membership or the tools directories.
+
 #### Scenario: Existing group belongs to another account
 
 - **WHEN** a non-root remote user exists and another account is a supplementary member of `deno` or uses its GID as its
@@ -146,6 +151,20 @@ with a message naming the conflicting account, without changing group membership
   non-root remote user
 - **THEN** installation succeeds, including when that group is empty, and the user retains tools access after UID/GID
   remapping and a reinstall
+
+#### Scenario: Group command missing
+
+- **WHEN** a non-root remote user exists, and the image lacks `groupadd` while no `deno` group exists, or lacks
+  `usermod` while that user is not a member of the `deno` group
+- **THEN** installation fails before package installation or downloads, names the missing command, and leaves group
+  membership and the tools directories unchanged
+
+#### Scenario: Group prepared in the image
+
+- **WHEN** a non-root remote user is already the only supplementary member of a `deno` group that is no account's
+  primary group, and the image lacks both `groupadd` and `usermod`
+- **THEN** installation succeeds and that user installs a global tool with `deno install --global` without elevated
+  privileges
 
 #### Scenario: Non-root remote user installs a global tool
 

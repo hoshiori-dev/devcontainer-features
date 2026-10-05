@@ -21,10 +21,11 @@ and have mode 2775, and the user joins that group. Tools remain writable after t
 UID/GID. Otherwise the directories are root-owned with mode 0755. Existing tools keep their ownership on reinstall.
 Because the tools directory comes last on `PATH`, a tool named like a system command runs only by its full path. The
 feature installs after `common-utils` when both are used, so a remote user that feature creates can join the group.
-Non-root setup requires `groupadd` and `usermod` in the image. An existing `deno` group may be reused only when it has
-no supplementary members except the remote user and is not any account's primary group. A group conflict stops
-installation before packages or Deno are downloaded; use a separate primary group for the remote user and reserve `deno`
-for this feature.
+Non-root setup requires `groupadd` in the image unless a `deno` group already exists, and `usermod` unless the remote
+user is already a member of it. An existing `deno` group may be reused only when it has no supplementary members except
+the remote user and is not any account's primary group. A missing group command or a group conflict stops installation
+before packages or Deno are downloaded; use a separate primary group for the remote user and reserve `deno` for this
+feature.
 
 `DENO_DIR` (Deno's cache) keeps its per-user default.
 
