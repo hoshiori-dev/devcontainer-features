@@ -35,6 +35,11 @@ Research for this change, re-checked against upstream on 2026-09-30; items marke
   in `/etc/fuse.conf`. Any mount needs `CAP_SYS_ADMIN` and seccomp/AppArmor profiles that allow `mount`; FUSE also needs
   `/dev/fuse`. The feature metadata schema has no `devices` property, so only `privileged` could expose `/dev/fuse` from
   the feature itself.
+- A mount started with `--fuse-owner-only` answered `Permission denied` to every access, the mounting user's included,
+  whether root or `vscode` had mounted, with upstream `0.10.0`, `0.12.0`, and `0.13.1` in
+  `mcr.microsoft.com/devcontainers/base:ubuntu24.04` on one host (Linux 6.18, WSL2); in the same container
+  `bindfs --no-allow-other` was readable by its owner, and a `vscode` FUSE mount worked once `/etc/fuse.conf` held
+  `user_allow_other`. The cause is not established, and no other kernel was tried (2026-10-05).
 - The duplicate test of devcontainer CLI 0.89.0 installs the feature twice in one build: first with the first value of
   each `enum` and `proposals` list that is not the default and with every boolean negated, then with no options (the
   defaults). With the options below that is `backend=nfs`, `installMountDependencies=false`, `version=0.13.1`, then
@@ -307,8 +312,8 @@ has no `dependsOn` or `installsAfter`.
 
 ## Open Questions
 
-The revision of 2026-10-05 left three points to the maintainer. The package is written for option A of each, so
-"accepted as written" closes a question with A.
+The revision of 2026-10-05 left three points to the maintainer, and the implementation added a fourth. The package is
+written for option A of each, so "accepted as written" closes a question with A.
 
 1. **A Goal that names the shell style guide.** Raised by `.agents/knowledge/shell-style.md` (Applying the guide): new
    files follow the guide, and each file written is also run through
@@ -352,3 +357,16 @@ The revision of 2026-10-05 left three points to the maintainer. The package is w
 
    Recommendation: A. The rule asks for limitations and constraints, and this is neither; B costs one sentence and
    matches the three merged features.
+4. **Whether `NOTES.md` states the limit seen with `--fuse-owner-only`.** Raised by the mount hand checks of 2026-10-05
+   (Context) and by the independent review: the `NOTES.md` content bounds under Decisions name `--fuse-owner-only` as
+   one of two non-root prerequisites for FUSE and no limit of it, while a mount with that flag refused every access in
+   the hand checks. This question was added during the implementation, not by the maintainer.
+   - A (as written): `src/hf-mount/NOTES.md` keeps one sentence next to the flag that states the observation, with the
+     upstream versions and the kind of host it was made on, and points to `user_allow_other`. Accepting it adds "and the
+     limit of `--fuse-owner-only` seen in the hand checks" to the content bounds.
+   - B: the sentence is removed and `src/hf-mount/README.md` regenerated, so the notes stay within the content bounds
+     and offer the flag as an equal alternative.
+
+   Recommendation: A. `.agents/knowledge/feature-authoring.md` (User documentation) asks for actual limitations, and a
+   developer who follows the notes on such a host meets `Permission denied` without a hint; against it, the observation
+   comes from one host and its cause is unknown.
