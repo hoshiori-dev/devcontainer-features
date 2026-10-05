@@ -31,6 +31,7 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 | [apk-packages](src/apk-packages/)                           | Installs listed system packages with apk.                                                                                                             |
 | [pacman-packages](src/pacman-packages/)                     | Installs listed system packages with pacman.                                                                                                          |
 | [zypper-packages](src/zypper-packages/)                     | Installs listed system packages with zypper.                                                                                                          |
+| [`hf-mount`](src/hf-mount/)                                 | Installs the Hugging Face `hf-mount` daemon and its NFS and FUSE backends, to mount Hugging Face Buckets and repositories as local filesystems.       |
 | [firewall](src/firewall/)                                   | Restricts a dev container's outbound traffic to an allowlist of presets, domains, and CIDRs (or keeps it from a denylist), re-applied at every start. |
 
 ## Development
