@@ -27,34 +27,28 @@ Restricts the container's outbound and forwarded traffic to an allowlist of pres
 ## A guardrail, not a security boundary
 
 This feature makes unexpected egress, for example from an AI agent, fail as a refused connection instead of succeeding
-silently. It does not stop a process that tries to get around it. It holds only for a remote user **without root,
-passwordless `sudo`, or access to a Docker daemon**, and the default users of common dev container images have
-passwordless `sudo`: `vscode` in the Dev Containers base images can remove the rules with one command. It does not stop
-a process that:
+silently. It is a guardrail, not a security boundary: it holds only for a remote user **without root, passwordless
+`sudo`, or access to a Docker daemon**. The default users of common dev container images have passwordless `sudo`:
+`vscode` in the Dev Containers base images can remove the rules with one command. Membership in the `docker` group is
+equivalent to root, and a nested `--privileged` container or a `macvlan` network bypasses the rules.
 
-- has root or passwordless `sudo` inside the container, or can use a Docker daemon, including through membership in the
-  `docker` group (a nested `--privileged` container or a `macvlan` network bypasses the rules);
-- tunnels data through DNS lookups, which stay possible for every name;
-- reaches other services that share an allowed address or range, such as other sites on an allowed CDN or GitHub's
-  ranges;
-- reaches a denied host through an address it did not look up through the container's resolver, through a name that is
-  not denied, or through a protocol that carries names inside allowed traffic (DNS over HTTPS);
-- reaches a denied range through a name of an allowed domain that resolves into it (DNS rebinding);
-- makes a start fail on purpose while `failureMode` is `warn`, for example by exhausting GitHub's API rate limit or by
-  binding `127.0.0.1:53` first: that start removes the rules;
-- exploits the resolver (dnsmasq), which keeps the capability to change the rules;
-- forges the start check's output through the dynamic loader of the remote user's environment (`LD_PRELOAD`);
-- changes the dev container configuration in the workspace for the next build.
+**VS Code Server and extension downloads are refused** unless you add the `vscode` preset, for example
+`"presets": "github,vscode"`.
 
-With `defaultAction` `allow`, the feature refuses only what the denied entries name: use `deniedCidrs` for ranges that
-must stay out of reach, since `deniedDomains` refuses only the addresses learned from lookups of denied names.
+Even for a remote user without those privileges:
+
+- DNS lookups remain possible for every name, so data can leave the container through them.
+- Other sites that share an allowed address or range are reachable too, such as other sites on an allowed CDN or in
+  GitHub's ranges.
+- With `defaultAction` `allow`, the feature refuses only what the denied entries name, and a process can avoid a denied
+  name, for example by connecting to an address it did not look up, so use `deniedCidrs` for ranges that must stay out
+  of reach.
+- With `failureMode` `warn`, any process that can make a start fail removes the rules at that start.
 
 ## Before you enable it
 
-- **VS Code Server and extension downloads are refused** unless you add the `vscode` preset (for example
-  `"presets": "github,vscode"`). Everything no option allows is refused, including sibling Compose services, the Docker
-  host, and package mirrors (`deb.debian.org`, `dl-cdn.alpinelinux.org`, Fedora mirrors): add them to `allowedDomains`
-  or `allowedCidrs`.
+- Everything no option allows is refused, including sibling Compose services, the Docker host, and package mirrors
+  (`deb.debian.org`, `dl-cdn.alpinelinux.org`, Fedora mirrors): add them to `allowedDomains` or `allowedCidrs`.
 - The default is `presets` `github` with `defaultAction` `deny`: the container reaches GitHub (web, API, Git, raw and
   release content) and nothing else beyond loopback and its DNS resolvers.
 - With the default `failureMode` `closed`, a start whose rules cannot be applied in full keeps only loopback and DNS
@@ -168,6 +162,16 @@ to them too, but **a nested container is not guaranteed to reach an allowed doma
 - If dnsmasq exits after a successful start, name lookups fail until the next start; the recorded result stays.
 - When no rule can be loaded at all (no `NET_ADMIN`, for example with a runtime that drops `capAdd`, an entrypoint that
   does not run as root, or a kernel without nftables), outbound traffic is unrestricted and the start check reports it.
+- The entrypoint has to run as root. If the container's user is not root (`containerUser`, or the image's `USER`), the
+  entrypoint loads no rule and cannot write the start record either, so the start check waits its 90 seconds and then
+  reports that the record is missing. Leave the container's user at root and name the unprivileged user with
+  `remoteUser`.
+- Do not configure DNS servers for a dev container on a user-defined Docker network, which is what Docker Compose
+  creates: not with `docker run --dns`, not with `dns:` in a Compose file, and not with a Docker daemon started with
+  `--dns`. Docker's embedded resolver then forwards lookups from inside the container to those servers, and the rules
+  refuse them like any DNS server that `/etc/resolv.conf` does not name. Only the names Docker answers itself, those of
+  other containers and services, still resolve, although the start check passes. Without configured DNS servers every
+  name resolves, and so it does on the default bridge network, where `/etc/resolv.conf` names the configured servers.
 - `--network=host` is not supported: the rules would land in the host's network namespace.
 - A failed start writes its reason to the container log and to `/run/firewall/status`. A restart applies the rules
   again.
