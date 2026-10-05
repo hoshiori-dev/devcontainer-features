@@ -71,7 +71,11 @@ behavior contract to feature developers and auditors, so it is written for readi
 - A pattern stays unquoted: a `case` pattern, and the right side of `==` or `=~` in `[[ ]]` when it is meant as a glob
   or regular expression. Quoting it makes it match literally.
 - Every constant is `readonly` and defined at the top of the file. An option variable gets its default at the top and
-  becomes `readonly` as soon as it is validated.
+  becomes `readonly` as soon as it is validated; one that `/etc/os-release` also assigns (in practice `VERSION`) only
+  after that file has been read. When a script validates its options before it reads that file, make such a variable
+  readonly in `main` after the platform step instead of inside `validate_options`.
+- Give an option its default with `${NAME-default}`: an unset variable takes the default, and an explicitly empty value
+  stays empty and reaches validation. Use `${NAME:-default}` only when the spec says an empty value means the default.
 - Rewrite an option's value only where its spec defines an accepted alternative form (glab's leading `v`); every other
   value is either valid as given or fails.
 
@@ -88,7 +92,9 @@ behavior contract to feature developers and auditors, so it is written for readi
 - A shipped script sources only two kinds of file:
   - `/etc/os-release`, always inside a subshell, because it defines variables such as `VERSION` that would overwrite
     options. Put `# shellcheck source=/dev/null` on the line above
-    `os_id="$(. /etc/os-release && printf '%s\n' "${ID:-}")"`.
+    `os_id="$(. /etc/os-release && printf '%s\n' "${ID:-}")"`. Read it before an option variable it also assigns (in
+    practice `VERSION`) becomes readonly: the subshell inherits the attribute, and the file's own `VERSION=` then fails.
+    For the same reason, no readonly constant takes the name of a key that file defines (`NAME`, `ID`, `VERSION_ID`).
   - Library files of its own feature under `src/<id>/`. Most features stay one file; split only when it makes a large
     feature easier to audit. A library is named `*.sh`, has no shebang, is not executable, starts with
     `# shellcheck shell=…`, defines only functions and constants, and uses the `log` and `fail` of the script that
@@ -127,13 +133,19 @@ behavior contract to feature developers and auditors, so it is written for readi
 - Give a set of arguments used more than once a function, in both dialects, for example
   `fetch() { curl --proto '=https' … "$@"; }`. Arrays hold only lists that vary, such as package names.
 - Print text that contains an expansion with `printf '%s\n' "…"`; fixed text may use `echo`.
+- Assign the output of a command whose failure matters to a variable before using it: in
+  `log "installed $(tool --version)"` the status is `log`'s, so a failing `tool` goes unnoticed. Write
+  `version="$(tool --version)"` first; a bare assignment keeps the command's status, so `set -e` stops there, while
+  `local`, `readonly`, and `export` with an assignment report their own status instead.
 - Shipped scripts contain no `eval`, aliases, indirect expansion (`${!name}`), command names built from variables,
   encoded blobs, or `set -x`.
 
 ## Options are data
 
-- `main` first validates every option and every platform precondition the feature relies on, and changes nothing in the
-  image until all of them pass.
+- `main` validates every option value, and checks the platform preconditions the run relies on, before anything changes
+  in the image. The spec decides the order of the checks; where it fixes none, keep the order the script has. A
+  precondition the run does not need (a package manager when the package list is empty) is not checked; option values
+  are always validated.
 - Validate with patterns that must match the whole value: `case` in POSIX, an anchored `[[ … =~ ^…$ ]]` in bash. Avoid
   `grep` for this: it matches per line, so it lets a value with a newline through.
 - An option value reaches a command only as a quoted argument; it never reaches `eval`, `sh -c`, `source`, or a script
@@ -178,7 +190,7 @@ check "example-tool is installed at /usr/local/bin/example-tool" test -x /usr/lo
 
 ## Skeletons
 
-Start an executable shipped script from the skeleton for its dialect and keep its order: shebang, header, `set`,
+Start an executable shipped script from the skeleton for its dialect and keep its layout: shebang, header, `set`,
 constants, option defaults, mutable globals, `log` and `fail`, other functions, `main`, `main "$@"`.
 
 ### Bash
@@ -192,7 +204,7 @@ set -euo pipefail
 readonly RELEASES_URL="https://example.com/example-tool/releases/download"
 readonly INSTALL_PATH="/usr/local/bin/example-tool"
 
-VERSION="${VERSION:-latest}"
+VERSION="${VERSION-latest}"
 
 work_dir=""
 
@@ -213,6 +225,18 @@ cleanup() {
 # Runs curl with the transport rules every download in this feature needs (feature-authoring.md, install.sh).
 fetch() {
   curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 "$@"
+}
+
+# Fails unless the image is Debian or Ubuntu. Runs before VERSION becomes readonly: /etc/os-release assigns it too.
+detect_platform() {
+  local os_id
+  [[ -r /etc/os-release ]] || fail "cannot read /etc/os-release; use a Debian or Ubuntu image"
+  # shellcheck source=/dev/null
+  os_id="$(. /etc/os-release && printf '%s\n' "${ID:-}")"
+  case "${os_id}" in
+    debian | ubuntu) ;;
+    *) fail "unsupported distribution \"${os_id}\"; use a Debian or Ubuntu image" ;;
+  esac
 }
 
 validate_options() {
@@ -240,6 +264,7 @@ install_release() {
 }
 
 main() {
+  detect_platform
   validate_options
   trap cleanup EXIT
   install_release
@@ -260,7 +285,7 @@ set -eu
 readonly RELEASES_URL="https://example.com/example-tool/releases/download"
 readonly INSTALL_PATH="/usr/local/bin/example-tool"
 
-VERSION="${VERSION:-latest}"
+VERSION="${VERSION-latest}"
 
 work_dir=""
 
@@ -281,6 +306,17 @@ cleanup() {
 # Runs curl with the transport rules every download in this feature needs (feature-authoring.md, install.sh).
 fetch() {
   curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 "$@"
+}
+
+# Fails unless the image is Alpine. Runs before VERSION becomes readonly: /etc/os-release assigns it too.
+detect_platform() {
+  [ -r /etc/os-release ] || fail "cannot read /etc/os-release; use an Alpine image"
+  # shellcheck source=/dev/null
+  detect_platform_os_id="$(. /etc/os-release && printf '%s\n' "${ID:-}")"
+  case "${detect_platform_os_id}" in
+    alpine) ;;
+    *) fail "unsupported distribution \"${detect_platform_os_id}\"; use an Alpine image" ;;
+  esac
 }
 
 validate_options() {
@@ -312,6 +348,7 @@ install_release() {
 }
 
 main() {
+  detect_platform
   validate_options
   trap cleanup EXIT
   install_release

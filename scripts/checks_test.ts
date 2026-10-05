@@ -114,9 +114,9 @@ Deno.test("scaffold declares exactly the spec's options and reads each one in in
     const files = scaffold("demo", "Demo", spec.options);
     assertEquals(optionDifferences(spec.options, JSON.parse(files["src/demo/devcontainer-feature.json"])), []);
     const install = files["src/demo/install.sh"];
-    assert(install.includes('VERSION="${VERSION:-latest}"'), install);
-    assert(install.includes('FAILURE_MODE="${FAILURE_MODE:-a\\"\\$b\\}}"'), install);
-    assert(install.includes('INSTALLTOOLS="${INSTALLTOOLS:-false}"'), install);
+    assert(install.includes('VERSION="${VERSION-latest}"'), install);
+    assert(install.includes('FAILURE_MODE="${FAILURE_MODE-a\\"\\$b\\}}"'), install);
+    assert(install.includes('INSTALLTOOLS="${INSTALLTOOLS-false}"'), install);
     assert(
         install.includes("#   version: VERSION\n#   failure-mode: FAILURE_MODE\n#   installTools: INSTALLTOOLS\n"),
         install,
