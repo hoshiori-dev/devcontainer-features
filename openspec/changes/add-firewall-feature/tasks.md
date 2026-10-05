@@ -285,3 +285,62 @@ start check.
 - [x] 8.5 Verify `just affected` selects only `firewall`, and record the results of 8.1 to 8.4 and every Acceptance item
       of proposal.md, with the scenarios it points to, in the PR's Validation section; verify each item of the
       proposal's `## Acceptance` is named there with its result.
+
+## 9. Review follow-up
+
+The maintainer answered design.md's Open Questions 9 to 15 in conversation on 2026-10-05; design.md records the answers
+under Decisions of 2026-10-05. Questions 9 to 12 keep what sections 5 and 6 built. Question 13 changes two test scripts,
+and questions 14 and 15 correct the delta spec, which had promised what tasks 3.8 and 3.1 recorded as open. The ticked
+tasks above stay as the record of the earlier work, also where they name these questions as open.
+
+- [x] 9.1 In `test/firewall/duplicate.sh`, turn the check of the premise that the first install used other options into
+      a precondition in the same place (question 13): when `DEFAULTACTION` and `PRESETS` are not `allow` and `npm`, or
+      their `__DEFAULT` counterparts not `deny` and `github`, the script prints which premise does not hold and the
+      values the harness passed, and exits with status 1 before its first check; the comparison keeps its four literals,
+      and an unset variable counts as a value that does not match. Remove the deviation comment. Verify with
+      `shellcheck` and `shellcheck -o require-variable-braces,require-double-brackets` reporting nothing, and with hand
+      runs in throwaway `debian:12` and `alpine:3.24` containers: without the harness's variables, and with a first
+      install of the defaults, the script prints the message and ends with status 1 and no check; after an install with
+      `defaultAction` `allow` and `presets` `npm` followed by one with the defaults, and with the variables the harness
+      would set, its seven checks pass (the run through the harness is 9.8).
+- [x] 9.2 In `test/firewall/rerun.sh`, turn the two checks of the re-run's premises into preconditions in the same
+      places (question 13): when `/etc/resolv.conf` does not name the stopped resolver, and when the listing of the
+      other tables holds no table of the test's own, the script prints which premise does not hold and exits with status
+      1; both conditions stay as they were. Remove the deviation comment. Verify with `shellcheck` and
+      `shellcheck -o require-variable-braces,require-double-brackets` reporting nothing, and with hand runs in a
+      throwaway `debian:12` container after a default install and start: a copy that writes the original
+      `/etc/resolv.conf` back before the first precondition, and a copy that replaces the test's table with another
+      before the listing, each end with status 1 and that precondition's message; the script as committed passes its
+      sixteen checks (the run through the harness is 9.8).
+- [x] 9.3 In the delta spec, Requirement: DNS only to the container's resolvers, scope the sentence that every name
+      still resolves to where it holds (Docker forwards lookups from the host's network namespace, or `/etc/resolv.conf`
+      names the configured DNS servers), and state that on a user-defined network with DNS servers configured for the
+      container or the Docker daemon only the names Docker itself answers resolve and that `NOTES.md` SHALL state that
+      limitation (question 14, the documented limitation; the rules, the resolver handling, and `NOTES.md` do not
+      change). This settles the point task 3.8 recorded as open. Verify that `just spec-check` passes, that every
+      scenario of the requirement keeps its name and text, and that `src/firewall/NOTES.md` (Limits and failures) states
+      the limitation.
+- [x] 9.4 In the delta spec, say that a start under an entrypoint that does not run as root loads no rule and writes no
+      record, and that the start check reports it from the missing record: in Requirement: Failure mode, with the
+      sentence that `NOTES.md` SHALL state that the entrypoint has to run as root; in its Scenario: Rules cannot be
+      loaded, where "recorded as not applied" stays for a start that runs as root; and in Requirement: Start record
+      readable by the remote user, whose record is written by each start whose entrypoint runs as root (question 15, the
+      documented limitation; the scripts and `NOTES.md` do not change). This settles the point task 3.1 recorded as
+      open. Verify that `just spec-check` passes, that every scenario name of the delta spec is unchanged
+      (`grep '^#### Scenario'` before and after), and that `src/firewall/NOTES.md` (Limits and failures) says that the
+      entrypoint has to run as root.
+- [x] 9.5 In `design.md`, record the seven answers under Decisions of 2026-10-05, each with its rejected alternative and
+      the number of its question; reduce Open Questions to questions 1 to 8 and a sentence pointing to those decisions;
+      move the two observations the questions carried into Context; and bring Goals (A record per start, Scripts follow
+      the shell style guide), Non-Goals, Test coverage (the preconditions, the row of "Rules cannot be loaded"), and
+      Risks into agreement with 9.1 to 9.4. In `proposal.md`, add the two limits to What Changes and the two `NOTES.md`
+      statements of 9.3 and 9.4 to the Acceptance item on `NOTES.md`. Verify that
+      `grep -n 'Open Questions \(9\|1[0-5]\)' design.md proposal.md` and the same search under `src/firewall/` and
+      `test/firewall/` print nothing beyond the sentence of Decisions of 2026-10-05 that names the range, that no text
+      of the two files says a point of questions 9 to 15 awaits an answer, and that `just spec-check` passes.
+- [x] 9.6 Run `just docs`; verify that it leaves `src/firewall/README.md` unchanged, since `NOTES.md` and the metadata
+      did not change, and that `jq -r .version src/firewall/devcontainer-feature.json` still prints `1.0.0`.
+- [x] 9.7 Run `just check`; verify it passes.
+- [ ] 9.8 Run `just test firewall` and `just test-scenarios firewall` through the PR's container test jobs after the
+      push; verify every job is green, with `duplicate.sh` passing its preconditions on each compatibility image and
+      `rerun` passing its two.
