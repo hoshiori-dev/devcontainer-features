@@ -208,8 +208,8 @@ resolve_release() {
   release="${resolve_release_target#"${TAG_URL_PREFIX}"}"
   is_release_number "${release}" \
     || fail "${LATEST_URL} answered HTTP status ${resolve_release_http_status}" \
-      "and the redirect target \"${resolve_release_target}\"," \
-      "not a redirect to ${TAG_URL_PREFIX}<MAJOR.MINOR.PATCH>; set version to a release number"
+      "with the redirect target \"${resolve_release_target}\"," \
+      "which is not ${TAG_URL_PREFIX}<MAJOR.MINOR.PATCH>; set version to a release number"
   log "read the latest release ${release} from the redirect of ${LATEST_URL}"
 }
 
