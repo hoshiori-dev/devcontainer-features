@@ -127,10 +127,11 @@ parameters; `main` then passes them to `install_packages "$@"`.
 All five option defaults move to the top. The controls keep `${NAME-default}`, so an explicitly empty value still fails.
 `PACKAGES` changes from `${PACKAGES:-}` to `${PACKAGES-}`, the guide's form and the one all five package-list installers
 use (Cross-installer alignment), with the same result because the default is empty. A comment above the defaults says
-why a default applies only to an unset option: an explicitly empty control is invalid and reaches validation, while an
-empty `packages` is the documented no-op. The four controls become readonly at the end of `validate_options`, `PACKAGES`
-after the entry loop. An empty `networkTimeout` is accepted by a `[ -z … ]` test ahead of its `case`, because the guide
-keeps `case` patterns unquoted and an empty pattern can only be written quoted.
+why a default applies only to an unset option: an explicitly empty `installWeakDeps`, `refreshPolicy`, or `cleanup` is
+invalid and reaches validation, while an empty `packages` is the documented no-op and an empty `networkTimeout` its
+default. The four controls become readonly at the end of `validate_options`, `PACKAGES` after the entry loop. An empty
+`networkTimeout` is accepted by a `[ -n … ]` test around its `case`, because the guide keeps `case` patterns unquoted
+and an empty pattern can only be written quoted.
 
 - Rejected: `${NAME:-default}` for the controls. An empty value would silently take the default, which the spec forbids
   ("Boolean options SHALL accept only `true` or `false`; enum options SHALL accept only their declared values").
@@ -314,6 +315,11 @@ decision and not by this list.
 
 ## Risks / Trade-offs
 
+- [The `cleanup=packages` tests cannot tell a working `dnf clean packages` from a missing one] → dnf's default
+  `keepcache=0` deletes each downloaded package after the transaction (measured on fedora:44 and almalinux:9 with
+  `cleanup=none`), so the check in `controls_packages_*.sh` only shows that no package file is left; its label and a
+  comment say so, and neither the scenarios nor `control_checks.ts` plant a package file. Unchanged from 1.0.0; a test
+  that plants one is left to a later change.
 - [`control_checks.ts` asserts message and argument texts] → The messages keep the option name, the entry, and
   `was not found`, hold none of the words its cache-miss check looks for, the timeout pair is unchanged, and the runner
   is run by hand on the three amd64 images with its result in the PR's Validation section.

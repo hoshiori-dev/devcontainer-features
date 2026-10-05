@@ -21,6 +21,8 @@ package_files_are_removed() {
 check "Listed packages are installed: bc is installed" rpm -q bc
 check "Listed packages are installed: file is installed" rpm -q file
 check "Only package files are cleaned: repository metadata remains" metadata_remains
-check "Only package files are cleaned: package files are removed from the cache" package_files_are_removed
+# dnf's default keepcache=0 deletes each downloaded package after the transaction, so this check only shows that no
+# package file is left; no test plants one to see `dnf clean packages` remove it.
+check "Only package files are cleaned: no package file is left in the cache" package_files_are_removed
 
 reportResults

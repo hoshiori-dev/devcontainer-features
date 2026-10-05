@@ -9,8 +9,8 @@ set -eu
 readonly ENTRY_FIRST_CHARS="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 readonly ENTRY_CHARS="${ENTRY_FIRST_CHARS}._+:~^-"
 
-# A default applies only to an unset option: an explicitly empty control is invalid and reaches validation, and an empty
-# `packages` is the documented no-op.
+# A default applies only to an unset option: an explicitly empty installWeakDeps, refreshPolicy, or cleanup is invalid
+# and reaches validation, while an empty `packages` is the documented no-op and an empty networkTimeout its default.
 PACKAGES="${PACKAGES-}"
 INSTALLWEAKDEPS="${INSTALLWEAKDEPS-false}"
 REFRESHPOLICY="${REFRESHPOLICY-default}"
