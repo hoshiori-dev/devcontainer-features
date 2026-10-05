@@ -63,11 +63,12 @@ Set `version` to a release number, such as `0.13.1`, for a build that does not c
 
 A second installation downloads and replaces the daemon and every backend it selects, at its own `version`, including an
 older one. It removes nothing: a backend installed earlier and not selected again stays at its earlier version, next to
-the newer daemon, and packages installed earlier stay whatever `installMountDependencies` says later.
+the daemon of the second installation, and packages installed earlier stay whatever `installMountDependencies` says
+later.
 
 ## OS support
 
 Debian, Ubuntu, and Fedora images with glibc 2.34 or later, on x86_64 and aarch64; the tested images are listed in
-[test/hf-mount/compatibility.json](../../test/hf-mount/compatibility.json). On a musl-based image such as Alpine, an
-older glibc, another architecture, or another distribution, the install fails with a message naming the reason, before
-it changes anything.
+[test/hf-mount/compatibility.json](../../test/hf-mount/compatibility.json). On a musl-based image such as Alpine, with
+an older glibc, on another architecture, or on another distribution, the install fails with a message naming the reason,
+before it changes anything.
