@@ -1,0 +1,34 @@
+{
+  "backend_nfs": {
+    "image": "debian:12",
+    "features": {
+      "hf-mount": {
+        "backend": "nfs"
+      }
+    }
+  },
+  "backend_fuse": {
+    "image": "debian:12",
+    "features": {
+      "hf-mount": {
+        "backend": "fuse"
+      }
+    }
+  },
+  "dependencies_disabled": {
+    "image": "debian:12",
+    "features": {
+      "hf-mount": {
+        "installMountDependencies": false
+      }
+    }
+  },
+  "pinned_version": {
+    "image": "debian:12",
+    "features": {
+      "hf-mount": {
+        "version": "0.13.0"
+      }
+    }
+  }
+}

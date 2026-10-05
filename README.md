@@ -31,6 +31,7 @@ Each feature's options and notes are in `src/<feature-id>/README.md`.
 | [apk-packages](src/apk-packages/)                           | Installs listed system packages with apk.                                                                                                                   |
 | [pacman-packages](src/pacman-packages/)                     | Installs listed system packages with pacman.                                                                                                                |
 | [zypper-packages](src/zypper-packages/)                     | Installs listed system packages with zypper.                                                                                                                |
+| [`hf-mount`](src/hf-mount/)                                 | Installs the Hugging Face `hf-mount` daemon and its NFS and FUSE backends, to mount Hugging Face Buckets and repositories as local filesystems.             |
 | [`openspec`](src/openspec/)                                 | Installs the OpenSpec CLI from the npm registry, with every package's integrity hash and registry signature verified, on a Node.js runtime it brings along. |
 
 ## Development
