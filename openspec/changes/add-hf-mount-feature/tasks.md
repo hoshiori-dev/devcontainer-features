@@ -202,3 +202,16 @@
       searching `NOTES.md`, the proposal, the delta spec, this file, and the rest of the design for the stronger claim
 - [x] 10.3 Run `just docs` and verify that `src/hf-mount/README.md` does not change, and run `just check` and verify it
       passes
+- [x] 10.4 Add one sentence under "What is installed" of `src/hf-mount/NOTES.md` saying that `curl` and
+      `ca-certificates` are installed from the image's repositories when the image lacks them, and regenerate
+      `src/hf-mount/README.md` with `just docs` (design, Questions answered on 2026-10-05); verify that the README gains
+      the same sentence and nothing else, and with one install each in a throwaway `debian:12` container, which lacks
+      both packages and must hold both afterwards, and in a throwaway `mcr.microsoft.com/devcontainers/base:ubuntu24.04`
+      container, which ships both and whose log must name no package installation
+- [x] 10.5 In the design, record the maintainer's four answers of 2026-10-05 under Decisions, each with its rejected
+      alternative (they are the points that tasks 7.1 and 8.1 cite as the design's Open Questions, 2 and 3), add the
+      download tools and the limit seen with `--fuse-owner-only` to the `NOTES.md` content bounds, and remove the Open
+      Questions section; verify by reading `test/hf-mount/test.sh` for the unchanged `root:root 755` comparison, its
+      spec-worded label, and its comment, by reading `src/hf-mount/NOTES.md` for the `--fuse-owner-only` sentence, and
+      by searching the design and the prose of this file for a sentence that still calls a question open
+- [ ] 10.6 Run `just check` on the committed tree and verify it passes

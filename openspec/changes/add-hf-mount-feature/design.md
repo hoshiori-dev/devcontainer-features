@@ -160,8 +160,9 @@ All three options are new. Where this table and the delta spec's Option requirem
 - **`NOTES.md` content bounds.** It names the container settings a mount needs (`--cap-add SYS_ADMIN`,
   `--device /dev/fuse` for FUSE, `--security-opt apparmor=unconfined` where AppArmor applies, or `--privileged` as the
   broad alternative), the non-root prerequisites (passwordless `sudo` for NFS; `user_allow_other` in `/etc/fuse.conf` or
-  `--fuse-owner-only` for FUSE), and that the downloads are checked against no checksum or signature, since upstream
-  publishes none, and rest on TLS alone.
+  `--fuse-owner-only` for FUSE) and the limit of `--fuse-owner-only` seen in the hand checks, the download tools the
+  install adds when the image lacks them (`curl` and `ca-certificates`), and that the downloads are checked against no
+  checksum or signature, since upstream publishes none, and rest on TLS alone.
 - **Tests.** Container tests assert only what needs no privileges and no network: `hf-mount --version` (the
   `hf-mount <MAJOR.MINOR.PATCH>` form only; `test.sh` makes no network request, since `latest` can move between build
   and test), `hf-mount status`, the backend files, `mount.nfs` or `fusermount3` presence, no `hf-mount` process (read
@@ -197,6 +198,28 @@ and new sections of `feature-authoring.md` and `testing.md`).
   `/usr/local/bin/hf-mount`: on `fedora:44`, `/usr/local/sbin` is a link to `/usr/local/bin` and comes first on `PATH`,
   so the command names `/usr/local/sbin/hf-mount` there. Rejected: leaving the scenario as it was and noting the fact
   only in Context.
+
+### Questions answered on 2026-10-05
+
+The revision of 2026-10-05 left three points to the maintainer, and the implementation added a fourth. The maintainer
+answered all four in conversation on 2026-10-05, so no question is open.
+
+- The Goals gain no bound that names `.agents/knowledge/shell-style.md`: the guide applies on its own, and the tasks
+  carry the review against it and the `shellcheck` runs with the two optional checks. Rejected: one more Goal restating
+  the guide, as the restyle designs carry it.
+- The ownership check of `test/hf-mount/test.sh` keeps its `root:root 755` comparison under the label "<binary> is owned
+  by root and executable by every user", the words of the spec's "Daemon and selected backends are installed", with a
+  comment saying that it is stricter than the spec and why. Rejected: narrowing the command to owner root and executable
+  by every user, which weakens the check; stating group root and mode `0755` in the delta spec, which promises more than
+  a consumer relies on.
+- `NOTES.md` names the download tools: one sentence under "What is installed" says that `curl` and `ca-certificates` are
+  installed from the image's repositories when the image lacks them, as the notes of glab, deno, and uv do, and the
+  content bounds gain it (`NOTES.md` content bounds). Rejected: leaving the notes silent, on the ground that this is
+  neither a limitation nor a constraint.
+- `NOTES.md` keeps the sentence on the limit seen with `--fuse-owner-only`, with the upstream versions and the kind of
+  host it was observed on and the pointer to `user_allow_other` (Context), and the content bounds gain that limit.
+  Rejected: removing the sentence and offering the flag as an equal alternative, since the observation comes from one
+  host and its cause is unknown.
 
 ## Optional improvements offered, not adopted
 
@@ -313,64 +336,3 @@ has no `dependsOn` or `installsAfter`.
 - [`nfs-common` pulls `rpcbind`, whose maintainer scripts were not yet run inside a container build] → The default
   install on every compatibility image exercises it; a failure there is resolved before the PR is marked ready.
 - [Each backend is about 27 MB, so `both` adds about 55 MB] → `backend` narrows it.
-
-## Open Questions
-
-The revision of 2026-10-05 left three points to the maintainer, and the implementation added a fourth. The package is
-written for option A of each, so "accepted as written" closes a question with A.
-
-1. **A Goal that names the shell style guide.** Raised by `.agents/knowledge/shell-style.md` (Applying the guide): new
-   files follow the guide, and each file written is also run through
-   `shellcheck -o require-variable-braces,require-double-brackets`. The Goals hold no bound that names the guide. They
-   record the POSIX entry point, a deliberate deviation, with its reason; what follows from it, a short option kept
-   before the glibc check where BusyBox has no long form (`id -u`), is marked in the script only, and the stricter check
-   of question 2 is one more deviation. The audit's findings disagree on whether a design has to say more.
-   - A (as written): no such Goal. The guide applies on its own, and the tasks carry the review against it and the two
-     optional `shellcheck` checks. No file changes.
-   - B: one more Goal in this file, as the restyle designs carry it: "Shell style. `install.sh` and every script under
-     `test/hf-mount/` follow `.agents/knowledge/shell-style.md`; each deliberate deviation is marked in the script by a
-     comment giving its reason. Checked by review against the guide, by `just check`, and by
-     `shellcheck -o require-variable-braces,require-double-brackets` on each script." No other file changes.
-
-   Recommendation: A. B adds one bullet and no work, at the cost of restating a knowledge-base rule in the design.
-2. **The ownership check of `test.sh` is stricter than the spec.** Raised by `.agents/knowledge/shell-style.md` (Tests):
-   a check's label states one behavior in the words of the spec, and its command verifies exactly that behavior. The
-   spec's "Daemon and selected backends are installed" says each installed binary is owned by root and executable by
-   every user; the check compares owner, group, and mode with `root:root 755`, which is how `install` leaves each binary
-   under the Goals (Idempotent and additive).
-   - A (as written): the check keeps its command and takes its label from the spec's words, under a comment saying that
-     it is stricter than the spec and why. Changes `test/hf-mount/test.sh` only (label and comment).
-   - B: the command narrows to owner root and executable by every user, so label and command match exactly. Changes
-     `test/hf-mount/test.sh` and weakens the check.
-   - C: the delta spec's "Daemon and selected backends are installed" states group root and mode `0755`, and the label
-     quotes it. Changes the delta spec and `test/hf-mount/test.sh` (label).
-
-   Recommendation: A. No check is weakened and the spec promises no more than a consumer relies on; the deno restyle
-   kept a literal owner, group, and mode comparison under a spec-worded label in the same way.
-3. **Whether `NOTES.md` names the download tools.** Raised by `.agents/knowledge/feature-authoring.md` (User
-   documentation): the notes are checked for clear wording, actual limitations, and configuration constraints. The
-   `NOTES.md` content bounds under Decisions do not include the packages the feature installs to download the binaries,
-   and "What is installed" in `src/hf-mount/NOTES.md` does not mention that `curl` and `ca-certificates` are installed
-   from the image's repositories when the image lacks them, the packages the spec's "Mount dependencies follow the
-   selected backends" allows for downloading the binaries.
-   - A (as written): the content bounds stay as they are; the notes are reviewed against the User documentation section
-     without a prescribed addition. No file changes beyond what that review finds.
-   - B: the content bounds gain "the download tools the install adds when the image lacks them", `src/hf-mount/NOTES.md`
-     gains one sentence under "What is installed", and `src/hf-mount/README.md` is regenerated. The notes of glab, deno,
-     and uv carry such a sentence.
-
-   Recommendation: A. The rule asks for limitations and constraints, and this is neither; B costs one sentence and
-   matches the three merged features.
-4. **Whether `NOTES.md` states the limit seen with `--fuse-owner-only`.** Raised by the mount hand checks of 2026-10-05
-   (Context) and by the independent review: the `NOTES.md` content bounds under Decisions name `--fuse-owner-only` as
-   one of two non-root prerequisites for FUSE and no limit of it, while a mount with that flag refused every access in
-   the hand checks. This question was added during the implementation, not by the maintainer.
-   - A (as written): `src/hf-mount/NOTES.md` keeps one sentence next to the flag that states the observation, with the
-     upstream versions and the kind of host it was made on, and points to `user_allow_other`. Accepting it adds "and the
-     limit of `--fuse-owner-only` seen in the hand checks" to the content bounds.
-   - B: the sentence is removed and `src/hf-mount/README.md` regenerated, so the notes stay within the content bounds
-     and offer the flag as an equal alternative.
-
-   Recommendation: A. `.agents/knowledge/feature-authoring.md` (User documentation) asks for actual limitations, and a
-   developer who follows the notes on such a host meets `Permission denied` without a hint; against it, the observation
-   comes from one host and its cause is unknown.
