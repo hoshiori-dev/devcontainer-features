@@ -86,7 +86,7 @@ feature and were confirmed against the files at commit `f64470a`.
 - Changing download sources, verification, the checksum-file format the parser accepts, or the cleanup of package
   caches.
 - CI coverage of failure scenarios, which #50 tracks; `group_conflicts.sh` stays a host-side test run by hand.
-- The optional improvements listed below, unless the maintainer picks them at the package gate.
+- The optional improvements listed below, none of which the maintainer adopted at the package gate.
 
 ## Decisions
 
@@ -237,10 +237,19 @@ requirement in NOTES.md only, which leaves a failure condition outside the spec.
   scenario for the prepared-group case, whose image would delete system binaries; #50 is where CI coverage of these
   paths belongs.
 
+### Package gate decisions
+
+The maintainer closed the package deliberation on 2026-10-05 and approved the package with these decisions:
+
+- The `groupadd` and `usermod` precondition stays in the delta spec, as drafted (Group command precondition), not only
+  in NOTES.md; NOTES.md states it for users as well.
+- Every other decision above stands as drafted.
+- None of the optional improvements below is adopted.
+
 ## Optional improvements offered, not adopted
 
-The audit suggested these; none is required by the guide or by a confirmed investigation item. Each can be picked at the
-package gate and fits the same PATCH bump.
+The audit suggested these; none is required by the guide or by a confirmed investigation item. The maintainer adopted
+none of them when closing the package gate (Package gate decisions); each stays out of this change.
 
 - **Distinguish `getent`'s exit status 2 ("not found") from other failures.** Gain: a missing `getent` or an enumeration
   error fails at the check instead of falling through to `groupadd`. Cost: a status branch for a path no supported image
