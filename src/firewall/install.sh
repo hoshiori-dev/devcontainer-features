@@ -76,7 +76,7 @@ install_packages() {
     install_packages_present=false
     case "${family}" in
       debian)
-        # Known failure mode: dpkg-query exits 1 for a package dpkg has no record of, which means not installed.
+        # dpkg-query exits 1 for a package dpkg has no record of, which means not installed.
         if install_packages_status="$(
           dpkg-query --show --showformat '${db:Status-Status}' "${install_packages_package}" 2>/dev/null
         )" && [ "${install_packages_status}" = "installed" ]; then
