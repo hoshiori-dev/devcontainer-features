@@ -75,6 +75,9 @@ No option is added, changed, renamed, or removed, so this design has no option t
   list is lost.
 - Every message the host checks match keeps its substring (Risks). Checked by running `direct_checks.ts` and
   `control_checks.ts` on both images.
+- Every package-tool call whose failure the script handles (`apt-get`, `apt-config`, `apt-cache`) ends with `|| fail`,
+  exits 1, and shows the tool's own exit status in the message. Checked in review of the diff, and by making the
+  refresh, the installation, and the cleanup fail in a container of each image.
 
 **Non-Goals:**
 
@@ -84,12 +87,25 @@ No option is added, changed, renamed, or removed, so this design has no option t
 
 ## Decisions
 
-- **POSIX `sh` stays; the header gives the real reason.** The empty list must succeed on images without `apt-get`, and
-  the package-list installers keep broad image compatibility, which the guide allows for them; `alpine` runs the
-  feature's early steps under BusyBox ash. The header names what is installed and from where (packages from the
-  repositories the image configures), that it runs as root at image build time, and the five environment variables
-  (`PACKAGES`, `INSTALLRECOMMENDS`, `REFRESHPOLICY`, `CLEANUP`, `NETWORKTIMEOUT`); the step list and the second-install
-  sentence leave it. Rejected: bash, which breaks the empty list on Alpine and would need bash installed.
+- **Package gate.** The maintainer closed the package deliberation on 2026-10-05 and approved the package. Decided
+  there:
+  - The decisions of this design stand, except where the wording shared by the five package-list installers
+    (`apk-packages`, `apt-packages`, `dnf-packages`, `pacman-packages`, `zypper-packages`) replaces a message, a log
+    line, or the header (Messages, Log lines, and the header decision below).
+  - The package list's default is `${PACKAGES-}` in all five installers, never `${PACKAGES:-}` (Option defaults).
+  - Every package-manager failure the script handles ends with `|| fail` and exits 1, and the message shows the tool's
+    own exit status (Explicit failures).
+  - None of the improvements under "Optional improvements offered, not adopted" is adopted. One item listed there, the
+    existing-index line on the `refreshPolicy=never` path, is part of the shared wording instead and moved to Log lines.
+  - The bump stays PATCH. Trimming the host runners stays deferred to #50.
+- **POSIX `sh` stays; the header follows the installers' shared pattern.** The empty list must succeed on images without
+  `apt-get`, and the package-list installers keep broad image compatibility, which the guide allows for them; `alpine`
+  runs the feature's early steps under BusyBox ash. The header's first sentence is the shared pattern, "Installs the
+  packages listed in the option `packages` with apt-get from the image's repositories, to the paths the packages
+  define"; the second says that it runs as root at image build time and that the options arrive as `PACKAGES`,
+  `INSTALLRECOMMENDS`, `REFRESHPOLICY`, `CLEANUP`, and `NETWORKTIMEOUT`; the third gives the reason for POSIX `sh`: an
+  empty list must succeed, and a missing `apt-get` be reported, on images that ship no bash. The step list and the
+  second-install sentence leave it. Rejected: bash, which breaks the empty list on Alpine and would need bash installed.
 - **`main` lists the steps in the spec's order; the entry list stays in `main`'s positional parameters.** Steps:
   validate the controls, parse and validate the entries, exit on an empty list, require `apt-get`, resolve the index
   directory, refresh or select the index, check exact names and versions, install, clean. The parse loop and its
@@ -118,70 +134,102 @@ No option is added, changed, renamed, or removed, so this design has no option t
   the top in the `${NAME-default}` form, so an explicitly empty `installRecommends`, `refreshPolicy`, or `cleanup` still
   reaches validation and fails, as "Installation controls are validated before changes" requires. `PACKAGES` moves from
   `${PACKAGES:-}` to `${PACKAGES-}`: with an empty default the two are identical, and one form for every option removes
-  the mixed forms the audit flagged. Each control becomes readonly right after its validation and `PACKAGES` after the
-  parse. The index directory is resolved from APT's configuration at run time ("Clean package caches": APT's effective
-  locations), so it stays a lower-case global assigned once, with a comment saying why it is not a top-of-file constant.
-  Rejected: `${NAME:-default}`, which turns an empty control into its default and breaks the spec and three
-  `control_checks.ts` cases; keeping the mixed forms with a comment, which explains a difference that has no effect.
+  the mixed forms the audit flagged; the package gate fixed `${PACKAGES-}` for all five package-list installers. Each
+  control becomes readonly right after its validation and `PACKAGES` after the parse. The index directory is resolved
+  from APT's configuration at run time ("Clean package caches": APT's effective locations), so it stays a lower-case
+  global assigned once, with a comment saying why it is not a top-of-file constant. Rejected: `${NAME:-default}`, which
+  turns an empty control into its default and breaks the spec and three `control_checks.ts` cases; keeping the mixed
+  forms with a comment, which explains a difference that has no effect.
 - **Validation keeps its accepted sets; only messages and form change.** The entry grammar, the control `case` patterns,
   the empty-or-root index-directory refusal, and the `networkTimeout` length test stay; the length test gets a comment
-  naming the overflow it prevents, and the two `networkTimeout` messages become one. The `${lists_dir:?}` guard next to
-  `rm` stays. Rejected: dropping the length test (accepts an overflowing value under dash).
-- **Messages: `<reason>; <how to fix it>`, the given value shown.** `log` writes `apt-packages: <message>` to stdout;
-  `fail` writes `apt-packages: error: <message>` to stderr and exits 1; messages start in lower case and have no
-  trailing period. Each message is a reason and a fix joined by a semicolon and a space. Wording, with `<…>` substituted
-  and quoted values printed verbatim with `printf '%s'`:
+  naming the overflow it prevents, and the two `networkTimeout` messages become one, whose fix both failing branches
+  take from one hint variable, as the guide's POSIX skeleton does. The `${lists_dir:?}` guard next to `rm` stays.
+  Rejected: dropping the length test (accepts an overflowing value under dash).
+- **Messages: `<reason>; <how to fix it>`, in the wording the five package-list installers share.** `log` writes
+  `apt-packages: <text>` to stdout; `fail` writes `apt-packages: error: <text>` to stderr and exits 1; both print
+  `"$*"`. The form rules, decided for all five installers at the package gate:
 
-  - invalid `installRecommends`: `option installRecommends is "<value>"` / `use true or false`
-  - invalid `refreshPolicy`: `option refreshPolicy is "<value>"` / `use default, always, or never`
-  - invalid `cleanup`: `option cleanup is "<value>"` / `use all, packages, or none`
-  - invalid `networkTimeout`: `option networkTimeout is "<value>"` /
-    `leave it empty or use whole seconds from 1 through 3600 without a leading zero`
-  - refused entry: `entry "<entry>" is not a package name, name=version, or name:architecture` /
-    `write the exact lower-case name with an optional =version or :architecture, without paths, URLs, options, shell
-    characters, or a trailing -`
-  - no `apt-get`: `apt-get is not available on <distribution>` / `use a Debian or Ubuntu image, which provides apt-get`,
-    where `<distribution>` is `PRETTY_NAME` or `an unidentified distribution`
-  - `apt-config` fails: `apt-config cannot report Dir::State::lists` /
-    `check the image's APT configuration and APT_CONFIG`
-  - index directory empty or `/`: `the package index directory Dir::State::lists is "<value>"` /
-    `set it to a directory other than / in the image's APT configuration`
-  - `refreshPolicy=never` without an index: `refreshPolicy is never but <directory> holds no package index` /
-    `run apt-get update before this feature, or use refreshPolicy default or always`
-  - refresh fails: `cannot refresh the package index from the image's repositories` /
-    `check their sources, signing keys, and the network in the APT messages above`
-  - `apt-cache pkgnames` fails: `apt-cache cannot list the package names in the index for "<entry>"` /
-    `check the image's package index in the APT messages above`
-  - `apt-cache show` fails: `apt-cache finds no record for "<entry>"` /
-    `check its architecture and version against apt-cache policy <name>`; probed, this is also how an architecture the
-    image has not enabled ends, so the text names the entry's qualifiers rather than a broken index
-  - name not exact: `no package is named exactly "<name>" (entry "<entry>")` /
-    `check the name with apt-cache policy, or use refreshPolicy always if the index is stale`
-  - version not exact: `no version "<version>" of <name> is available (entry "<entry>")` /
-    `pick one that apt-cache policy <name> lists, or use refreshPolicy always if the index is stale`
-  - install fails: `apt-get cannot install <entries>` / `see the APT messages above`
-  - `apt-get clean` fails: `cannot remove the downloaded package files` / `see the APT messages above`
+  - Text is lower case with no trailing period, and every failure reads `<reason>; <how to fix it>`.
+  - A value an option or setting "is" goes in double quotes (`is "<value>"`); an entry goes in single quotes
+    (`'<entry>'`), as the refusals of the sibling installers do, whose host runners assert that form.
+  - Options are named in camelCase, and a value in effect or suggested is written `<option>=<value>`
+    (`refreshPolicy=never`, `or use cleanup=none`).
+  - `<status>` is `$?`, written in the `fail` argument directly right of `||`; it expands to the failed command's status
+    under dash and BusyBox ash, and shellcheck with the two optional checks accepts it.
+  - A message whose source line would pass 120 columns is split after its `;` into two arguments of `fail`, which `"$*"`
+    joins with one space while `IFS` is the default; the output is the same as from one argument.
+  - No feature text contains `fetch`, `Downloading`, `Retrieving repository`, `signature`, `conflict`, `is up to date`,
+    or `failed to synchronize`, so a host check that looks for the tool's own words cannot pass on the feature's text.
+
+  Failures, after `apt-packages: error:` and a space, with `<…>` substituted and printed verbatim:
+
+  - invalid `installRecommends`: `option installRecommends is "<value>"; use true or false`
+  - invalid `refreshPolicy`: `option refreshPolicy is "<value>"; use default, always, or never`
+  - invalid `cleanup`: `option cleanup is "<value>"; use all, packages, or none`
+  - invalid `networkTimeout`:
+    `option networkTimeout is "<value>"; leave it empty or use whole seconds from 1 through 3600 without a leading zero`
+  - refused entry:
+    `refusing the entry '<entry>': not a package name with an optional :architecture or =version; start with a lower-case letter or digit, use only letters, digits, and . + - : ~ =, and do not end in -`
+  - no `apt-get`:
+    `apt-get was not found on this image (<distribution>); use a Debian or Ubuntu image, which provides apt-get`, where
+    `<distribution>` is `PRETTY_NAME` or `an unidentified distribution`
+  - `apt-config` fails:
+    `apt-config shell failed with status <status>; fix what apt-config reports above (APT configuration or APT_CONFIG)`
+  - index directory empty or `/`:
+    `apt-config reports Dir::State::lists as "<value>"; set it to a directory other than / in the image's APT configuration`
+  - `refreshPolicy=never` without an index:
+    `refreshPolicy=never needs a package index in <directory>; add it to the image, or use refreshPolicy=default`
+  - refresh fails:
+    `apt-get update failed with status <status>; fix what apt-get reports above (repositories, keys, or network)`
+  - `apt-cache pkgnames` fails:
+    `apt-cache pkgnames failed with status <status> for the entry '<entry>'; fix what apt-cache reports above (the package index)`
+  - `apt-cache show` fails:
+    `apt-cache show failed with status <status> for the entry '<entry>'; check its architecture and version with apt-cache policy <name>`;
+    probed, this is also how an architecture the image has not enabled ends, so the fix names the entry's qualifiers
+    rather than a broken index
+  - name not exact:
+    `the entry '<entry>' names no package in the package index; check the spelling, or use refreshPolicy=always`
+  - version not exact:
+    `the entry '<entry>' names no available version; pick one that apt-cache policy <name> lists, or use refreshPolicy=always`
+  - install fails:
+    `apt-get install failed with status <status>; fix what apt-get reports above (entries, repositories, or network)`
+  - `apt-get clean` fails:
+    `apt-get clean failed with status <status>; fix what apt-get reports above, or use cleanup=none`
 
   Rejected: printing the environment variable name (`INSTALLRECOMMENDS`), which the developer never wrote and
-  `control_checks.ts` would no longer find; keeping the grammar dump, which restates the README in every refusal.
-- **Log lines.** `no packages listed; nothing to do` and `using the package index the image already holds` keep their
-  wording without the period; `installing <entries>` gains its source, as the guide's "from where" asks
-  (`installing <entries> from the repositories the image configures`), and moves to `printf` through `log`. New:
-  `refreshing the package index from the repositories the image configures` before every `apt-get update`,
-  `removing downloaded package files and the package index in <directory>` for `cleanup=all`, and
-  `removing downloaded package files` for `cleanup=packages`; `cleanup=none` deletes nothing and logs nothing. Rejected:
-  a log line for the read-only exact-name check, which changes nothing and uses no network.
+  `control_checks.ts` would no longer find; keeping the grammar dump, which restates the README in every refusal;
+  listing the refused kinds (paths, URLs, options, shell characters) in the refusal, which the character rule already
+  excludes; this design's draft wording, which named no exit status and differed from the sibling installers in the
+  refusal lead and the missing-tool sentence.
+- **Log lines, in the shared wording.** After `apt-packages:` and a space; a line for a step that a control selects ends
+  with `(<option>=<value>)`:
+
+  - empty list: `no packages listed; nothing to do`
+  - before every `apt-get update`: `refreshing the package index from the image's repositories (refreshPolicy=<value>)`
+  - existing index: `using the package index the image already holds in <directory> (refreshPolicy=<value>)`, printed
+    for `default` with an index and for `never`
+  - before the installation: `installing <entries> from the image's repositories (installRecommends=<value>)`, where
+    `<entries>` is the accepted entries joined by spaces
+  - `cleanup=all`:
+    `removing downloaded packages from apt-get's cache and the package index from <directory> (cleanup=all)`
+  - `cleanup=packages`: `removing downloaded packages from apt-get's cache (cleanup=packages)`
+  - `cleanup=none` deletes nothing and logs nothing.
+
+  The existing-index line keeps the lead `direct_checks.ts` asserts and gains the directory and the policy. On the
+  `refreshPolicy=never` path it is printed only when an index exists; a miss prints the failure alone, which holds none
+  of the words `control_checks.ts` scans that path for. Rejected: a log line for the read-only exact-name check, which
+  changes nothing and uses no network; this design's draft wording, which named no control.
 - **Explicit failures; no pipeline decides.** `apt_network update --error-on=any`, `apt_network install …`, and
-  `apt-get clean` each end with `|| fail`; a failed refresh or install now exits 1 instead of 100, and APT's own lines
-  still print above, since nothing redirects them. `apt-config`'s and `apt-cache`'s output is saved by a bare assignment
-  ending in `|| fail`, which keeps the command's own status, and the saved text is then tested without a pipeline: the
-  `value='…'` wrapper is stripped by parameter expansion, the name is matched as a whole line, and the version is
-  compared with each `Version:` field. The name check still runs first, so a non-zero `apt-cache show` status means the
-  qualified entry has no record (an architecture the image has not enabled) or a tool failure, never an absent version
-  of a known name (probed: that exits 0 with empty output); its message covers both, and APT's own `E:` line still
-  prints on stderr. `rm --recursive --force` of the index directory stays under `set -e`, since its failure is not one
-  the developer fixes by configuration. Rejected: keeping the pipelines (a tool failure is misreported); `|| fail` on a
-  multi-command function (switches `set -e` off inside it).
+  `apt-get clean` each end with `|| fail`; a failed refresh or install now exits 1 instead of 100, the message shows
+  APT's status, and APT's own lines still print above, since nothing redirects them. `apt-config`'s and `apt-cache`'s
+  output is saved by a bare assignment ending in `|| fail`, which keeps the command's own status, and the saved text is
+  then tested without a pipeline: the `value='…'` wrapper is stripped by parameter expansion, the name is matched as a
+  whole line, and the version is compared with each `Version:` field. The name check still runs first, so a non-zero
+  `apt-cache show` status means the qualified entry has no record (an architecture the image has not enabled) or a tool
+  failure, never an absent version of a known name (probed: that exits 0 with empty output); its message covers both,
+  and APT's own `E:` line still prints on stderr. `rm --recursive --force` of the index directory stays under `set -e`,
+  since its failure is not one the developer fixes by configuration. Rejected: keeping the pipelines (a tool failure is
+  misreported); `|| fail` on a multi-command function (switches `set -e` off inside it).
 - **`DEBIAN_FRONTEND` is exported once at the top**, as a readonly constant like every other constant. It then reaches
   every `apt-get`, `apt-cache`, and `apt-config` call, which do not consult debconf except during installation, and the
   empty-list path exits before any of them. Rejected: the assignment in front of a function call (unspecified by POSIX);
@@ -223,7 +271,9 @@ No option is added, changed, renamed, or removed, so this design has no option t
 
 The audit's optional reading of `/etc/os-release` is adopted above, because the guide requires a change at that line
 (pipeline status, command substitution in an argument). Every item below is outside what the guide requires and the
-audit confirmed; the maintainer may pick any at the package gate.
+audit confirmed. The maintainer adopted none of them at the package gate on 2026-10-05; the existing-index line on the
+`refreshPolicy=never` path, offered here too, came with the installers' shared wording and moved to Decisions (Log
+lines).
 
 - **Rename the scenarios `controls_{packages,none}_{0,1}` to names that state behavior and image** (for example
   `cleanup_packages_ubuntu`). Clearer keys and file names; the same scheme is used by apk, dnf, and pacman packages, so
@@ -241,16 +291,15 @@ audit confirmed; the maintainer may pick any at the package gate.
 - **Decode `apt-config`'s `'\''` escaping** for an index directory whose path holds a quote (an unconfirmed audit item).
   Correct for such paths; no known image has one, and the decoding adds a loop to the trust-critical `rm` target.
 - **Drop the redundant `${lists_dir:?}` guard.** One less expansion; it is a second safety next to `rm --recursive`.
-- **Log `using the package index the image already holds` on the `refreshPolicy=never` path too.** Symmetric output;
-  adds a line the guide does not require on a path the host check scans for download words.
 
 ## Risks / Trade-offs
 
-- [A host check asserts a substring the restyle rewords] → Kept verbatim: the existing-index log line, the raw entry
-  with exit 1, the camelCase option name with exit 1, `apt-get`, `Debian`, and `Ubuntu`, and APT's own text, which is
-  never redirected. No line the `refreshPolicy=never` miss can print contains `fetch http`, `Downloading`, or
-  `Retrieving repository`. Both runners are rerun on both images and recorded in the PR, since CI does not run them
-  (#50).
+- [A host check asserts a substring the restyle rewords] → Kept verbatim: the lead of the existing-index log line
+  (`using the package index the image already holds`), the raw entry with exit 1, the camelCase option name with exit 1,
+  `apt-get`, `Debian`, and `Ubuntu`, and APT's own text, which is never redirected. The refresh failure says `keys`, not
+  `signature`, so the unverifiable-repository check still passes only on APT's text. No line the `refreshPolicy=never`
+  miss can print contains `fetch http`, `Downloading`, or `Retrieving repository`. Both runners are rerun on both images
+  and recorded in the PR, since CI does not run them (#50).
 - [The guide's "validate before anything changes" invites hoisting the `apt-get` check or the exact-name check] → The
   spec fixes both positions; comments mark them, and the Alpine direct checks fail if the `apt-get` check moves.
 - [Moving the parse loop into a function loses the entry list silently] → The parse loop stays in `main`; `just test`
@@ -260,7 +309,8 @@ audit confirmed; the maintainer may pick any at the package gate.
   `INSTALLRECOMMENDS`, `REFRESHPOLICY`, `CLEANUP`, `NETWORKTIMEOUT`, or `DEBIAN_FRONTEND`. No new readonly constant
   takes an os-release key (`NAME`, `ID`, `VERSION`, `VERSION_ID`, `PRETTY_NAME`).
 - [Exit status 100 becomes 1 for a failed refresh or install] → The spec requires only a non-zero status there; a build
-  fails either way. A caller that matched 100 would notice; none in this repository does.
+  fails either way, and the feature's line still shows APT's status. A caller that matched 100 would notice; none in
+  this repository does.
 - [The trim idiom differs on a shell not probed] → Probed on dash and BusyBox ash, the two shells that run it on the
   supported and the no-`apt-get` images; bash is not `/bin/sh` on either.
 - [`set -u` in the tests] → The test library tolerates it (audit verifier); `duplicate.sh` no longer reads `CLEANUP`.

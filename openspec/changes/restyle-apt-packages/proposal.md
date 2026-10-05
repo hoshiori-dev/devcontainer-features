@@ -19,11 +19,13 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/52.
 - Every failure the developer can fix prints one `apt-packages: error: <reason>; <how to fix it>` line on stderr and
   exits with status 1: invalid options and entries (with the given value), an image without `apt-get` (with the detected
   distribution), an unusable index directory, `refreshPolicy=never` without an index, an inexact name or version, and a
-  failed refresh, install, or cleanup. A failed refresh or install now exits 1 instead of APT's 100; APT's own messages
-  still print above the feature's line.
+  failed refresh, install, or cleanup. A failed refresh or install now exits 1 instead of APT's 100; the feature's line
+  shows the failed command's own status, and APT's own messages still print above it.
 - The feature logs one line before each step that changes the image or uses the network: refreshing the index,
-  installing, and each cleanup mode that deletes files. Existing log lines keep their wording without the trailing
-  period.
+  installing, and each cleanup mode that deletes files. It also logs one line when it uses the index the image already
+  holds, now under `refreshPolicy=never` too.
+- Failure and log lines use the wording the five package-list installers (`apk-packages`, `apt-packages`,
+  `dnf-packages`, `pacman-packages`, `zypper-packages`) share, and a log line names the control that selects its step.
 - The tests state their expected values as literals and their labels in the spec's words, and the four `controls_*.sh`
   checks report through the test library like the other scenarios.
 
@@ -62,10 +64,10 @@ failures, so the new wording, log lines, and status 1 stay inside it. The change
 - A refused option names the option in camelCase and shows the given value; a refused entry shows the entry verbatim;
   the message for an image without `apt-get` names `apt-get`, Debian, Ubuntu, and the detected distribution.
 - A failed `apt-get update`, `apt-get install`, or `apt-get clean`, and a failing `apt-config` or `apt-cache` call, ends
-  with an `apt-packages: error:` line naming that step and exit status 1; a failing `apt-config` or `apt-cache` is no
-  longer reported as an empty directory or a missing name or version.
+  with an `apt-packages: error:` line naming that command and its exit status, and the feature exits with status 1; a
+  failing `apt-config` or `apt-cache` is no longer reported as an empty directory or a missing name or version.
 - The build output shows an `apt-packages:` line before every index refresh, the installation, and every cleanup that
-  deletes files.
+  deletes files, and one whenever the feature uses the index the image already holds.
 - `test/apt-packages/duplicate.sh` asserts literal packages and cache state, and each check label in the shell tests
   states one behavior in the spec's words.
 - `src/apt-packages/devcontainer-feature.json` has version `1.1.1`.
