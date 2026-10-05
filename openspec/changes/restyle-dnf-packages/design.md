@@ -226,10 +226,10 @@ logged: it selects no step, and `dnf`'s arguments carry it. `cleanup=none` logs 
 
 `require_dnf` reads `PRETTY_NAME` with the guide's idiom, `. /etc/os-release` inside a command substitution with
 `# shellcheck source=/dev/null` above it, behind a `-r` test. A failed read (a syntax error, or a key that collides with
-a readonly name) falls back to `an unidentified distribution` through `|| <name>=`, with a comment naming that failure
-mode, so the status stays 1 as "Image without dnf" requires. The file is read only on this path, after the options are
-readonly; it assigns none of their names. The probe uses only builtins, so it works on `control_checks.ts`'s no-manager
-`PATH`.
+a readonly name) falls back to `an unidentified distribution` through `if ! <name>="$(…)"`, with a comment naming that
+failure mode, so the status stays 1 as "Image without dnf" requires. The file is read only on this path, after the
+options are readonly; it assigns none of their names. The probe uses only builtins, so it works on `control_checks.ts`'s
+no-manager `PATH`.
 
 - Rejected: keeping `sed | tr`. A pipeline's status decides the fallback.
 - Rejected: no fallback. A broken `/etc/os-release` would end the run with status 2 and without the message.

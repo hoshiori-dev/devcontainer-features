@@ -84,13 +84,15 @@ validate_options() {
 
 # Fails, naming the image's distribution, unless dnf is on PATH.
 require_dnf() {
-  if command -v dnf >/dev/null 2>&1; then return; fi
+  if command -v dnf >/dev/null 2>&1; then return 0; fi
   require_dnf_distribution=""
   if [ -r /etc/os-release ]; then
-    # Known failure mode: a file that is not valid shell, or that assigns a readonly name, ends the subshell with
-    # another status; the message then names no distribution, and the status stays 1.
+    # A malformed /etc/os-release, or one that assigns a readonly name, fails the subshell. The message below must
+    # still be the one that ends the run, so the distribution then stays unidentified.
     # shellcheck source=/dev/null
-    require_dnf_distribution="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")" || require_dnf_distribution=""
+    if ! require_dnf_distribution="$(. /etc/os-release && printf '%s\n' "${PRETTY_NAME:-}")"; then
+      require_dnf_distribution=""
+    fi
   fi
   fail "dnf was not found on this image (${require_dnf_distribution:-an unidentified distribution});" \
     "use a Fedora or RHEL-compatible image, which provides dnf (images with only microdnf are not supported)"
