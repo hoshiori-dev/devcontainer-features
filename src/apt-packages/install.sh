@@ -132,11 +132,11 @@ resolve_lists_dir() {
 # Refreshes the package index from every configured repository, or keeps the one the image holds, as the option
 # refreshPolicy selects.
 refresh_index() {
-  if [ "${REFRESHPOLICY}" = never ] && ! has_index; then
+  if [ "${REFRESHPOLICY}" = "never" ] && ! has_index; then
     fail "refreshPolicy=never needs a package index in ${lists_dir};" \
       "add it to the image, or use refreshPolicy=default"
   fi
-  if [ "${REFRESHPOLICY}" != always ] && has_index; then
+  if [ "${REFRESHPOLICY}" != "always" ] && has_index; then
     log "using the package index the image already holds in ${lists_dir} (refreshPolicy=${REFRESHPOLICY})"
     return 0
   fi

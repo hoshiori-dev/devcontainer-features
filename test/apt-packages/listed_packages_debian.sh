@@ -23,8 +23,8 @@ no_index_files() {
 
 check "bc is installed" installed bc
 check "file is installed" installed file
-check "the installed bc runs" bash -c 'echo "6*7" | bc | grep -qx 42'
-check "the installed file runs" file --version
+check "bc, with its dependencies, is installed: it computes 6*7" bash -c 'echo "6*7" | bc | grep -qx 42'
+check "file, with its dependencies, is installed: it prints its version" file --version
 check "file's dependency libmagic-mgc is installed" installed libmagic-mgc
 check "the image holds no downloaded package files" no_package_files
 check "the image holds no package index files" no_index_files

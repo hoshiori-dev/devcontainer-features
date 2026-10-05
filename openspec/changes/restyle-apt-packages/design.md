@@ -118,18 +118,18 @@ No option is added, changed, renamed, or removed, so this design has no option t
 - **Single-use helpers are inlined; the call depth is three.** `trim` becomes the two-expansion idiom in the parse loop
   (probed identical on dash and BusyBox ash). `describe_system` becomes part of the `apt-get` step. `refuse` disappears:
   the entry check is a predicate whose body is only `case` pattern tests, and `main` calls `fail` once with the entry.
-  `has_index` (two callers) and `apt_network` (three callers) stay helpers and get one-sentence comments. The
-  character-set comment keeps its non-obvious reason (ranges are read by locale collation in some shells) and replaces
-  its restated regular expression with a pointer to "Entries are validated before anything changes". Rejected: keeping
-  `refuse` with a constant message (four call levels); a `case` per refusal each calling `fail` (three copies of one
-  message).
+  `has_index` (two callers) and `apt_network` (two call sites, the refresh and the install) stay helpers and get
+  one-sentence comments. The character-set comment keeps its non-obvious reason (ranges are read by locale collation in
+  some shells) and replaces its restated regular expression with a pointer to "Entries are validated before anything
+  changes". Rejected: keeping `refuse` with a constant message (four call levels); a `case` per refusal each calling
+  `fail` (three copies of one message).
 - **POSIX forms the guide requires.** Every named variable is braced; a variable used only inside a function carries
   that function's name as prefix (`main_entry`, `has_index_list`); `apt_network` moves up with the other functions. The
   one-line `case … esac` validations take the guide's `case` layout, the two-command `cleanup=all` alternative is split
   across lines, and the guards outside the guide's forms become `if`: `[ -e … ] && return 0` in `has_index`,
-  `|| continue` in the parse loop, and `has_index || fail` on the `refreshPolicy=never` path, which becomes
-  `if ! has_index; then fail …; fi` because `has_index` runs a loop. Rejected: keeping `has_index || fail` on the
-  grounds that its loop holds only tests (true, but it breaks the guard rule as written).
+  `|| continue` in the parse loop, and `has_index || fail` on the `refreshPolicy=never` path, which becomes an `if`
+  whose condition joins the policy test and `! has_index`, because `has_index` runs a loop. Rejected: keeping
+  `has_index || fail` on the grounds that its loop holds only tests (true, but it breaks the guard rule as written).
 - **Option defaults at the top with `${NAME-default}`, readonly once validated.** All five options get their default at
   the top in the `${NAME-default}` form, so an explicitly empty `installRecommends`, `refreshPolicy`, or `cleanup` still
   reaches validation and fails, as "Installation controls are validated before changes" requires. `PACKAGES` moves from
