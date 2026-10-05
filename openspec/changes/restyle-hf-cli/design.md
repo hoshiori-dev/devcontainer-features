@@ -86,18 +86,21 @@ No option is added, changed, renamed, or removed, so there is no option table.
 `install.sh` keeps bash: both compatibility images ship it, and the upstream installer needs it. It takes the skeleton's
 layout: shebang, header, `set`, readonly constants, option defaults, mutable globals, `log` and `fail`, helpers, steps,
 `main`, `main "$@"`. `main` reads as the list of steps (validate options, detect platform, check the remote user, select
-Python, check uv, install prerequisites, confirm Python, resolve the version, install, verify, link); the helpers are
-`log`, `fail`, `cleanup`, the version comparison, the download helper, the run-as-user helper, and the installed-version
-probe. Calls go at most `main` → step → helper. The script stays one file. Rejected: keeping top-level code (the guide
-requires `main`); splitting into a library (the file stays small enough to audit whole).
+Python, check uv, install prerequisites, confirm Python, collect the proxy variables, create the work directory, resolve
+the version, prepare the install environment, install, verify, link); the helpers are `log`, `fail`, `cleanup`, the
+version comparison, the download helper, the run-as-user helper, and the installed-version probe. Calls go at most
+`main` → step → helper, with one exception: the installed-version probe runs the venv's interpreter through the
+run-as-user helper, so its two call sites share one command line instead of repeating it. The script stays one file.
+Rejected: keeping top-level code (the guide requires `main`); splitting into a library (the file stays small enough to
+audit whole).
 
 Mutable globals, declared lower case at the top, are only the values a later step, a helper, or the trap reads: the
-remote user and home, the selected interpreter, the proxy and installer environment lists, the work directory, and the
-resolved version. Every other variable is `local` to its step, declared on its own line before any assignment from a
-command substitution; the installed-version results of the skip check and of the verification are separate locals.
-Layout follows the guide: two-space indentation, lines within 120 characters (the long messages and the inline Python
-probes wrap), multi-line bodies for `log`, `fail`, and the version comparison, and the guide's `case` layout for the
-`installSkill` and architecture checks.
+remote user and home, the selected interpreter, the apt packages that Python selection asks for, the proxy and installer
+environment lists, the work directory, and the resolved version. Every other variable is `local` to its step, declared
+on its own line before any assignment from a command substitution; the installed-version results of the skip check and
+of the verification are separate locals. Layout follows the guide: two-space indentation, lines within 120 characters
+(the long messages and the inline Python probes wrap), multi-line bodies for `log`, `fail`, and the version comparison,
+and the guide's `case` layout for the `installSkill` and architecture checks.
 
 The `PATH` reset stays right after the constants as an exported variable, with a comment that it deliberately discards
 the build's `PATH` before the first command lookup. Rejected: making it `main`'s first line (equivalent, but the reset
@@ -109,9 +112,10 @@ Readonly constants at the top name every external URL, every version floor, and 
 modifies: the PyPI endpoint; the installer base and its path inside a tag, with the full template
 `https://raw.githubusercontent.com/huggingface/huggingface_hub/refs/tags/v<version>/utils/installers/install.sh` shown
 once in the header; `1.27.0`, `0.12.16`, and the `1.33.0` cut-off for `--claude`; the first-party Python directory; the
-CA bundle; `/usr/local/bin/hf`; `/var/lib/apt/lists`; and the home-relative suffixes of the venv, the skill directory,
-and the Claude skill link, joined with the remote home at run time. The PyPI URL reaches the JSON parser as an argument,
-so its message prints the constant. No constant takes a name that `/etc/os-release` defines.
+distribution's `/usr/bin/python3`, the interpreter once apt installed it; the CA bundle; `/usr/local/bin/hf`;
+`/var/lib/apt/lists`; and the home-relative suffixes of the venv, the skill directory, and the Claude skill link, joined
+with the remote home at run time. The PyPI URL reaches the JSON parser as an argument, so its message prints the
+constant. No constant takes a name that `/etc/os-release` defines.
 
 ### Variables and validation
 
@@ -172,12 +176,15 @@ names and the substrings runners rely on; exact words may change during implemen
 - apt failure (new `|| fail` on update and on install): names the packages and points to the image's apt sources and the
   build's network or proxy.
 - Download failure: names the URL, and so the tag or the endpoint; starts with `cannot fetch`; the integration runner's
-  substring changes to match.
+  substring changes to match. The new step lines name both URLs before the request, so the direct runner's
+  `unreachable-latest` and `missing-tag` observations assert text only the failure prints: `cannot fetch` with the
+  endpoint, and the cause line's `failed: HTTP 404` with the tag's installer path.
 - Invalid PyPI value: names the endpoint and the value, with separate wording for a malformed value and one below the
   floor.
 - Installer failure (new `|| fail`): follows the installer's own output and says to read it.
 - Version mismatch: keeps `differs from requested <version>` and names both versions.
 - Missing marker, skill, or skill link: names the path; the skill message keeps the word `skill` and names the version.
+  These and the version mismatch say to read the output above, not the installer's: on the skip path no installer ran.
 - `using …` lines: the interpreter path with its version; the uv path with its version, or that uv is absent.
 - New step lines: the apt packages and their source; the PyPI request; the installer URL and its destination; the
   installer run with its user and venv; the skill generation on the skip path; the link and its target.
@@ -193,10 +200,10 @@ those to their own message).
 The download helper keeps urllib, HTTPS-only constant URLs, the redirect refusal, the 60-second timeout, and its silence
 about exception text. It adds one credential-free cause line naming the URL and the HTTP status, `redirect refused` with
 its status, or the exception class name. The file write leaves the `try`, so a local error surfaces with Python's own
-message. Each call site ends with `|| fail` naming the URL and a fix that fits it (a missing release for the installer
-tag, network or proxy for the endpoint). Rejected: printing exception text (a proxy URL may carry credentials, which
-NOTES.md promises not to print); curl (not on `debian:12`, one more package); leaving the single sentence (the confirmed
-unclear failure).
+message, ahead of the call site's failure line. Each call site ends with `|| fail` naming the URL and a fix that fits it
+(a missing release for the installer tag, network or proxy for the endpoint). Rejected: printing exception text (a proxy
+URL may carry credentials, which NOTES.md promises not to print); curl (not on `debian:12`, one more package); leaving
+the single sentence (the confirmed unclear failure).
 
 ### Commands and comments
 
@@ -236,8 +243,11 @@ unclear failure).
 - Comparisons passed to `check` use the `test` command, as the guide's own example does, since `[[` is a keyword and
   cannot be an argument. Rejected: one helper per comparison (noise); `bash -c '[[ … ]]'` (expansions move into a quoted
   string).
-- The three implementation-worded labels are restated in the spec's words; a comment above each expected value computed
-  at run time says why (latest from PyPI when the test runs; `install_skill` installs latest; the first-party feature's
+- The three implementation-worded labels are restated in the spec's words, and so are the labels that named a behavior
+  in words the spec does not use: in `test.sh` the link's owner and target, the installer's marker, the distribution's
+  `python3`, the apt packages, the update-check variable, and `HF_HUB_OFFLINE`; in `duplicate.sh` the link; in the three
+  Python scenarios the interpreter the virtual environment uses. A comment above each expected value computed at run
+  time says why (latest from PyPI when the test runs; `install_skill` installs latest; the first-party feature's
   interpreter prefix depends on the Python it installed); the startup-file assertion and other multi-line or over-long
   assertions become helpers named after the behavior; `as_root` and `no_uv_settings` become multi-line functions.
 - No check is added or dropped, and each keeps its command's meaning; `test.sh:37` stays after the root run it guards.
@@ -297,6 +307,9 @@ for a later change.
   script takes no arguments; helpers keep their explicit arguments and `fetch` keeps forwarding `"$@"` to Python.
 - [The runners are hand-run, so CI does not catch a broken substring; a lower-cased final line would make the
   integration negative check vacuous] → the runners change with the messages and are run before the PR is marked ready.
+- [A step line that names a URL or a path satisfies a runner substring before the failure prints it] →
+  `unreachable-latest` and `missing-tag` assert text only the failure prints. `skill-failure` keeps `skill`, which the
+  skill-generation line prints too, because tightening it is one of the optional improvements not adopted.
 - [Runner mocks depend on `PATH` lookups through `/usr/local/sbin` and on `UV_CONSTRAINT` / `PIP_CONSTRAINT`] → the
   `PATH` constant and the constraint variable names stay; `uname --machine` still reaches the mock, which ignores its
   arguments.

@@ -23,7 +23,7 @@ each step, each source, and each failure stated plainly.
 - The build log has one line before each step that changes the image or uses the network: the apt installation, the
   latest-version request, the installer download, the installer run, the skill generation, and the system link.
 - A download failure names its URL and a cause that carries no proxy value (HTTP status, refused redirect, or error
-  class); a local write error is no longer reported as a download failure.
+  class); a local write error surfaces with Python's own message, ahead of the call site's failure line.
 - The `uv` version check runs before anything changes in the image; an unreadable `/etc/os-release` fails with a message
   saying so.
 - The test scripts under `test/hf-cli/` and the global scenario script `test/_global/uv_and_hf_cli.sh` follow the guide:
