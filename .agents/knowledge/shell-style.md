@@ -22,9 +22,8 @@ behavior contract to feature developers and auditors, so it is written for readi
   gives the reason. Disable checks per line, never per file. Two directives need no reason:
   `# shellcheck source=/dev/null` before sourcing `/etc/os-release` or `dev-container-features-test-lib`, and
   `# shellcheck shell=bash` or `# shellcheck shell=sh` at the top of a sourced file.
-- `just check` runs shellcheck on every tracked `*.sh`. Until the repository-wide restyle adds a `.shellcheckrc`, also
-  run the two optional checks this guide relies on for every file you write or restyle:
-  `shellcheck -o require-variable-braces,require-double-brackets <file>`.
+- `just check` runs shellcheck on every tracked `*.sh`. `.shellcheckrc` enables the two optional checks this guide
+  relies on, `require-variable-braces` and `require-double-brackets`, wherever shellcheck runs.
 
 ## Choosing bash or POSIX sh
 
