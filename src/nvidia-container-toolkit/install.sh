@@ -22,6 +22,7 @@ readonly RPM_KEY="/etc/pki/rpm-gpg/RPM-GPG-KEY-nvidia-container-toolkit"
 readonly DNF_REPO_FILE="/etc/yum.repos.d/nvidia-container-toolkit.repo"
 readonly ZYPPER_REPO_FILE="/etc/zypp/repos.d/nvidia-container-toolkit.repo"
 readonly DAEMON_JSON="/etc/docker/daemon.json"
+readonly APT_LISTS_DIR="/var/lib/apt/lists"
 readonly PACKAGES=(
   nvidia-container-toolkit nvidia-container-toolkit-base libnvidia-container-tools libnvidia-container1
 )
@@ -395,7 +396,7 @@ clean_caches() {
   case "${family}" in
     apt)
       apt-get clean
-      rm --recursive --force /var/lib/apt/lists/*
+      rm --recursive --force "${APT_LISTS_DIR:?}"/*
       ;;
     dnf) dnf clean all ;;
     zypper) zypper_unattended clean --all ;;

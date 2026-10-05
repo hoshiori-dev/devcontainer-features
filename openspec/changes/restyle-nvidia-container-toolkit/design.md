@@ -84,17 +84,18 @@ with an `enum` of `"true"` and `"false"` (a type change, MAJOR, for no gain), an
 
 ### Structure follows the bash skeleton
 
-`install.sh` takes the skeleton's order: shebang, header, `set`, readonly constants (adding `DNF_REPO_FILE` and
-`ZYPPER_REPO_FILE`), option defaults, lower-case mutable globals, `log` and `fail`, step functions, `main`, and
-`main "$@"`. `main` reads as the list of steps; the trap is armed in `main` before the first step that changes the
-image. Platform detection becomes a step with its loop variables `local`; `os_id`, `os_id_like`, `family`, and `arch`
-stay global because later steps and messages read them, and `/etc/os-release` is read in the guide's subshell form with
-`printf`. The header names what is installed, from where, the prerequisites installed from the image's own repositories
-when missing, the paths it writes, the import of the key into the RPM database, and the variables `VERSION` and
-`CONFIGUREDOCKER`; second-install behavior leaves the header. Divider comments are removed; their content becomes
-one-sentence function comments where a name does not say everything, including why an exact version maps to package
-release `-1`, what `cleanup` does, and why `gpgconf --kill` may fail (no gpg-agent may be running). The `|| true` after
-`grep --count` stays with a comment (grep exits 1 on zero matches while still printing 0).
+`install.sh` takes the skeleton's order: shebang, header, `set`, readonly constants (adding `DNF_REPO_FILE`,
+`ZYPPER_REPO_FILE`, and `APT_LISTS_DIR`, the apt lists directory the cache cleanup empties), option defaults, lower-case
+mutable globals, `log` and `fail`, step functions, `main`, and `main "$@"`. `main` reads as the list of steps; the trap
+is armed in `main` before the first step that changes the image. Platform detection becomes a step with its loop
+variables `local`; `os_id`, `os_id_like`, `family`, and `arch` stay global because later steps and messages read them,
+and `/etc/os-release` is read in the guide's subshell form with `printf`. The header names what is installed, from
+where, the prerequisites installed from the image's own repositories when missing, the paths it writes, the import of
+the key into the RPM database, and the variables `VERSION` and `CONFIGUREDOCKER`; second-install behavior leaves the
+header. Divider comments are removed; their content becomes one-sentence function comments where a name does not say
+everything, including why an exact version maps to package release `-1`, what `cleanup` does, and why `gpgconf --kill`
+may fail (no gpg-agent may be running). The `|| true` after `grep --count` stays with a comment (grep exits 1 on zero
+matches while still printing 0).
 
 The guide's mechanical rules apply throughout: braced variables, `printf` for text with an expansion, numeric
 comparisons in `(( ))` (the primary-key count, `id -u` in the tests), `${path%/*}` instead of `dirname`, the reason of
@@ -146,7 +147,9 @@ prerequisite install (already logged), downloading the key from its URL, install
 or the RPM key path, writing the repository definition with its base URL to its file, installing the four packages at
 the requested version from NVIDIA's stable repository, replacing a zero-length `/etc/docker/daemon.json` with an empty
 JSON object, registering the runtime with `nvidia-ctk`, and cleaning the package caches. The existing outcome lines (key
-verified, versions installed, Docker registered, skipped, or disabled, and the final line) stay.
+verified, versions installed, Docker registered, skipped, or disabled, and the final line) stay. The key-verified line
+is now printed right after the fingerprint check, before the key is installed, instead of after it: the line reports the
+check, not the install.
 
 Alternative rejected: logging outcomes only, which leaves a hanging build without a hint of the step it is in.
 
@@ -283,8 +286,8 @@ when closing the package gate (Package decisions); each stays available to a lat
   refreshes stops it, the image's own included.
 - [`dnf repo info` is dnf5 syntax] → Fedora 44 is the only dnf image; dnf4 hosts are attempted but not tested.
 - [Long options] → Every compatibility image uses GNU tools; Alpine fails detection before any command runs.
-- [A readonly constant named like an `/etc/os-release` key aborts the read] → The new constants `DNF_REPO_FILE` and
-  `ZYPPER_REPO_FILE`, like the existing ones, name no key that file defines.
+- [A readonly constant named like an `/etc/os-release` key aborts the read] → The new constants `DNF_REPO_FILE`,
+  `ZYPPER_REPO_FILE`, and `APT_LISTS_DIR`, like the existing ones, name no key that file defines.
 - [The spec's failure scenarios and second-install variants have no CI coverage] → Unchanged by this change and tracked
   by #50. The failure scenarios this change touches ("Malformed version" with an empty value, "Invalid configureDocker"
   with `yes` and an empty value, "Version the repository does not offer", "Distribution without a supported package
