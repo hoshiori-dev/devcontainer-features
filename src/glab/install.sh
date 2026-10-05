@@ -1,237 +1,312 @@
 #!/bin/sh
-# Installs the GitLab CLI (glab) from its GitLab release archive, verified against the release's
-# checksums.txt, to /usr/local/bin/glab. Runs as root at image build time; the `version` option
-# arrives as VERSION. Configures no authentication and writes nothing under any home directory.
-# Installing twice is safe: the requested version, when already installed, is left untouched, and
-# any other version is replaced atomically, so a failed install keeps the earlier binary.
-# POSIX sh, because Alpine ships no bash.
+# Installs the GitLab CLI (glab) from its GitLab release archive, verified against the release's checksums.txt, to
+# /usr/local/bin/glab. Runs as root at image build time; the option `version` arrives as VERSION. Configures no
+# authentication and writes nothing under any home directory.
+# POSIX sh, because Alpine images ship no bash.
 set -eu
 
-MIN_VERSION="1.47.0"
-RELEASES="https://gitlab.com/gitlab-org/cli/-/releases"
-TARGET="/usr/local/bin/glab"
-FAMILIES="the Debian, Ubuntu, Fedora, and Alpine families"
-REQUESTED="${VERSION-latest}"
+readonly MIN_VERSION="1.47.0"
+readonly RELEASES="https://gitlab.com/gitlab-org/cli/-/releases"
+readonly LATEST_URL="${RELEASES}/permalink/latest"
+readonly TARGET="/usr/local/bin/glab"
+# The binary is staged next to the target, so the rename over it stays on one file system.
+readonly STAGING_TEMPLATE="${TARGET%/*}/.glab-feature.XXXXXX"
+readonly APT_LISTS_DIR="/var/lib/apt/lists"
+readonly FAMILIES="the Debian, Ubuntu, Fedora, or Alpine family"
 
+VERSION="${VERSION-latest}"
+
+version=""
+arch=""
+pm=""
+archive=""
 work=""
 staged=""
-cleanup() {
-  if [ -n "$staged" ]; then rm -f "$staged"; fi
-  if [ -n "$work" ]; then rm -rf "$work"; fi
-}
-trap cleanup EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
 
 log() {
-  echo "glab feature: $*"
+  printf 'glab: %s\n' "$*"
 }
 
 fail() {
-  echo "glab feature: error: $*" >&2
+  printf 'glab: error: %s\n' "$*" >&2
   exit 1
+}
+
+# Removes the staged binary and the work directory on every exit, success or failure.
+cleanup() {
+  if [ -n "${staged}" ]; then rm -f "${staged}"; fi
+  if [ -n "${work}" ]; then rm -rf "${work}"; fi
 }
 
 # Prints $1 without a leading "v" when it is v?MAJOR.MINOR.PATCH of decimal numbers; else returns 1.
 normalize_version() {
-  v=${1#v}
-  case $v in
+  normalize_version_value="${1#v}"
+  case "${normalize_version_value}" in
     *.*.*.*) return 1 ;;
     *.*.*) ;;
     *) return 1 ;;
   esac
-  major=${v%%.*}
-  rest=${v#*.}
-  minor=${rest%%.*}
-  patch=${rest#*.}
-  for part in "$major" "$minor" "$patch"; do
-    case $part in
+  normalize_version_major="${normalize_version_value%%.*}"
+  normalize_version_rest="${normalize_version_value#*.}"
+  normalize_version_minor="${normalize_version_rest%%.*}"
+  normalize_version_patch="${normalize_version_rest#*.}"
+  for normalize_version_part in \
+    "${normalize_version_major}" "${normalize_version_minor}" "${normalize_version_patch}"; do
+    case "${normalize_version_part}" in
       '' | *[!0-9]*) return 1 ;;
     esac
   done
-  printf '%s\n' "$v"
+  printf '%s\n' "${normalize_version_value}"
 }
 
 # Succeeds when normalized version $1 is at or above normalized version $2.
 version_at_least() {
-  a=$1
-  b=$2
+  version_at_least_a="$1"
+  version_at_least_b="$2"
   for _ in 1 2 3; do
-    x=${a%%.*}
-    y=${b%%.*}
-    if [ "$x" -gt "$y" ]; then return 0; fi
-    if [ "$x" -lt "$y" ]; then return 1; fi
-    a=${a#*.}
-    b=${b#*.}
+    version_at_least_x="${version_at_least_a%%.*}"
+    version_at_least_y="${version_at_least_b%%.*}"
+    if [ "${version_at_least_x}" -gt "${version_at_least_y}" ]; then return 0; fi
+    if [ "${version_at_least_x}" -lt "${version_at_least_y}" ]; then return 1; fi
+    version_at_least_a="${version_at_least_a#*.}"
+    version_at_least_b="${version_at_least_b#*.}"
   done
   return 0
 }
 
-# Every request goes over HTTPS only, including each redirect; failing HTTP statuses are errors.
+# Runs curl over HTTPS only, including each redirect, with failing HTTP statuses as errors. --retry 3 handles a known
+# failure mode: a transient network error.
 fetch() {
   curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --retry 3 "$@"
 }
 
-# Downloads $1 to $2, following redirects, and logs the final URL so a host change shows in the log.
-download() {
-  final=$(fetch --location --output "$2" --write-out '%{url_effective}' "$1") || return 1
-  log "downloaded $1 (final URL: $final)"
-}
-
-# Runs a glab binary isolated from the image: temporary configuration, no update check, no telemetry.
-run_glab() {
-  binary=$1
-  shift
-  GLAB_CONFIG_DIR="$work/config" GLAB_CHECK_UPDATE=false CHECK_UPDATE=false \
-    GLAB_SEND_TELEMETRY=false "$binary" "$@"
-}
-
-# Succeeds when binary $1 reports version $2 in an output format glab has used since 1.47.0.
-reports_version() {
-  output=$(run_glab "$1" --version 2>/dev/null) || return 1
-  case $output in
-    "glab $2 ("* | "Current glab version: $2" | "Current glab version: $2 ("*) return 0 ;;
-  esac
-  return 1
-}
-
-has_package() {
-  case $pm in
-    apt-get) dpkg-query -W -f '${Status}' "$1" 2>/dev/null | grep -q 'install ok installed' ;;
-    dnf) rpm -q "$1" >/dev/null 2>&1 ;;
-    apk) apk info -e "$1" >/dev/null 2>&1 ;;
-  esac
-}
-
-# --- Checks that need no network, before anything is installed or downloaded ---
-
-version=""
-if [ "$REQUESTED" != "latest" ]; then
-  if ! version=$(normalize_version "$REQUESTED"); then
-    fail "invalid version '$REQUESTED': use 'latest' or a release version MAJOR.MINOR.PATCH," \
-      "with or without a leading 'v' (for example 1.120.0)."
+# Fails unless VERSION is "latest" or a release version at or above MIN_VERSION. Sets ${version} to the release
+# version without its leading "v", and leaves it empty for "latest".
+validate_options() {
+  if [ "${VERSION}" = "latest" ]; then return 0; fi
+  if ! version="$(normalize_version "${VERSION}")"; then
+    fail "option version is \"${VERSION}\";" \
+      "use \"latest\" or a release version MAJOR.MINOR.PATCH such as 1.120.0, with or without a leading \"v\""
   fi
-  version_at_least "$version" "$MIN_VERSION" \
-    || fail "version $version is not supported: the minimum is $MIN_VERSION."
-fi
+  if ! version_at_least "${version}" "${MIN_VERSION}"; then
+    fail "option version is ${version}, below the minimum ${MIN_VERSION}; set version to ${MIN_VERSION} or later"
+  fi
+}
 
-machine=$(uname -m)
-case $machine in
-  x86_64) arch=amd64 ;;
-  aarch64) arch=arm64 ;;
-  *) fail "unsupported architecture '$machine': supported are x86_64 and aarch64." ;;
-esac
-
-[ -f /etc/os-release ] \
-  || fail "/etc/os-release is missing, so the distribution cannot be identified; supported are $FAMILIES."
-# Read in subshells: os-release sets VERSION, which would overwrite the option.
-# shellcheck source=/dev/null
-os_id=$(. /etc/os-release && printf '%s' "${ID:-}")
-# shellcheck source=/dev/null
-os_like=$(. /etc/os-release && printf '%s' "${ID_LIKE:-}")
-pm=""
-set -f
-for word in $os_id $os_like; do
-  case $word in
-    debian | ubuntu) pm=apt-get ;;
-    fedora) pm=dnf ;;
-    alpine) pm=apk ;;
-    *) continue ;;
+# Fails unless the machine is x86_64 or aarch64 and the image belongs to a supported family and has that family's
+# package manager; sets ${arch} and ${pm}. Runs before VERSION becomes readonly: /etc/os-release assigns it too.
+detect_platform() {
+  detect_platform_machine="$(uname --machine)"
+  case "${detect_platform_machine}" in
+    x86_64) arch=amd64 ;;
+    aarch64) arch=arm64 ;;
+    *) fail "unsupported architecture \"${detect_platform_machine}\"; use an x86_64 or aarch64 machine" ;;
   esac
-  break
-done
-set +f
-[ -n "$pm" ] \
-  || fail "unsupported distribution '$os_id' (ID_LIKE '$os_like'): supported are $FAMILIES."
-command -v "$pm" >/dev/null 2>&1 \
-  || fail "distribution '$os_id' is in a supported family, but its package manager $pm is missing."
 
-# --- Prerequisites: git for glab at run time; curl, ca-certificates, and tar for the install ---
+  [ -f /etc/os-release ] \
+    || fail "/etc/os-release is missing, so the distribution cannot be identified; use an image of ${FAMILIES}"
+  # Read in subshells: os-release sets VERSION, which would overwrite the option.
+  # shellcheck source=/dev/null
+  detect_platform_id="$(. /etc/os-release && printf '%s\n' "${ID:-}")"
+  # shellcheck source=/dev/null
+  detect_platform_id_like="$(. /etc/os-release && printf '%s\n' "${ID_LIKE:-}")"
 
-missing=""
-for command in git curl tar; do
-  command -v "$command" >/dev/null 2>&1 || missing="$missing $command"
-done
-has_package ca-certificates || missing="$missing ca-certificates"
-if [ -n "$missing" ]; then
-  log "installing missing prerequisites:$missing"
-  # $missing is a space-separated list of package names, split on purpose.
-  case $pm in
+  # ID decides first, then each word of ID_LIKE in order. The two values are unquoted to split them into words, and
+  # set -f keeps a word from expanding as a glob.
+  set -f
+  for detect_platform_family in ${detect_platform_id} ${detect_platform_id_like}; do
+    case "${detect_platform_family}" in
+      debian | ubuntu)
+        pm=apt-get
+        break
+        ;;
+      fedora)
+        pm=dnf
+        break
+        ;;
+      alpine)
+        pm=apk
+        break
+        ;;
+    esac
+  done
+  set +f
+  [ -n "${pm}" ] \
+    || fail "unsupported distribution \"${detect_platform_id}\" (ID_LIKE \"${detect_platform_id_like}\");" \
+      "use an image of ${FAMILIES}"
+  command -v "${pm}" >/dev/null 2>&1 \
+    || fail "distribution \"${detect_platform_id}\" is in a supported family," \
+      "but its package manager ${pm} is missing; use an image that has ${pm}"
+}
+
+# Installs what the image lacks of git, which glab needs at run time, and of curl, tar, and ca-certificates, which
+# the install needs, and cleans the package manager's cache. The missing packages are this function's positional
+# parameters.
+install_prerequisites() {
+  set --
+  for install_prerequisites_command in git curl tar; do
+    if ! command -v "${install_prerequisites_command}" >/dev/null 2>&1; then
+      set -- "$@" "${install_prerequisites_command}"
+    fi
+  done
+  case "${pm}" in
     apt-get)
-      DEBIAN_FRONTEND=noninteractive apt-get update
-      # shellcheck disable=SC2086
-      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $missing
-      rm -rf /var/lib/apt/lists/*
+      # Known failure mode: dpkg-query exits 1 for a package dpkg has no record of. Any failed query counts as not
+      # installed.
+      if ! install_prerequisites_status="$(
+        dpkg-query --show --showformat '${Status}' ca-certificates 2>/dev/null
+      )"; then
+        install_prerequisites_status=""
+      fi
+      case "${install_prerequisites_status}" in
+        *'install ok installed'*) ;;
+        *) set -- "$@" ca-certificates ;;
+      esac
       ;;
     dnf)
-      # shellcheck disable=SC2086
-      dnf install -y $missing
+      if ! rpm --query ca-certificates >/dev/null 2>&1; then set -- "$@" ca-certificates; fi
+      ;;
+    apk)
+      if ! apk info --installed ca-certificates >/dev/null 2>&1; then set -- "$@" ca-certificates; fi
+      ;;
+  esac
+  if [ "$#" -eq 0 ]; then return 0; fi
+
+  log "installing missing prerequisites with ${pm}: $*"
+  case "${pm}" in
+    apt-get)
+      DEBIAN_FRONTEND=noninteractive apt-get update \
+        || fail "apt-get update failed; check the image's package repositories and network access"
+      DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends "$@" \
+        || fail "apt-get install failed; check the image's package repositories and network access"
+      rm --recursive --force "${APT_LISTS_DIR:?}"/*
+      ;;
+    dnf)
+      dnf install --assumeyes "$@" \
+        || fail "dnf install failed; check the image's package repositories and network access"
       dnf clean all
       ;;
     apk)
-      # shellcheck disable=SC2086
-      apk add --no-cache $missing
+      apk add --no-cache "$@" \
+        || fail "apk add failed; check the image's package repositories and network access"
       ;;
   esac
-fi
+}
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/glab-feature.XXXXXX")
-mkdir -m 700 "$work/config"
-
-# --- Version: `latest` from the release page's permanent link, read without following it ---
-
-if [ -z "$version" ]; then
-  location=$(fetch --head --output /dev/null --write-out '%{redirect_url}' "$RELEASES/permalink/latest") \
-    || fail "could not read $RELEASES/permalink/latest."
-  [ -n "$location" ] || fail "$RELEASES/permalink/latest did not redirect to a release."
-  tag=${location%%[?#]*}
-  tag=${tag%/}
-  tag=${tag##*/}
-  log "latest release: $location"
-  if ! version=$(normalize_version "$tag"); then
-    fail "the latest release is '$tag', which is not a release version MAJOR.MINOR.PATCH;" \
-      "set the version option to a release."
+# Sets ${version} to the release the latest-release link redirects to, read without following the redirect.
+resolve_latest() {
+  resolve_latest_location="$(fetch --head --output /dev/null --write-out '%{redirect_url}' "${LATEST_URL}")" \
+    || fail "cannot read ${LATEST_URL}; check network access to gitlab.com, or set version to a release"
+  [ -n "${resolve_latest_location}" ] \
+    || fail "${LATEST_URL} did not redirect to a release; set version to a release"
+  log "read the latest release from ${LATEST_URL}: ${resolve_latest_location}"
+  # The Location header may be absolute or relative, and curl prints the URL it resolves to. The tag is the last
+  # path segment of that URL, without a query, a fragment, or a trailing slash.
+  resolve_latest_tag="${resolve_latest_location%%[?#]*}"
+  resolve_latest_tag="${resolve_latest_tag%/}"
+  resolve_latest_tag="${resolve_latest_tag##*/}"
+  if ! version="$(normalize_version "${resolve_latest_tag}")"; then
+    fail "the latest release is \"${resolve_latest_tag}\", which is not a release version MAJOR.MINOR.PATCH;" \
+      "set version to a release"
   fi
-  version_at_least "$version" "$MIN_VERSION" \
-    || fail "the latest release is '$tag', below the minimum $MIN_VERSION."
-fi
+  if ! version_at_least "${version}" "${MIN_VERSION}"; then
+    fail "the latest release is \"${resolve_latest_tag}\", below the minimum ${MIN_VERSION};" \
+      "set version to a release"
+  fi
+}
 
-if [ -f "$TARGET" ] && reports_version "$TARGET" "$version"; then
-  log "glab $version is already installed at $TARGET; leaving it unchanged."
-  exit 0
-fi
+# Ends the install with status 0 when ${TARGET} already reports ${version} in an output format glab has used since
+# 1.47.0. A glab that exits non-zero or prints anything else is replaced. The glab run is isolated from the image:
+# temporary configuration, no update check, no telemetry.
+skip_when_installed() {
+  [ -f "${TARGET}" ] || return 0
+  mkdir --mode 700 "${work}/config"
+  if ! skip_when_installed_output="$(
+    GLAB_CONFIG_DIR="${work}/config" GLAB_CHECK_UPDATE=false CHECK_UPDATE=false GLAB_SEND_TELEMETRY=false \
+      "${TARGET}" --version 2>/dev/null
+  )"; then
+    return 0
+  fi
+  case "${skip_when_installed_output}" in
+    "glab ${version} ("* | "Current glab version: ${version}" | "Current glab version: ${version} ("*)
+      log "glab ${version} is already installed at ${TARGET}; leaving it unchanged"
+      exit 0
+      ;;
+  esac
+}
 
-# --- Download and verify against the release's checksums.txt ---
+# Downloads the release's checksums.txt and then its archive into ${work}, logging each final URL so a host change
+# shows in the build log. Fails unless checksums.txt holds exactly one entry for the archive and the archive's
+# SHA-256 digest equals that entry.
+download_and_verify() {
+  archive="glab_${version}_linux_${arch}.tar.gz"
+  download_and_verify_url="${RELEASES}/v${version}/downloads"
 
-archive="glab_${version}_linux_${arch}.tar.gz"
-downloads="$RELEASES/v$version/downloads"
-if ! download "$downloads/checksums.txt" "$work/checksums.txt"; then
-  fail "could not download checksums.txt of glab $version from $downloads/checksums.txt;" \
-    "does release v$version exist?"
-fi
-awk -v name="$archive" 'NF == 2 && $2 == name' "$work/checksums.txt" >"$work/archive.sha256"
-entries=$(awk 'END { print NR }' "$work/archive.sha256")
-[ "$entries" = 1 ] \
-  || fail "verification failed: checksums.txt holds $entries entries for $archive, expected exactly one."
-download "$downloads/$archive" "$work/$archive" \
-  || fail "could not download $archive of glab $version from $downloads/$archive."
-(cd "$work" && sha256sum -c archive.sha256) \
-  || fail "verification failed: the SHA-256 digest of $archive does not match its entry in checksums.txt."
+  download_and_verify_final="$(fetch --location --output "${work}/checksums.txt" --write-out '%{url_effective}' \
+    "${download_and_verify_url}/checksums.txt")" \
+    || fail "cannot download ${download_and_verify_url}/checksums.txt;" \
+      "check that release v${version} exists and that gitlab.com is reachable"
+  log "downloaded ${download_and_verify_url}/checksums.txt to ${work}/checksums.txt" \
+    "(final URL: ${download_and_verify_final})"
+  awk -v name="${archive}" 'NF == 2 && $2 == name' "${work}/checksums.txt" >"${work}/archive.sha256"
+  download_and_verify_entries="$(awk 'END { print NR }' "${work}/archive.sha256")"
+  [ "${download_and_verify_entries}" = "1" ] \
+    || fail "verification failed: checksums.txt of release v${version} holds ${download_and_verify_entries} entries" \
+      "for ${archive}, expected exactly one;" \
+      "retry the build, and set version to another release if it persists"
 
-mkdir "$work/extract"
-tar -xzf "$work/$archive" -C "$work/extract" bin/glab \
-  || fail "could not extract bin/glab from $archive."
-if [ ! -f "$work/extract/bin/glab" ] || [ -L "$work/extract/bin/glab" ]; then
-  fail "$archive does not hold bin/glab as a regular file."
-fi
+  download_and_verify_final="$(fetch --location --output "${work}/${archive}" --write-out '%{url_effective}' \
+    "${download_and_verify_url}/${archive}")" \
+    || fail "cannot download ${download_and_verify_url}/${archive};" \
+      "check that release v${version} has an archive for linux ${arch}"
+  log "downloaded ${download_and_verify_url}/${archive} to ${work}/${archive}" \
+    "(final URL: ${download_and_verify_final})"
+  (cd "${work}" && sha256sum -c archive.sha256) \
+    || fail "verification failed: ${archive} does not match its entry in checksums.txt;" \
+      "retry the build, and set version to another release if it persists"
+}
 
-# --- Install: stage next to the target, then rename over it atomically ---
+# Extracts bin/glab from the archive into ${work}/extract.
+extract_binary() {
+  mkdir "${work}/extract"
+  tar --extract --gzip --file "${work}/${archive}" --directory "${work}/extract" bin/glab \
+    || fail "cannot extract bin/glab from ${archive}; set version to another release"
+  # Only a regular file is installed: cp would follow a symbolic link out of the work directory.
+  if [ ! -f "${work}/extract/bin/glab" ] || [ -L "${work}/extract/bin/glab" ]; then
+    fail "${archive} does not hold bin/glab as a regular file; set version to another release"
+  fi
+}
 
-mkdir -p "${TARGET%/*}"
-staged=$(mktemp "${TARGET%/*}/.glab-feature.XXXXXX")
-cp "$work/extract/bin/glab" "$staged"
-chmod 0755 "$staged"
-mv -f "$staged" "$TARGET"
-staged=""
-log "installed $(run_glab "$TARGET" --version 2>/dev/null || echo "glab $version") at $TARGET"
+# Stages the binary next to ${TARGET} and renames it over the target, so the target is replaced in one step.
+install_binary() {
+  mkdir --parents "${TARGET%/*}"
+  staged="$(mktemp "${STAGING_TEMPLATE}")"
+  cp "${work}/extract/bin/glab" "${staged}"
+  chmod 0755 "${staged}"
+  mv --force "${staged}" "${TARGET}"
+  staged=""
+  log "installed glab ${version} from ${archive} to ${TARGET}"
+}
+
+main() {
+  validate_options
+  detect_platform
+  readonly VERSION
+
+  trap cleanup EXIT
+  # dash does not run the EXIT trap when a signal ends the script; exiting from the signal's trap runs it, with the
+  # status a shell reports for that signal.
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
+  install_prerequisites
+  work="$(mktemp --directory "${TMPDIR:-/tmp}/glab-feature.XXXXXX")"
+  if [ "${VERSION}" = "latest" ]; then resolve_latest; fi
+  skip_when_installed
+  download_and_verify
+  extract_binary
+  install_binary
+}
+
+main "$@"
