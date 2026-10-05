@@ -1,8 +1,9 @@
 #!/usr/bin/env -S deno run --allow-read --allow-env=GITHUB_EVENT_PATH
 // Checks a pull request description against the PR template: every `## ` heading of the template
 // must appear as a line of its own, and the template's security checklist item (the item mentioning
-// "secrets") must appear with the same text and be ticked. The template is read from the path given; CI passes the base commit's copy
-// (.github/workflows/pr.yml) so a pull request cannot relax the check by editing the template.
+// "secrets") must appear with the same text and be ticked. The template is read from the path given;
+// CI passes the base commit's copy (.github/workflows/pr.yml) so a pull request cannot relax the check
+// by editing the template.
 //
 //   scripts/check_pr_body.ts --template .github/pull_request_template.md [--body-file body.md]
 //

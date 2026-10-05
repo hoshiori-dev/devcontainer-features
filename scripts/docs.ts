@@ -27,7 +27,11 @@ if (import.meta.main) {
         const src = join(temp, "src");
         await copy("src", src);
         for await (const entry of Deno.readDir(src)) {
-            if (entry.isDirectory) await Deno.remove(join(src, entry.name, "README.md")).catch(() => {});
+            if (!entry.isDirectory) continue;
+            // A feature without a README.md yet is expected; any other failure to remove one is not.
+            await Deno.remove(join(src, entry.name, "README.md")).catch((error) => {
+                if (!(error instanceof Deno.errors.NotFound)) throw error;
+            });
         }
         // --project-folder must be the folder holding the feature directories (src/ itself), and
         // relative: the CLI embeds it verbatim in each README's link to devcontainer-feature.json.

@@ -127,12 +127,29 @@ if (import.meta.main) {
     let cleaned: Promise<void> | undefined;
     const cleanup = () =>
         cleaned ??= (async () => {
+            // A failed start is already reported as a setup failure by the try block below.
             await starting?.catch(() => "");
-            await new Deno.Command("docker", { args: ["rm", "-f", container], stdout: "null", stderr: "null" })
-                .output();
+            // Cleanup problems are reported, not counted as failures: they do not change what the tests showed.
+            // `docker rm -f` exits 0 for a container that does not exist, so a failure here is a real one.
+            const removed = await new Deno.Command("docker", {
+                args: ["rm", "-f", container],
+                stdout: "null",
+                stderr: "piped",
+            }).output().catch((error) => error as Error);
+            if (removed instanceof Error || !removed.success) {
+                const reason = removed instanceof Error
+                    ? removed.message
+                    : new TextDecoder().decode(removed.stderr).trim() || `exit code ${removed.code}`;
+                console.error(`\nwarning: could not remove the registry container ${container}: ${reason}`);
+            }
             if (args.keep) {
                 console.log(`\nStaging directory kept: ${out} (its registry refs point at a removed registry)`);
-            } else await Deno.remove(out, { recursive: true }).catch(() => {});
+            } else {
+                await Deno.remove(out, { recursive: true }).catch((error) => {
+                    const reason = error instanceof Error ? error.message : error;
+                    console.error(`\nwarning: could not remove the staging directory ${out}: ${reason}`);
+                });
+            }
         })();
     const handlers = Object.entries(SIGNALS).map(([signal, code]) => {
         const handler = () => {

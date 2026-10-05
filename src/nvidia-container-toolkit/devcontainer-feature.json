@@ -1,0 +1,26 @@
+{
+  "id": "nvidia-container-toolkit",
+  "version": "1.0.0",
+  "name": "NVIDIA Container Toolkit",
+  "description": "Installs the NVIDIA Container Toolkit from NVIDIA's signed package repository and registers the nvidia runtime with a Docker daemon in the dev container.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/nvidia-container-toolkit",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": [
+        "latest",
+        "1.19.1"
+      ],
+      "default": "latest",
+      "description": "Toolkit release to install: 'latest' for the newest stable release, or an exact MAJOR.MINOR.PATCH release. Older releases have known vulnerabilities; see the notes."
+    },
+    "configureDocker": {
+      "type": "boolean",
+      "default": true,
+      "description": "Register the nvidia runtime in /etc/docker/daemon.json when a Docker daemon (dockerd) is installed in the dev container; skipped when none is."
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/docker-in-docker"
+  ]
+}

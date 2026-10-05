@@ -1,0 +1,38 @@
+{
+  "id": "uv",
+  "version": "1.0.0",
+  "name": "uv",
+  "description": "Installs Astral's uv and uvx, optionally Python command-line tools, and keeps uv's Python interpreters and cache on a volume that survives rebuilds.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/uv",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "0.12.16"],
+      "default": "latest",
+      "description": "The uv release to install: latest, the newest release at build time, or one release as MAJOR.MINOR.PATCH."
+    },
+    "toolsToInstall": {
+      "type": "string",
+      "proposals": ["", "pycowsay"],
+      "default": "",
+      "description": "Python command-line tools to install at build time, comma-separated, each a package name with at most one extra and one version constraint (needs uv 0.12.16 or later)."
+    }
+  },
+  "containerEnv": {
+    "UV_PYTHON_INSTALL_DIR": "/var/lib/uv/python",
+    "UV_CACHE_DIR": "/var/lib/uv/cache",
+    "UV_TOOL_DIR": "/usr/local/share/uv/tools",
+    "UV_TOOL_BIN_DIR": "/usr/local/share/uv/bin",
+    "UV_LINK_MODE": "copy",
+    "PATH": "${PATH}:/usr/local/share/uv/bin"
+  },
+  "mounts": [
+    {
+      "source": "uv-${devcontainerId}",
+      "target": "/var/lib/uv",
+      "type": "volume"
+    }
+  ],
+  "installsAfter": ["ghcr.io/devcontainers/features/common-utils"],
+  "onCreateCommand": "/usr/local/share/uv-feature/repair-volume"
+}

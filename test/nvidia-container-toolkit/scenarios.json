@@ -1,0 +1,74 @@
+{
+  "docker_in_docker": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "ghcr.io/devcontainers/features/docker-in-docker:4": {},
+      "nvidia-container-toolkit": {}
+    }
+  },
+  "docker_outside_of_docker": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+      "nvidia-container-toolkit": {}
+    }
+  },
+  "pinned_debian": {
+    "image": "debian:12",
+    "features": {
+      "nvidia-container-toolkit": {
+        "version": "1.19.1"
+      }
+    }
+  },
+  "pinned_fedora": {
+    "image": "fedora:44",
+    "features": {
+      "nvidia-container-toolkit": {
+        "version": "1.19.1"
+      }
+    }
+  },
+  "pinned_opensuse": {
+    "image": "registry.opensuse.org/opensuse/leap:16.0",
+    "features": {
+      "nvidia-container-toolkit": {
+        "version": "1.19.1"
+      }
+    }
+  },
+  "oldest_release": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "nvidia-container-toolkit": {
+        "version": "1.14.0"
+      }
+    }
+  },
+  "daemon_json_kept": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "nvidia-container-toolkit": {}
+    }
+  },
+  "daemon_json_empty": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "nvidia-container-toolkit": {}
+    }
+  },
+  "docker_disabled": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "nvidia-container-toolkit": {
+        "configureDocker": false
+      }
+    }
+  }
+}
