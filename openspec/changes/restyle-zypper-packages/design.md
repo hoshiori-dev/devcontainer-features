@@ -130,7 +130,10 @@ No option is added, changed, renamed, or removed, so the design carries no optio
   `zypper repos` output through a here-document, not `printf | sed`. Rejected: keeping `sed | tr`, where the fallback is
   decided by `tr`'s status alone and the substitution sits inside `fail`'s arguments, both of which the guide rules out;
   `sed` on the file with quote stripping by parameter expansion, which keeps a spawned tool for what the guide's idiom
-  does with builtins. The output differs from today only for a `PRETTY_NAME` with quotes inside its value.
+  does with builtins. The file is now executed in a subshell, as the guide prescribes, so the output differs from
+  today's when the file holds more than plain assignments: quotes and expansions in `PRETTY_NAME` are interpreted
+  instead of stripped or kept literally, a command in the file runs, an inherited `PRETTY_NAME` is used when the file
+  sets none, and a file that fails to source gives `an unidentified distribution` after the shell's own error line.
 - **Alias extraction keeps `sed`, with its long option.** The regular expression stays as it is and the call spells
   `--quiet` instead of `-n`: it runs only after `zypper` was found, so only on the supported openSUSE images, whose GNU
   `sed` has the long option the guide asks for. Rejected: a builtin loop with `case` and parameter expansion, which
