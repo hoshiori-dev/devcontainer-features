@@ -1,6 +1,6 @@
-# Pull-request metadata checks. They depend on the title, the description, and the draft state, so
-# they rerun on edits and on ready/draft transitions without rerunning CI. Each job is a required
-# check; job map: .agents/knowledge/github/checks.md.
+# Pull-request metadata checks. They rerun on edits and on ready/draft transitions without rerunning
+# CI. `pr-title`, `pr-checklist`, and `spec-archived` are required checks; job map:
+# .agents/knowledge/github/checks.md.
 name: PR
 
 on:
@@ -51,8 +51,12 @@ jobs:
       - working-directory: ${{ steps.base.outputs.root }}
         run: ./scripts/check_pr_body.ts --template .github/pull_request_template.md
 
-  spec-archived:
+  # Decides whether the tree holds an unarchived OpenSpec change. The verdict depends on the tree
+  # alone, never on the draft state, so every run on a commit agrees.
+  archive-verdict:
     runs-on: ubuntu-24.04
+    outputs:
+      archived: ${{ steps.verdict.outputs.archived }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -62,13 +66,47 @@ jobs:
         uses: ./.github/actions/base-checks
         with:
           files: scripts/check_spec_archived.ts
-      # Runs in the workspace, so it reads this pull request's openspec/changes/.
-      - env:
-          DRAFT: ${{ github.event.pull_request.draft }}
+      # Loads the checker without running it. A checker Deno cannot load exits 1, the status that
+      # means an unarchived change, so a load failure has to fail the job here, before the verdict.
+      - id: load
+        env:
+          ROOT: ${{ steps.base.outputs.root }}
+        run: deno cache "${ROOT}/scripts/check_spec_archived.ts"
+      # Runs in the workspace, so it reads this pull request's openspec/changes/. The checker prints
+      # names the pull request chose, so its status leaves this step through a file and the verdict
+      # is written by the next step: nothing printed here can reach the job's output.
+      - id: check
+        env:
           ROOT: ${{ steps.base.outputs.root }}
         run: |
-          if [[ "${DRAFT}" == "true" ]]; then
-            "${ROOT}/scripts/check_spec_archived.ts"
+          status=0
+          "${ROOT}/scripts/check_spec_archived.ts" --ready || status=$?
+          echo "${status}" > "${RUNNER_TEMP}/archive-status"
+      # Status 1 means a change is unarchived, which is a state to wait in, not a failure; any other
+      # non-zero status is the checker failing and fails the job.
+      - id: verdict
+        run: |
+          status="$(cat "${RUNNER_TEMP}/archive-status")"
+          case "${status}" in
+            0) echo "archived=true" >> "${GITHUB_OUTPUT}" ;;
+            1) echo "archived=false" >> "${GITHUB_OUTPUT}" ;;
+            *) exit "${status}" ;;
+          esac
+
+  # Carries the required check. It succeeds either way, but under the required name only when no
+  # change is unarchived: while one is, nothing reports `spec-archived`, so the ruleset blocks the
+  # merge and the run still succeeds. `awaiting-archive` is not a required check and never becomes
+  # one (.agents/knowledge/github/checks.md).
+  spec-archived:
+    name: ${{ needs.archive-verdict.outputs.archived == 'true' && 'spec-archived' || 'awaiting-archive' }}
+    needs: archive-verdict
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          ARCHIVED: ${{ needs.archive-verdict.outputs.archived }}
+        run: |
+          if [[ "${ARCHIVED}" == "true" ]]; then
+            echo "No unarchived OpenSpec change."
           else
-            "${ROOT}/scripts/check_spec_archived.ts" --ready
+            echo "Waiting for the archive; the unarchived changes are named in the archive-verdict job."
           fi
