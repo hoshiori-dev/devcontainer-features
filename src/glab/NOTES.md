@@ -21,16 +21,19 @@ forward it with `remoteEnv` in `devcontainer.json`:
 }
 ```
 
-`${localEnv:GITLAB_TOKEN}` is read on the host when the container starts, so the token stays out of the repository and
-out of the image. Prefer `remoteEnv` to `containerEnv` for a token: `containerEnv` stores the value in the container's
-configuration, where `docker inspect` shows it. If the variable is unset on the host, the container gets an empty
-`GITLAB_TOKEN`, which glab ignores: it uses a token stored by `glab auth login` if there is one, and otherwise sends
-unauthenticated requests.
+`${localEnv:GITLAB_TOKEN}` takes the value from the environment of the tool on your machine, so the token stays out of
+the repository and out of the image; a tool that was already running, such as VS Code, may need a restart to see a
+variable you have just set. Prefer `remoteEnv` to `containerEnv` for a token: `containerEnv` stores the value in the
+container's configuration, where `docker inspect` shows it. If the variable is unset on the host, the container gets an
+empty `GITLAB_TOKEN`, which glab ignores: it uses a token stored by `glab auth login` if there is one, and otherwise
+sends unauthenticated requests.
 
 ## Self-managed instances
 
-Inside a Git repository, glab uses the GitLab host of that repository's remote, so a workspace cloned from your instance
-needs no host setting. Outside a repository glab uses `gitlab.com`, unless `GITLAB_HOST` names another instance:
+Inside a Git repository, glab uses the GitLab host of that repository's remote, but only a host it knows: `gitlab.com`,
+or an instance stored by `glab auth login --hostname <host>`. A token passed through `GITLAB_TOKEN` alone does not make
+your instance known, so in a workspace cloned from it glab reports that no remote points to a known GitLab host. Outside
+a repository glab uses `gitlab.com`. `GITLAB_HOST` names your instance in both cases:
 
 ```jsonc
 {
