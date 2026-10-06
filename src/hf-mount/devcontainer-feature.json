@@ -1,6 +1,6 @@
 {
   "id": "hf-mount",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "Hugging Face hf-mount",
   "description": "Installs the hf-mount daemon and its NFS and FUSE backends from upstream release binaries, to mount Hugging Face Buckets and repositories as local filesystems.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/hf-mount",

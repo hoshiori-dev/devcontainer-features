@@ -52,6 +52,51 @@ up:
   started but refused every access, the mounting user's included, whether root or `vscode` had mounted; if the mount
   point answers `Permission denied`, use `user_allow_other` instead.
 
+## Passing a token from your machine
+
+Public repositories mount without a token. For private repositories and private Buckets, `hf-mount` reads the token from
+`HF_TOKEN`, from `--hf-token`, or from the file `--token-file` names. To hand the container a token that already exists
+on the host, set the variable on the host and forward it with `remoteEnv`:
+
+```jsonc
+{
+  "remoteEnv": {
+    "HF_TOKEN": "${localEnv:HF_TOKEN}"
+  }
+}
+```
+
+`${localEnv:HF_TOKEN}` is read on the host when the container starts, so the token stays out of the repository and out
+of the image. Prefer `remoteEnv` to `containerEnv` for a token: `containerEnv` stores the value in the container's
+configuration, where `docker inspect` shows it. Prefer the variable to `--hf-token` as well, since a command-line
+argument is visible in the process list. If you logged in with `hf auth login`,
+`--token-file ~/.cache/huggingface/token` points `hf-mount` at the token that command stored.
+
+## The cache
+
+`hf-mount` keeps its own disk cache, apart from the `hf` CLI's, in `/tmp/hf-mount-cache` unless `--cache-dir` names
+another directory. `--cache-size` caps its chunk cache at about 10 GB by default; the staging files of
+`--advanced-writes` live in the same directory and have no cap unless `--max-staging-size` sets one. It is in the
+container's filesystem, so a rebuild discards it. The feature mounts nothing there on purpose: a mount works without a
+persistent cache, and where the cache lives and how large it grows are your decisions. To keep it, mount a volume or a
+host folder and name it when you start the mount:
+
+```jsonc
+{
+  "mounts": [{ "source": "hf-mount-cache-${devcontainerId}", "target": "/var/cache/hf-mount", "type": "volume" }],
+  "postCreateCommand": "sudo chown \"$(id -u):$(id -g)\" /var/cache/hf-mount"
+}
+```
+
+```bash
+hf-mount start --cache-dir /var/cache/hf-mount repo openai-community/gpt2 /tmp/gpt2
+```
+
+A new volume belongs to root, so the `chown` (which needs passwordless `sudo`) hands it to your user. The `HF_HOME`,
+`HF_HUB_CACHE`, and `HF_XET_*` variables are documented for the `huggingface_hub` Python library and the `hf` CLI;
+upstream documents none of them for `hf-mount`. Its flags are listed in the
+[upstream README](https://github.com/huggingface/hf-mount#options); a pinned older release may not have all of them.
+
 ## Downloads
 
 The binaries come from the GitHub releases of `huggingface/hf-mount`:
