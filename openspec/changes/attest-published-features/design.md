@@ -22,17 +22,18 @@
 
 **Goals:**
 
-- A user verifies a version's origin with one command and no trust in the package's write permissions. Checked on the
-  first release after the merge.
+- A user verifies, with one command and no trust in the package's write permissions, the origin of the artifact a
+  version tag points to. Checked on the first release after the merge.
 - The token that can write packages and tags is never in a job that can request a signing identity. Checked by reading
   the workflow's `permissions:` blocks.
 - The step that decides what is attested is tested without a release. Checked by unit tests of the script over publish
-  outputs: several published, none published, a malformed object.
+  outputs: several published, none published, a malformed object, and an id or digest outside its pattern.
 
 **Non-Goals:**
 
 - Attesting versions already on GHCR, the collection metadata package, or anything a feature downloads.
 - Storing attestations in GHCR, SBOMs, or signing with long-lived keys.
+- Binding a version to its digest inside the attestation; see Risks.
 - Documenting verification for users (#99).
 
 ## Decisions
@@ -45,8 +46,11 @@ checks out nothing it does not need, and runs `actions/attest` over a checksums 
 skipped when the output names no feature.
 
 A Deno script under `scripts/` turns the publish JSON into the subject list. It accepts only the shape described in
-Context and fails on anything else, so a change in the CLI's output stops the release visibly instead of attesting the
-wrong thing. It is added to `INFRA_PATHS` like the other files of the release path.
+Context, with every feature id matching `ID_PATTERN` (`scripts/new_feature.ts`) and every digest matching `sha256:`
+followed by 64 lowercase hexadecimal digits, and fails on anything else. A change in the CLI's output then stops the
+release visibly instead of attesting the wrong thing, and no value can add a line to the checksums file or carry
+anything but a name and a digest into the job that signs. It is added to `INFRA_PATHS` like the other files of the
+release path.
 
 Rejected: attesting inside `publish` — one job would hold package and tag write access together with the signing
 identity. Rejected: resolving digests from the registry after publishing — the run would attest whatever the tag points
@@ -83,5 +87,11 @@ Dependabot proposes its updates.
   error in the step's wiring shows only then, leaving that release's versions unattested until their next bump.
 - Verification depends on GitHub's attestation service and on `gh`; a user without them falls back to comparing the
   artifact with the tagged source.
+- An attestation binds a digest to the workflow and commit that published it, not to a version: its subject carries the
+  package name and the digest, and `gh attestation verify` matches on the digest. Whoever can write to the package can
+  point a version tag at another digest this workflow published, an older version for one, and the command still
+  succeeds. The attestation narrows that actor from any content to content this repository released. A user who needs
+  the version as well passes `--source-digest` with the commit of the tag `<id>/v<version>`, or compares the artifact
+  with the tagged source, and pins the digest.
 - An attestation proves which workflow and commit published an artifact, not that the content is harmless. The source at
   the tagged commit still has to be read.

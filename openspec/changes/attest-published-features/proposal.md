@@ -4,8 +4,8 @@
 
 A user who wants to check a published feature version can compare the GHCR artifact with `src/<id>/` at the tag
 `<id>/v<version>`, but nothing proves where the artifact was built: anyone able to push to the package could publish
-other content under the same version. A signed provenance attestation lets a user verify, with one command, that a
-version was published by this repository's Release workflow from a commit on `main`.
+other content under the same version. A signed provenance attestation lets a user verify, with one command, that the
+artifact a version tag points to was published by this repository's Release workflow from a commit on `main`.
 
 ## What Changes
 
