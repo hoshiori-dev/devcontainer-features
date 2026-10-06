@@ -66,8 +66,6 @@ jobs:
         uses: ./.github/actions/base-checks
         with:
           files: scripts/check_spec_archived.ts
-      # Test only: stands in for a checker that fails with a status other than 0 and 1.
-      - run: exit 3
       # Runs in the workspace, so it reads this pull request's openspec/changes/. Status 1 means a
       # change is unarchived, which is a state to wait in, not a failure; any other non-zero status
       # is the checker failing and fails the job.
