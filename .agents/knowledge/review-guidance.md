@@ -31,8 +31,8 @@ An accepted risk is known and left in place. Report one only with information th
 
 The collection accepts these for every feature:
 
-- A version published before the Release workflow attested build provenance has no attestation until the feature's next
-  version.
+- A version published before the Release workflow began attesting build provenance has no attestation until the
+  feature's next version.
 - An attestation binds a digest to the workflow and commit that published it, not to a version tag.
 - A consumer on a floating major tag receives a new version on the next build without acting.
 - An upstream that publishes a malicious release through its own channel, or whose signing key is taken over, is outside

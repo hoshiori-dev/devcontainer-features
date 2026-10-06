@@ -9,7 +9,7 @@
 # `attest` then signs a build provenance attestation for the versions this run published, and for
 # nothing else: `publish` hands it their names and digests as the CLI reported them. The two jobs
 # split the permissions — the one that can write packages and tags cannot request a signing
-# identity, and the one that signs cannot write either. A failed `attest` leaves the version
+# identity, and the one that signs cannot write packages or tags. A failed `attest` leaves the version
 # published and tagged without an attestation; recovery is in .agents/knowledge/github/checks.md.
 name: Release
 

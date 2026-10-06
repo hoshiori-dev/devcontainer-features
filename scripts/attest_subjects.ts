@@ -3,7 +3,7 @@
 // workflow attests: one checksums line, `<hex digest>  <package name>`, per feature version that
 // run published. Run by the release workflow's `publish` job; the `attest` job signs exactly these
 // lines. It accepts only the shape below and fails on anything else, so a change in the CLI's
-// output stops the release instead of attesting the wrong thing, and no value can add a line or
+// output fails the job instead of attesting the wrong thing, and no value can add a line or
 // carry anything but a name and a digest into the job that signs.
 //
 //   devcontainer features publish … | scripts/attest_subjects.ts

@@ -35,7 +35,7 @@ scenario matrix and are dependencies of `ci-gate`.
 | `verify` (Release)                       | `scripts/validate.ts --base <previous main>` on the commit about to be published, without the write token                                                                                                                                                                 | before every `publish`                                          |
 | `secret-scan` (Secret Scanning)          | TruffleHog over the commits the PR or push adds (`--results=verified,unknown`); locally `docker run --rm -v "$PWD:/tmp" -w /tmp <image> git file:///tmp/ --since-commit origin/main --branch HEAD --results=verified,unknown --fail`, `<image>` as pinned in `secret.yml` | PR, push to `main`                                              |
 | `publish` (Release)                      | `devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features`, then `scripts/tag_releases.ts`, then `scripts/attest_subjects.ts` over the CLI's output                                                                          | push to `main` touching `src/**`; dispatch by maintainers       |
-| `attest` (Release)                       | `actions/attest` over the subjects `publish` listed: one build provenance attestation for the feature versions that run published. Runs only in the workflow; `scripts/attest_subjects.ts` is the part that runs locally                                                  | after `publish`, when it published a version                    |
+| `attest` (Release)                       | `actions/attest` over the subjects `publish` listed: one build provenance attestation for the feature versions the run published. Runs only in the workflow; `scripts/attest_subjects.ts` is the part that runs locally                                                   | after `publish`, when it published a version                    |
 
 ## Reading a run
 
@@ -72,7 +72,7 @@ Dependabot bumps only the action, so update the image with it.
 
 - Merging a version bump is the release decision. The Release workflow validates the merge commit (`verify`), publishes
   every feature version not yet on GHCR (the CLI skips published ones), then creates `<id>/v<version>` tags at it.
-- `attest` then signs one build provenance attestation whose subjects are the versions that run published, each named
+- `attest` then signs one build provenance attestation whose subjects are the versions the run published, each named
   `ghcr.io/hoshiori-dev/devcontainer-features/<id>` with the digest the CLI reported, and stores it with this repository
   (`platform-settings.md`); nothing is pushed to GHCR. A run that published nothing skips the job. `publish` holds
   `contents: write` and `packages: write` and no `id-token`; `attest` holds `id-token: write` and `attestations: write`

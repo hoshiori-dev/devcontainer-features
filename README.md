@@ -151,14 +151,16 @@ of the `:1` tag when you want the exact version you read. You then move to a new
 
 Newer versions also carry a signed provenance attestation: proof that this repository's Release workflow published that
 artifact from a commit on `main`. Verifying it is a separate step, because it needs the
-[GitHub CLI](https://cli.github.com/) (`gh`) and the comparison above does not:
+[GitHub CLI](https://cli.github.com/) (`gh`), signed in with `gh auth login` or a token in `GH_TOKEN`, and the
+comparison above needs neither:
 
 ```bash
 (
     set -euo pipefail
     REPO=hoshiori-dev/devcontainer-features
     ID=deno
-    # A version published before the Release workflow began attesting has no attestation to find.
+    # A version published before the Release workflow began attesting has no attestation to find;
+    # deno 1.0.1 is one, and the command ends in "HTTP 404" for it.
     VERSION=1.0.1
 
     # The commit the release tag names. The attestation has to name the same one.
@@ -179,8 +181,9 @@ artifact from a commit on `main`. Verifying it is a separate step, because it ne
 > - Only versions published since the Release workflow began attesting carry an attestation. For an earlier version the
 >   command finds none, and the comparison is the only check until the feature's next version.
 > - An attestation proves where a digest came from, not which version it is. Whoever can write to a package could point
->   a version tag at other content this repository released. `--source-digest` above ties the artifact to the commit of
->   its release tag; pinning the digest you checked keeps it there.
+>   a version tag at other content this repository released. `--source-digest` above narrows that to content released
+>   from the commit of the release tag, which can still be another feature published in the same run; the comparison
+>   tells those apart, and pinning the digest you checked keeps it there.
 > - Neither check says the content is harmless. Read the source before you trust it.
 > - Where an upstream publishes no checksum or signature, the download relies on TLS alone. The feature's specification
 >   says so for each such download.

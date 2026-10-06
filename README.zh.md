@@ -148,15 +148,16 @@ Actions 按 commit SHA 固定。版本只由 `main` 上的 [Release workflow](.g
 里用第 4 步得到的引用地址替换 `:1` 标签。之后要升级版本，把这套检查再做一遍。
 
 较新的版本还带有一份经过签名的来源证明（provenance attestation）：它证明这个制品是由本仓库的 Release workflow 从 `main`
-上的某个 commit 发布的。验证它是单独的一步，因为它需要
-[GitHub CLI](https://cli.github.com/)（`gh`），而上面的比较不需要：
+上的某个 commit 发布的。验证它是单独的一步，因为它需要 [GitHub CLI](https://cli.github.com/)（`gh`），并且要先用
+`gh auth login` 登录或在 `GH_TOKEN` 里提供 token，而上面的比较两样都不需要：
 
 ```bash
 (
     set -euo pipefail
     REPO=hoshiori-dev/devcontainer-features
     ID=deno
-    # 在 Release workflow 开始生成来源证明之前发布的版本，没有可供查找的来源证明。
+    # 在 Release workflow 开始生成来源证明之前发布的版本，没有可供查找的来源证明；
+    # deno 1.0.1 就是这样的版本，对它运行这条命令会以 "HTTP 404" 结束。
     VERSION=1.0.1
 
     # 发布标签指向的 commit。来源证明里记录的必须是同一个。
@@ -176,8 +177,9 @@ Actions 按 commit SHA 固定。版本只由 `main` 上的 [Release workflow](.g
 >
 > - 只有 Release workflow 开始生成来源证明之后发布的版本才带有来源证明。对更早的版本，这条命令找不到任何证明；在该
 >   feature 发布下一个版本之前，上面的比较是唯一可用的检查。
-> - 来源证明证明的是某个 digest 从哪里来，而不是它是哪个版本。能写入 package 的人可以把版本标签指向本仓库发布过的其他
->   内容。上面的 `--source-digest` 把制品和发布标签对应的 commit 绑定在一起；固定你检查过的 digest，它就不会再变。
+> - 来源证明说明的是某个 digest 从哪里来，而不是它是哪个版本。能写入 package 的人可以把版本标签指向本仓库发布过的其他
+>   内容。上面的 `--source-digest` 把范围缩小到从发布标签对应的 commit 发布的内容，但那仍可能是同一次运行里发布的另一个
+>   feature；上面的比较能把它们区分开，固定你检查过的 digest 之后它就不会再变。
 > - 这两项检查都不能说明内容是无害的。信任之前请先读源码。
 > - 上游没有发布校验和或签名时，下载只依赖 TLS。feature 的规格会逐项写明这样的下载。
 > - feature 安装的是你指定的上游版本。如果上游自己发布了有问题的版本，feature 会照样安装。
