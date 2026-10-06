@@ -117,8 +117,10 @@
   passing state. That commit stands in for an archive and is not one: it exists only on the test branch, and this pull
   request's change stays unarchived until a maintainer commands the archive. When the observations are recorded, the
   test pull request is closed with a comment that says so; deleting its branch is left to a maintainer
-  (`agent-authority.md`). Rejected: observing only on this pull request, which shows the passing state for the first
-  time at its own archive, when a defect would block the merge of the fix.
+  (`agent-authority.md`). Being temporary exempts it from nothing: its title, description, commits, and comments, the
+  test-only commits included, pass the publish gate of the `github-project-workflow` skill before they are published,
+  and hold no secret, credential, internal host, or personal data. Rejected: observing only on this pull request, which
+  shows the passing state for the first time at its own archive, when a defect would block the merge of the fix.
 - **Every unmeasured assumption gets a measured conclusion, recorded on this pull request.** The test pull request
   measures the eight items listed under Context. Where the finished workflow cannot produce the case, a commit that
   exists only on the test branch produces it: a deciding job made to fail for item 3, and for item 4 a job name made to
@@ -128,8 +130,10 @@
   permits the fork. The results are posted as one comment on this pull request before it is marked ready: for each item
   what was done, what was observed with a link to the run or the API readback, and the conclusion — confirmed, refuted,
   or not measured with the reason. A refuted item that the design relies on stops the work: the package is revised and
-  the package gate is asked again. Rejected: recording the results only in the Validation section, which is rewritten as
-  the description changes, while a comment keeps its date.
+  the package gate is asked again. The comment passes the same publish gate. An API readback or a log excerpt quoted in
+  it is cut down to the fields the conclusion needs, and item 7 is recorded as the maintainer's statement that no
+  notification arrived, never as a copy of a notification or of anything from an inbox. Rejected: recording the results
+  only in the Validation section, which is rewritten as the description changes, while a comment keeps its date.
 - **The waiting job is named `awaiting-archive`.** It reads as a state in the pull request's check list and shares no
   prefix with a required check.
 

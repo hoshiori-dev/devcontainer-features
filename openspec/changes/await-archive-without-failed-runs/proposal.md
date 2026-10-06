@@ -84,4 +84,6 @@ None. This change edits the harness only (`skip_specs: true`).
 - `just spec-status` lists the unarchived changes and exits zero; with `--ready` it exits non-zero when one exists.
 - `pr-title`, `pr-checklist`, `ci-gate`, and `secret-scan` behave as before.
 - The test pull request is never merged, and `main` receives nothing from it.
+- Nothing published for the test — the test pull request, its commits and comments, and the comment that records the
+  conclusions — holds a secret, a credential, an internal host, or personal data.
 - No file under `src/`, `test/`, or `openspec/specs/` changes, and `just check` passes.
