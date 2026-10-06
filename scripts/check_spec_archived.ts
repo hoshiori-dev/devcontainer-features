@@ -14,16 +14,26 @@ import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 export const UNARCHIVED = 1;
 export const FAILED = 2;
 
+/** Whether an entry of the changes directory is a change; a symbolic link counts, since it may point at one. */
+export function isChange(entry: { name: string; isDirectory: boolean; isSymlink: boolean }): boolean {
+    return (entry.isDirectory || entry.isSymlink) && entry.name !== "archive";
+}
+
 export async function activeChanges(root = "openspec/changes"): Promise<string[]> {
     const names: string[] = [];
     try {
         for await (const entry of Deno.readDir(root)) {
-            if (entry.isDirectory && entry.name !== "archive") names.push(entry.name);
+            if (isChange(entry)) names.push(entry.name);
         }
     } catch (error) {
         if (!(error instanceof Deno.errors.NotFound)) throw error;
     }
     return names.sort();
+}
+
+/** Escapes text for a workflow command, so a directory name cannot end the line and start another command. */
+export function commandData(text: string): string {
+    return text.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
 }
 
 /** Prints the verdict and returns the exit status; `annotate` writes GitHub Actions annotations. */
@@ -38,13 +48,14 @@ export async function main(args: string[], annotate: boolean, root = "openspec/c
         const message = `Unarchived OpenSpec change(s): ${changes.join(", ")}. ` +
             "Archive only after a maintainer commands it, then commit the archive; see .agents/knowledge/spec-workflow.md.";
         // Waiting for the archive is not a defect, so a workflow run reports it as a warning.
-        if (annotate) console.log(`::warning::${message}`);
+        if (annotate) console.log(`::warning::${commandData(message)}`);
         else if (ready) console.error(`error: ${message}`);
         else console.log(`warning: ${message}`);
         return ready ? UNARCHIVED : 0;
     } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
-        console.error(`${annotate ? "::error::" : "error: "}The archive check itself failed: ${reason}`);
+        const failure = `The archive check itself failed: ${reason}`;
+        console.error(annotate ? `::error::${commandData(failure)}` : `error: ${failure}`);
         return FAILED;
     }
 }

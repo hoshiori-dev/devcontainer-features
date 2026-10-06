@@ -73,7 +73,9 @@
   for a status written through its API.
 - Making the PR checks proof against a pull request that edits the workflow. Review guards those edits today (`pr.yml`,
   header comment) and keeps doing so.
-- Fewer PR workflow runs. The triggers stay as they are; `pr-title` and `pr-checklist` need them.
+- Fewer PR workflow runs. The triggers stay as they are. `pr-title` and `pr-checklist` need `edited`; with the verdict
+  no longer read from the draft state, no job needs `ready_for_review` or `converted_to_draft` any more, and dropping
+  them is left to a later change.
 
 ## Decisions
 
@@ -158,6 +160,12 @@
   editing the workflow, as it can today; with the genuine check withheld instead of failed, no failing check of the same
   name appears beside it. Review of edits under `.github/` remains the guard, and an archive that never happened is
   visible in the diff.
+- **The checker prints names the pull request chose.** A directory name under `openspec/changes/` reaches the log of the
+  step that runs the checker, where a line break in it could start a workflow command. Mitigation, added on 2026-10-06
+  after the final review: the checker's status leaves that step through a file and the next step writes the job's
+  output, so nothing printed can set the verdict whichever script the base holds; the checker of this change also
+  escapes the annotation text and counts a symbolic link under `openspec/changes/` as a change, which the script `main`
+  holds does not.
 - **"All checks pass" no longer implies mergeable.** A withheld check is absent from the list of reported checks, so a
   tool that reads only reported checks sees a passing pull request. The Finish step of the `github-project-workflow`
   skill and `checks.md` say that the pull request waits for the archive whatever the reported checks show.

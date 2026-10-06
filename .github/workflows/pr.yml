@@ -72,15 +72,21 @@ jobs:
         env:
           ROOT: ${{ steps.base.outputs.root }}
         run: deno cache "${ROOT}/scripts/check_spec_archived.ts"
-      # Runs in the workspace, so it reads this pull request's openspec/changes/. Status 1 means a
-      # change is unarchived, which is a state to wait in, not a failure; any other non-zero status
-      # is the checker failing and fails the job.
-      - id: verdict
+      # Runs in the workspace, so it reads this pull request's openspec/changes/. The checker prints
+      # names the pull request chose, so its status leaves this step through a file and the verdict
+      # is written by the next step: nothing printed here can reach the job's output.
+      - id: check
         env:
           ROOT: ${{ steps.base.outputs.root }}
         run: |
           status=0
           "${ROOT}/scripts/check_spec_archived.ts" --ready || status=$?
+          echo "${status}" > "${RUNNER_TEMP}/archive-status"
+      # Status 1 means a change is unarchived, which is a state to wait in, not a failure; any other
+      # non-zero status is the checker failing and fails the job.
+      - id: verdict
+        run: |
+          status="$(cat "${RUNNER_TEMP}/archive-status")"
           case "${status}" in
             0) echo "archived=true" >> "${GITHUB_OUTPUT}" ;;
             1) echo "archived=false" >> "${GITHUB_OUTPUT}" ;;

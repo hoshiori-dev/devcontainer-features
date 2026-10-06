@@ -23,6 +23,13 @@
       so a checker Deno cannot load fails the job instead of reading as waiting; verify with the unit test that the step
       precedes the verdict, and locally that `deno cache` exits non-zero for an unresolvable import and 0 for the
       checker `main` holds
+- [x] 2.4 After the final review, run the checker in its own step and pass its status to the verdict step through a
+      file, so nothing the checker prints can set the job's output; verify with the unit test that pins the text and
+      order of the three steps, and by running both steps' shell locally against a stand-in checker that exits 0, 1, and
+      2 and prints a `set-output` command
+- [x] 2.5 After the final review, escape the annotation text in the checker and count a symbolic link under
+      `openspec/changes/` as a change; verify with unit tests over a directory name holding a line break, the warning
+      and error levels, and a symbolic link
 
 ## 3. Documents
 

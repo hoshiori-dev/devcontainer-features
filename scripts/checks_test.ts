@@ -3,7 +3,7 @@ import { parse } from "jsr:@std/semver@1.0.8";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
 import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
-import { FAILED, main as archiveVerdict, UNARCHIVED } from "./check_spec_archived.ts";
+import { FAILED, isChange, main as archiveVerdict, UNARCHIVED } from "./check_spec_archived.ts";
 import {
     type Archive,
     type Checks,
@@ -82,6 +82,40 @@ Deno.test("check_spec_archived answers 0, 1, and its own failure apart", async (
         assertEquals(await archiveVerdict([], true, root), 0, "listing never fails");
         await Deno.writeTextFile(`${dir}/file`, "");
         assertEquals(await archiveVerdict(["--ready"], true, `${dir}/file`), FAILED, "a path that is no directory");
+        assert(isChange({ name: "pending", isDirectory: false, isSymlink: true }), "a symbolic link counts");
+        assert(!isChange({ name: "README.md", isDirectory: false, isSymlink: false }));
+        assert(!isChange({ name: "archive", isDirectory: true, isSymlink: false }));
+    } finally {
+        await Deno.remove(dir, { recursive: true });
+    }
+});
+
+/** Runs the archive checker and returns its status with everything it printed, one entry per console call. */
+async function archiveOutput(root: string): Promise<{ status: number; printed: string[] }> {
+    const printed: string[] = [];
+    const { log, error } = console;
+    console.log = console.error = (text: string) => void printed.push(text);
+    try {
+        return { status: await archiveVerdict(["--ready"], true, root), printed };
+    } finally {
+        console.log = log;
+        console.error = error;
+    }
+}
+
+Deno.test("check_spec_archived annotates waiting as a warning and keeps a directory name on one line", async () => {
+    const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "archived-test-" });
+    try {
+        await Deno.mkdir(`${dir}/changes/x\n::set-output name=archived::true`, { recursive: true });
+        const waiting = await archiveOutput(`${dir}/changes`);
+        assertEquals(waiting.status, UNARCHIVED);
+        assertEquals(waiting.printed.length, 1);
+        assert(waiting.printed[0].startsWith("::warning::Unarchived OpenSpec change(s): x%0A::set-output"));
+        assert(!waiting.printed[0].includes("\n"), "the annotation must stay on one line");
+        await Deno.writeTextFile(`${dir}/file`, "");
+        const failed = await archiveOutput(`${dir}/file`);
+        assertEquals(failed.status, FAILED);
+        assert(failed.printed[0].startsWith("::error::The archive check itself failed: "), failed.printed[0]);
     } finally {
         await Deno.remove(dir, { recursive: true });
     }
@@ -99,11 +133,25 @@ Deno.test("pr.yml reports spec-archived only for an archived verdict, whatever t
     assertEquals(carrier.if, undefined);
     const decider = workflow.jobs["archive-verdict"];
     assertEquals(decider.outputs, { archived: "${{ steps.verdict.outputs.archived }}" });
-    const ids = decider.steps.map((step: { id?: string }) => step.id);
-    assert(ids.indexOf("load") >= 0 && ids.indexOf("load") < ids.indexOf("verdict"), "load runs before verdict");
-    assertEquals(decider.steps[ids.indexOf("load")].run, 'deno cache "${ROOT}/scripts/check_spec_archived.ts"');
-    const verdict = decider.steps.find((step: { id?: string }) => step.id === "verdict");
-    assert(verdict.run.includes('check_spec_archived.ts" --ready'), verdict.run);
+    // The last three steps, in order, and their whole text: the status mapping is the safety argument.
+    const [load, check, verdict] = decider.steps.slice(-3);
+    assertEquals([load.id, check.id, verdict.id], ["load", "check", "verdict"]);
+    assertEquals(load.run, 'deno cache "${ROOT}/scripts/check_spec_archived.ts"');
+    assertEquals(
+        check.run,
+        "status=0\n" +
+            '"${ROOT}/scripts/check_spec_archived.ts" --ready || status=$?\n' +
+            'echo "${status}" > "${RUNNER_TEMP}/archive-status"\n',
+    );
+    assertEquals(
+        verdict.run,
+        'status="$(cat "${RUNNER_TEMP}/archive-status")"\n' +
+            'case "${status}" in\n' +
+            '  0) echo "archived=true" >> "${GITHUB_OUTPUT}" ;;\n' +
+            '  1) echo "archived=false" >> "${GITHUB_OUTPUT}" ;;\n' +
+            '  *) exit "${status}" ;;\n' +
+            "esac\n",
+    );
     assert(!text.includes("pull_request.draft"), "the verdict must not depend on the draft state");
     assertEquals(workflow.permissions, { contents: "read" });
     assertEquals(Object.keys(workflow.on), ["pull_request"]);
