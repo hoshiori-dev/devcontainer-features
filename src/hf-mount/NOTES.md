@@ -66,8 +66,9 @@ on the host, set the variable on the host and forward it with `remoteEnv`:
 }
 ```
 
-`${localEnv:HF_TOKEN}` is read on the host when the container starts, so the token stays out of the repository and out
-of the image. Prefer `remoteEnv` to `containerEnv` for a token: `containerEnv` stores the value in the container's
+`${localEnv:HF_TOKEN}` takes the value from the environment of the tool on your machine, so the token stays out of the
+repository and out of the image; a tool that was already running, such as VS Code, may need a restart to see a variable
+you have just set. Prefer `remoteEnv` to `containerEnv` for a token: `containerEnv` stores the value in the container's
 configuration, where `docker inspect` shows it. Prefer the variable to `--hf-token` as well, since a command-line
 argument is visible in the process list. If you logged in with `hf auth login`,
 `--token-file ~/.cache/huggingface/token` points `hf-mount` at the token that command stored.
