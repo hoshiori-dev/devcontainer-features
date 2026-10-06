@@ -16,8 +16,8 @@ next to real ones.
   sent to `AGENTS.md`, humans to `CONTRIBUTING.md`.
 - The feature list in `README.md` is generated from each feature's metadata by `just docs`, and `just check` fails when
   it is stale.
-- `README.zh.md` is a Chinese translation of the finished English README. The English file is authoritative, and
-  `just check` fails when the two list different features.
+- `README.zh.md` is a Chinese translation of the finished English README, made by the coding agent and not by a script.
+  The English file is authoritative, and `just check` fails when the two list different features.
 - `CONTRIBUTING.md` is added for human contributors: spec-driven development with OpenSpec, where a feature's spec
   lives, the coding agents the harness supports, and the path from issue to release. It summarizes and links to the
   knowledge files; it restates no rule.
