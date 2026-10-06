@@ -55,7 +55,7 @@ title is the PR title and must follow Conventional Commits: `<type>(<scope>)[!]:
 
 1. Branch from the current `main` (`gh issue develop -c <bug-issue>`).
 2. Fix, bump the feature's PATCH version, open the PR; CI tests the affected features.
-3. Squash-merge into `main`; the release workflow publishes the new version and tags it.
+3. Squash-merge into `main`; the release workflow publishes the new version, tags it, and attests its provenance.
 
 Recovery is always roll-forward: publish a higher fixed version. A published version cannot be withdrawn from the
 floating tags consumers use.

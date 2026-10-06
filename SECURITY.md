@@ -44,8 +44,9 @@ over or damage a developer's machine or the CI environment, or to get at its cre
 **Risks we know about and accept.** We know about the following, and a report that only restates one of them is not
 handled as a vulnerability:
 
-- Published artifacts carry no signature or provenance attestation
-  ([#100](https://github.com/hoshiori-dev/devcontainer-features/issues/100)).
+- A version published before we began attesting releases has no provenance attestation until the feature's next version.
+- An attestation ties a digest to the workflow and commit that published it, not to a version tag. Someone able to write
+  to a package could point a version tag at other content this repository released.
 - A major tag such as `:1` delivers new versions without asking.
 - A feature installs the upstream version you ask for. It cannot tell when the upstream itself, or its signing key, has
   been compromised.
@@ -55,4 +56,5 @@ handled as a vulnerability:
 
 A report about one of these is welcome when it brings something we did not know.
 
-The [README](README.md#check-a-published-version-yourself) shows how to compare a published version with its source.
+The [README](README.md#check-a-published-version-yourself) shows how to compare a published version with its source and
+how to verify its attestation.
