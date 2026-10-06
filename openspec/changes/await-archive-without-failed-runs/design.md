@@ -22,8 +22,8 @@
     ([Workflow syntax, `permissions`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions)).
   - GitHub advises against `pull_request_target` and `workflow_run` with untrusted pull requests
     ([Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)).
-- What this design assumes without a documented statement; the first two are to be observed on this pull request, and
-  the third is avoided instead of tested:
+- What this design assumes without a documented statement; the first two are to be observed on the test pull request,
+  and the third is avoided instead of tested:
   - A required check that no run has reported on the head commit blocks the merge and shows as expected.
   - A job whose `name` is an expression over `needs` reports its check under the evaluated name.
   - When several runs report a check of the same name on one commit, an earlier success may keep satisfying the
@@ -51,8 +51,8 @@
   no base that already contains the new script. Checked by this pull request's own runs, which use that script.
 - A failure of the checker itself fails the run and is never shown as waiting. Checked by a unit test of the script's
   exit statuses and by reading the workflow's mapping of them.
-- The archived case is observed before this pull request is marked ready, on a throwaway draft pull request that carries
-  the workflow and no change, closed unmerged.
+- The finished pipeline is observed end to end on a test pull request before this one is marked ready (Decisions).
+  Checked by its observations standing in this pull request's Validation section and by its state, closed and unmerged.
 
 **Non-Goals:**
 
@@ -95,6 +95,17 @@
   on the outputs of a job it `needs`. The deciding job also writes the warning annotation that names the unarchived
   changes. The name expression yields the waiting name unless the deciding job's output says archived, so a failed or
   cancelled deciding job cannot produce the required name.
+- **A test pull request exercises the pipeline, then is closed.** Once the implementation is complete, a pull request
+  with no purpose beyond the test is opened from a branch cut from this one, against `main`, so the ruleset applies to
+  it and it runs the new workflow with the script `main` holds. Its title and description say that it is a test and will
+  not be merged, and it closes no issue. It carries this change unarchived, which gives the waiting state, observed as a
+  draft and as a ready pull request: the run's conclusion, the annotation, the blocked merge, and what the pull request
+  page and the pull request list show. A further commit on its branch removes the change's directory, which gives the
+  passing state. That commit stands in for an archive and is not one: it exists only on the test branch, and this pull
+  request's change stays unarchived until a maintainer commands the archive. When the observations are recorded, the
+  test pull request is closed with a comment that says so; deleting its branch is left to a maintainer
+  (`agent-authority.md`). Rejected: observing only on this pull request, which shows the passing state for the first
+  time at its own archive, when a defect would block the merge of the fix.
 - **The waiting job is named `awaiting-archive`.** It reads as a state in the pull request's check list and shares no
   prefix with a required check.
 
@@ -105,8 +116,10 @@
   and the `awaiting-archive` entry in the check list say why; `checks.md` records what was observed. If the list proves
   misleading in practice, a status written through the API is the remedy, as its own change.
 - **The name expression may not behave as documented.** If a job is not reported under its evaluated name, an archived
-  pull request never satisfies the requirement. Mitigation: the throwaway draft pull request shows the archived case
-  before this one is marked ready; if it fails, the change is revised before any merge.
+  pull request never satisfies the requirement. Mitigation: the test pull request shows the passing state before this
+  one is marked ready; if it fails, the change is revised before any merge.
+- **The test pull request cannot exercise the new script.** Its checks run the script `main` holds, so the status the
+  new script gives its own errors is covered by unit tests only, until the first pull request after the merge.
 - **A failure before the script runs looks like waiting.** If Deno cannot start the script or fetch its import, it exits
   1 and the pull request reads as waiting with no annotation. The merge stays blocked, never opened; the job log shows
   the error, and a rerun clears a transient one.

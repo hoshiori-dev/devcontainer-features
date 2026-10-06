@@ -42,6 +42,8 @@ None. This change edits the harness only (`skip_specs: true`).
 - Feature ids touched: none, so no version bump. `pr.yml` is not test infrastructure (`INFRA_PATHS` in
   `scripts/lib/repo.ts`), so CI selects no feature test for this change.
 - Remote settings: none. The `main` ruleset and its required checks stay as they are.
+- A test pull request is opened to exercise the changed workflow and closed without merging; it leaves a closed pull
+  request and its branch behind.
 - Open pull requests: each receives the changed workflow with its next run. A draft that passed `spec-archived` with a
   warning shows the waiting state from then on.
 
@@ -61,7 +63,10 @@ None. This change edits the harness only (`skip_specs: true`).
 - None of the six documents calls the waiting state red: `git grep -n -i -w red` over them finds no line about
   `spec-archived` or the archive.
 - `.agents/knowledge/github/checks.md` states what the pull request page and the pull request list show for a pull
-  request that waits for its archive, as observed on this pull request.
+  request that waits for its archive, as observed on the test pull request.
+- A test pull request, opened once the implementation is complete and serving no purpose beyond exercising the changed
+  workflow, showed the waiting state and the passing state; its observations are in this pull request's Validation
+  section, and it is closed.
 
 **Stays true:**
 
@@ -76,4 +81,5 @@ None. This change edits the harness only (`skip_specs: true`).
 - No workflow archives a change; the archive follows a maintainer's command, and both approval gates are unchanged.
 - `just spec-status` lists the unarchived changes and exits zero; with `--ready` it exits non-zero when one exists.
 - `pr-title`, `pr-checklist`, `ci-gate`, and `secret-scan` behave as before.
+- The test pull request is never merged, and `main` receives nothing from it.
 - No file under `src/`, `test/`, or `openspec/specs/` changes, and `just check` passes.
