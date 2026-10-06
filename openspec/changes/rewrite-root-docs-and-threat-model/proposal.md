@@ -20,7 +20,7 @@ next to real ones.
   The English file is authoritative, and `just check` fails when the two list different features.
 - `CONTRIBUTING.md` is added for human contributors, as an overview in plain language: spec-driven development with
   OpenSpec, where a feature's spec lives, the coding agents the harness supports, and the path from issue to release. It
-  summarizes and links to the knowledge files; it restates no rule.
+  summarizes; it states no rule in the detail an agent acts on and links to no knowledge file.
 - `SECURITY.md` keeps private reporting and the latest-version-only policy and gains an overview of the threat model in
   plain language: what counts as a threat for shipped code, for test code, and for administration code, and what does
   not.
@@ -31,8 +31,10 @@ next to real ones.
   lives as long as the feature; the authoring rule that asks this for downloads relying on TLS alone is widened to every
   such risk. A review does not report an accepted risk as a finding unless it brings new information.
 - `CONTRIBUTING.md` and `SECURITY.md` are human documents, separate from the knowledge base, and an agent does not read
-  them for rules. Each carries one visible sentence for a coding agent that opened it anyway: check the knowledge files
-  it names, whose details govern.
+  them for rules and neither links to a knowledge file. Each carries one visible sentence for a coding agent that opened
+  it anyway: go to `AGENTS.md` and follow the knowledge base, whose details govern.
+- The link runs the other way: `AGENTS.md` says which knowledge files each of the two documents summarizes, and a change
+  to one of those files includes checking whether the document needs an update.
 
 ## Capabilities
 
@@ -73,7 +75,7 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/100 and is not part
 - `README.zh.md` carries the same sections as `README.md`, in Chinese, and says the English file is authoritative.
 - `CONTRIBUTING.md` covers OpenSpec and the location of a feature's spec, the supported coding agents (Codex, Google
   Antigravity, Claude Code) and what each reads, the issue-to-release workflow, and the validation commands; each rule
-  it mentions links to the knowledge file that owns it.
+  it mentions has an owning knowledge file.
 - `SECURITY.md` describes the threat model for shipped, test, and administration code in plain language.
   `review-guidance.md` states it in full; the review guidance and the Copilot review skill require each security finding
   to state its scenario under that model.
@@ -81,7 +83,10 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/100 and is not part
   Requirement is not a finding without new information. `feature-authoring.md` requires a risk one feature accepts to be
   stated, with its reason, in a Requirement of its spec.
 - `CONTRIBUTING.md` and `SECURITY.md` each carry one visible sentence that tells a coding agent to check the knowledge
-  files it names and to follow them where the two differ.
+  base through `AGENTS.md` and to follow it where the two differ. Neither document links to a file under
+  `.agents/knowledge/`.
+- `AGENTS.md`'s "Keep In Sync" table names, for each of the two documents, the knowledge files it summarizes, and asks
+  for the document to be checked when one of them changes.
 - `AGENTS.md` says the two documents are for human readers. No knowledge file, skill, or `AGENTS.md` sends an agent to
   either of them for a rule.
 - `just check` passes.
@@ -92,8 +97,8 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/100 and is not part
 - Private vulnerability reporting and the latest-version-only support policy keep their meaning.
 - The download, integrity, and "Developer trust and readability" rules in `feature-authoring.md` keep their meaning, and
   exposed secrets and private personal data remain the highest-priority review findings.
-- Each rule has one owner, and that owner is in the knowledge base: a human document summarizes and links, and states no
-  rule of its own.
+- Each rule has one owner, and that owner is in the knowledge base: a human document summarizes, and states no rule of
+  its own.
 - `.devcontainer/`, `.pre-commit-config.yaml`, `.editorconfig`, CI workflows, required checks, lifecycle gates, and
   agent authority do not change.
 - Repository content other than `README.zh.md` is English, and nothing carries secrets, private data, or tool

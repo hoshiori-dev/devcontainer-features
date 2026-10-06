@@ -37,8 +37,10 @@
   workflow that implements it, and by running each audit command.
 - The feature list cannot drift from `src/`. Checked by removing a row, and by changing a description, and seeing
   `just check` fail each time.
-- Each rule keeps one owner. Checked by searching `CONTRIBUTING.md` and `README.md` for rules restated from the
-  knowledge base instead of linked.
+- Each rule keeps one owner. Checked by reading `CONTRIBUTING.md`, `SECURITY.md`, and `README.md` for a rule stated in
+  the detail an agent would act on.
+- The human documents follow the knowledge base when it changes. Checked by reading the "Keep In Sync" row against the
+  finished documents: every knowledge file one of them summarizes is named there.
 - A reviewer can tell a security finding from a robustness remark. Checked by reading the review guidance against the
   threat model it now holds: every category it asks for maps to a scenario in its own table.
 - An agent that follows only `AGENTS.md` and the knowledge base misses no rule. Checked by searching `AGENTS.md`,
@@ -94,35 +96,44 @@ into `devcontainer.json` by hand.
 Layout: a title and one-sentence description, a link to the other language, a small number of badges (CI, license), then
 Usage, Features, Principles and auditing, Contributing, License. No emoji as structure and no decorative images.
 
-### `CONTRIBUTING.md` summarizes and links
+### `CONTRIBUTING.md` summarizes and links to no knowledge file
 
 It is written for a human contributor, in plain language, and holds: how the work is organized (OpenSpec, one spec per
 feature at `openspec/specs/<id>/spec.md`, a change approved before implementation), the supported coding agents and what
-each reads, the path from issue to release, and the commands of `AGENTS.md`'s Validation table. For every rule it gives
-one sentence and a link to the owning knowledge file, as "Source of truth" in `spec-workflow.md` requires of a pointing
-file. It leaves out the detail an agent needs to act; that stays in the knowledge file. `README.md` asks a coding agent
-that has not read `AGENTS.md` to read it, in one short paragraph.
+each reads, the path from issue to release, and the validation commands. For a rule it gives a sentence a person can
+follow and stops there: it leaves out the detail an agent needs to act, and it links to no file under
+`.agents/knowledge/`, which is written for agents and is not where a human reader is sent. It names `AGENTS.md` only as
+what the coding agents read. `README.md` asks a coding agent that has not read `AGENTS.md` to read it, in one short
+paragraph.
 
 Rejected: moving rules out of the knowledge base into `CONTRIBUTING.md` — agents load the knowledge files on demand, and
-two owners would drift.
+two owners would drift. Rejected: a link from each sentence to the owning knowledge file — it sends a human reader into
+agent-facing text and makes the document look like a route into the knowledge base for an agent.
 
 ### Human documents are not an agent source
 
 `CONTRIBUTING.md` and `SECURITY.md` are what the project shows to people; the knowledge base is what an agent works
-from. The two are separate systems, and an agent is not expected to open either document. Three things keep them apart:
+from. The two are separate systems, and an agent is not expected to open either document. The documents do not point
+into the knowledge base; the knowledge base points at them. Four things hold this:
 
 - Each document carries one visible sentence near its top, addressed to a coding agent that opened it anyway: this is an
-  overview for human readers, check the knowledge files named here, and follow them where the two differ.
-  `CONTRIBUTING.md` names `AGENTS.md`, whose "When To Read What" table routes to the owning file. `SECURITY.md` names
-  `.agents/knowledge/review-guidance.md` for the threat model and `.agents/knowledge/feature-authoring.md` for the
-  download and integrity rules.
+  overview for human readers, go to `AGENTS.md`, and follow the knowledge base where the two differ. `AGENTS.md` is the
+  only agent-facing file either document names; its "When To Read What" table routes to the owning file.
+- Neither document links to a file under `.agents/knowledge/`.
+- `AGENTS.md`'s "Keep In Sync" table gains one row: when a knowledge file that `CONTRIBUTING.md` or `SECURITY.md`
+  summarizes changes, check whether the document needs an update, in the same PR. The row names the files per document
+  as the finished documents require — for `SECURITY.md` the threat model in `review-guidance.md` and the download and
+  integrity rules in `feature-authoring.md`; for `CONTRIBUTING.md` the workflow, specification, authority, and
+  validation rules it describes.
 - `AGENTS.md` gains one line under Core Conventions: the two documents are overviews for human readers, and an agent
   takes rules from the knowledge base.
 - No knowledge file, skill, or `AGENTS.md` links to either document as the source of a rule.
 
 Rejected: putting the sentence in an HTML comment — a visible line also tells a human reader where the binding detail
 lives, and it survives a tool that strips comments. Rejected: relying on `AGENTS.md` alone — an agent that lands on the
-document through a search or a link never passes through the entrypoint.
+document through a search or a link never passes through the entrypoint. Rejected: a reminder at the end of each
+summarized knowledge file — the pairs would be kept in as many places as there are files, while "Keep In Sync" is loaded
+in every session and already holds this kind of rule.
 
 ### The knowledge base owns the threat model; `SECURITY.md` gives an overview
 
@@ -197,5 +208,8 @@ changes next.
   list would be a second owner; a reader searches the spec.
 - Until the existing specs are audited, a spec may accept a risk in practice without stating it. A review reports such a
   risk as it would any other, which is how the gap closes.
-- The overview in `SECURITY.md` can drift from the model in `review-guidance.md`. The sentence in the document settles
-  which one governs, and the document holds no detail that could contradict a rule.
+- The overview in `SECURITY.md` or `CONTRIBUTING.md` can drift from the knowledge base. The "Keep In Sync" row asks for
+  the check on every change to a summarized file, the sentence in the document settles which one governs, and the
+  document holds no detail that could contradict a rule. Nothing checks the prose mechanically.
+- A human reader who wants the exact rule gets no link to it. The documents are complete enough to contribute with a
+  coding agent, which reads the rule itself.
