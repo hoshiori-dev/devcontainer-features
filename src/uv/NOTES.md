@@ -34,12 +34,18 @@ user at build time:
 | `/var/lib/uv/python` | `UV_PYTHON_INSTALL_DIR` | Python interpreters uv installs at runtime |
 | `/var/lib/uv/cache`  | `UV_CACHE_DIR`          | uv's cache                                 |
 
-Both survive a rebuild of the dev container, so a workspace `.venv/` keeps a working interpreter and packages install
-from the cache. The feature also sets `UV_TOOL_DIR=/usr/local/share/uv/tools`,
-`UV_TOOL_BIN_DIR=/usr/local/share/uv/bin`, and `UV_LINK_MODE=copy` (so installs also work when the cache and workspace
-are on different filesystems), and puts `/usr/local/share/uv/bin` at the end of `PATH`, also in login shells through
-`/etc/profile.d/uv.sh`. Existing commands earlier in `PATH` take precedence over same-named uv tools; use
-`/usr/local/share/uv/bin/<command>` to select the uv-installed tool in that case.
+Both survive a rebuild of the dev container. The interpreters need to: the workspace outlives a rebuild, and a `.venv/`
+in it only links to its interpreter. If uv kept interpreters in the container's own filesystem, every rebuild would
+delete them and leave each environment with a dangling link, until uv recreated the environment and downloaded the
+interpreter again. The cache is there for speed, so packages install from it after a rebuild instead of being downloaded
+again. The volume is per dev container because what it holds fits one container: a locally built package depends on the
+image's system libraries, and the files belong to one numeric user ID.
+
+The feature also sets `UV_TOOL_DIR=/usr/local/share/uv/tools`, `UV_TOOL_BIN_DIR=/usr/local/share/uv/bin`, and
+`UV_LINK_MODE=copy` (so installs also work when the cache and workspace are on different filesystems), and puts
+`/usr/local/share/uv/bin` at the end of `PATH`, also in login shells through `/etc/profile.d/uv.sh`. Existing commands
+earlier in `PATH` take precedence over same-named uv tools; use `/usr/local/share/uv/bin/<command>` to select the
+uv-installed tool in that case.
 
 - Interpreters installed at build time for tools are not on the volume, so runtime `uv python list` does not show them
   and `uv venv` downloads a matching version to the volume.
@@ -57,6 +63,55 @@ are on different filesystems), and puts `/usr/local/share/uv/bin` at the end of 
   `uv tool list`.
 - The volume grows as interpreters and cache entries accumulate. `uv cache prune` and `uv python uninstall <version>`
   shrink it; `docker volume rm uv-<devcontainerId>` removes it, also after the dev container itself is deleted.
+
+## Changing where uv stores data
+
+The paths are plain environment variables, and a value in your `devcontainer.json` replaces the feature's. The feature
+still creates and mounts its own volume at `/var/lib/uv`; with both variables pointed elsewhere it stays empty.
+
+### One volume for several containers
+
+Not recommended: locally built packages depend on the image's system libraries and the files belong to one numeric user
+ID, so share a volume only between containers with the same distribution release and remote user ID. Nothing checks
+that. If you accept this, mount a volume with a fixed name and point uv at it:
+
+```jsonc
+{
+  "mounts": [{ "source": "uv-shared", "target": "/mnt/uv", "type": "volume" }],
+  "containerEnv": {
+    "UV_PYTHON_INSTALL_DIR": "/mnt/uv/python",
+    "UV_CACHE_DIR": "/mnt/uv/cache"
+  },
+  "postCreateCommand": "sudo chown \"$(id -u):$(id -g)\" /mnt/uv"
+}
+```
+
+A volume you add belongs to root, so the `chown` (which needs passwordless `sudo`) hands it to your user. The ownership
+check described below covers `/var/lib/uv` only; a volume of your own is yours to keep in order. uv's cache tolerates
+several uv processes at once. An environment created before the change still links to an interpreter under
+`/var/lib/uv/python`; recreate it or keep that interpreter.
+
+### Project environments outside the workspace
+
+Not recommended. `UV_PROJECT_ENVIRONMENT` moves the project environment away from `.venv/`, for example onto the volume:
+
+```jsonc
+{
+  "containerEnv": {
+    "UV_PROJECT_ENVIRONMENT": "/var/lib/uv/venv"
+  }
+}
+```
+
+uv uses an absolute path as it is, without a directory per project. Every project in the container then syncs into the
+same environment, and each `uv sync` removes the packages the previous project installed. Editors look for `.venv/` in
+the workspace and may not find an environment elsewhere; the interpreter then has to be selected by hand. A relative
+path is resolved against the root of the project's uv workspace and stays in the workspace folder.
+
+uv's documentation covers the remaining settings: [storage](https://docs.astral.sh/uv/reference/storage/),
+[the cache](https://docs.astral.sh/uv/concepts/cache/),
+[project environments](https://docs.astral.sh/uv/concepts/projects/config/), and
+[environment variables](https://docs.astral.sh/uv/reference/environment/).
 
 ## When volume ownership changes
 

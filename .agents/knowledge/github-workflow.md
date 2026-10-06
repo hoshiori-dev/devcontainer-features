@@ -85,9 +85,9 @@ The OpenSpec contract lives in `.agents/knowledge/spec-workflow.md`. Because of 
   change's proposal Acceptance and the scenarios it points to;
 - the `github-project-workflow` skill's Take work, Create issues, and Finish steps apply the gates, the reconciliation,
   and the archive-on-command rule;
-- the `spec-archived` check (workflow PR, `scripts/check_spec_archived.ts`) fails a ready PR that still holds an
-  unarchived change and warns on a draft. No other OpenSpec automation exists: no comment commands, no status labels, no
-  archiving job.
+- the `spec-archived` check (workflow PR, `scripts/check_spec_archived.ts`) is withheld from a PR that still holds an
+  unarchived change, draft or ready, which blocks its merge without failing the run (`github/checks.md`, Waiting for the
+  archive). No other OpenSpec automation exists: no comment commands, no status labels, no archiving job.
 
 A ready PR needs `Phase: implementation`, a `Spec:` line, no reserved line left in Changes or Validation, and every
 checklist item ticked except the one `spec-archived` tracks. When the OpenSpec layout or version changes, re-check every
