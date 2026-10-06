@@ -45,6 +45,9 @@ Deno.test("listedLinks reads ids and targets and ignores the prose around them",
     const translated = "| Name | Text |\n| --- | --- |\n| [uv](src/uv/README.md) | translated |\n" +
         "| [`apt-packages`](src/apt-packages/README.md) | translated, too |";
     assertEquals(listedLinks(translated), listedLinks(featureTable(FEATURES)));
+    assertEquals(listedLinks("| [uv](src/uv/README.md) | see [docs](https://example.com/) |"), [
+        "uv -> src/uv/README.md",
+    ]);
 });
 
 Deno.test("translationProblems reports a missing, extra, relinked, or repeated feature, and missing markers", () => {

@@ -96,8 +96,8 @@ You can compare what the registry serves with the source at the release tag, in 
 3. Compare the two. They should be identical.
 4. Pin the digest you checked, so a rebuild cannot pick up anything else.
 
-The commands below do exactly that. Run them on Linux or inside any dev container; they need `git`, `curl`, `tar`, and
-`sha256sum`.
+The commands below do exactly that. Run them on Linux or inside any dev container; they need `bash`, `git`, `curl`, and
+`tar`, plus tools every Linux image already has (coreutils, `sed`, `grep`, `diff`).
 
 <details>
 <summary>Show the commands</summary>

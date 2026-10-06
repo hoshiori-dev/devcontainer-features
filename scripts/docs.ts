@@ -62,9 +62,13 @@ export function withList(text: string, table: string): string | undefined {
     return `${text.slice(0, start)}\n\n${table}\n\n${text.slice(start + region.length)}`;
 }
 
-/** The feature links of a list region as sorted `id -> target` strings, whatever the surrounding prose says. */
+/**
+ * The feature links of a list region as sorted `id -> target` strings: the link that opens each table row, whatever
+ * the rest of the row says, so a link inside a description is not taken for a feature.
+ */
 export function listedLinks(region: string): string[] {
-    return [...region.matchAll(/\[`?([a-z0-9][a-z0-9._-]*)`?\]\(([^)\s]+)\)/g)].map((m) => `${m[1]} -> ${m[2]}`).sort();
+    return [...region.matchAll(/^\|\s*\[`?([a-z0-9][a-z0-9._-]*)`?\]\(([^)\s]+)\)/gm)]
+        .map((m) => `${m[1]} -> ${m[2]}`).sort();
 }
 
 /** Problems of a translated README's list against the English one; empty when both list the same features. */

@@ -94,7 +94,8 @@ Actions 按 commit SHA 固定。版本只由 `main` 上的 [Release workflow](.g
 3. 比较两者，它们应该完全一致。
 4. 固定你检查过的 digest，这样重建时不会换成别的内容。
 
-下面的命令做的就是这四步。请在 Linux 或任意 dev container 里运行，需要 `git`、`curl`、`tar` 和 `sha256sum`。
+下面的命令做的就是这四步。请在 Linux 或任意 dev container 里运行，需要 `bash`、`git`、`curl` 和 `tar`，以及任何 Linux
+镜像都自带的工具（coreutils、`sed`、`grep`、`diff`）。
 
 <details>
 <summary>显示命令</summary>
@@ -141,10 +142,10 @@ Actions 按 commit SHA 固定。版本只由 `main` 上的 [Release workflow](.g
 
 </details>
 
-这些命令会在第一个失败的步骤停下，只有比较通过后才打印引用地址。信任它之前，先到命令打印出的 目录里读一遍 `install.sh`
-以及它旁边的
-`scripts/`（如果有）：你的构建运行的就是这些，容器启动时运行的也是它留下的这些。想用你读过的那个确切版本，就在
-`devcontainer.json` 里用第 4 步得到的引用地址替换 `:1` 标签。之后要升级版本，把这套检查再做一遍。
+这些命令会在第一个失败的步骤停下，只有比较通过后才打印引用地址。信任它之前，先到命令打印出的目录里读一遍
+`install.sh`，旁边如果有 `scripts/`
+也一起读：你的构建运行的就是这些，容器启动时运行的也是它留下的这些。想用你读过的那个确切版本，就在 `devcontainer.json`
+里用第 4 步得到的引用地址替换 `:1` 标签。之后要升级版本，把这套检查再做一遍。
 
 > [!IMPORTANT]
 > **这些还不能保证什么**
