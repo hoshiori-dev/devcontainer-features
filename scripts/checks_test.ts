@@ -3,6 +3,7 @@ import { parse } from "jsr:@std/semver@1.0.8";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
 import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
+import { FAILED, main as archiveVerdict, UNARCHIVED } from "./check_spec_archived.ts";
 import {
     type Archive,
     type Checks,
@@ -66,6 +67,43 @@ Deno.test("bodyProblems wants whole heading lines and the template's own securit
     assert(bodyProblems(TEMPLATE, ticked.replace("## Validation", "### Validation"))[0].includes("## Validation"));
     assert(bodyProblems(TEMPLATE, `${TEMPLATE}- [x] secrets n/a\n`).some((p) => p.includes("unticked")));
     assert(bodyProblems("## What and why\n", "## What and why\n")[0].includes("no checklist item"));
+});
+
+Deno.test("check_spec_archived answers 0, 1, and its own failure apart", async () => {
+    const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "archived-test-" });
+    try {
+        const root = `${dir}/changes`;
+        assertEquals(await archiveVerdict(["--ready"], false, root), 0, "no changes directory");
+        await Deno.mkdir(`${root}/archive/2026-01-01-done`, { recursive: true });
+        assertEquals(await archiveVerdict(["--ready"], true, root), 0, "an archive only");
+        await Deno.mkdir(`${root}/pending`);
+        assertEquals(await archiveVerdict(["--ready"], true, root), UNARCHIVED);
+        assertEquals(await archiveVerdict(["--ready"], false, root), UNARCHIVED);
+        assertEquals(await archiveVerdict([], true, root), 0, "listing never fails");
+        await Deno.writeTextFile(`${dir}/file`, "");
+        assertEquals(await archiveVerdict(["--ready"], true, `${dir}/file`), FAILED, "a path that is no directory");
+    } finally {
+        await Deno.remove(dir, { recursive: true });
+    }
+});
+
+Deno.test("pr.yml reports spec-archived only for an archived verdict, whatever the draft state", async () => {
+    const text = await Deno.readTextFile(new URL("../.github/workflows/pr.yml", import.meta.url));
+    const workflow = parseYaml(text);
+    const carrier = workflow.jobs["spec-archived"];
+    assertEquals(
+        carrier.name,
+        "${{ needs.archive-verdict.outputs.archived == 'true' && 'spec-archived' || 'awaiting-archive' }}",
+    );
+    assertEquals(carrier.needs, "archive-verdict");
+    assertEquals(carrier.if, undefined);
+    const decider = workflow.jobs["archive-verdict"];
+    assertEquals(decider.outputs, { archived: "${{ steps.verdict.outputs.archived }}" });
+    const verdict = decider.steps.find((step: { id?: string }) => step.id === "verdict");
+    assert(verdict.run.includes('check_spec_archived.ts" --ready'), verdict.run);
+    assert(!text.includes("pull_request.draft"), "the verdict must not depend on the draft state");
+    assertEquals(workflow.permissions, { contents: "read" });
+    assertEquals(Object.keys(workflow.on), ["pull_request"]);
 });
 
 Deno.test("scaffold produces the required files for a valid id", () => {

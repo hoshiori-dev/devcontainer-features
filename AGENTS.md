@@ -71,7 +71,7 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 | Scenario tests of one feature / the global scenarios                                                          | `just test-scenarios <id>` / `just test-global` |
 | Which features and images CI will test for this branch                                                        | `just affected`                                 |
 | Regenerate feature READMEs and the root feature list                                                          | `just docs`                                     |
-| Unarchived OpenSpec changes (`--ready`: the verdict a ready PR gets)                                          | `just spec-status`                              |
+| Unarchived OpenSpec changes (`--ready`: non-zero when one exists, the verdict the PR workflow reads)          | `just spec-status`                              |
 
 ## Workflow
 

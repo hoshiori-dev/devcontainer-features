@@ -34,7 +34,7 @@ spec-check:
     OPENSPEC_NO_UPDATE_CHECK=1 OPENSPEC_TELEMETRY=0 openspec validate --all --strict --no-interactive
     ./scripts/check_openspec.ts
 
-# List unarchived OpenSpec changes; --ready shows the verdict CI gives a ready PR
+# List unarchived OpenSpec changes; --ready exits non-zero when one exists, the verdict the PR workflow reads
 spec-status *args:
     ./scripts/check_spec_archived.ts "$@"
 

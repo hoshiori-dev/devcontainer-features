@@ -2,27 +2,27 @@
 
 ## 1. Archive checker
 
-- [ ] 1.1 In `scripts/check_spec_archived.ts`, keep statuses 0 and 1 for `--ready`, report the script's own unexpected
+- [x] 1.1 In `scripts/check_spec_archived.ts`, keep statuses 0 and 1 for `--ready`, report the script's own unexpected
       errors with status 2, and under `--ready` in GitHub Actions name the unarchived changes in a warning annotation
       instead of an error; verify with unit tests in `scripts/checks_test.ts` over no change, an archive only, an
       unarchived change with and without `--ready`, and a changes path that cannot be read
-- [ ] 1.2 Rewrite the script's header comment, the `spec-status` comment in `justfile`, and its row in the Validation
+- [x] 1.2 Rewrite the script's header comment, the `spec-status` comment in `justfile`, and its row in the Validation
       table of `AGENTS.md` so that none speaks of a verdict only a ready pull request gets; verify `just spec-status`
       exits 0 and `just spec-status --ready` exits 1 on this branch
 
 ## 2. PR workflow
 
-- [ ] 2.1 In `.github/workflows/pr.yml`, replace the job `spec-archived` with a deciding job that always runs the base
+- [x] 2.1 In `.github/workflows/pr.yml`, replace the job `spec-archived` with a deciding job that always runs the base
       commit's checker with `--ready` and maps status 0 to archived, 1 to unarchived, and any other status to a failed
       job, and a second job that needs it, succeeds either way, and is named `spec-archived` only when the output says
       archived and `awaiting-archive` otherwise; verify with a unit test that parses the workflow and checks the name
       expression, the absence of the draft state, and the unchanged `permissions:` and trigger
-- [ ] 2.2 Verify the step's status mapping by running its shell text locally against a stand-in checker that exits 0, 1,
+- [x] 2.2 Verify the step's status mapping by running its shell text locally against a stand-in checker that exits 0, 1,
       and 2
 
 ## 3. Documents
 
-- [ ] 3.1 Describe the waiting state instead of a red check in `.agents/knowledge/github/checks.md` (required checks,
+- [x] 3.1 Describe the waiting state instead of a red check in `.agents/knowledge/github/checks.md` (required checks,
       job map, Reading a run), `.agents/knowledge/spec-workflow.md`, `.agents/knowledge/github-workflow.md`, the Finish
       step of the `github-project-workflow` skill, the checklist item of `.github/pull_request_template.md`, and
       `CONTRIBUTING.md`; verify `git grep -n -i -w red` over the six finds no line about `spec-archived` or the archive
