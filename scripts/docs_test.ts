@@ -47,7 +47,7 @@ Deno.test("listedLinks reads ids and targets and ignores the prose around them",
     assertEquals(listedLinks(translated), listedLinks(featureTable(FEATURES)));
 });
 
-Deno.test("translationProblems reports a missing, an extra, and a relinked feature, and missing markers", () => {
+Deno.test("translationProblems reports a missing, extra, relinked, or repeated feature, and missing markers", () => {
     const english = featureTable(FEATURES);
     assertEquals(translationProblems("README.zh.md", english, english), []);
     const missing = translationProblems("README.zh.md", english, "| [uv](src/uv/README.md) | translated |");
@@ -56,5 +56,7 @@ Deno.test("translationProblems reports a missing, an extra, and a relinked featu
     assert(extra[0].includes("not in README.md: gone -> src/gone/README.md"));
     const relinked = translationProblems("README.zh.md", english, english.replace("src/uv/README.md", "src/uv/"));
     assert(relinked[0].includes("missing: uv -> src/uv/README.md"));
+    const repeated = translationProblems("README.zh.md", english, `${english}\n| [uv](src/uv/README.md) | again |`);
+    assert(repeated[0].includes("listed more than once: uv -> src/uv/README.md"));
     assert(translationProblems("README.zh.md", english, undefined)[0].includes(LIST_START));
 });

@@ -103,38 +103,51 @@ The commands below do exactly that. Run them on Linux or inside any dev containe
 <summary>Show the commands</summary>
 
 ```bash
-REPO=hoshiori-dev/devcontainer-features
-ID=deno
-VERSION=1.0.1
+(
+    set -euo pipefail
+    REPO=hoshiori-dev/devcontainer-features
+    ID=deno
+    VERSION=1.0.1
 
-# 1. The source this version was built from: the release tag.
-git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$ID/v$VERSION" \
-    "https://github.com/$REPO.git" source
+    # An empty directory, so nothing left from an earlier run can pass for a result.
+    WORK=$(mktemp -d)
+    cd "$WORK"
 
-# 2. The published artifact, straight from the registry.
-TOKEN=$(curl -fsSL "https://ghcr.io/token?scope=repository:$REPO/$ID:pull" |
-    sed -E 's/.*"token":"([^"]+)".*/\1/')
-curl -fsSL -H "Authorization: Bearer $TOKEN" \
-    -H "Accept: application/vnd.oci.image.manifest.v1+json" \
-    "https://ghcr.io/v2/$REPO/$ID/manifests/$VERSION" -o manifest.json
-LAYER=$(sed -E 's/.*"layers":\[\{[^}]*"digest":"(sha256:[0-9a-f]{64})".*/\1/' manifest.json)
-curl -fsSL -H "Authorization: Bearer $TOKEN" \
-    "https://ghcr.io/v2/$REPO/$ID/blobs/$LAYER" -o feature.tar
-echo "${LAYER#sha256:}  feature.tar" | sha256sum --check
+    # 1. The source this version was built from: the release tag.
+    git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$ID/v$VERSION" \
+        "https://github.com/$REPO.git" source
 
-# 3. Compare. Silence from diff means the artifact holds exactly the tagged source.
-mkdir published && tar -xf feature.tar -C published
-diff -r "source/src/$ID" published && echo "identical to $ID/v$VERSION"
+    # 2. The published artifact, straight from the registry.
+    TOKEN=$(curl -fsSL "https://ghcr.io/token?scope=repository:$REPO/$ID:pull" |
+        sed -nE 's/.*"token":"([^"]+)".*/\1/p')
+    curl -fsSL -H "Authorization: Bearer $TOKEN" \
+        -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+        "https://ghcr.io/v2/$REPO/$ID/manifests/$VERSION" -o manifest.json
+    # A feature's manifest names two blobs: an empty config, then the one layer that is the feature.
+    DIGESTS=$(grep -oE 'sha256:[0-9a-f]{64}' manifest.json)
+    [ "$(echo "$DIGESTS" | wc -l)" -eq 2 ] || { echo "unexpected manifest: stop here" >&2; exit 1; }
+    LAYER=$(echo "$DIGESTS" | tail -n 1)
+    curl -fsSL -H "Authorization: Bearer $TOKEN" \
+        "https://ghcr.io/v2/$REPO/$ID/blobs/$LAYER" -o feature.tar
+    echo "${LAYER#sha256:}  feature.tar" | sha256sum --check
 
-# 4. The reference to pin, so a rebuild cannot pick up anything else.
-echo "ghcr.io/$REPO/$ID@sha256:$(sha256sum manifest.json | cut -d' ' -f1)"
+    # 3. Compare. Any difference is printed and stops here.
+    mkdir published && tar -xf feature.tar -C published
+    diff -r "source/src/$ID" published
+    echo "identical to $ID/v$VERSION; read the source in $WORK/source/src/$ID"
+
+    # 4. The reference to pin, so a rebuild cannot pick up anything else.
+    DIGEST=$(sha256sum manifest.json | cut -d' ' -f1)
+    echo "ghcr.io/$REPO/$ID@sha256:$DIGEST"
+)
 ```
 
 </details>
 
-Read `source/src/$ID/install.sh`, and any `scripts/` beside it, before you trust it: that is what your build runs and
-what it leaves to run when the container starts. Use the reference from step 4 in `devcontainer.json` in place of the
-`:1` tag when you want the exact version you read. You then move to a new version by repeating the check.
+The commands stop at the first step that fails, and print the reference only after the comparison passed. Read
+`install.sh`, and any `scripts/` beside it, in the directory they print before you trust it: that is what your build
+runs and what it leaves to run when the container starts. Use the reference from step 4 in `devcontainer.json` in place
+of the `:1` tag when you want the exact version you read. You then move to a new version by repeating the check.
 
 > [!IMPORTANT]
 > **What this does not give you**

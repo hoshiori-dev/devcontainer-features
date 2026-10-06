@@ -41,11 +41,18 @@ A feature is also not a sandbox: it cannot protect you from a configuration that
 that build the features: a contribution, the content of a pull request, or a dependency the tooling runs, used to take
 over or damage a developer's machine or the CI environment, or to get at its credentials.
 
-**What we know about and accept.** Published artifacts carry no signature or provenance attestation
-([#100](https://github.com/hoshiori-dev/devcontainer-features/issues/100)). A major tag such as `:1` delivers new
-versions without asking. A feature installs the upstream version you ask for and cannot tell when the upstream itself,
-or its signing key, has been compromised. Where an upstream publishes no checksum, a download relies on TLS alone, and
-the feature's specification under `openspec/specs/` says so. Reports about these are welcome when they bring something
-new; otherwise they are already on our list.
+**Risks we know about and accept.** We know about the following, and a report that only restates one of them is not
+handled as a vulnerability:
+
+- Published artifacts carry no signature or provenance attestation
+  ([#100](https://github.com/hoshiori-dev/devcontainer-features/issues/100)).
+- A major tag such as `:1` delivers new versions without asking.
+- A feature installs the upstream version you ask for. It cannot tell when the upstream itself, or its signing key, has
+  been compromised.
+- Where an upstream publishes no checksum or signature, a download relies on TLS alone. The feature's specification
+  under `openspec/specs/` says so for each such download.
+- We cannot rule out that a maintainer's account is taken over.
+
+A report about one of these is welcome when it brings something we did not know.
 
 The [README](README.md#check-a-published-version-yourself) shows how to compare a published version with its source.

@@ -72,15 +72,18 @@ export function translationProblems(file: string, english: string, translated: s
     if (translated === undefined) {
         return [`${file} needs one ${LIST_START} … ${LIST_END} pair around its feature list.`];
     }
+    const links = listedLinks(translated);
     const want = new Set(listedLinks(english));
-    const have = new Set(listedLinks(translated));
+    const have = new Set(links);
     const missing = [...want].filter((link) => !have.has(link));
     const extra = [...have].filter((link) => !want.has(link));
-    if (missing.length === 0 && extra.length === 0) return [];
+    const repeated = [...have].filter((link) => links.indexOf(link) !== links.lastIndexOf(link));
+    if (missing.length === 0 && extra.length === 0 && repeated.length === 0) return [];
     return [
-        `${file} lists other features than README.md` +
+        `${file} does not list the features of README.md exactly` +
         (missing.length > 0 ? `; missing: ${missing.join(", ")}` : "") +
         (extra.length > 0 ? `; not in README.md: ${extra.join(", ")}` : "") +
+        (repeated.length > 0 ? `; listed more than once: ${repeated.join(", ")}` : "") +
         ". Translate the list of README.md again; this file is written by hand.",
     ];
 }

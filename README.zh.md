@@ -100,36 +100,49 @@ Actions 按 commit SHA 固定。版本只由 `main` 上的 [Release workflow](.g
 <summary>显示命令</summary>
 
 ```bash
-REPO=hoshiori-dev/devcontainer-features
-ID=deno
-VERSION=1.0.1
+(
+    set -euo pipefail
+    REPO=hoshiori-dev/devcontainer-features
+    ID=deno
+    VERSION=1.0.1
 
-# 1. 构建这个版本所用的源码：发布标签处的代码。
-git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$ID/v$VERSION" \
-    "https://github.com/$REPO.git" source
+    # 一个空目录，这样上次运行留下的文件不会被当成结果。
+    WORK=$(mktemp -d)
+    cd "$WORK"
 
-# 2. 已发布的制品，直接从 registry 取。
-TOKEN=$(curl -fsSL "https://ghcr.io/token?scope=repository:$REPO/$ID:pull" |
-    sed -E 's/.*"token":"([^"]+)".*/\1/')
-curl -fsSL -H "Authorization: Bearer $TOKEN" \
-    -H "Accept: application/vnd.oci.image.manifest.v1+json" \
-    "https://ghcr.io/v2/$REPO/$ID/manifests/$VERSION" -o manifest.json
-LAYER=$(sed -E 's/.*"layers":\[\{[^}]*"digest":"(sha256:[0-9a-f]{64})".*/\1/' manifest.json)
-curl -fsSL -H "Authorization: Bearer $TOKEN" \
-    "https://ghcr.io/v2/$REPO/$ID/blobs/$LAYER" -o feature.tar
-echo "${LAYER#sha256:}  feature.tar" | sha256sum --check
+    # 1. 构建这个版本所用的源码：发布标签处的代码。
+    git -c advice.detachedHead=false clone --quiet --depth 1 --branch "$ID/v$VERSION" \
+        "https://github.com/$REPO.git" source
 
-# 3. 比较。diff 没有输出，说明制品的内容和标签处的源码完全一致。
-mkdir published && tar -xf feature.tar -C published
-diff -r "source/src/$ID" published && echo "identical to $ID/v$VERSION"
+    # 2. 已发布的制品，直接从 registry 取。
+    TOKEN=$(curl -fsSL "https://ghcr.io/token?scope=repository:$REPO/$ID:pull" |
+        sed -nE 's/.*"token":"([^"]+)".*/\1/p')
+    curl -fsSL -H "Authorization: Bearer $TOKEN" \
+        -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+        "https://ghcr.io/v2/$REPO/$ID/manifests/$VERSION" -o manifest.json
+    # feature 的 manifest 里有两个 blob：一个空的 config，以及唯一的一层，也就是 feature 本身。
+    DIGESTS=$(grep -oE 'sha256:[0-9a-f]{64}' manifest.json)
+    [ "$(echo "$DIGESTS" | wc -l)" -eq 2 ] || { echo "unexpected manifest: stop here" >&2; exit 1; }
+    LAYER=$(echo "$DIGESTS" | tail -n 1)
+    curl -fsSL -H "Authorization: Bearer $TOKEN" \
+        "https://ghcr.io/v2/$REPO/$ID/blobs/$LAYER" -o feature.tar
+    echo "${LAYER#sha256:}  feature.tar" | sha256sum --check
 
-# 4. 用来固定版本的引用地址，这样重建时不会换成别的内容。
-echo "ghcr.io/$REPO/$ID@sha256:$(sha256sum manifest.json | cut -d' ' -f1)"
+    # 3. 比较。有任何差异都会打印出来，并在这里停下。
+    mkdir published && tar -xf feature.tar -C published
+    diff -r "source/src/$ID" published
+    echo "identical to $ID/v$VERSION; read the source in $WORK/source/src/$ID"
+
+    # 4. 用来固定版本的引用地址，这样重建时不会换成别的内容。
+    DIGEST=$(sha256sum manifest.json | cut -d' ' -f1)
+    echo "ghcr.io/$REPO/$ID@sha256:$DIGEST"
+)
 ```
 
 </details>
 
-信任它之前，先读一遍 `source/src/$ID/install.sh` 以及它旁边的
+这些命令会在第一个失败的步骤停下，只有比较通过后才打印引用地址。信任它之前，先到命令打印出的 目录里读一遍 `install.sh`
+以及它旁边的
 `scripts/`（如果有）：你的构建运行的就是这些，容器启动时运行的也是它留下的这些。想用你读过的那个确切版本，就在
 `devcontainer.json` 里用第 4 步得到的引用地址替换 `:1` 标签。之后要升级版本，把这套检查再做一遍。
 
