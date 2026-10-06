@@ -38,8 +38,8 @@ Both survive a rebuild of the dev container. The interpreters need to: the works
 in it only links to its interpreter. If uv kept interpreters in the container's own filesystem, every rebuild would
 delete them and leave each environment with a dangling link, until uv recreated the environment and downloaded the
 interpreter again. The cache is there for speed, so packages install from it after a rebuild instead of being downloaded
-again. The volume is per dev container because an interpreter belongs to one C library and architecture, a locally built
-package also to the image's system libraries, and the files to one numeric user ID.
+again. The volume is per dev container because what it holds fits one container: a locally built package depends on the
+image's system libraries, and the files belong to one numeric user ID.
 
 The feature also sets `UV_TOOL_DIR=/usr/local/share/uv/tools`, `UV_TOOL_BIN_DIR=/usr/local/share/uv/bin`, and
 `UV_LINK_MODE=copy` (so installs also work when the cache and workspace are on different filesystems), and puts
@@ -71,8 +71,9 @@ still creates and mounts its own volume at `/var/lib/uv`; with both variables po
 
 ### One volume for several containers
 
-Not recommended: it is only sound between containers with the same distribution release, architecture, and remote user
-ID, and nothing checks that. If you accept this, mount a volume with a fixed name and point uv at it:
+Not recommended: locally built packages depend on the image's system libraries and the files belong to one numeric user
+ID, so share a volume only between containers with the same distribution release and remote user ID. Nothing checks
+that. If you accept this, mount a volume with a fixed name and point uv at it:
 
 ```jsonc
 {
@@ -104,8 +105,8 @@ Not recommended. `UV_PROJECT_ENVIRONMENT` moves the project environment away fro
 
 uv uses an absolute path as it is, without a directory per project. Every project in the container then syncs into the
 same environment, and each `uv sync` removes the packages the previous project installed. Editors look for `.venv/` in
-the workspace and do not find an environment elsewhere, so the interpreter has to be selected by hand. A relative path
-is resolved against the root of the project's uv workspace and stays in the workspace folder.
+the workspace and may not find an environment elsewhere; the interpreter then has to be selected by hand. A relative
+path is resolved against the root of the project's uv workspace and stays in the workspace folder.
 
 uv's documentation covers the remaining settings: [storage](https://docs.astral.sh/uv/reference/storage/),
 [the cache](https://docs.astral.sh/uv/concepts/cache/),
