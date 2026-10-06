@@ -1,0 +1,125 @@
+# Design
+
+## Context
+
+- The decisions below were made with the maintainer in conversation on 2026-10-06.
+- State on `main` at 97fa7e8: 14 features under `src/`; the root list names 12. `scripts/docs.ts` generates each
+  `src/<id>/README.md` through `devcontainer features generate-docs` and has a `--check` mode that `just check` runs.
+- The collection is not in the containers.dev index (`_data/collection-index.yml` of
+  `devcontainers/devcontainers.github.io`) and no submission is open, so editors do not offer its features in their
+  pickers.
+- What exists for a user who wants to check a feature: every URL a feature requests is named in its spec; downloads use
+  HTTPS on every hop and are verified where upstream publishes a checksum or signature (`feature-authoring.md`); Actions
+  are pinned by commit SHA; versions are published only from `main` by the Release workflow, which tags the commit
+  `<id>/v<version>`. What does not exist: a signature or provenance attestation on the GHCR artifact (#100). hf-cli's
+  upstream installer and hf-mount's binaries have no upstream checksum and rely on TLS alone.
+- `feature-authoring.md` states that a feature is not a sandbox against a malicious configuration. The claim a README
+  can make is narrower: unusual execution or access is visible in the configuration and cannot hide behind
+  ordinary-looking values.
+- Agent support checked on 2026-10-06: Codex reads `AGENTS.md` and `.agents/skills`; Google Antigravity reads
+  `AGENTS.md` (IDE 1.20.5 or later) and `.agents/skills`; Claude Code reads `CLAUDE.md`, which imports `AGENTS.md`, and
+  `.claude/skills`, a symlink to `.agents/skills`. The `/opsx:*` commands exist for Claude Code only; the other agents
+  use the `openspec-*` skills. GitHub Copilot code review uses `.github/skills/code-review`.
+- Threat model, from the maintainer. A feature configures a developer's own environment. For shipped code the threats
+  are supply-chain poisoning, by the feature's authors or by an upstream source it depends on, and a configuration
+  author hijacking another user's environment through settings that look legitimate. Handling every untrusted input is
+  not a goal: a user does not attack themselves. For test and administration code the threat is hijacking or damaging a
+  feature developer's environment or the CI/CD environment (GitHub Actions today).
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- The README states only what the repository does today. Checked by tracing each measure it names to the rule or
+  workflow that implements it, and by running each audit command.
+- The feature list cannot drift from `src/`. Checked by removing a row, and by changing a description, and seeing
+  `just check` fail each time.
+- Each rule keeps one owner. Checked by searching `CONTRIBUTING.md` and `README.md` for rules restated from the
+  knowledge base instead of linked.
+- A reviewer can tell a security finding from a robustness remark. Checked by reading the review guidance against the
+  threat model: every category it asks for maps to a scenario in `SECURITY.md`.
+
+**Non-Goals:**
+
+- Submitting the collection to the containers.dev index.
+- Attesting or signing published artifacts (#100).
+- Changing any feature, its notes, or any download rule.
+- Translating any document other than the root README.
+
+## Decisions
+
+### The feature list is a generated region of `README.md`
+
+`scripts/docs.ts` writes a table between two marker comments in `README.md`: one row per feature that is not
+`deprecated`, sorted by `id`, holding the id linked to `src/<id>/README.md` and the `description` from
+`devcontainer-feature.json`. `--check` compares the region as it compares feature READMEs. Text outside the markers is
+written by hand. `AGENTS.md` lists the region with the other generated files.
+
+Rejected: a hand-maintained row per feature PR (#39) — nothing would catch a missed row, which already happened twice.
+Rejected: generating the whole README from a template — the prose would move into a script and become harder to edit.
+
+### `README.zh.md` is translated by hand and checked only for its feature list
+
+The Chinese file is written after the English one is final, section for section, with a line at the top naming the
+English file as authoritative; each README links to the other. `scripts/docs.ts --check` also fails when the set of
+feature ids and links in `README.zh.md`'s table differs from the English table. The check reads no prose. A PR that
+changes `README.md` updates `README.zh.md` in the same PR; `CONTRIBUTING.md` and the "Keep In Sync" table of `AGENTS.md`
+say so.
+
+Rejected: generating the Chinese table too — descriptions come from metadata, which is English only, and a second
+description field would be a new convention for every feature. Rejected: no check at all — the translated list would go
+stale the same way the English one did.
+
+### The README states measures and limits, and gives audit steps
+
+The trust section has three parts: the principles (official sources only, verification wherever upstream allows it,
+scripts written to be read, options that cannot hide behavior), the audit steps (find the tag for a version, fetch the
+published artifact, compare it with `src/<id>/` at that tag, pin a digest), and the limits (no attestation yet, TLS-only
+downloads named per feature in its README). It promises no equivalence with first-party features; it lets the reader
+judge. The commands of the audit steps are chosen during implementation from tools a user is likely to have, and each is
+run before it is written down.
+
+The index note is a GitHub alert block: the collection is not in the containers.dev index yet, so the reference is typed
+into `devcontainer.json` by hand.
+
+Layout: a title and one-sentence description, a link to the other language, a small number of badges (CI, license), then
+Usage, Features, Principles and auditing, Contributing, License. No emoji as structure and no decorative images.
+
+### `CONTRIBUTING.md` summarizes and links
+
+It is written for a human contributor and holds: how the work is organized (OpenSpec, one spec per feature at
+`openspec/specs/<id>/spec.md`, a change approved before implementation), the supported coding agents and what each
+reads, the path from issue to release, and the commands of `AGENTS.md`'s Validation table. For every rule it gives one
+sentence and a link to the owning knowledge file, as "Source of truth" in `spec-workflow.md` requires of a pointing
+file. `README.md` asks a coding agent that has not read `AGENTS.md` to read it, in one short paragraph.
+
+Rejected: moving rules out of the knowledge base into `CONTRIBUTING.md` — agents load the knowledge files on demand, and
+two owners would drift.
+
+### `SECURITY.md` owns the threat model; the review rules point to it
+
+`SECURITY.md` gains a section that states, per role of code, who the attacker is and what they could gain:
+
+| Code           | Threats in scope                                                                                                                                                 | Not a threat                                                             |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Shipped        | A feature author or an upstream source poisons what is installed; a configuration author takes over another user's environment through settings that look normal | A user passing hostile values to a feature in their own configuration    |
+| Test           | A contribution uses test code to hijack or damage a developer's machine or the CI/CD environment                                                                 | Deterministic test inputs treated as attacker-controlled                 |
+| Administration | A contribution, or untrusted pull-request input, uses scripts or workflows to hijack or damage a developer's machine or CI/CD, or to reach its credentials       | Hardening a script against inputs outside its actual invocation contract |
+
+`review-guidance.md` keeps its privacy and reporting rules and replaces its general list of execution risks with a
+pointer to that section plus one rule: a security finding names the role of the code, the actor, and the steps by which
+the actor gains something under the model; a concern with no such scenario is reported as a correctness or robustness
+remark, or not at all. The Copilot review skill's step 5 carries the same requirement by pointing to the guidance.
+`feature-authoring.md`'s "Developer trust and readability" stays the authoring rule and is not restated.
+
+Rejected: keeping the threat model in `review-guidance.md` and summarizing it in `SECURITY.md` — reporters and users
+read `SECURITY.md`, and it is the public statement, so it is the natural owner.
+
+## Risks / Trade-offs
+
+- The README's limits section says in public that artifacts are unsigned. This is already observable; saying so is the
+  point of the section.
+- The Chinese prose can lag behind the English between PRs that touch only one of them. The authoritative-file line and
+  the same-PR convention bound this; only the feature list is checked mechanically.
+- Narrowing review to the threat model could hide a real problem that fits no listed scenario. The rule sends such a
+  concern to a correctness remark; it does not drop it.
