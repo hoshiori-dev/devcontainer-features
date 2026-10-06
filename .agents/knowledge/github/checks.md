@@ -69,9 +69,9 @@ on the head commit, so the ruleset keeps the merge blocked whatever the run's ou
 - The reason is in the run, not on the required check: `archive-verdict` carries an annotation that names each
   unarchived change (a warning; an error-level one while the base commit still holds the checker from before
   2026-10-06).
-- `archive-verdict` fails only when the checker itself breaks (any status but 0 and 1); the next job is then skipped and
-  the run fails. When Deno cannot start the checker at all it exits 1, which reads as waiting with no annotation: the
-  merge stays blocked, the job log shows the error, and a rerun clears a transient one.
+- `archive-verdict` fails only when the checker itself breaks: Deno cannot load it (the step before the verdict, which
+  catches an import that cannot be fetched), or it ends with any status but 0 and 1. The next job is then skipped and
+  the run fails; a rerun clears a transient failure.
 - What GitHub shows for a waiting PR, as a maintainer saw it on a test pull request on 2026-10-06: the pull request page
   lists `spec-archived` in its merge box as expected and waiting for its status to be reported, with no reason beside
   it, and the pull request list shows the passing icon, a green check mark. The list therefore never tells a waiting PR

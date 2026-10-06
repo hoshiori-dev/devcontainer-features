@@ -66,6 +66,12 @@ jobs:
         uses: ./.github/actions/base-checks
         with:
           files: scripts/check_spec_archived.ts
+      # Loads the checker without running it. A checker Deno cannot load exits 1, the status that
+      # means an unarchived change, so a load failure has to fail the job here, before the verdict.
+      - id: load
+        env:
+          ROOT: ${{ steps.base.outputs.root }}
+        run: deno cache "${ROOT}/scripts/check_spec_archived.ts"
       # Runs in the workspace, so it reads this pull request's openspec/changes/. Status 1 means a
       # change is unarchived, which is a state to wait in, not a failure; any other non-zero status
       # is the checker failing and fails the job.

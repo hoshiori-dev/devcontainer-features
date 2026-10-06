@@ -148,9 +148,12 @@
   one is marked ready; if it fails, the change is revised before any merge.
 - **The test pull request cannot exercise the new script.** Its checks run the script `main` holds, so the status the
   new script gives its own errors is covered by unit tests only, until the first pull request after the merge.
-- **A failure before the script runs looks like waiting.** If Deno cannot start the script or fetch its import, it exits
-  1 and the pull request reads as waiting with no annotation. The merge stays blocked, never opened; the job log shows
-  the error, and a rerun clears a transient one.
+- **A failure before the script runs would look like waiting.** If Deno cannot fetch the script's import, `deno run`
+  exits 1, the status of an unarchived change. Mitigation, added on 2026-10-06 after a review comment on the pull
+  request: the deciding job first loads the checker with `deno cache`, which exits non-zero for an import it cannot
+  resolve and 0 for the script `main` holds today (both measured locally with Deno 2.9.7), so a load failure fails the
+  job instead of reading as waiting. What remains is an uncaught error in the script `main` holds, which exits 1 until
+  the script of this change is the base; the merge stays blocked in that case, never opened.
 - **A pass reported by an edited workflow stands alone.** A pull request can make a job named `spec-archived` succeed by
   editing the workflow, as it can today; with the genuine check withheld instead of failed, no failing check of the same
   name appears beside it. Review of edits under `.github/` remains the guard, and an archive that never happened is

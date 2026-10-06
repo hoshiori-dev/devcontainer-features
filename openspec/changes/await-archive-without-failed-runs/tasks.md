@@ -19,6 +19,10 @@
       expression, the absence of the draft state, and the unchanged `permissions:` and trigger
 - [x] 2.2 Verify the step's status mapping by running its shell text locally against a stand-in checker that exits 0, 1,
       and 2
+- [x] 2.3 After a review comment on the pull request, load the checker with `deno cache` in a step before the verdict,
+      so a checker Deno cannot load fails the job instead of reading as waiting; verify with the unit test that the step
+      precedes the verdict, and locally that `deno cache` exits non-zero for an unresolvable import and 0 for the
+      checker `main` holds
 
 ## 3. Documents
 

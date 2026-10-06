@@ -99,6 +99,9 @@ Deno.test("pr.yml reports spec-archived only for an archived verdict, whatever t
     assertEquals(carrier.if, undefined);
     const decider = workflow.jobs["archive-verdict"];
     assertEquals(decider.outputs, { archived: "${{ steps.verdict.outputs.archived }}" });
+    const ids = decider.steps.map((step: { id?: string }) => step.id);
+    assert(ids.indexOf("load") >= 0 && ids.indexOf("load") < ids.indexOf("verdict"), "load runs before verdict");
+    assertEquals(decider.steps[ids.indexOf("load")].run, 'deno cache "${ROOT}/scripts/check_spec_archived.ts"');
     const verdict = decider.steps.find((step: { id?: string }) => step.id === "verdict");
     assert(verdict.run.includes('check_spec_archived.ts" --ready'), verdict.run);
     assert(!text.includes("pull_request.draft"), "the verdict must not depend on the draft state");
