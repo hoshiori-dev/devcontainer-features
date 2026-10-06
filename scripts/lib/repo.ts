@@ -28,6 +28,7 @@ export const INFRA_PATHS = [
     ".github/actions/",
     "scripts/lib/",
     "scripts/affected.ts",
+    "scripts/attest_subjects.ts",
     "scripts/test_feature.ts",
     "test/canary.json",
     "test/compatibility.schema.json",

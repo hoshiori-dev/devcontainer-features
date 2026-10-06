@@ -6,6 +6,11 @@
 # version above the previous main — since two pull requests green on their own can still combine
 # into an invalid main (a stale dependency major, or two identical bumps that would publish nothing
 # new). It runs without the write token, which only `publish` receives.
+# `attest` then signs a build provenance attestation for the versions this run published, and for
+# nothing else: `publish` hands it their names and digests as the CLI reported them. The two jobs
+# split the permissions — the one that can write packages and tags cannot request a signing
+# identity, and the one that signs cannot write either. A failed `attest` leaves the version
+# published and tagged without an attestation; recovery is in .agents/knowledge/github/checks.md.
 name: Release
 
 on:
@@ -42,6 +47,8 @@ jobs:
     permissions:
       contents: write # push release tags
       packages: write # publish to ghcr.io
+    outputs:
+      subjects: ${{ steps.subjects.outputs.subjects }}
     steps:
       # Keeps the checkout's credentials: scripts/tag_releases.ts pushes the release tags with them.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,6 +61,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # The namespace is REPO in scripts/lib/repo.ts; scripts/checks_test.ts keeps the two equal.
-        run: devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features
+        # The CLI logs to standard error and prints one JSON object, what it published, to standard output.
+        run: |
+          {
+            devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features
+          } > "${RUNNER_TEMP}/published.json"
+          cat "${RUNNER_TEMP}/published.json"
       - name: Tag new versions
         run: ./scripts/tag_releases.ts
+      # After tagging, so a publish output this script refuses still leaves every published version tagged.
+      - name: List the versions this run published
+        id: subjects
+        run: |
+          subjects="$(./scripts/attest_subjects.ts < "${RUNNER_TEMP}/published.json")"
+          {
+            echo "subjects<<END_OF_SUBJECTS"
+            if [[ -n "${subjects}" ]]; then echo "${subjects}"; fi
+            echo "END_OF_SUBJECTS"
+          } >> "${GITHUB_OUTPUT}"
+
+  attest:
+    needs: publish
+    # A run that published nothing has nothing to attest.
+    if: needs.publish.outputs.subjects != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write # request the signing certificate for this run
+      attestations: write # store the attestation with this repository
+    steps:
+      # No checkout: the subjects are all this job needs, and it runs no code from the repository.
+      - name: Write the subjects
+        env:
+          SUBJECTS: ${{ needs.publish.outputs.subjects }}
+        run: printf '%s\n' "${SUBJECTS}" > subjects.txt
+      # push-to-registry stays off: only `devcontainer features publish` writes to a feature package.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: subjects.txt

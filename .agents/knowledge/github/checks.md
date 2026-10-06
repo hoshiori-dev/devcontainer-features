@@ -34,7 +34,8 @@ scenario matrix and are dependencies of `ci-gate`.
 | `spec-archived` (PR)                     | `just spec-status` (add `--ready` for the verdict a ready PR gets)                                                                                                                                                                                                        | same                                                            |
 | `verify` (Release)                       | `scripts/validate.ts --base <previous main>` on the commit about to be published, without the write token                                                                                                                                                                 | before every `publish`                                          |
 | `secret-scan` (Secret Scanning)          | TruffleHog over the commits the PR or push adds (`--results=verified,unknown`); locally `docker run --rm -v "$PWD:/tmp" -w /tmp <image> git file:///tmp/ --since-commit origin/main --branch HEAD --results=verified,unknown --fail`, `<image>` as pinned in `secret.yml` | PR, push to `main`                                              |
-| `publish` (Release)                      | `devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features`, then `scripts/tag_releases.ts`                                                                                                                                   | push to `main` touching `src/**`; dispatch by maintainers       |
+| `publish` (Release)                      | `devcontainer features publish ./src --registry ghcr.io --namespace hoshiori-dev/devcontainer-features`, then `scripts/tag_releases.ts`, then `scripts/attest_subjects.ts` over the CLI's output                                                                          | push to `main` touching `src/**`; dispatch by maintainers       |
+| `attest` (Release)                       | `actions/attest` over the subjects `publish` listed: one build provenance attestation for the feature versions that run published. Runs only in the workflow; `scripts/attest_subjects.ts` is the part that runs locally                                                  | after `publish`, when it published a version                    |
 
 ## Reading a run
 
@@ -59,17 +60,32 @@ CI pins Deno, just, the devcontainer CLI, and OpenSpec in `.github/actions/setup
 versions live; shellcheck is the runner image's (0.9.0 on ubuntu-24.04, as in the dev container's apt package). The dev
 container installs its own copies (OpenSpec at `@latest` via `.devcontainer/setup.sh`). Before bumping a pin, run
 `just check` locally with that version. `publish` skips just (`just: "false"`), and it is the only job whose checkout
-keeps git credentials (`persist-credentials`), which `scripts/tag_releases.ts` needs to push tags. Every action,
-`actions/*` included, is pinned by full commit SHA with its version in a comment (`@<sha> # vX.Y.Z`); Dependabot
-proposes updates for them. Deno scripts pin their `jsr:` / `npm:` imports inline, and CI's OpenSpec install uses the
-same permission flags as `setup.sh`. The local registry image the feature tests publish to is pinned by digest as
-`REGISTRY_IMAGE` in `scripts/test_feature.ts`. The TruffleHog action in `secret.yml` is pinned by commit SHA, and the
-image it runs by digest in its `version` input: Dependabot bumps only the action, so update the image with it.
+keeps git credentials (`persist-credentials`), which `scripts/tag_releases.ts` needs to push tags. `attest` checks out
+nothing and uses `actions/attest`, a GitHub-owned action. Every action, `actions/*` included, is pinned by full commit
+SHA with its version in a comment (`@<sha> # vX.Y.Z`); Dependabot proposes updates for them. Deno scripts pin their
+`jsr:` / `npm:` imports inline, and CI's OpenSpec install uses the same permission flags as `setup.sh`. The local
+registry image the feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts/test_feature.ts`. The
+TruffleHog action in `secret.yml` is pinned by commit SHA, and the image it runs by digest in its `version` input:
+Dependabot bumps only the action, so update the image with it.
 
 ## Release path
 
 - Merging a version bump is the release decision. The Release workflow validates the merge commit (`verify`), publishes
   every feature version not yet on GHCR (the CLI skips published ones), then creates `<id>/v<version>` tags at it.
+- `attest` then signs one build provenance attestation whose subjects are the versions that run published, each named
+  `ghcr.io/hoshiori-dev/devcontainer-features/<id>` with the digest the CLI reported, and stores it with this repository
+  (`platform-settings.md`); nothing is pushed to GHCR. A run that published nothing skips the job. `publish` holds
+  `contents: write` and `packages: write` and no `id-token`; `attest` holds `id-token: write` and `attestations: write`
+  and nothing else. Keep the two apart: no job may hold a write token together with the signing identity.
+- `scripts/attest_subjects.ts` accepts only the publish output it knows, so a CLI upgrade that changes the output turns
+  `publish` red after the versions are published and tagged, and `attest` is skipped. A feature that declares
+  `legacyIds` adds a key the script refuses; decide how its packages are attested before adding one.
+- A version is attested only by the run that published it. A red `attest` is retried with "Re-run failed jobs" on the
+  same run, which keeps `publish` and its subjects. Every other rerun publishes again, finds the versions already on
+  GHCR, lists no subject, and ends green without an attestation: "Re-run all jobs", a dispatch, and the rerun of a
+  `publish` that failed part-way or at the subject list. A green rerun is therefore no proof of an attestation. When
+  "Re-run failed jobs" on `attest` cannot succeed, or `publish` itself was red, the recovery is a higher version, which
+  the next release attests.
 - A new GHCR package starts with the organization's default visibility; a maintainer makes it public after its first
   publish (`platform-settings.md`).
 - A failed release is fixed forward through a PR; a maintainer may rerun it by dispatch on `main` — the job skips any
