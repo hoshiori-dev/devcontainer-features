@@ -72,6 +72,10 @@ on the head commit, so the ruleset keeps the merge blocked whatever the run's ou
 - `archive-verdict` fails only when the checker itself breaks (any status but 0 and 1); the next job is then skipped and
   the run fails. When Deno cannot start the checker at all it exits 1, which reads as waiting with no annotation: the
   merge stays blocked, the job log shows the error, and a rerun clears a transient one.
+- What GitHub shows for a waiting PR, as a maintainer saw it on a test pull request on 2026-10-06: the pull request page
+  lists `spec-archived` in its merge box as expected and waiting for its status to be reported, with no reason beside
+  it, and the pull request list shows the passing icon, a green check mark. The list therefore never tells a waiting PR
+  from a mergeable one.
 - What the API shows for a waiting PR, read on a test pull request on 2026-10-06: the merge state is `BLOCKED`
   (`gh pr view <n> --json mergeStateStatus`), draft or ready, while the reported checks are all passing — the check
   rollup is `SUCCESS`, and `gh pr checks <n> --required` lists `ci-gate`, `pr-title`, `pr-checklist`, and `secret-scan`

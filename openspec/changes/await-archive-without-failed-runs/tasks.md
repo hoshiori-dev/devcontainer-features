@@ -40,14 +40,14 @@
       `spec-archived` reports `success` and no longer blocks the merge
 - [x] 4.4 Measure item 3 with a test-only commit that makes the deciding job fail, and item 4 with a test-only commit
       that makes the job name depend on the draft state; verify each has its run links and a conclusion
-- [ ] 4.5 Record in `.agents/knowledge/github/checks.md` what the pull request page and the pull request list show for a
+- [x] 4.5 Record in `.agents/knowledge/github/checks.md` what the pull request page and the pull request list show for a
       pull request that waits for its archive, as observed; verify the text matches the readbacks
-- [ ] 4.6 Post the conclusions of the eight items as one comment on this pull request through the publish gate — item 7
+- [x] 4.6 Post the conclusions of the eight items as one comment on this pull request through the publish gate — item 7
       from the runs' conclusions and a maintainer's statement, item 8 as not measured because no fork is available, on
       the maintainer's decision of 2026-10-06 — and close the test pull request with a comment that says so; verify the
       comment exists and the test pull request is closed and unmerged
 
 ## 5. Integration
 
-- [ ] 5.1 Run `just check`, confirm this pull request has no failed PR workflow run from the commit that changes the
+- [x] 5.1 Run `just check`, confirm this pull request has no failed PR workflow run from the commit that changes the
       workflow onward, and record every Acceptance item with its result in this pull request's Validation section
