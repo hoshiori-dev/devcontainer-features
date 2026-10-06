@@ -1,14 +1,25 @@
-# devcontainer-features
+<h1 align="center">devcontainer-features</h1>
+
+<p align="center">
+  hoshiori-dev 维护的一组 <a href="https://containers.dev/implementors/features/">Dev Container Features</a>。<br>
+  每个 feature 单独发布到 GitHub Container Registry，各自按 SemVer 管理版本。
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> · <b>简体中文</b>
+</p>
+
+<p align="center">
+  <a href="https://github.com/hoshiori-dev/devcontainer-features/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/hoshiori-dev/devcontainer-features/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/hoshiori-dev/devcontainer-features"></a>
+</p>
+
+<p align="center">
+  <a href="#使用">使用</a> · <a href="#features">Features</a> · <a href="#原则与审计">原则</a> ·
+  <a href="#自己检查已发布的版本">审计</a> · <a href="#参与贡献">参与贡献</a>
+</p>
 
 > 本文是 [README.md](README.md) 的中文翻译。两者不一致时，以英文版为准。
-
-hoshiori-dev 维护的一组 [Dev Container Features](https://containers.dev/implementors/features/)。每个 feature 单独发布到
-GitHub Container Registry，各自按 SemVer 管理版本。
-
-[English](README.md)
-
-[![CI](https://github.com/hoshiori-dev/devcontainer-features/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hoshiori-dev/devcontainer-features/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/hoshiori-dev/devcontainer-features)](LICENSE)
 
 ## 使用
 
@@ -16,11 +27,15 @@ GitHub Container Registry，各自按 SemVer 管理版本。
 
 ```jsonc
 {
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
   "features": {
-    "ghcr.io/hoshiori-dev/devcontainer-features/<feature-id>:1": {}
+    "ghcr.io/hoshiori-dev/devcontainer-features/deno:1": {},
+    "ghcr.io/hoshiori-dev/devcontainer-features/uv:1": {}
   }
 }
 ```
+
+引用地址的格式都是 `ghcr.io/hoshiori-dev/devcontainer-features/<feature-id>:<major>`。
 
 > [!NOTE]
 > 这个集合还没有收录进 [containers.dev 索引](https://containers.dev/features)，所以编辑器的 feature
@@ -72,8 +87,17 @@ Actions 按 commit SHA 固定。版本只由 `main` 上的 [Release workflow](.g
 
 ### 自己检查已发布的版本
 
-下面的步骤把 registry 上实际提供的内容和发布标签对应的源码做比较。请在 Linux 或任意 dev container 里运行，需要
-`git`、`curl`、`tar` 和 `sha256sum`。
+你可以把 registry 上实际提供的内容和发布标签对应的源码做比较，一共四步：
+
+1. 取回发布标签 `<feature-id>/v<version>` 处的源码。
+2. 直接从 registry 取回已发布的制品。
+3. 比较两者，它们应该完全一致。
+4. 固定你检查过的 digest，这样重建时不会换成别的内容。
+
+下面的命令做的就是这四步。请在 Linux 或任意 dev container 里运行，需要 `git`、`curl`、`tar` 和 `sha256sum`。
+
+<details>
+<summary>显示命令</summary>
 
 ```bash
 REPO=hoshiori-dev/devcontainer-features
@@ -103,19 +127,26 @@ diff -r "source/src/$ID" published && echo "identical to $ID/v$VERSION"
 echo "ghcr.io/$REPO/$ID@sha256:$(sha256sum manifest.json | cut -d' ' -f1)"
 ```
 
+</details>
+
 信任它之前，先读一遍 `source/src/$ID/install.sh` 以及它旁边的
 `scripts/`（如果有）：你的构建运行的就是这些，容器启动时运行的也是它留下的这些。想用你读过的那个确切版本，就在
 `devcontainer.json` 里用第 4 步得到的引用地址替换 `:1` 标签。之后要升级版本，把这套检查再做一遍。
 
-### 这些还不能保证什么
-
-- 已发布的制品没有签名，也没有来源证明（[#100](https://github.com/hoshiori-dev/devcontainer-features/issues/100)）。上面的比较是现在唯一可用的检查。
-- 上游没有发布校验和或签名时，下载只依赖 TLS。feature 的规格会逐项写明这样的下载。
-- feature 安装的是你指定的上游版本。如果上游自己发布了有问题的版本，feature 会照样安装。
+> [!IMPORTANT]
+> **这些还不能保证什么**
+>
+> - 已发布的制品没有签名，也没有来源证明（[#100](https://github.com/hoshiori-dev/devcontainer-features/issues/100)）。上面的比较是现在唯一可用的检查。
+> - 上游没有发布校验和或签名时，下载只依赖 TLS。feature 的规格会逐项写明这样的下载。
+> - feature 安装的是你指定的上游版本。如果上游自己发布了有问题的版本，feature 会照样安装。
 
 ## 参与贡献
 
-人类贡献者请读 [CONTRIBUTING.md](CONTRIBUTING.md)。报告漏洞请看 [SECURITY.md](SECURITY.md)。
+| 你是         | 从这里开始                         |
+| ------------ | ---------------------------------- |
+| 人类贡献者   | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 要报告漏洞   | [SECURITY.md](SECURITY.md)         |
+| Coding agent | [AGENTS.md](AGENTS.md)             |
 
 Coding agent：如果你还没有读过
 [AGENTS.md](AGENTS.md)，在这个仓库里做任何事之前先读它。它是你的入口，会把你带到当前任务对应的规则。
