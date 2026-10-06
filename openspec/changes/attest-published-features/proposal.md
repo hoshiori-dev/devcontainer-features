@@ -14,6 +14,8 @@ artifact a version tag points to was published by this repository's Release work
 - The attestation covers the feature artifacts a run publishes itself. Versions published before this change stay
   without one until their next version.
 - The knowledge base records the new job, its permissions, and how a failed attestation is recovered.
+- `README.md`, `README.zh.md`, `SECURITY.md`, and the accepted risks in the review guidance stop saying that published
+  artifacts carry no attestation. They say how to verify one, what it proves, and what stays accepted.
 
 ## Capabilities
 
@@ -27,12 +29,11 @@ None. This harness change sets `skip_specs: true`; no feature's behavior changes
 
 ## Impact
 
-`.github/workflows/release.yml`, one administration script with its tests, and the knowledge files that describe the
-release path and the repository's settings. The workflow gains the `id-token: write` and `attestations: write`
-permissions in one job and one more GitHub-owned action. No file under `src/` or `test/` changes, so no feature version
-changes and this change publishes nothing by itself. Implements
-https://github.com/hoshiori-dev/devcontainer-features/issues/100. Telling users how to verify belongs to the root README
-(https://github.com/hoshiori-dev/devcontainer-features/issues/99).
+`.github/workflows/release.yml`, one administration script with its tests, the knowledge files that describe the release
+path, the repository's settings, and the accepted risks, and the human documents that mirror them: `README.md`,
+`README.zh.md`, and `SECURITY.md`. The workflow gains the `id-token: write` and `attestations: write` permissions in one
+job and one more GitHub-owned action. No file under `src/` or `test/` changes, so no feature version changes and this
+change publishes nothing by itself. Implements https://github.com/hoshiori-dev/devcontainer-features/issues/100.
 
 ## Acceptance
 
@@ -47,6 +48,10 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/100. Telling users 
 - A Release run that publishes nothing creates no attestation and succeeds.
 - A run whose attestation fails is red, and the knowledge base says how to recover.
 - The knowledge base names the job, its permissions, and the action it uses.
+- `README.md` shows the verification command beside the comparison with the tagged source, and says which versions carry
+  an attestation and that it proves the origin of a digest, not its version. `README.zh.md` says the same.
+- The accepted risks in `.agents/knowledge/review-guidance.md` and in `SECURITY.md` name what stays accepted in place of
+  the missing attestation; no file says that published artifacts carry none.
 - `just check` passes.
 
 ### Stays true

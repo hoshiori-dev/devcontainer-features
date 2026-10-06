@@ -17,6 +17,11 @@
 - The repository allows GitHub-owned actions (`platform-settings.md`), so no allow-list change is needed. Artifact
   attestations are available to public repositories on every current plan.
 - The Release workflow runs only on `main`, so the attestation step cannot be exercised by a pull request.
+- Since https://github.com/hoshiori-dev/devcontainer-features/pull/105, four files say that published artifacts carry no
+  attestation and point at #100: `README.md` and `README.zh.md` (the limits under "Check a published version yourself"),
+  `SECURITY.md`, and the accepted risks in `review-guidance.md`. `AGENTS.md` (Keep In Sync) has `README.zh.md` follow
+  `README.md`, and `SECURITY.md` follow the accepted risks, in the same pull request. The README's check compares the
+  artifact with the source at the tag `<id>/v<version>` using `bash`, `git`, `curl`, and `tar` only.
 
 ## Goals / Non-Goals
 
@@ -34,7 +39,6 @@
 - Attesting versions already on GHCR, the collection metadata package, or anything a feature downloads.
 - Storing attestations in GHCR, SBOMs, or signing with long-lived keys.
 - Binding a version to its digest inside the attestation; see Risks.
-- Documenting verification for users (#99).
 
 ## Decisions
 
@@ -76,6 +80,21 @@ an attestation. Rerunning only `attest` in the same run retries it with the same
 is the repository's usual recovery: a higher version, which the next release attests. A later run never attests an
 earlier run's artifact.
 
+### The documents change with the workflow
+
+`README.md` gains the verification as its own step beside the comparison with the tagged source, and `README.zh.md`
+follows. The command passes `--source-digest` with the commit of the tag `<id>/v<version>`, which the comparison has
+already cloned, so it checks the version as well as the origin. The step stays apart from the comparison's commands:
+those need no `gh`, and they remain the only check for a version published before this change. The limits beside it say
+which versions carry an attestation and what one proves.
+
+The accepted risk "published artifacts carry no signature or provenance attestation" leaves `review-guidance.md` and
+`SECURITY.md`. Two remain in its place: a version published before this change has no attestation until its next
+version, and an attestation binds a digest to its origin, not to a version tag.
+
+Rejected: leaving the documents to a later pull request. #105 was merged with these statements pointing here, and they
+turn false with the first attested release.
+
 ### Action pin
 
 `actions/attest` is pinned by full commit SHA with its version in a comment, as `github-workflow.md` requires;
@@ -92,6 +111,11 @@ Dependabot proposes its updates.
   point a version tag at another digest this workflow published, an older version for one, and the command still
   succeeds. The attestation narrows that actor from any content to content this repository released. A user who needs
   the version as well passes `--source-digest` with the commit of the tag `<id>/v<version>`, or compares the artifact
-  with the tagged source, and pins the digest.
+  with the tagged source, and pins the digest. The README's command does the first; the review guidance lists the rest
+  as an accepted risk.
+- The documents describe a command before any attestation exists. Until a feature's next version, the command finds
+  nothing for it, and the README says so. If the first release shows the command or its flags to be wrong, the fix
+  corrects the documents too. Whether `gh attestation verify` needs a signed-in `gh` for a public repository is checked
+  then and stated in the README.
 - An attestation proves which workflow and commit published an artifact, not that the content is harmless. The source at
   the tagged commit still has to be read.
