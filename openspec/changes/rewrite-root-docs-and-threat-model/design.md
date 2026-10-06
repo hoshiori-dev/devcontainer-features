@@ -37,7 +37,10 @@
 - Each rule keeps one owner. Checked by searching `CONTRIBUTING.md` and `README.md` for rules restated from the
   knowledge base instead of linked.
 - A reviewer can tell a security finding from a robustness remark. Checked by reading the review guidance against the
-  threat model: every category it asks for maps to a scenario in `SECURITY.md`.
+  threat model it now holds: every category it asks for maps to a scenario in its own table.
+- An agent that follows only `AGENTS.md` and the knowledge base misses no rule. Checked by searching `AGENTS.md`,
+  `.agents/`, and `.github/skills/` for links to `CONTRIBUTING.md` or `SECURITY.md` that carry a rule, and by confirming
+  each statement in the two documents has an owning knowledge file.
 
 **Non-Goals:**
 
@@ -89,18 +92,38 @@ Usage, Features, Principles and auditing, Contributing, License. No emoji as str
 
 ### `CONTRIBUTING.md` summarizes and links
 
-It is written for a human contributor and holds: how the work is organized (OpenSpec, one spec per feature at
-`openspec/specs/<id>/spec.md`, a change approved before implementation), the supported coding agents and what each
-reads, the path from issue to release, and the commands of `AGENTS.md`'s Validation table. For every rule it gives one
-sentence and a link to the owning knowledge file, as "Source of truth" in `spec-workflow.md` requires of a pointing
-file. `README.md` asks a coding agent that has not read `AGENTS.md` to read it, in one short paragraph.
+It is written for a human contributor, in plain language, and holds: how the work is organized (OpenSpec, one spec per
+feature at `openspec/specs/<id>/spec.md`, a change approved before implementation), the supported coding agents and what
+each reads, the path from issue to release, and the commands of `AGENTS.md`'s Validation table. For every rule it gives
+one sentence and a link to the owning knowledge file, as "Source of truth" in `spec-workflow.md` requires of a pointing
+file. It leaves out the detail an agent needs to act; that stays in the knowledge file. `README.md` asks a coding agent
+that has not read `AGENTS.md` to read it, in one short paragraph.
 
 Rejected: moving rules out of the knowledge base into `CONTRIBUTING.md` — agents load the knowledge files on demand, and
 two owners would drift.
 
-### `SECURITY.md` owns the threat model; the review rules point to it
+### Human documents are not an agent source
 
-`SECURITY.md` gains a section that states, per role of code, who the attacker is and what they could gain:
+`CONTRIBUTING.md` and `SECURITY.md` are what the project shows to people; the knowledge base is what an agent works
+from. The two are separate systems, and an agent is not expected to open either document. Three things keep them apart:
+
+- Each document carries one visible sentence near its top, addressed to a coding agent that opened it anyway: this is an
+  overview for human readers, check the knowledge files named here, and follow them where the two differ.
+  `CONTRIBUTING.md` names `AGENTS.md`, whose "When To Read What" table routes to the owning file. `SECURITY.md` names
+  `.agents/knowledge/review-guidance.md` for the threat model and `.agents/knowledge/feature-authoring.md` for the
+  download and integrity rules.
+- `AGENTS.md` gains one line under Core Conventions: the two documents are overviews for human readers, and an agent
+  takes rules from the knowledge base.
+- No knowledge file, skill, or `AGENTS.md` links to either document as the source of a rule.
+
+Rejected: putting the sentence in an HTML comment — a visible line also tells a human reader where the binding detail
+lives, and it survives a tool that strips comments. Rejected: relying on `AGENTS.md` alone — an agent that lands on the
+document through a search or a link never passes through the entrypoint.
+
+### The knowledge base owns the threat model; `SECURITY.md` gives an overview
+
+`review-guidance.md` gains the threat model in place of its general list of execution risks. It states, per role of
+code, who the attacker is and what they could gain:
 
 | Code           | Threats in scope                                                                                                                                                 | Not a threat                                                             |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -108,14 +131,19 @@ two owners would drift.
 | Test           | A contribution uses test code to hijack or damage a developer's machine or the CI/CD environment                                                                 | Deterministic test inputs treated as attacker-controlled                 |
 | Administration | A contribution, or untrusted pull-request input, uses scripts or workflows to hijack or damage a developer's machine or CI/CD, or to reach its credentials       | Hardening a script against inputs outside its actual invocation contract |
 
-`review-guidance.md` keeps its privacy and reporting rules and replaces its general list of execution risks with a
-pointer to that section plus one rule: a security finding names the role of the code, the actor, and the steps by which
-the actor gains something under the model; a concern with no such scenario is reported as a correctness or robustness
-remark, or not at all. The Copilot review skill's step 5 carries the same requirement by pointing to the guidance.
-`feature-authoring.md`'s "Developer trust and readability" stays the authoring rule and is not restated.
+It keeps its privacy and reporting rules and adds one rule: a security finding names the role of the code, the actor,
+and the steps by which the actor gains something under the model; a concern with no such scenario is reported as a
+correctness or robustness remark, or not at all. The Copilot review skill's step 5 carries the same requirement by
+pointing to the guidance. `feature-authoring.md`'s "Developer trust and readability" stays the authoring rule and is not
+restated.
 
-Rejected: keeping the threat model in `review-guidance.md` and summarizing it in `SECURITY.md` — reporters and users
-read `SECURITY.md`, and it is the public statement, so it is the natural owner.
+`SECURITY.md` gains a section that tells a reporter or a user the same thing in a few plain paragraphs: what the project
+treats as a threat for each role of code and what it does not. It holds no table of rules and no review procedure, and
+it defers to the knowledge base through the sentence described above.
+
+Rejected: `SECURITY.md` as the owner with the review rules pointing to it — an agent would have to read a human document
+to get a rule, which joins the two systems this change keeps apart. Rejected: a new knowledge file for the threat model
+— the review guidance is where it is applied, and its execution-risk list is what the model replaces.
 
 ## Risks / Trade-offs
 
@@ -125,3 +153,5 @@ read `SECURITY.md`, and it is the public statement, so it is the natural owner.
   the same-PR convention bound this; only the feature list is checked mechanically.
 - Narrowing review to the threat model could hide a real problem that fits no listed scenario. The rule sends such a
   concern to a correctness remark; it does not drop it.
+- The overview in `SECURITY.md` can drift from the model in `review-guidance.md`. The sentence in the document settles
+  which one governs, and the document holds no detail that could contradict a rule.

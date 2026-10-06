@@ -18,13 +18,17 @@ next to real ones.
   it is stale.
 - `README.zh.md` is a Chinese translation of the finished English README, made by the coding agent and not by a script.
   The English file is authoritative, and `just check` fails when the two list different features.
-- `CONTRIBUTING.md` is added for human contributors: spec-driven development with OpenSpec, where a feature's spec
-  lives, the coding agents the harness supports, and the path from issue to release. It summarizes and links to the
-  knowledge files; it restates no rule.
-- `SECURITY.md` keeps private reporting and the latest-version-only policy and gains the threat model: what counts as a
-  threat for shipped code, for test code, and for administration code, and what does not.
-- The review guidance and the Copilot review skill require a security finding to name the scenario that makes it a
-  threat under that model.
+- `CONTRIBUTING.md` is added for human contributors, as an overview in plain language: spec-driven development with
+  OpenSpec, where a feature's spec lives, the coding agents the harness supports, and the path from issue to release. It
+  summarizes and links to the knowledge files; it restates no rule.
+- `SECURITY.md` keeps private reporting and the latest-version-only policy and gains an overview of the threat model in
+  plain language: what counts as a threat for shipped code, for test code, and for administration code, and what does
+  not.
+- The review guidance owns the threat model in its detailed form. It and the Copilot review skill require a security
+  finding to name the scenario that makes it a threat under that model.
+- `CONTRIBUTING.md` and `SECURITY.md` are human documents, separate from the knowledge base, and an agent does not read
+  them for rules. Each carries one visible sentence for a coding agent that opened it anyway: check the knowledge files
+  it names, whose details govern.
 
 ## Capabilities
 
@@ -64,8 +68,13 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/100 and is not part
 - `CONTRIBUTING.md` covers OpenSpec and the location of a feature's spec, the supported coding agents (Codex, Google
   Antigravity, Claude Code) and what each reads, the issue-to-release workflow, and the validation commands; each rule
   it mentions links to the knowledge file that owns it.
-- `SECURITY.md` states the threat model for shipped, test, and administration code. The review guidance and the Copilot
-  review skill point to it and require each security finding to state its scenario under that model.
+- `SECURITY.md` describes the threat model for shipped, test, and administration code in plain language.
+  `review-guidance.md` states it in full; the review guidance and the Copilot review skill require each security finding
+  to state its scenario under that model.
+- `CONTRIBUTING.md` and `SECURITY.md` each carry one visible sentence that tells a coding agent to check the knowledge
+  files it names and to follow them where the two differ.
+- `AGENTS.md` says the two documents are for human readers. No knowledge file, skill, or `AGENTS.md` sends an agent to
+  either of them for a rule.
 - `just check` passes.
 
 ### Stays true
@@ -74,7 +83,8 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/100 and is not part
 - Private vulnerability reporting and the latest-version-only support policy keep their meaning.
 - The download, integrity, and "Developer trust and readability" rules in `feature-authoring.md` keep their meaning, and
   exposed secrets and private personal data remain the highest-priority review findings.
-- Each rule has one owner: no rule is stated in both a human document and a knowledge file.
+- Each rule has one owner, and that owner is in the knowledge base: a human document summarizes and links, and states no
+  rule of its own.
 - `.devcontainer/`, `.pre-commit-config.yaml`, `.editorconfig`, CI workflows, required checks, lifecycle gates, and
   agent authority do not change.
 - Repository content other than `README.zh.md` is English, and nothing carries secrets, private data, or tool
