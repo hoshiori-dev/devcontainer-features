@@ -54,11 +54,11 @@ test-scenarios feature *args:
 test-global *args:
     ./scripts/test_feature.ts --mode global "$@"
 
-# Regenerate every feature's README.md
+# Regenerate every feature's README.md and the feature list in the root README.md
 docs:
     ./scripts/docs.ts
 
-# Fail when a generated README.md is out of date
+# Fail when a generated README.md or the root feature list is out of date, or README.zh.md lists other features
 docs-check:
     ./scripts/docs.ts --check
 
