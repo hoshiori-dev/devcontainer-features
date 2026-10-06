@@ -1,6 +1,6 @@
 {
   "id": "uv",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "name": "uv",
   "description": "Installs Astral's uv and uvx, optionally Python command-line tools, and keeps uv's Python interpreters and cache on a volume that survives rebuilds.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/uv",

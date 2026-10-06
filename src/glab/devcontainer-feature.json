@@ -1,6 +1,6 @@
 {
   "id": "glab",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "name": "GitLab CLI",
   "description": "Installs the GitLab CLI (glab) from its checksum-verified GitLab release archive and configures no authentication.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/glab",
