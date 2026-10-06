@@ -26,19 +26,19 @@
       job map, Reading a run), `.agents/knowledge/spec-workflow.md`, `.agents/knowledge/github-workflow.md`, the Finish
       step of the `github-project-workflow` skill, the checklist item of `.github/pull_request_template.md`, and
       `CONTRIBUTING.md`; verify `git grep -n -i -w red` over the six finds no line about `spec-archived` or the archive
-- [ ] 3.2 Verify `just check` passes with the implementation and the documents in place
+- [x] 3.2 Verify `just check` passes with the implementation and the documents in place
 
 ## 4. Test pull request
 
-- [ ] 4.1 Open a draft pull request against `main` from a branch cut from this one, titled and described as a test that
+- [x] 4.1 Open a draft pull request against `main` from a branch cut from this one, titled and described as a test that
       will not be merged and closing no issue, through the publish gate; verify it holds this change unarchived and its
       PR workflow run uses the changed workflow
-- [ ] 4.2 Observe the waiting state as a draft and as a ready pull request: the run's conclusion, the annotation, the
+- [x] 4.2 Observe the waiting state as a draft and as a ready pull request: the run's conclusion, the annotation, the
       check list, the blocked merge, the pull request list, and the reported checks (design items 1, 2, 5, 6); verify
       each observation has a link to its run or an API readback
-- [ ] 4.3 Observe the passing state on a test-only commit that removes the change's directory (item 2); verify
+- [x] 4.3 Observe the passing state on a test-only commit that removes the change's directory (item 2); verify
       `spec-archived` reports `success` and no longer blocks the merge
-- [ ] 4.4 Measure item 3 with a test-only commit that makes the deciding job fail, and item 4 with a test-only commit
+- [x] 4.4 Measure item 3 with a test-only commit that makes the deciding job fail, and item 4 with a test-only commit
       that makes the job name depend on the draft state; verify each has its run links and a conclusion
 - [ ] 4.5 Record in `.agents/knowledge/github/checks.md` what the pull request page and the pull request list show for a
       pull request that waits for its archive, as observed; verify the text matches the readbacks

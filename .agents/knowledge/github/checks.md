@@ -72,6 +72,16 @@ on the head commit, so the ruleset keeps the merge blocked whatever the run's ou
 - `archive-verdict` fails only when the checker itself breaks (any status but 0 and 1); the next job is then skipped and
   the run fails. When Deno cannot start the checker at all it exits 1, which reads as waiting with no annotation: the
   merge stays blocked, the job log shows the error, and a rerun clears a transient one.
+- What the API shows for a waiting PR, read on a test pull request on 2026-10-06: the merge state is `BLOCKED`
+  (`gh pr view <n> --json mergeStateStatus`), draft or ready, while the reported checks are all passing — the check
+  rollup is `SUCCESS`, and `gh pr checks <n> --required` lists `ci-gate`, `pr-title`, `pr-checklist`, and `secret-scan`
+  without a line for `spec-archived`. Reported checks therefore never show that such a PR is blocked; the merge state
+  does.
+- Once the tree holds no unarchived change, `spec-archived` reports `success` and the merge state leaves `BLOCKED`.
+- When `archive-verdict` fails, the skipped job reports under the text of its name expression, not under
+  `spec-archived`.
+- A success under `spec-archived` from an earlier PR workflow run on the same commit does not unblock the merge once a
+  later run reports nothing under that name, although the reported checks keep listing it as passing.
 - A PR never makes `spec-archived` report by other means; an edit of `pr.yml` that would is caught in review.
 
 ## Toolchain pins
