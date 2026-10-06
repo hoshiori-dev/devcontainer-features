@@ -47,4 +47,4 @@
 ## 5. Integration
 
 - [x] 5.1 Run `just check`; verify it passes and that no file under `src/`, `test/`, or `openspec/specs/` changed
-- [ ] 5.2 Record each Acceptance item with its result in the PR's Validation section
+- [x] 5.2 Record each Acceptance item with its result in the PR's Validation section
