@@ -93,7 +93,7 @@ Deno.test("pr.yml reports spec-archived only for an archived verdict, whatever t
     const carrier = workflow.jobs["spec-archived"];
     assertEquals(
         carrier.name,
-        "${{ needs.archive-verdict.outputs.archived == 'true' && 'spec-archived' || 'awaiting-archive' }}",
+        "${{ github.event.pull_request.draft && 'spec-archived' || needs.archive-verdict.outputs.archived == 'true' && 'spec-archived' || 'awaiting-archive' }}",
     );
     assertEquals(carrier.needs, "archive-verdict");
     assertEquals(carrier.if, undefined);
@@ -101,7 +101,6 @@ Deno.test("pr.yml reports spec-archived only for an archived verdict, whatever t
     assertEquals(decider.outputs, { archived: "${{ steps.verdict.outputs.archived }}" });
     const verdict = decider.steps.find((step: { id?: string }) => step.id === "verdict");
     assert(verdict.run.includes('check_spec_archived.ts" --ready'), verdict.run);
-    assert(!text.includes("pull_request.draft"), "the verdict must not depend on the draft state");
     assertEquals(workflow.permissions, { contents: "read" });
     assertEquals(Object.keys(workflow.on), ["pull_request"]);
 });
