@@ -25,6 +25,9 @@
   author hijacking another user's environment through settings that look legitimate. Handling every untrusted input is
   not a goal: a user does not attack themselves. For test and administration code the threat is hijacking or damaging a
   feature developer's environment or the CI/CD environment (GitHub Actions today).
+- Refined with the maintainer on 2026-10-06: upstream poisoning is split into what a feature can detect and what it
+  cannot, a dependency of the tooling is an actor for administration code, shipped code is considered at build and at
+  container start, and the model stays free of example attacks.
 
 ## Goals / Non-Goals
 
@@ -48,6 +51,7 @@
 - Attesting or signing published artifacts (#100).
 - Changing any feature, its notes, or any download rule.
 - Translating any document other than the root README.
+- Auditing the existing specs for accepted risks they do not state yet; each spec changes through its own change.
 
 ## Decisions
 
@@ -125,11 +129,23 @@ document through a search or a link never passes through the entrypoint.
 `review-guidance.md` gains the threat model in place of its general list of execution risks. It states, per role of
 code, who the attacker is and what they could gain:
 
-| Code           | Threats in scope                                                                                                                                                 | Not a threat                                                             |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Shipped        | A feature author or an upstream source poisons what is installed; a configuration author takes over another user's environment through settings that look normal | A user passing hostile values to a feature in their own configuration    |
-| Test           | A contribution uses test code to hijack or damage a developer's machine or the CI/CD environment                                                                 | Deterministic test inputs treated as attacker-controlled                 |
-| Administration | A contribution, or untrusted pull-request input, uses scripts or workflows to hijack or damage a developer's machine or CI/CD, or to reach its credentials       | Hardening a script against inputs outside its actual invocation contract |
+| Code           | Threats in scope                                                                                                                                                                                                                                                                                                          | Not a threat                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Shipped        | A feature author poisons what a feature installs or runs; what a feature fetches is replaced on its way from the upstream, comes from a source the upstream does not control, or differs from what the upstream published; a configuration author takes over another user's environment through settings that look normal | A user passing hostile values to a feature in their own configuration    |
+| Test           | A contribution uses test code to hijack or damage a developer's machine or the CI/CD environment                                                                                                                                                                                                                          | Deterministic test inputs treated as attacker-controlled                 |
+| Administration | A contribution, untrusted pull-request input, or a dependency that the scripts, workflows, or development environment run uses them to hijack or damage a developer's machine or CI/CD, or to reach its credentials                                                                                                       | Hardening a script against inputs outside its actual invocation contract |
+
+Shipped code runs in two phases, and the row covers both: the install script at image build, as root, and whatever the
+feature leaves to run when the container is created or started, when the developer's workspace and the credentials
+forwarded into the container are present.
+
+An upstream that publishes a malicious release through its own channel, or whose signing key is taken over, is outside
+what a feature can detect: a feature installs the version it is asked for and carries no per-version hash
+(`feature-authoring.md`). The model names this as an accepted risk (next decision), so a review does not report it as a
+finding.
+
+The model names actors and what they gain, and lists no example attacks: a list of examples narrows what a reviewer
+looks for.
 
 It keeps its privacy and reporting rules and adds one rule: a security finding names the role of the code, the actor,
 and the steps by which the actor gains something under the model; a concern with no such scenario is reported as a
@@ -145,6 +161,30 @@ Rejected: `SECURITY.md` as the owner with the review rules pointing to it — an
 to get a rule, which joins the two systems this change keeps apart. Rejected: a new knowledge file for the threat model
 — the review guidance is where it is applied, and its execution-risk list is what the model replaces.
 
+### A feature's accepted risks live in its spec; the collection's live in the threat model
+
+An accepted risk is known and left in place, which differs from "not a threat": it is not reported again, unless a
+review brings information the acceptance did not have. Each one has a single owner, chosen by its reach:
+
+- A risk every feature shares is named once, in the threat model in `review-guidance.md`: published artifacts carry no
+  signature or attestation (#100), consumers on a floating major tag receive a new version without acting, and an
+  upstream or a maintainer account can be taken over.
+- A risk one feature accepts is stated in a Requirement of `openspec/specs/<id>/spec.md`, in the Requirement that
+  defines the behavior carrying the risk, together with the reason. `feature-authoring.md` already asks this of a
+  download that relies on TLS alone, and eight specs do it; the rule is widened to every risk a feature accepts,
+  whatever its kind. The `specs` rule in `openspec/config.yaml` that sends behavior-shaping sources to Requirements
+  gains the same case.
+
+The spec is the right home because it outlives the change that made the decision — a design is frozen at archive — and
+because a Requirement passes the package gate, so accepting a risk takes a maintainer's approval. The review already
+reads the living spec; `review-guidance.md` tells it to treat a risk stated there as accepted.
+
+This change sets the rule and edits no spec. Rejected: an "Accepted risks" section in each spec — OpenSpec reads only
+Purpose and Requirements, and a separate list would repeat what the Requirement defining the behavior already says.
+Rejected: copying the shared risks into every spec — fourteen owners for one fact. Rejected: keeping a feature's
+accepted risks in the design of the change that introduced them — nobody reads an archived design when the feature
+changes next.
+
 ## Risks / Trade-offs
 
 - The README's limits section says in public that artifacts are unsigned. This is already observable; saying so is the
@@ -153,5 +193,9 @@ to get a rule, which joins the two systems this change keeps apart. Rejected: a 
   the same-PR convention bound this; only the feature list is checked mechanically.
 - Narrowing review to the threat model could hide a real problem that fits no listed scenario. The rule sends such a
   concern to a correctness remark; it does not drop it.
+- A feature's accepted risks sit inside the Requirements that carry them, so no single place lists them for a feature. A
+  list would be a second owner; a reader searches the spec.
+- Until the existing specs are audited, a spec may accept a risk in practice without stating it. A review reports such a
+  risk as it would any other, which is how the gap closes.
 - The overview in `SECURITY.md` can drift from the model in `review-guidance.md`. The sentence in the document settles
   which one governs, and the document holds no detail that could contradict a rule.

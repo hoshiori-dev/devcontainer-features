@@ -26,6 +26,10 @@ next to real ones.
   not.
 - The review guidance owns the threat model in its detailed form. It and the Copilot review skill require a security
   finding to name the scenario that makes it a threat under that model.
+- Accepted risks get an owner. A risk every feature shares is named in the threat model. A risk one feature accepts is
+  stated, with its reason, in a Requirement of that feature's spec, where it is approved with the specification and
+  lives as long as the feature; the authoring rule that asks this for downloads relying on TLS alone is widened to every
+  such risk. A review does not report an accepted risk as a finding unless it brings new information.
 - `CONTRIBUTING.md` and `SECURITY.md` are human documents, separate from the knowledge base, and an agent does not read
   them for rules. Each carries one visible sentence for a coding agent that opened it anyway: check the knowledge files
   it names, whose details govern.
@@ -42,9 +46,11 @@ None. This harness change sets `skip_specs: true`; no feature's behavior changes
 
 ## Impact
 
-Root documents, `scripts/docs.ts` and its recipe, the knowledge files and agent entrypoint that name generated files and
-review rules, and the Copilot review skill. No file under `src/` or `test/` changes, so no feature version changes.
-Implements https://github.com/hoshiori-dev/devcontainer-features/issues/99 and supersedes the hand-maintained list of
+Root documents, `scripts/docs.ts` and its recipe, the knowledge files and agent entrypoint that name generated files,
+review rules, and the authoring rule for accepted risks, the matching rule in `openspec/config.yaml`, and the Copilot
+review skill. No file under `src/`, `test/`, or `openspec/specs/` changes, so no feature version changes; bringing
+existing specs in line with the widened rule is left to later changes. Implements
+https://github.com/hoshiori-dev/devcontainer-features/issues/99 and supersedes the hand-maintained list of
 https://github.com/hoshiori-dev/devcontainer-features/issues/39. Attesting published artifacts is
 https://github.com/hoshiori-dev/devcontainer-features/issues/100 and is not part of this change.
 
@@ -71,6 +77,9 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/100 and is not part
 - `SECURITY.md` describes the threat model for shipped, test, and administration code in plain language.
   `review-guidance.md` states it in full; the review guidance and the Copilot review skill require each security finding
   to state its scenario under that model.
+- `review-guidance.md` names the risks the whole collection accepts and says a risk a feature's spec accepts in a
+  Requirement is not a finding without new information. `feature-authoring.md` requires a risk one feature accepts to be
+  stated, with its reason, in a Requirement of its spec.
 - `CONTRIBUTING.md` and `SECURITY.md` each carry one visible sentence that tells a coding agent to check the knowledge
   files it names and to follow them where the two differ.
 - `AGENTS.md` says the two documents are for human readers. No knowledge file, skill, or `AGENTS.md` sends an agent to
@@ -79,7 +88,7 @@ https://github.com/hoshiori-dev/devcontainer-features/issues/100 and is not part
 
 ### Stays true
 
-- No file under `src/` or `test/` changes, and no feature version changes.
+- No file under `src/`, `test/`, or `openspec/specs/` changes, and no feature version changes.
 - Private vulnerability reporting and the latest-version-only support policy keep their meaning.
 - The download, integrity, and "Developer trust and readability" rules in `feature-authoring.md` keep their meaning, and
   exposed secrets and private personal data remain the highest-priority review findings.
