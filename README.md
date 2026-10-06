@@ -149,12 +149,39 @@ The commands stop at the first step that fails, and print the reference only aft
 runs and what it leaves to run when the container starts. Use the reference from step 4 in `devcontainer.json` in place
 of the `:1` tag when you want the exact version you read. You then move to a new version by repeating the check.
 
+Newer versions also carry a signed provenance attestation: proof that this repository's Release workflow published that
+artifact from a commit on `main`. Verifying it is a separate step, because it needs the
+[GitHub CLI](https://cli.github.com/) (`gh`) and the comparison above does not:
+
+```bash
+(
+    set -euo pipefail
+    REPO=hoshiori-dev/devcontainer-features
+    ID=deno
+    # A version published before the Release workflow began attesting has no attestation to find.
+    VERSION=1.0.1
+
+    # The commit the release tag names. The attestation has to name the same one.
+    COMMIT=$(git ls-remote "https://github.com/$REPO.git" "refs/tags/$ID/v$VERSION" | cut -f1)
+    [ -n "$COMMIT" ] || { echo "no tag $ID/v$VERSION: stop here" >&2; exit 1; }
+
+    gh attestation verify "oci://ghcr.io/$REPO/$ID:$VERSION" \
+        --repo "$REPO" \
+        --signer-workflow "$REPO/.github/workflows/release.yml" \
+        --source-ref refs/heads/main \
+        --source-digest "$COMMIT"
+)
+```
+
 > [!IMPORTANT]
 > **What this does not give you**
 >
-> - Published artifacts carry no signature and no provenance attestation
->   ([#100](https://github.com/hoshiori-dev/devcontainer-features/issues/100)). The comparison above is the check that
->   exists today.
+> - Only versions published since the Release workflow began attesting carry an attestation. For an earlier version the
+>   command finds none, and the comparison is the only check until the feature's next version.
+> - An attestation proves where a digest came from, not which version it is. Whoever can write to a package could point
+>   a version tag at other content this repository released. `--source-digest` above ties the artifact to the commit of
+>   its release tag; pinning the digest you checked keeps it there.
+> - Neither check says the content is harmless. Read the source before you trust it.
 > - Where an upstream publishes no checksum or signature, the download relies on TLS alone. The feature's specification
 >   says so for each such download.
 > - A feature installs the upstream version you ask for. If the upstream itself ships a bad release, the feature
