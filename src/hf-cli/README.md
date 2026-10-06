@@ -73,24 +73,26 @@ container a token that already exists on the host, set the variable on the host 
 }
 ```
 
-`${localEnv:HF_TOKEN}` is read on the host when the container starts, so the token stays out of the repository and out
-of the image. Prefer `remoteEnv` to `containerEnv` for a token: `containerEnv` stores the value in the container's
+`${localEnv:HF_TOKEN}` takes the value from the environment of the tool on your machine, so the token stays out of the
+repository and out of the image; a tool that was already running, such as VS Code, may need a restart to see a variable
+you have just set. Prefer `remoteEnv` to `containerEnv` for a token: `containerEnv` stores the value in the container's
 configuration, where `docker inspect` shows it. Never pass a token at build time.
 
 ## Transfer settings
 
-The CLI moves files with `hf-xet`, which is installed with it. Four variables change how it behaves; set them with
+The CLI moves files with `hf-xet`, which is installed with it. Three variables change how it behaves; set them with
 `remoteEnv` or in the shell. A boolean counts as set when its value is `1`, `ON`, `YES`, or `TRUE`, in any letter case.
 
-| Variable                                | Effect                                                                                                                                                            |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HF_HUB_DISABLE_XET`                    | Boolean. Stops the CLI from using `hf-xet`. It also turns off the cache's shared blob store, so a file that several repositories contain is stored once for each. |
-| `HF_XET_HIGH_PERFORMANCE`               | Boolean. Lets `hf-xet` try to saturate the network and use every CPU core for parallel transfers.                                                                 |
-| `HF_XET_RECONSTRUCT_WRITE_SEQUENTIALLY` | Boolean. Writes downloads to disk sequentially instead of in parallel. Meant for spinning disks; the default suits SSD and NVMe.                                  |
-| `HF_XET_SHARD_CACHE_SIZE_LIMIT`         | Size of the local Xet shard cache in bytes, `16000000000` (16 GB) by default. A larger cache avoids re-uploading chunks already sent.                             |
+| Variable                        | Effect                                                                                                                                                                                   |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HF_HUB_DISABLE_XET`            | Boolean. Stops the CLI from using `hf-xet`. From release 1.32.0 on it also turns off the cache's shared blob store, so a file that several repositories contain is stored once for each. |
+| `HF_XET_HIGH_PERFORMANCE`       | Boolean. Lets `hf-xet` try to saturate the network and use every CPU core for parallel transfers.                                                                                        |
+| `HF_XET_SHARD_CACHE_SIZE_LIMIT` | Size of the local Xet shard cache in bytes, `16000000000` (16 GB) by default. A larger cache avoids re-uploading chunks already sent.                                                    |
 
 Hugging Face documents these and the other variables in its
 [environment variable reference](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables).
+That reference also lists `HF_XET_RECONSTRUCT_WRITE_SEQUENTIALLY`; the `hf-xet` releases this feature installs (1.5.2
+and later) no longer read it.
 
 ## Keeping the cache between rebuilds
 
