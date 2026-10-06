@@ -96,7 +96,9 @@
   - Turning off failed-run notifications in the maintainer's account. It hides real failures as well.
 - **One verdict for draft and ready.** A pass reported while a pull request is a draft would stay on its commit when the
   pull request becomes ready, and the withheld check could not replace it. Rejected: keeping the draft pass, which makes
-  the block depend on the assumption about same-name checks listed under Context.
+  the block depend on the assumption about same-name checks listed under Context. The test pull request refuted that
+  assumption on 2026-10-06: a later run that reports nothing under the name does withhold the check again. The decision
+  stands on its other ground, a verdict that does not change with the draft state.
 - **The exit status carries the verdict, and `--ready` keeps its contract.** The workflow always runs the checker with
   `--ready`: status 0 means archived, status 1 means a change is unarchived, any other status fails the job. The script
   reports its own unexpected errors with a status other than 0 and 1. The script `main` holds today already answers 0
@@ -165,7 +167,7 @@
   after the final review: the checker's status leaves that step through a file and the next step writes the job's
   output, so nothing printed can set the verdict whichever script the base holds; the checker of this change also
   escapes the annotation text and counts a symbolic link under `openspec/changes/` as a change, which the script `main`
-  holds does not.
+  holds does not; the other scripts that list changes keep reading directories only.
 - **"All checks pass" no longer implies mergeable.** A withheld check is absent from the list of reported checks, so a
   tool that reads only reported checks sees a passing pull request. The Finish step of the `github-project-workflow`
   skill and `checks.md` say that the pull request waits for the archive whatever the reported checks show.

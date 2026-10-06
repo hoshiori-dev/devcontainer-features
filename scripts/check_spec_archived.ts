@@ -4,26 +4,31 @@
 // commands the archive and it is committed (.agents/knowledge/spec-workflow.md). Also usable
 // locally to list active changes.
 //
-//   scripts/check_spec_archived.ts            list active changes; always exits 0
+//   scripts/check_spec_archived.ts            list active changes; exits 0 whether or not one exists
 //   scripts/check_spec_archived.ts --ready    exit 0 when none is unarchived, 1 when one is
 //
-// The PR workflow reads the exit status of --ready, so the script's own errors exit with FAILED:
-// a status of 1 always means an unarchived change, never a broken checker.
+// The PR workflow reads the exit status of --ready, so an error this script catches exits with
+// FAILED in either form, never with 1. A script Deno cannot load still exits 1; the workflow loads
+// it first for that reason.
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 
 export const UNARCHIVED = 1;
 export const FAILED = 2;
 
-/** Whether an entry of the changes directory is a change; a symbolic link counts, since it may point at one. */
-export function isChange(entry: { name: string; isDirectory: boolean; isSymlink: boolean }): boolean {
-    return (entry.isDirectory || entry.isSymlink) && entry.name !== "archive";
+/** Whether an entry of the changes directory is a change; with `links`, a symbolic link counts as one. */
+export function isChange(entry: { name: string; isDirectory: boolean; isSymlink: boolean }, links: boolean): boolean {
+    return (entry.isDirectory || (links && entry.isSymlink)) && entry.name !== "archive";
 }
 
-export async function activeChanges(root = "openspec/changes"): Promise<string[]> {
+/**
+ * The change directories under `root`. Callers that read the changes pass no `links`; the archive
+ * verdict passes it, so a symbolic link in place of a change directory cannot read as archived.
+ */
+export async function activeChanges(root = "openspec/changes", links = false): Promise<string[]> {
     const names: string[] = [];
     try {
         for await (const entry of Deno.readDir(root)) {
-            if (isChange(entry)) names.push(entry.name);
+            if (isChange(entry, links)) names.push(entry.name);
         }
     } catch (error) {
         if (!(error instanceof Deno.errors.NotFound)) throw error;
@@ -40,7 +45,7 @@ export function commandData(text: string): string {
 export async function main(args: string[], annotate: boolean, root = "openspec/changes"): Promise<number> {
     try {
         const ready = parseArgs(args, { boolean: ["ready"] }).ready;
-        const changes = await activeChanges(root);
+        const changes = await activeChanges(root, true);
         if (changes.length === 0) {
             console.log("No unarchived OpenSpec change.");
             return 0;

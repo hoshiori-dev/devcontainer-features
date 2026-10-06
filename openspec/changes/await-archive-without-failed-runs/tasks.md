@@ -30,6 +30,10 @@
 - [x] 2.5 After the final review, escape the annotation text in the checker and count a symbolic link under
       `openspec/changes/` as a change; verify with unit tests over a directory name holding a line break, the warning
       and error levels, and a symbolic link
+- [x] 2.6 After a second review, capture the checker's output in every test, so `deno test` writes no workflow command
+      into the CI log, and count a symbolic link only for the archive verdict, leaving `activeChanges` as it was for
+      `check_openspec.ts`, `validate.ts`, and `new_feature.ts`; verify `deno test scripts/` prints no line starting with
+      `::` and the `scripts` job of the next CI run carries no annotation
 
 ## 3. Documents
 

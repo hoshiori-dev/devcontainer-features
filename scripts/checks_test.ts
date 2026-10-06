@@ -69,39 +69,50 @@ Deno.test("bodyProblems wants whole heading lines and the template's own securit
     assert(bodyProblems("## What and why\n", "## What and why\n")[0].includes("no checklist item"));
 });
 
-Deno.test("check_spec_archived answers 0, 1, and its own failure apart", async () => {
-    const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "archived-test-" });
-    try {
-        const root = `${dir}/changes`;
-        assertEquals(await archiveVerdict(["--ready"], false, root), 0, "no changes directory");
-        await Deno.mkdir(`${root}/archive/2026-01-01-done`, { recursive: true });
-        assertEquals(await archiveVerdict(["--ready"], true, root), 0, "an archive only");
-        await Deno.mkdir(`${root}/pending`);
-        assertEquals(await archiveVerdict(["--ready"], true, root), UNARCHIVED);
-        assertEquals(await archiveVerdict(["--ready"], false, root), UNARCHIVED);
-        assertEquals(await archiveVerdict([], true, root), 0, "listing never fails");
-        await Deno.writeTextFile(`${dir}/file`, "");
-        assertEquals(await archiveVerdict(["--ready"], true, `${dir}/file`), FAILED, "a path that is no directory");
-        assert(isChange({ name: "pending", isDirectory: false, isSymlink: true }), "a symbolic link counts");
-        assert(!isChange({ name: "README.md", isDirectory: false, isSymlink: false }));
-        assert(!isChange({ name: "archive", isDirectory: true, isSymlink: false }));
-    } finally {
-        await Deno.remove(dir, { recursive: true });
-    }
-});
-
-/** Runs the archive checker and returns its status with everything it printed, one entry per console call. */
-async function archiveOutput(root: string): Promise<{ status: number; printed: string[] }> {
+/** Runs the archive checker with its output captured, so a test never writes a workflow command into the CI log. */
+async function archiveOutput(
+    root: string,
+    args = ["--ready"],
+    annotate = true,
+): Promise<{ status: number; printed: string[] }> {
     const printed: string[] = [];
     const { log, error } = console;
     console.log = console.error = (text: string) => void printed.push(text);
     try {
-        return { status: await archiveVerdict(["--ready"], true, root), printed };
+        return { status: await archiveVerdict(args, annotate, root), printed };
     } finally {
         console.log = log;
         console.error = error;
     }
 }
+
+Deno.test("check_spec_archived answers 0, 1, and its own failure apart", async () => {
+    const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "archived-test-" });
+    try {
+        const root = `${dir}/changes`;
+        const status = async (path: string, args?: string[], annotate?: boolean) =>
+            (await archiveOutput(path, args, annotate)).status;
+        assertEquals(await status(root, ["--ready"], false), 0, "no changes directory");
+        await Deno.mkdir(`${root}/archive/2026-01-01-done`, { recursive: true });
+        assertEquals(await status(root), 0, "an archive only");
+        await Deno.mkdir(`${root}/pending`);
+        assertEquals(await status(root), UNARCHIVED);
+        assertEquals(await status(root, ["--ready"], false), UNARCHIVED);
+        assertEquals(await status(root, []), 0, "listing an unarchived change exits 0");
+        await Deno.writeTextFile(`${dir}/file`, "");
+        assertEquals(await status(`${dir}/file`), FAILED, "a path that is no directory");
+        assertEquals(await status(`${dir}/file`, []), FAILED, "also without --ready");
+        assert(
+            isChange({ name: "pending", isDirectory: false, isSymlink: true }, true),
+            "a link counts for the verdict",
+        );
+        assert(!isChange({ name: "pending", isDirectory: false, isSymlink: true }, false), "and for no other caller");
+        assert(!isChange({ name: "README.md", isDirectory: false, isSymlink: false }, true));
+        assert(!isChange({ name: "archive", isDirectory: true, isSymlink: false }, true));
+    } finally {
+        await Deno.remove(dir, { recursive: true });
+    }
+});
 
 Deno.test("check_spec_archived annotates waiting as a warning and keeps a directory name on one line", async () => {
     const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "archived-test-" });
