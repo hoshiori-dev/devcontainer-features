@@ -3,6 +3,7 @@ import { parse } from "jsr:@std/semver@1.0.8";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
 import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
+import { FAILED, isChange, main as archiveVerdict, UNARCHIVED } from "./check_spec_archived.ts";
 import {
     type Archive,
     type Checks,
@@ -66,6 +67,105 @@ Deno.test("bodyProblems wants whole heading lines and the template's own securit
     assert(bodyProblems(TEMPLATE, ticked.replace("## Validation", "### Validation"))[0].includes("## Validation"));
     assert(bodyProblems(TEMPLATE, `${TEMPLATE}- [x] secrets n/a\n`).some((p) => p.includes("unticked")));
     assert(bodyProblems("## What and why\n", "## What and why\n")[0].includes("no checklist item"));
+});
+
+/** Runs the archive checker with its output captured, so a test never writes a workflow command into the CI log. */
+async function archiveOutput(
+    root: string,
+    args = ["--ready"],
+    annotate = true,
+): Promise<{ status: number; printed: string[] }> {
+    const printed: string[] = [];
+    const { log, error } = console;
+    console.log = console.error = (text: string) => void printed.push(text);
+    try {
+        return { status: await archiveVerdict(args, annotate, root), printed };
+    } finally {
+        console.log = log;
+        console.error = error;
+    }
+}
+
+Deno.test("check_spec_archived answers 0, 1, and its own failure apart", async () => {
+    const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "archived-test-" });
+    try {
+        const root = `${dir}/changes`;
+        const status = async (path: string, args?: string[], annotate?: boolean) =>
+            (await archiveOutput(path, args, annotate)).status;
+        assertEquals(await status(root, ["--ready"], false), 0, "no changes directory");
+        await Deno.mkdir(`${root}/archive/2026-01-01-done`, { recursive: true });
+        assertEquals(await status(root), 0, "an archive only");
+        await Deno.mkdir(`${root}/pending`);
+        assertEquals(await status(root), UNARCHIVED);
+        assertEquals(await status(root, ["--ready"], false), UNARCHIVED);
+        assertEquals(await status(root, []), 0, "listing an unarchived change exits 0");
+        await Deno.writeTextFile(`${dir}/file`, "");
+        assertEquals(await status(`${dir}/file`), FAILED, "a path that is no directory");
+        assertEquals(await status(`${dir}/file`, []), FAILED, "also without --ready");
+        assert(
+            isChange({ name: "pending", isDirectory: false, isSymlink: true }, true),
+            "a link counts for the verdict",
+        );
+        assert(!isChange({ name: "pending", isDirectory: false, isSymlink: true }, false), "and for no other caller");
+        assert(!isChange({ name: "README.md", isDirectory: false, isSymlink: false }, true));
+        assert(!isChange({ name: "archive", isDirectory: true, isSymlink: false }, true));
+    } finally {
+        await Deno.remove(dir, { recursive: true });
+    }
+});
+
+Deno.test("check_spec_archived annotates waiting as a warning and keeps a directory name on one line", async () => {
+    const dir = await Deno.makeTempDir({ dir: "/tmp", prefix: "archived-test-" });
+    try {
+        await Deno.mkdir(`${dir}/changes/x\n::set-output name=archived::true`, { recursive: true });
+        const waiting = await archiveOutput(`${dir}/changes`);
+        assertEquals(waiting.status, UNARCHIVED);
+        assertEquals(waiting.printed.length, 1);
+        assert(waiting.printed[0].startsWith("::warning::Unarchived OpenSpec change(s): x%0A::set-output"));
+        assert(!waiting.printed[0].includes("\n"), "the annotation must stay on one line");
+        await Deno.writeTextFile(`${dir}/file`, "");
+        const failed = await archiveOutput(`${dir}/file`);
+        assertEquals(failed.status, FAILED);
+        assert(failed.printed[0].startsWith("::error::The archive check itself failed: "), failed.printed[0]);
+    } finally {
+        await Deno.remove(dir, { recursive: true });
+    }
+});
+
+Deno.test("pr.yml reports spec-archived only for an archived verdict, whatever the draft state", async () => {
+    const text = await Deno.readTextFile(new URL("../.github/workflows/pr.yml", import.meta.url));
+    const workflow = parseYaml(text);
+    const carrier = workflow.jobs["spec-archived"];
+    assertEquals(
+        carrier.name,
+        "${{ needs.archive-verdict.outputs.archived == 'true' && 'spec-archived' || 'awaiting-archive' }}",
+    );
+    assertEquals(carrier.needs, "archive-verdict");
+    assertEquals(carrier.if, undefined);
+    const decider = workflow.jobs["archive-verdict"];
+    assertEquals(decider.outputs, { archived: "${{ steps.verdict.outputs.archived }}" });
+    // The last three steps, in order, and their whole text: the status mapping is the safety argument.
+    const [load, check, verdict] = decider.steps.slice(-3);
+    assertEquals([load.id, check.id, verdict.id], ["load", "check", "verdict"]);
+    assertEquals(load.run, 'deno cache "${ROOT}/scripts/check_spec_archived.ts"');
+    assertEquals(
+        check.run,
+        "status=0\n" +
+            '"${ROOT}/scripts/check_spec_archived.ts" --ready || status=$?\n' +
+            'echo "${status}" > "${RUNNER_TEMP}/archive-status"\n',
+    );
+    assertEquals(
+        verdict.run,
+        'status="$(cat "${RUNNER_TEMP}/archive-status")"\n' +
+            'case "${status}" in\n' +
+            '  0) echo "archived=true" >> "${GITHUB_OUTPUT}" ;;\n' +
+            '  1) echo "archived=false" >> "${GITHUB_OUTPUT}" ;;\n' +
+            '  *) exit "${status}" ;;\n' +
+            "esac\n",
+    );
+    assert(!text.includes("pull_request.draft"), "the verdict must not depend on the draft state");
+    assertEquals(workflow.permissions, { contents: "read" });
+    assertEquals(Object.keys(workflow.on), ["pull_request"]);
 });
 
 Deno.test("scaffold produces the required files for a valid id", () => {

@@ -103,8 +103,8 @@ these gates are where they attach.
 
 There are two. The **package gate** releases the task list and the implementation. The **freeze gate** releases the
 archive, and the maintainer's final approval applies to the archived version. The PR is marked ready before the archive,
-so the `spec-archived` check is red for the whole second deliberation: that red is the merge block, not a defect. Never
-archive to turn it green.
+so the `spec-archived` check is withheld for the whole second deliberation: its absence is the merge block, not a
+defect. Never archive to make it report.
 
 The package gate is exercised on the approval package: the proposal, the delta specs, and `design.md` when one is
 warranted — always for a new feature, and otherwise when more than one reasonable approach exists or the change touches
@@ -151,9 +151,9 @@ part of the archive and waits for the same command. Every task ticked, then the 
 commit. No workflow archives: no token can push to a fork, and a job that could would be the only automation needing
 write access to repository contents.
 
-The `spec-archived` check fails a ready PR that still holds an unarchived change (a warning while it is a draft), so the
-PR stays red until the archive. A commit after the archive commit means the approved version no longer exists: say so
-and ask for the gate again.
+The `spec-archived` check is withheld from a PR that still holds an unarchived change, draft or ready, so the PR stays
+blocked until the archive while its PR workflow run succeeds (`github/checks.md`, Waiting for the archive). A commit
+after the archive commit means the approved version no longer exists: say so and ask for the gate again.
 
 ## Specifications and issues
 

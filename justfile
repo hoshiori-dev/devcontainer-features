@@ -34,7 +34,7 @@ spec-check:
     OPENSPEC_NO_UPDATE_CHECK=1 OPENSPEC_TELEMETRY=0 openspec validate --all --strict --no-interactive
     ./scripts/check_openspec.ts
 
-# List unarchived OpenSpec changes; --ready shows the verdict CI gives a ready PR
+# List unarchived OpenSpec changes; --ready exits non-zero when one exists, the verdict the PR workflow reads
 spec-status *args:
     ./scripts/check_spec_archived.ts "$@"
 
@@ -54,11 +54,11 @@ test-scenarios feature *args:
 test-global *args:
     ./scripts/test_feature.ts --mode global "$@"
 
-# Regenerate every feature's README.md
+# Regenerate every feature's README.md and the feature list in the root README.md
 docs:
     ./scripts/docs.ts
 
-# Fail when a generated README.md is out of date
+# Fail when a generated README.md or the root feature list is out of date, or README.zh.md lists other features
 docs-check:
     ./scripts/docs.ts --check
 
