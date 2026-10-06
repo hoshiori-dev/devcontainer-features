@@ -59,7 +59,8 @@ and the person who commits answers for the change.
 4. **Implementation.** Write the task list, the code, and the tests. A change under `src/<feature-id>/` bumps that
    feature's version, and every feature has to survive being installed twice.
 5. **Review.** Mark the pull request ready when the checks pass and its description says how each acceptance item was
-   verified. From then on one check, `spec-archived`, is red on purpose until the change is archived.
+   verified. From then on the pull request waits for its archive: the required check `spec-archived` stays unreported on
+   purpose, which blocks the merge without failing anything, until the change is archived.
 6. **Archive and merge.** When the maintainer asks for it, you or your agent archive the change and push that commit;
    the maintainer then squash-merges. The pull request title becomes the commit title, so it follows
    [Conventional Commits](https://www.conventionalcommits.org/), for example `feat(deno): add a version option`.
