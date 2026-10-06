@@ -22,16 +22,29 @@
     ([Workflow syntax, `permissions`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions)).
   - GitHub advises against `pull_request_target` and `workflow_run` with untrusted pull requests
     ([Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)).
-- What this design assumes without a documented statement; the first two are to be observed on the test pull request,
-  and the third is avoided instead of tested:
-  - A required check that no run has reported on the head commit blocks the merge and shows as expected.
-  - A job whose `name` is an expression over `needs` reports its check under the evaluated name.
-  - When several runs report a check of the same name on one commit, an earlier success may keep satisfying the
-    requirement if a later run reports nothing under that name.
+- Measured locally on 2026-10-06 with Deno 2.9.7: an uncaught error, an import that cannot be resolved, and a denied
+  permission each end `deno run` with status 1, the status the script uses today for "a change is unarchived"; the
+  script `main` holds exits 0 for an unknown flag, with or without an unarchived change, and with `--ready` exits 1 and
+  0 for the two cases.
+- What this design assumes or guesses without a documented statement or a measurement. The test pull request measures
+  each one (Decisions):
+  1. A required check that no run has reported on the head commit blocks the merge, and the pull request page shows it
+     as expected.
+  2. A job whose `name` is an expression over `needs` reports its check under the evaluated name, for both values.
+  3. When the deciding job fails, the job that depends on it is skipped and reports under a name other than
+     `spec-archived`. The skipped matrix jobs of the CI workflow show their unevaluated expression as a name, which
+     suggests the same here.
+  4. When several runs report a check of the same name on one commit, an earlier success keeps satisfying the
+     requirement if a later run reports nothing under that name. The design avoids depending on the answer, but the
+     reason it gives for one verdict for draft and ready rests on it.
+  5. The pull request list shows a passing icon for a pull request that waits for its archive.
+  6. A withheld check is absent from the reported checks (`gh pr checks`, `statusCheckRollup`), so those report a
+     passing pull request.
+  7. A successful run in the waiting state sends no failed-run notification.
+  8. A pull request from a fork gets the same verdict and the same block.
 - The PR checks run the base commit's copy of their script, while the workflow file comes from the pull request merged
   with `main`. After this change merges, every open pull request therefore runs the new workflow with whatever script
   its base commit holds. Five pull requests are open on 2026-10-06, four of them drafts.
-- Deno exits 1 on an uncaught error, the same status the script uses today for "a change is unarchived".
 - All 48 pull requests so far came from branches of this repository; none came from a fork.
 
 ## Goals / Non-Goals
@@ -106,6 +119,17 @@
   test pull request is closed with a comment that says so; deleting its branch is left to a maintainer
   (`agent-authority.md`). Rejected: observing only on this pull request, which shows the passing state for the first
   time at its own archive, when a defect would block the merge of the fix.
+- **Every unmeasured assumption gets a measured conclusion, recorded on this pull request.** The test pull request
+  measures the eight items listed under Context. Where the finished workflow cannot produce the case, a commit that
+  exists only on the test branch produces it: a deciding job made to fail for item 3, and for item 4 a job name made to
+  depend on the draft state, so that one commit first receives a success under `spec-archived` and then a run that
+  reports nothing under it. Item 7 is read from the runs' conclusions by the implementer and from the inbox by a
+  maintainer. Item 8 needs a pull request from a fork, which the implementer opens only if a maintainer provides or
+  permits the fork. The results are posted as one comment on this pull request before it is marked ready: for each item
+  what was done, what was observed with a link to the run or the API readback, and the conclusion — confirmed, refuted,
+  or not measured with the reason. A refuted item that the design relies on stops the work: the package is revised and
+  the package gate is asked again. Rejected: recording the results only in the Validation section, which is rewritten as
+  the description changes, while a comment keeps its date.
 - **The waiting job is named `awaiting-archive`.** It reads as a state in the pull request's check list and shares no
   prefix with a required check.
 

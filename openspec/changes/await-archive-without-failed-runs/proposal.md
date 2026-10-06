@@ -67,6 +67,8 @@ None. This change edits the harness only (`skip_specs: true`).
 - A test pull request, opened once the implementation is complete and serving no purpose beyond exercising the changed
   workflow, showed the waiting state and the passing state; its observations are in this pull request's Validation
   section, and it is closed.
+- Every assumption the design lists as unmeasured has its conclusion in a comment on this pull request: confirmed or
+  refuted by a measurement on the test pull request, or named as not measured with the reason.
 
 **Stays true:**
 
