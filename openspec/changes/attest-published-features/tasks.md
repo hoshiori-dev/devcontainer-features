@@ -6,7 +6,9 @@
       print one checksums line per version that run published (`<hex digest>  ghcr.io/<namespace>/<id>`), failing on any
       other shape, id, or digest; verify with unit tests over several published, none published, a malformed object, and
       an id or digest outside its pattern
-- [x] 1.2 Add the script to `INFRA_PATHS` in `scripts/lib/repo.ts`; verify `just scripts-check` passes
+- [x] 1.2 Keep the script out of `INFRA_PATHS` in `scripts/lib/repo.ts`, departing from the design on the maintainer's
+      decision of 2026-10-06: the list holds the paths of the test pipeline, and no file of the release path is in it;
+      verify `just affected` selects no test job for this change
 
 ## 2. Release workflow
 

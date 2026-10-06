@@ -80,12 +80,12 @@ Dependabot bumps only the action, so update the image with it.
 - `scripts/attest_subjects.ts` accepts only the publish output it knows, so a CLI upgrade that changes the output turns
   `publish` red after the versions are published and tagged, and `attest` is skipped. A feature that declares
   `legacyIds` adds a key the script refuses; decide how its packages are attested before adding one.
-- A version is attested only by the run that published it. A red `attest` is retried with "Re-run failed jobs" on the
-  same run, which keeps `publish` and its subjects. Every other rerun publishes again, finds the versions already on
-  GHCR, lists no subject, and ends green without an attestation: "Re-run all jobs", a dispatch, and the rerun of a
-  `publish` that failed part-way or at the subject list. A green rerun is therefore no proof of an attestation. When
-  "Re-run failed jobs" on `attest` cannot succeed, or `publish` itself was red, the recovery is a higher version, which
-  the next release attests.
+- A version is attested only by the run attempt that published it. A red `attest` is retried with "Re-run failed jobs"
+  on the same run, which keeps `publish` and its subjects. Any rerun of `publish` — "Re-run all jobs", a dispatch, or
+  the rerun of a red `publish` — skips the versions already on GHCR and lists only what it publishes itself, so a
+  version an earlier attempt pushed stays without an attestation while the run ends green. A green rerun is therefore no
+  proof of an attestation. For a version left without one, the recovery is a higher version, which the next release
+  attests.
 - A new GHCR package starts with the organization's default visibility; a maintainer makes it public after its first
   publish (`platform-settings.md`).
 - A failed release is fixed forward through a PR; a maintainer may rerun it by dispatch on `main` — the job skips any
