@@ -27,6 +27,11 @@ whether normal configuration can trigger unintended execution, privilege changes
 sandbox against arbitrary malicious devcontainer configuration; complex internal checks cannot provide that boundary.
 The download and integrity requirements below still apply.
 
+When a feature knowingly leaves a risk in place, its spec states the risk and the reason in the Requirement that defines
+the behavior carrying it; approving that spec is the acceptance. A download that relies on TLS alone (below) is one
+case, and the rule holds for a risk of any kind. Risks the whole collection accepts are listed once in
+`.agents/knowledge/review-guidance.md` and are not repeated in specs.
+
 Developers can fix configuration: predictable behavior and a clear failure are more useful than accommodating every
 possible input. Write shipped scripts for users who need to audit the source before trusting it.
 `.agents/knowledge/shell-style.md` states how a script validates options, logs, and fails.
