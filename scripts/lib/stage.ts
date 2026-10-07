@@ -4,12 +4,15 @@
 // OCI identity: the CLI deduplicates a dependency a scenario also installs, honors installsAfter,
 // and resolves the `:<major>` tag the way it does for users. Only the features a test needs — its
 // roots and their install closure — are staged into src/, so an unrelated feature cannot break it.
+// Each staged feature's test folder also gets the feature's sources as they are in the checkout, so a
+// scenario script can run the installer itself (.agents/knowledge/testing.md, Running the installer).
 import { join } from "jsr:@std/path@1.1.6";
 import { copy } from "jsr:@std/fs@1.0.24/copy";
 import {
     exists,
     inRepoId,
     installClosure,
+    INSTALLER_COPY,
     loadRepo,
     majorOf,
     NAMESPACE,
@@ -75,7 +78,8 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 /**
  * Stages `root` into the empty or missing directory `out` for the registry at `host` (`localhost:<port>`). `roots`
  * picks the features under test from the loaded model; src/ gets them plus their install closure (all features when
- * omitted). Returns the staged feature ids.
+ * omitted). A staged feature with a test folder finds its sources, unrewritten, in test/<id>/_feature. Returns the
+ * staged feature ids.
  */
 export async function stage(
     root: string,
@@ -101,6 +105,10 @@ export async function stage(
 
     const testDir = join(out, "test");
     if (!(await exists(testDir))) return staged;
+    // The copy comes from the checkout, not from the staged src/, whose metadata names the local registry.
+    for (const id of staged) {
+        if (await exists(join(testDir, id))) await copy(join(root, "src", id), join(testDir, id, INSTALLER_COPY));
+    }
     for await (const entry of Deno.readDir(testDir)) {
         const path = join(testDir, entry.name, "scenarios.json");
         if (!entry.isDirectory || !(await exists(path))) continue;

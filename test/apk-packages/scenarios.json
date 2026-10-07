@@ -1,5 +1,5 @@
 {
-  "listed_packages_alpine_3_24": {
+  "test_listed_packages_alpine_3_24": {
     "image": "alpine:3.24",
     "features": {
       "apk-packages": {
@@ -7,7 +7,7 @@
       }
     }
   },
-  "listed_packages_alpine_3_22": {
+  "test_listed_packages_alpine_3_22": {
     "image": "alpine:3.22",
     "features": {
       "apk-packages": {
@@ -15,7 +15,7 @@
       }
     }
   },
-  "install_if_and_whitespace_alpine_3_24": {
+  "test_install_if_and_whitespace_alpine_3_24": {
     "image": "alpine:3.24",
     "features": {
       "apk-packages": {
@@ -23,7 +23,7 @@
       }
     }
   },
-  "install_if_and_whitespace_alpine_3_22": {
+  "test_install_if_and_whitespace_alpine_3_22": {
     "image": "alpine:3.22",
     "features": {
       "apk-packages": {
@@ -31,7 +31,7 @@
       }
     }
   },
-  "controls_packages_0": {
+  "test_controls_packages_0": {
     "image": "alpine:3.22",
     "features": {
       "apk-packages": {
@@ -43,7 +43,7 @@
       }
     }
   },
-  "controls_none_0": {
+  "test_controls_none_0": {
     "image": "alpine:3.22",
     "features": {
       "apk-packages": {
@@ -55,7 +55,7 @@
       }
     }
   },
-  "controls_packages_1": {
+  "test_controls_packages_1": {
     "image": "alpine:3.24",
     "features": {
       "apk-packages": {
@@ -67,7 +67,7 @@
       }
     }
   },
-  "controls_none_1": {
+  "test_controls_none_1": {
     "image": "alpine:3.24",
     "features": {
       "apk-packages": {
@@ -77,6 +77,185 @@
         "networkTimeout": "10",
         "upgradePackages": true
       }
+    }
+  },
+  "test_empty_list_offline_alpine_3_24": {
+    "image": "alpine:3.24",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_empty_list_offline_alpine_3_22": {
+    "image": "alpine:3.22",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_refused_input_alpine_3_24": {
+    "image": "alpine:3.24",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_refused_input_alpine_3_22": {
+    "image": "alpine:3.22",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_refresh_offline_alpine_3_24": {
+    "image": "alpine:3.24",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_refresh_offline_alpine_3_22": {
+    "image": "alpine:3.22",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_entry_forms_alpine_3_24": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_entry_forms_alpine_3_22": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_unresolvable_entries_alpine_3_24": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_unresolvable_entries_alpine_3_22": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_refresh_alpine_3_24": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_refresh_alpine_3_22": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_control_runs_alpine_3_24": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_control_runs_alpine_3_22": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_second_install_alpine_3_24": {
+    "image": "alpine:3.24",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_second_install_alpine_3_22": {
+    "image": "alpine:3.22",
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_present_index_offline_alpine_3_24": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_present_index_offline_alpine_3_22": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_interactive_default_alpine_3_24": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_interactive_default_alpine_3_22": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_upgrade_lagging_alpine_3_24_0": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "test_upgrade_lagging_alpine_3_22_0": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "apk-packages": {}
+    }
+  },
+  "fail_image_without_apk": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apk-packages": {}
     }
   }
 }

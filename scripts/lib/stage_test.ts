@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from "jsr:@std/assert@1.0.19";
 import { join } from "jsr:@std/path@1.1.6";
-import { type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./repo.ts";
+import { exists, type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./repo.ts";
 import { localRef, rewriteFeatureRefs, rewriteScenarioKeys, stage } from "./stage.ts";
 
 const HOST = "localhost:5555";
@@ -115,6 +115,52 @@ Deno.test("stage copies only the roots and their install closure into src/", asy
         const staged: string[] = [];
         for await (const entry of Deno.readDir(join(out, "src"))) staged.push(entry.name);
         assertEquals(staged.sort(), ["a", "b", "c"]);
+    } finally {
+        await Deno.remove(root, { recursive: true });
+        await Deno.remove(out.slice(0, out.lastIndexOf("/")), { recursive: true });
+    }
+});
+
+/** Every file under `dir` as "relative path: mode: content", sorted. */
+async function tree(dir: string, prefix = ""): Promise<string[]> {
+    const lines: string[] = [];
+    for await (const entry of Deno.readDir(dir)) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory) lines.push(...(await tree(path, `${prefix}${entry.name}/`)));
+        else {
+            const mode = ((await Deno.stat(path)).mode ?? 0) & 0o777;
+            lines.push(`${prefix}${entry.name}: ${mode.toString(8)}: ${await Deno.readTextFile(path)}`);
+        }
+    }
+    return lines.sort();
+}
+
+Deno.test("stage copies a staged feature's sources, unrewritten, into its test folder", async () => {
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-root-" });
+    const out = join(await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-out-" }), "staged");
+    try {
+        await writeJson(join(root, "src/a/devcontainer-feature.json"), { id: "a", version: "1.0.0" });
+        await writeJson(join(root, "src/b/devcontainer-feature.json"), {
+            id: "b",
+            version: "1.0.0",
+            dependsOn: { [`${NAMESPACE}/a:1`]: {} },
+        });
+        await Deno.writeTextFile(join(root, "src/b/install.sh"), "#!/bin/sh\necho b\n", { mode: 0o755 });
+        await Deno.mkdir(join(root, "src/b/lib"));
+        await Deno.writeTextFile(join(root, "src/b/lib/helper.sh"), "# shellcheck shell=sh\n");
+        await writeJson(join(root, "src/c/devcontainer-feature.json"), { id: "c", version: "1.0.0" });
+        await writeJson(join(root, "test/b/scenarios.json"), { s: { image: "debian:12", features: { b: {} } } });
+        await writeJson(join(root, "test/c/scenarios.json"), { s: { image: "debian:12", features: { c: {} } } });
+
+        await stage(root, out, HOST, () => ["b"]);
+
+        // The copy is the checkout's src/b, whose metadata still names GHCR; the staged src/b names the registry.
+        assertEquals(await tree(join(out, "test/b/_feature")), await tree(join(root, "src/b")));
+        const staged = JSON.parse(await Deno.readTextFile(join(out, "src/b/devcontainer-feature.json")));
+        assertEquals(staged.dependsOn, { [`${LOCAL}/a:1`]: {} });
+        // a is staged but has no test folder; c has a test folder but is not staged.
+        assertEquals(await exists(join(out, "test/a")), false);
+        assertEquals(await exists(join(out, "test/c/_feature")), false);
     } finally {
         await Deno.remove(root, { recursive: true });
         await Deno.remove(out.slice(0, out.lastIndexOf("/")), { recursive: true });

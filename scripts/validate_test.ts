@@ -3,7 +3,7 @@
 import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.6";
 import { exists, loadRepo } from "./lib/repo.ts";
-import { checkVersionBumps, isExecutable, readBaseJsonc, versionBumpStep } from "./validate.ts";
+import { checkVersionBumps, installerCopyProblems, isExecutable, readBaseJsonc, versionBumpStep } from "./validate.ts";
 
 const SCHEMA = await Deno.readTextFile("test/compatibility.schema.json");
 
@@ -279,6 +279,31 @@ Deno.test("readBaseJsonc fails on content that is not valid JSONC unless told to
             `${path} on topic is not valid JSONC`,
         );
         assertEquals(await readBaseJsonc("topic", path, repo.root, "skip"), { found: true });
+    });
+});
+
+Deno.test("the reserved name _feature is rejected as a path and as a scenario name", async () => {
+    await withRepo(async (repo) => {
+        const problems = async () => {
+            const feature = (await loadRepo(repo.root)).features.get("a")!;
+            return (await installerCopyProblems("a", feature, repo.root)).map((p) => `${p.file}: ${p.message}`);
+        };
+        await repo.write("test/a/scenarios.json", JSON.stringify({ test_plain: { image: "debian:12" } }));
+        assertEquals(await problems(), []);
+        await repo.write("test/a/_feature/install.sh", "#!/bin/sh\n");
+        assertOne(await problems(), "test/a/_feature: ", "reserved name", "src/a/");
+        await Deno.remove(join(repo.root, "test/a/_feature"), { recursive: true });
+        // A symbolic link is rejected too, also one whose target does not exist.
+        // git writes the link: Deno.symlink needs unscoped permissions, which the tests do not have.
+        await repo.write("link-target", "../../src/missing");
+        const oid = (await repo.git("hash-object", "-w", "link-target")).trim();
+        await repo.git("update-index", "--add", "--cacheinfo", `120000,${oid},test/a/_feature`);
+        await repo.git("checkout-index", "test/a/_feature");
+        assertEquals((await Deno.lstat(join(repo.root, "test/a/_feature"))).isSymlink, true);
+        assertOne(await problems(), "test/a/_feature: ", "reserved name");
+        await Deno.remove(join(repo.root, "test/a/_feature"));
+        await repo.write("test/a/scenarios.json", JSON.stringify({ _feature: { image: "debian:12" } }));
+        assertOne(await problems(), "test/a/scenarios.json: ", 'scenario "_feature"', "test/a/_feature");
     });
 });
 

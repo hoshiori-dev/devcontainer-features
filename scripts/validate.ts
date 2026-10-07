@@ -7,6 +7,8 @@
 // - test/<id>/compatibility.json is valid, and every scenario image — the global scenarios' too —
 //   appears in the compatibility list of each feature it installs, for the scenario runners' arch;
 // - every scenarios.json, test/_global/scenarios.json, and test/canary.json is readable;
+// - nothing exists at test/<id>/_feature and no scenario is named `_feature`: a test run puts a copy
+//   of src/<id>/ there;
 // - in-repo dependsOn / installsAfter / scenario references resolve to a feature in src/, use the
 //   exact form `<namespace>/<id>:<its current major>` (installsAfter: no tag), and dependsOn plus
 //   installsAfter form no cycle;
@@ -37,6 +39,7 @@ import {
     type FeatureInfo,
     findInstallCycle,
     inRepoId,
+    INSTALLER_COPY,
     loadRepo,
     localPathRefs,
     majorOf,
@@ -321,6 +324,30 @@ async function scenarioProblems(model: RepoModel, id: string, feature: FeatureIn
     return problems;
 }
 
+/**
+ * test/<id>/_feature is where a test run puts a copy of src/<id>/ (scripts/lib/stage.ts), so the repository under
+ * `root` holds nothing there and no scenario of the feature takes the name.
+ */
+export async function installerCopyProblems(id: string, feature: FeatureInfo, root = "."): Promise<Problem[]> {
+    const path = `test/${id}/${INSTALLER_COPY}`;
+    const why = `A test run puts a copy of src/${id}/ there (.agents/knowledge/testing.md).`;
+    const problems: Problem[] = [];
+    // lstat, not exists(): a symbolic link there is rejected whether or not its target exists.
+    const present = await Deno.lstat(join(root, path)).then(() => true, (error) => {
+        if (error instanceof Deno.errors.NotFound) return false;
+        throw error;
+    });
+    if (present) problems.push({ file: path, message: `${path} is a reserved name. ${why} Remove or rename it.` });
+    if (feature.scenarios.some((scenario) => scenario.name === INSTALLER_COPY)) {
+        problems.push({
+            file: `test/${id}/scenarios.json`,
+            message: `scenario "${INSTALLER_COPY}" would keep its extra files in ${path}, a reserved name. ${why} ` +
+                "Rename the scenario.",
+        });
+    }
+    return problems;
+}
+
 /** A feature has an OpenSpec spec, in openspec/specs/ or in an active change (`inChanges`). */
 async function specProblems(id: string, inChanges: Set<string>): Promise<Problem[]> {
     if ((await exists(`openspec/specs/${id}/spec.md`)) || inChanges.has(id)) return [];
@@ -390,6 +417,7 @@ export async function checkFeatures(model: RepoModel, schema: Record<string, unk
         problems.push(...(await entryPointProblems(id)));
         problems.push(...(await compatibilityProblems(model, id, feature)));
         problems.push(...(await scenarioProblems(model, id, feature)));
+        problems.push(...(await installerCopyProblems(id, feature)));
         problems.push(...(await specProblems(id, inChanges)));
     }
     problems.push(...(await repositoryProblems(model)));
