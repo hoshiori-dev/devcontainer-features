@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario "test_dind_no_forward": docker-in-docker and firewall (presets npm, filterForward false). A nested container on
+# Scenario "test_dind_no_forward": docker-in-docker and firewall (presets npm, filterForward false). A nested container
+# on
 # a user-defined network reaches github.com, which no option allows, while the dev container itself is refused it
 # ("Forwarded traffic not filtered").
 set -euo pipefail

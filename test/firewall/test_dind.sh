@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Scenario "test_dind": docker-in-docker and firewall (presets npm, allowedCidrs 185.199.108.0/22, filterForward omitted).
+# Scenario "test_dind": docker-in-docker and firewall (presets npm, allowedCidrs 185.199.108.0/22, filterForward
+# omitted).
 # A nested container on a user-defined network reaches an address inside the allowed range, one of
 # raw.githubusercontent.com's without a lookup, and is refused a host that no option allows ("With docker-in-docker",
 # "Nested container filtered", "Nested container reaches an allowed range", "Omitted filterForward"). That a nested
