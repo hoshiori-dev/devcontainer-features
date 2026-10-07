@@ -1,5 +1,5 @@
 {
-  "listed_packages": {
+  "test_listed_packages": {
     "image": "archlinux:latest",
     "features": {
       "pacman-packages": {
@@ -7,7 +7,7 @@
       }
     }
   },
-  "optional_dependencies_and_whitespace": {
+  "test_optional_dependencies_and_whitespace": {
     "image": "archlinux:latest",
     "features": {
       "pacman-packages": {
@@ -15,7 +15,7 @@
       }
     }
   },
-  "controls_packages_0": {
+  "test_controls_packages_0": {
     "image": "archlinux:latest",
     "features": {
       "pacman-packages": {
@@ -24,13 +24,90 @@
       }
     }
   },
-  "controls_none_0": {
+  "test_controls_none_0": {
     "image": "archlinux:latest",
     "features": {
       "pacman-packages": {
         "packages": "tree",
         "cleanup": "none"
       }
+    }
+  },
+  "fail_refused_input": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "test_empty_list_offline": {
+    "image": "archlinux:latest",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "fail_refresh_offline": {
+    "image": "archlinux:latest",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "fail_unresolvable_entries": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "fail_refresh_and_signature": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "test_second_install": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "test_entry_forms": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "test_full_upgrade": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "test_keyring_and_configuration": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "test_control_runs": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "fail_image_without_pacman": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "pacman-packages": {}
     }
   }
 }

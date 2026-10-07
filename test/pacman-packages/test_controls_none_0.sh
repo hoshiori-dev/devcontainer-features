@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario controls_none_0 (scenarios.json): spec scenario "Feature cleanup is disabled", with packages=tree and
+# Scenario test_controls_none_0 (scenarios.json): spec scenario "Feature cleanup is disabled", with packages=tree and
 # cleanup=none, on an image where pacman and the image's hooks retain downloads.
 set -euo pipefail
 

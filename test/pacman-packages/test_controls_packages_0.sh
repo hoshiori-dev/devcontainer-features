@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Scenario controls_packages_0 (scenarios.json): spec scenario "Only package files are cleaned", with packages=tree and
-# cleanup=packages.
+# Scenario test_controls_packages_0 (scenarios.json): spec scenario "Only package files are cleaned", with packages=tree
+# and cleanup=packages.
 set -euo pipefail
 
 # shellcheck source=/dev/null

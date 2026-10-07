@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario listed_packages (scenarios.json): spec scenarios "Listed packages are installed", "Missing database is
+# Scenario test_listed_packages (scenarios.json): spec scenarios "Listed packages are installed", "Missing database is
 # downloaded" (the image ships no sync database), "Installation runs without a terminal" (the CLI builds without one),
 # and "Caches are removed". jq needs oniguruma, which the image lacks.
 set -euo pipefail

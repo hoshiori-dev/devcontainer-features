@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Scenario optional_dependencies_and_whitespace (scenarios.json): spec scenarios "Optional dependencies are left out",
-# "Spaces and empty entries are ignored", and "Caches are removed". rsync names python as an optional dependency, which
-# nothing in the image needs; the value has spaces, a tab, and an empty entry.
+# Scenario test_optional_dependencies_and_whitespace (scenarios.json): spec scenarios "Optional dependencies are left
+# out", "Spaces and empty entries are ignored", and "Caches are removed". rsync names python as an optional dependency,
+# which nothing in the image needs; the value has spaces, a tab, and an empty entry.
 set -euo pipefail
 
 # shellcheck source=/dev/null
