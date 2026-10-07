@@ -1,5 +1,5 @@
 {
-  "listed_packages_0": {
+  "test_listed_packages_0": {
     "image": "fedora:44",
     "features": {
       "dnf-packages": {
@@ -7,7 +7,7 @@
       }
     }
   },
-  "listed_packages_1": {
+  "test_listed_packages_1": {
     "image": "almalinux:9",
     "features": {
       "dnf-packages": {
@@ -15,7 +15,7 @@
       }
     }
   },
-  "listed_packages_2": {
+  "test_listed_packages_2": {
     "image": "rockylinux/rockylinux:9",
     "features": {
       "dnf-packages": {
@@ -23,7 +23,7 @@
       }
     }
   },
-  "controls_packages_0": {
+  "test_controls_packages_0": {
     "image": "fedora:44",
     "features": {
       "dnf-packages": {
@@ -35,7 +35,7 @@
       }
     }
   },
-  "controls_none_0": {
+  "test_controls_none_0": {
     "image": "fedora:44",
     "features": {
       "dnf-packages": {
@@ -47,7 +47,7 @@
       }
     }
   },
-  "controls_packages_1": {
+  "test_controls_packages_1": {
     "image": "almalinux:9",
     "features": {
       "dnf-packages": {
@@ -59,7 +59,7 @@
       }
     }
   },
-  "controls_none_1": {
+  "test_controls_none_1": {
     "image": "almalinux:9",
     "features": {
       "dnf-packages": {
@@ -71,7 +71,7 @@
       }
     }
   },
-  "controls_packages_2": {
+  "test_controls_packages_2": {
     "image": "rockylinux/rockylinux:9",
     "features": {
       "dnf-packages": {
@@ -83,7 +83,7 @@
       }
     }
   },
-  "controls_none_2": {
+  "test_controls_none_2": {
     "image": "rockylinux/rockylinux:9",
     "features": {
       "dnf-packages": {
@@ -95,7 +95,7 @@
       }
     }
   },
-  "optional_false_0": {
+  "test_optional_false_0": {
     "image": "fedora:44",
     "features": {
       "dnf-packages": {
@@ -104,7 +104,7 @@
       }
     }
   },
-  "optional_true_0": {
+  "test_optional_true_0": {
     "image": "fedora:44",
     "features": {
       "dnf-packages": {
@@ -113,7 +113,7 @@
       }
     }
   },
-  "architecture_0": {
+  "test_architecture_0": {
     "image": "fedora:44",
     "features": {
       "dnf-packages": {
@@ -121,7 +121,7 @@
       }
     }
   },
-  "optional_false_1": {
+  "test_optional_false_1": {
     "image": "almalinux:9",
     "features": {
       "dnf-packages": {
@@ -130,7 +130,7 @@
       }
     }
   },
-  "optional_true_1": {
+  "test_optional_true_1": {
     "image": "almalinux:9",
     "features": {
       "dnf-packages": {
@@ -139,7 +139,7 @@
       }
     }
   },
-  "architecture_1": {
+  "test_architecture_1": {
     "image": "almalinux:9",
     "features": {
       "dnf-packages": {
@@ -147,7 +147,7 @@
       }
     }
   },
-  "optional_false_2": {
+  "test_optional_false_2": {
     "image": "rockylinux/rockylinux:9",
     "features": {
       "dnf-packages": {
@@ -156,7 +156,7 @@
       }
     }
   },
-  "optional_true_2": {
+  "test_optional_true_2": {
     "image": "rockylinux/rockylinux:9",
     "features": {
       "dnf-packages": {
@@ -165,12 +165,162 @@
       }
     }
   },
-  "architecture_2": {
+  "test_architecture_2": {
     "image": "rockylinux/rockylinux:9",
     "features": {
       "dnf-packages": {
         "packages": "bc.x86_64"
       }
+    }
+  },
+  "fail_without_network_0": {
+    "image": "fedora:44",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "fail_without_network_1": {
+    "image": "almalinux:9",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "fail_without_network_2": {
+    "image": "rockylinux/rockylinux:9",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "fail_unresolvable_entries_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "fail_unresolvable_entries_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "fail_unresolvable_entries_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "fail_repositories_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "fail_repositories_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "fail_repositories_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_control_runs_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_control_runs_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_control_runs_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_entry_forms_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_entry_forms_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_entry_forms_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_unexpired_metadata_offline_0": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_unexpired_metadata_offline_1": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_unexpired_metadata_offline_2": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_second_install_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_second_install_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_second_install_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {}
     }
   }
 }
