@@ -44,6 +44,12 @@ done
 check "premise: with /etc/apk/interactive and a terminal, apk itself asks a question" apk_asked
 kill "${premise_pid}"
 wait "${premise_pid}" || true
+# script has ended; the apk it ran on its terminal ends a moment later and holds the database lock until then.
+waited=0
+while pidof apk >/dev/null && [ "${waited}" -lt 30 ]; do
+  sleep 1
+  waited=$((waited + 1))
+done
 check "premise: apk waited for an answer and did not install tree" not_installed tree
 
 # script runs the feature on a terminal of its own and exits with the feature's status.

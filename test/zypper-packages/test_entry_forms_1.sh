@@ -22,7 +22,8 @@ offered_editions() {
 # nothing when they offer none of them in two. Chosen when the test runs, so that no fixed edition goes stale.
 two_edition_package() {
   local candidate editions
-  for candidate in file bc libfuse3-3 curl openssl-libs glibc; do
+  # Not file: the script has pinned it to the first edition listed, which may be this oldest one.
+  for candidate in bc libfuse3-3 curl openssl-libs glibc; do
     editions="$(offered_editions "${candidate}" | sort -u -V)" || editions=""
     if [[ "${editions}" == *$'\n'* ]]; then
       echo "${candidate} ${editions%%$'\n'*}"

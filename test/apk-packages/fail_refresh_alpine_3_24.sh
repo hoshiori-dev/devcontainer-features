@@ -36,7 +36,11 @@ no_trusted_key() {
 }
 
 stalled_repository_listens() {
-  netstat -ltn | grep -q "127.0.0.1:${STALL_PORT} "
+  stalled_repository_listens_sockets="$(netstat -ltn)" || return 1
+  case "${stalled_repository_listens_sockets}" in
+    *"127.0.0.1:${STALL_PORT} "*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 reached_the_stalled_repository() {
@@ -81,7 +85,13 @@ mv "${KEYS_BACKUP}"/* /etc/apk/keys/
 mkfifo "${STALL_HOLD}"
 nc -l -s 127.0.0.1 -p "${STALL_PORT}" <>"${STALL_HOLD}" >"${STALL_REQUEST}" 2>/dev/null &
 stall_pid=$!
-until stalled_repository_listens; do sleep 1; done
+# The wait ends after 30 s, so a listener that never comes up fails the premise below.
+waited=0
+until stalled_repository_listens || [ "${waited}" -ge 30 ]; do
+  sleep 1
+  waited=$((waited + 1))
+done
+check "premise: the stalled repository listens on 127.0.0.1:${STALL_PORT}" stalled_repository_listens
 printf 'http://127.0.0.1:%s/unavailable\n' "${STALL_PORT}" >/etc/apk/repositories
 configuration_before="$(apk_configuration)"
 started="$(date +%s)"

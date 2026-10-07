@@ -86,7 +86,13 @@ retries=1
 EOF
 stalled_repository &
 stall_pid=$!
-until stalled_repository_listens; do sleep 0.1; done
+# The wait ends after 30 s, so a listener that never comes up fails the premise below.
+waited=0
+until stalled_repository_listens || [[ "${waited}" -ge 30 ]]; do
+  sleep 1
+  waited=$((waited + 1))
+done
+check "premise: the stalled repository listens on 127.0.0.1:${STALL_PORT}" stalled_repository_listens
 configuration_before="$(dnf_configuration)"
 SECONDS=0
 run_install PACKAGES=bc REFRESHPOLICY=always NETWORKTIMEOUT=1

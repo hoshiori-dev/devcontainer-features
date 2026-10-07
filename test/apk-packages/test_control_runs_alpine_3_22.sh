@@ -46,17 +46,27 @@ network_calls() {
   grep -E '\[(update|install|add)\]' "${CALL_LOG}"
 }
 
+# The searches below read the saved calls: POSIX sh has no pipefail, so a pipeline would hide a failing network_calls.
 no_network_call_sets_a_timeout() {
-  ! network_calls | grep -q '[Tt]imeout'
+  no_network_call_sets_a_timeout_calls="$(network_calls)" || return 1
+  ! grep -q '[Tt]imeout' <<EOF
+${no_network_call_sets_a_timeout_calls}
+EOF
 }
 
 # Every network call carries apk's timeout option with the value $1.
 every_network_call_has_timeout() {
-  ! network_calls | grep -Fqv -- "[--timeout] [$1]"
+  every_network_call_has_timeout_calls="$(network_calls)" || return 1
+  ! grep -Fqv -- "[--timeout] [$1]" <<EOF
+${every_network_call_has_timeout_calls}
+EOF
 }
 
 no_network_call_changes_verification_or_retries() {
-  ! network_calls | grep -Eq 'retries|sslverify|allow-untrusted|no-check-certificate'
+  no_network_call_changes_verification_or_retries_calls="$(network_calls)" || return 1
+  ! grep -Eq 'retries|sslverify|allow-untrusted|no-check-certificate' <<EOF
+${no_network_call_changes_verification_or_retries_calls}
+EOF
 }
 
 configuration_before="$(apk_configuration)"

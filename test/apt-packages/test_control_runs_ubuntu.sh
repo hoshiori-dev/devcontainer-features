@@ -25,17 +25,28 @@ network_calls() {
   grep --extended-regexp '\[(update|install)\]' "${CALL_LOG}"
 }
 
+# The searches below read the saved calls: in a pipeline, a search that stops at its first match can end the pipeline
+# with a failure, which would pass for "no match".
 no_network_call_sets_a_timeout() {
-  ! network_calls | grep --quiet '[Tt]imeout'
+  local calls
+  calls="$(network_calls)" || return
+  ! grep --quiet '[Tt]imeout' <<<"${calls}"
 }
 
 # Every network call carries the HTTPS timeout $1.
 every_network_call_has_timeout() {
-  ! network_calls | grep --invert-match --fixed-strings --quiet "Acquire::https::Timeout=$1"
+  local calls
+  calls="$(network_calls)" || return
+  ! grep --invert-match --fixed-strings --quiet "Acquire::https::Timeout=$1" <<<"${calls}"
 }
 
+# No network call carries an APT option for retries, TLS verification, or unauthenticated or insecure repositories.
 no_network_call_changes_verification_or_retries() {
-  ! network_calls | grep --extended-regexp --quiet 'retries|sslverify|allow-untrusted|no-check-certificate'
+  local calls
+  calls="$(network_calls)" || return
+  ! grep --extended-regexp --ignore-case --quiet \
+    'retries|verify-(peer|host)|allow-?unauthenticated|allow-?insecure|allowdowngradetoinsecure|allow-?releaseinfo' \
+    <<<"${calls}"
 }
 
 # The directory $1 holds a file whose name matches $2, or with "no" in $3 holds none.

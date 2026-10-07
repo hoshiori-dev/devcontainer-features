@@ -23,17 +23,25 @@ network_calls() {
   grep --fixed-strings '[install]' "${CALL_LOG}"
 }
 
+# The searches below read the saved calls: in a pipeline, a search that stops at its first match can end the pipeline
+# with a failure, which would pass for "no match".
 no_network_call_sets_a_timeout() {
-  ! network_calls | grep --quiet '[Tt]imeout'
+  local calls
+  calls="$(network_calls)" || return
+  ! grep --quiet '[Tt]imeout' <<<"${calls}"
 }
 
 # Every network call carries the timeout $1 for every repository.
 every_network_call_has_timeout() {
-  ! network_calls | grep --invert-match --fixed-strings --quiet -e "--setopt=*.timeout=$1"
+  local calls
+  calls="$(network_calls)" || return
+  ! grep --invert-match --fixed-strings --quiet -e "--setopt=*.timeout=$1" <<<"${calls}"
 }
 
 no_network_call_changes_verification_or_retries() {
-  ! network_calls | grep --extended-regexp --quiet 'retries|sslverify|allow-untrusted|no-check-certificate'
+  local calls
+  calls="$(network_calls)" || return
+  ! grep --extended-regexp --quiet 'retries|sslverify|allow-untrusted|no-check-certificate' <<<"${calls}"
 }
 
 configuration_before="$(dnf_configuration)"

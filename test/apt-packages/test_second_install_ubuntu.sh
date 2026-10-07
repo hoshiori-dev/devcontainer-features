@@ -16,9 +16,12 @@ source "$(dirname "$0")/installer.sh"
 # version goes stale. Needs a package index.
 two_version_package() {
   local preferred="unzip rsync less nano zip xxd patch sqlite3 libxml2-utils wget curl openssh-client tzdata"
+  # awk reads the lists to their end: a reader that stopped early would end the pipeline with a failure. The status is
+  # ignored, because an image without one of the two kinds of list still yields names from the other.
   local generic
   generic="$(/usr/lib/apt/apt-helper cat-file /var/lib/apt/lists/*-security_*_Packages* \
-    /var/lib/apt/lists/*-updates_*_Packages* 2>/dev/null | sed -n 's/^Package: //p' | head -n 300)" || generic=""
+    /var/lib/apt/lists/*-updates_*_Packages* 2>/dev/null \
+    | awk '$1 == "Package:" && count < 300 { print $2; count++ }')" || true
   local package candidate version
   for package in ${preferred} ${generic}; do
     if [[ "$(dpkg-query -W -f='${Status}' "${package}" 2>/dev/null)" == "install ok installed" ]]; then continue; fi

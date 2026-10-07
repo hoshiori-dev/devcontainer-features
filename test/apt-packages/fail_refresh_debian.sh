@@ -98,7 +98,13 @@ as_root sh -c 'rm -rf /var/lib/apt/lists/*'
 
 stalled_repository &
 stall_pid=$!
-until [[ -s "${STALL_PORT_FILE}" ]]; do sleep 0.1; done
+# The wait ends after 30 s, so a listener that never comes up fails the premise below.
+waited=0
+until [[ -s "${STALL_PORT_FILE}" || "${waited}" -ge 30 ]]; do
+  sleep 1
+  waited=$((waited + 1))
+done
+check "premise: the stalled repository listens and has written its port" test -s "${STALL_PORT_FILE}"
 as_root sh -c 'rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*'
 printf 'deb http://127.0.0.1:%s/ stalled main\n' "$(<"${STALL_PORT_FILE}")" \
   | as_root tee /etc/apt/sources.list >/dev/null

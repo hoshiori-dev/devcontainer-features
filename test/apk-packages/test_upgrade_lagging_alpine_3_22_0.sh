@@ -19,7 +19,10 @@ lagging_packages() {
 
 # The repositories still offer a newer version of the package: its line of lagging_packages is still $1.
 still_lags() {
-  lagging_packages | grep -Fqx -- "$1"
+  still_lags_packages="$(lagging_packages)" || return 1
+  grep -Fqx -- "$1" <<EOF
+${still_lags_packages}
+EOF
 }
 
 # The package and the versions are read when the test runs: which packages lag, and by how much, changes with every
