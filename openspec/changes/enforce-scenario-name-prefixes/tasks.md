@@ -16,7 +16,7 @@
 
 ## 3. Integration verification
 
-- [ ] 3.1 Run just check and inspect just affected; verify source, compatibility, workflow, and fixed CLI names remain
+- [x] 3.1 Run just check and inspect just affected; verify source, compatibility, workflow, and fixed CLI names remain
       unchanged.
 - [ ] 3.2 Run affected feature and global container tests locally or in CI; record each Acceptance item, results, and
       limitations in the PR Validation section.

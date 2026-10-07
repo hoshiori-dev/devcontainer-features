@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Scenario "test_minimal_image": debian:12 without curl or CA certificates, built from test_minimal_image/Dockerfile ("Minimal
-# image").
+# Scenario "test_minimal_image": debian:12 without curl or CA certificates, built from
+# test_minimal_image/Dockerfile ("Minimal image").
 set -euo pipefail
 
 # shellcheck source=/dev/null
