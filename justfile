@@ -23,7 +23,7 @@ lint:
 scripts-check:
     deno check scripts/ .agents/skills/github-project-workflow/scripts/
     deno lint scripts/ .agents/skills/github-project-workflow/scripts/
-    deno test --allow-read --allow-write=/tmp --allow-run=git,deno --allow-env=LOG_TOKENS,LOG_STREAM scripts/
+    deno test --allow-read --allow-write=/tmp --allow-run=git --allow-env=LOG_TOKENS,LOG_STREAM scripts/
 
 # Validate feature layout, metadata, and version bumps against a base ref
 validate base="origin/main":

@@ -17,7 +17,8 @@ Neither checks prefixes. `validate_test.ts` already has temporary repository hel
 
 - Keep each rename atomic across its key, script, extra-files directory, and references. Compare scenario values before
   and after with keys normalized through the rename mapping; compare script bodies after reversing name references.
-- Use one naming check for feature and global declarations. Tests exercise both callers, not only the shared helper.
+- Use one naming check for feature and global declarations. Table tests exercise the shared helper; review confirms both
+  callers use it.
 - Check names without changing the meaning of a scenario. Existing assertions and image/build settings are the
   comparison baseline; container test results verify that the renamed paths still resolve.
 
@@ -49,17 +50,17 @@ reader to rename its key, script, and any extra-files directory together.
 Duplicating the rule in the two callers risks inconsistent behavior. Placing it in the repository loader would change
 what other scripts can load and is unnecessary. Keep the existing `_feature` reserved-path/name check and its tests.
 
-### Test behavior and caller wiring
+### Test the shared rule
 
 Use `validate_test.ts` and Deno's existing assertions. Table cases accept `test_pinned_version` and
 `fail_invalid_option`; reject `pinned_version`, `contest_example`, and `failure_example`; and report all invalid entries
 in a mixed list. Assert error count, originating file, scenario name, and actionable prefix guidance without binding the
 entire diagnostic sentence.
 
-A temporary fixture exercises the actual validation entry point with invalid names in both a feature and `_global`, then
-renamed valid names. Provide corresponding executable scripts and valid configuration so missing scripts cannot explain
-the result. If the entry point's existing relative paths require changing cwd, isolate that test in a separate process
-rather than changing cwd while other tests run. No Docker is needed for the naming unit tests.
+At the maintainer's request, omit the CLI subprocess integration test without replacement and retain only the shared
+rule's unit test. The script test command permits Git subprocesses only; it does not add Deno execution permission. The
+feature and global call sites remain subject to review, and the migrated checkout still runs through `just validate`.
+Automated regression coverage for those call sites and CLI exit codes is outside this change.
 
 Leave `test.sh`, `duplicate.sh`, and helper scripts outside the rule: it applies to declared scenario keys only. Run the
 existing scaffold tests rather than adding a scenario generator that the current script does not need.

@@ -11,8 +11,8 @@
 
 - [x] 2.1 Add shared prefix validation to feature and global checks with actionable diagnostics; verify table tests for
       valid prefixes, invalid names, and mixed lists.
-- [x] 2.2 Exercise both actual validation paths in a temporary fixture with matching executable scripts; verify invalid
-      names fail and valid renames pass without script errors, while reserved-name tests remain green.
+- [x] 2.2 Review both feature and global call sites and retain existing reserved-name tests; remove the CLI subprocess
+      integration test and Deno execution permission as directed, without adding a replacement test.
 
 ## 3. Integration verification
 

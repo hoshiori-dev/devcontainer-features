@@ -41,8 +41,8 @@ tests.
   executable script; any extra-files directory and references use the same name.
 - `just validate` passes on the migrated checkout and rejects a scenario whose key and corresponding files are renamed
   together to a name without either prefix, in both feature and global scenarios.
-- Unit tests accept both prefixes, reject names without them, report every invalid entry in a mixed list, and prove that
-  both feature and global validation execute the rule with diagnostics identifying the file and scenario.
+- Unit tests accept both prefixes, reject names without them, report every invalid entry in a mixed list, and check
+  diagnostics identifying the file and scenario.
 - The testing guide states the convention without a migration exception, and scaffolded files still pass validation.
 - `just check` and the affected features' and global container tests pass, with results recorded in the PR.
 
