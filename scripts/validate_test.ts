@@ -293,6 +293,15 @@ Deno.test("the reserved name _feature is rejected as a path and as a scenario na
         await repo.write("test/a/_feature/install.sh", "#!/bin/sh\n");
         assertOne(await problems(), "test/a/_feature: ", "reserved name", "src/a/");
         await Deno.remove(join(repo.root, "test/a/_feature"), { recursive: true });
+        // A symbolic link is rejected too, also one whose target does not exist.
+        // git writes the link: Deno.symlink needs unscoped permissions, which the tests do not have.
+        await repo.write("link-target", "../../src/missing");
+        const oid = (await repo.git("hash-object", "-w", "link-target")).trim();
+        await repo.git("update-index", "--add", "--cacheinfo", `120000,${oid},test/a/_feature`);
+        await repo.git("checkout-index", "test/a/_feature");
+        assertEquals((await Deno.lstat(join(repo.root, "test/a/_feature"))).isSymlink, true);
+        assertOne(await problems(), "test/a/_feature: ", "reserved name");
+        await Deno.remove(join(repo.root, "test/a/_feature"));
         await repo.write("test/a/scenarios.json", JSON.stringify({ _feature: { image: "debian:12" } }));
         assertOne(await problems(), "test/a/scenarios.json: ", 'scenario "_feature"', "test/a/_feature");
     });

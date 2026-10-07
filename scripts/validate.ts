@@ -332,9 +332,12 @@ export async function installerCopyProblems(id: string, feature: FeatureInfo, ro
     const path = `test/${id}/${INSTALLER_COPY}`;
     const why = `A test run puts a copy of src/${id}/ there (.agents/knowledge/testing.md).`;
     const problems: Problem[] = [];
-    if (await exists(join(root, path))) {
-        problems.push({ file: path, message: `${path} is a reserved name. ${why} Remove or rename it.` });
-    }
+    // lstat, not exists(): a symbolic link there is rejected whether or not its target exists.
+    const present = await Deno.lstat(join(root, path)).then(() => true, (error) => {
+        if (error instanceof Deno.errors.NotFound) return false;
+        throw error;
+    });
+    if (present) problems.push({ file: path, message: `${path} is a reserved name. ${why} Remove or rename it.` });
     if (feature.scenarios.some((scenario) => scenario.name === INSTALLER_COPY)) {
         problems.push({
             file: `test/${id}/scenarios.json`,
