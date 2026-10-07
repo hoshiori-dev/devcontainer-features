@@ -1,5 +1,5 @@
 {
-  "pinned_version": {
+  "test_pinned_version": {
     "image": "debian:12",
     "features": {
       "hf-cli": {
@@ -7,7 +7,7 @@
       }
     }
   },
-  "install_skill": {
+  "test_install_skill": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {
@@ -16,7 +16,7 @@
       }
     }
   },
-  "redirected_sources": {
+  "test_redirected_sources": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -26,7 +26,7 @@
       }
     }
   },
-  "redirected_sources_uv": {
+  "test_redirected_sources_uv": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -37,7 +37,7 @@
       }
     }
   },
-  "existing_python": {
+  "test_existing_python": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -47,7 +47,7 @@
       }
     }
   },
-  "earlier_python": {
+  "test_earlier_python": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -57,7 +57,7 @@
       }
     }
   },
-  "first_party_python": {
+  "test_first_party_python": {
     "image": "debian:12",
     "features": {
       "ghcr.io/devcontainers/features/python:1": {

@@ -1,5 +1,5 @@
 {
-  "pinned_release": {
+  "test_pinned_release": {
     "image": "alpine:3.24",
     "features": {
       "uv": {
@@ -7,7 +7,7 @@
       }
     }
   },
-  "minimal_image": {
+  "test_minimal_image": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -15,7 +15,7 @@
       "uv": {}
     }
   },
-  "tools": {
+  "test_tools": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {
@@ -24,14 +24,14 @@
       }
     }
   },
-  "runtime_python": {
+  "test_runtime_python": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {
       "uv": {}
     }
   },
-  "changed_uid": {
+  "test_changed_uid": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -42,7 +42,7 @@
       }
     }
   },
-  "repair_volume": {
+  "test_repair_volume": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {

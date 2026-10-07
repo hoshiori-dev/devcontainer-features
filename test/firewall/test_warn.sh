@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "warn": failureMode warn, presets npm, so no start fetches from GitHub. The harness cannot start a
+# Scenario "test_warn": failureMode warn, presets npm, so no start fetches from GitHub. The harness cannot start a
 # container whose start fails, so after the first start this test stops the feature's resolver, lets an unprivileged
 # process hold 127.0.0.1:53, and runs the start-time script again as root ("Failed start removes the rules", "Failure
 # reported as a warning").

@@ -1,5 +1,5 @@
 # "Minimal image": debian:12 without curl or CA certificates. Records a SHA-256 of every apt
-# source and signing key before the feature installs its prerequisites; minimal_image.sh compares.
+# source and signing key before the feature installs its prerequisites; test_minimal_image.sh compares.
 FROM debian:12
 
 RUN if command -v curl >/dev/null || [ -e /etc/ssl/certs/ca-certificates.crt ]; then \

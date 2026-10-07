@@ -1,5 +1,5 @@
 {
-  "domains": {
+  "test_domains": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -8,7 +8,7 @@
       }
     }
   },
-  "cidrs": {
+  "test_cidrs": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -18,7 +18,7 @@
       }
     }
   },
-  "github_npm": {
+  "test_github_npm": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -26,19 +26,19 @@
       }
     }
   },
-  "rerun": {
+  "test_rerun": {
     "image": "debian:12",
     "features": {
       "firewall": {}
     }
   },
-  "fetch_fails": {
+  "test_fetch_fails": {
     "image": "debian:12",
     "features": {
       "firewall": {}
     }
   },
-  "warn": {
+  "test_warn": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -47,7 +47,7 @@
       }
     }
   },
-  "dind": {
+  "test_dind": {
     "image": "debian:12",
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:4": {},
@@ -57,7 +57,7 @@
       }
     }
   },
-  "dind_no_forward": {
+  "test_dind_no_forward": {
     "image": "debian:12",
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:4": {},
@@ -67,7 +67,7 @@
       }
     }
   },
-  "allow_all": {
+  "test_allow_all": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -76,7 +76,7 @@
       }
     }
   },
-  "denied_cidrs": {
+  "test_denied_cidrs": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -87,7 +87,7 @@
       }
     }
   },
-  "denied_domains": {
+  "test_denied_domains": {
     "image": "debian:12",
     "features": {
       "firewall": {
@@ -99,7 +99,7 @@
       }
     }
   },
-  "denied_in_range": {
+  "test_denied_in_range": {
     "image": "debian:12",
     "features": {
       "firewall": {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "rerun": default options. The harness cannot restart a container, so after the first start this test runs
+# Scenario "test_rerun": default options. The harness cannot restart a container, so after the first start this test runs
 # the start-time script once more as root, as the entrypoint does at a start: after deleting the feature's table
 # ("Root removes the firewall"), stopping its resolver while /etc/resolv.conf still names it, adding a table of its own
 # ("Other rules untouched"), and with variables named like the options ("Environment does not change the rules"). The

@@ -56,9 +56,9 @@ behavior contract to feature developers and auditors, so it is written for readi
 - Functions and variables: lower snake_case. Name a loop variable after what it holds (`for package in …`).
 - Upper case only for readonly constants, exported variables, and the variables that options and the Dev Container
   tooling set (`VERSION`, `_REMOTE_USER`). A mutable global is lower case.
-- Shell script file names: snake_case (`repair_volume.sh`), test scripts included, so scenario keys in `scenarios.json`
-  are snake_case too. `install.sh` and paths installed into an image keep the names the Dev Container spec or the
-  feature's spec gives them.
+- Shell script file names: snake_case (`test_repair_volume.sh`), test scripts included, so scenario keys in
+  `scenarios.json` are snake_case too. `install.sh` and paths installed into an image keep the names the Dev Container
+  spec or the feature's spec gives them.
 - `TODO(#<issue>)` for a known gap, naming the issue that tracks it.
 
 ## Variables and quoting

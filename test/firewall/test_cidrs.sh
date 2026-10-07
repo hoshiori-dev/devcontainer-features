@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "cidrs": presets empty, allowedCidrs 185.199.108.0/22,2606:50c0::/32, deniedCidrs 185.199.108.133/32
+# Scenario "test_cidrs": presets empty, allowedCidrs 185.199.108.0/22,2606:50c0::/32, deniedCidrs 185.199.108.133/32
 # ("IPv4 and IPv6 ranges", IPv4 by connection and IPv6 by ruleset, since the harness has no IPv6; "Denied range inside
 # an allowed range"). The addresses are raw.githubusercontent.com's, reached without a lookup.
 set -euo pipefail

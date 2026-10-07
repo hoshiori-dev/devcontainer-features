@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "denied_in_range": default options (the github preset) and deniedDomains raw.githubusercontent.com, a
+# Scenario "test_denied_in_range": default options (the github preset) and deniedDomains raw.githubusercontent.com, a
 # subdomain of the preset's githubusercontent.com whose addresses lie in a fetched GitHub range ("Denied subdomain of
 # an allowed domain", "Denied name inside an allowed range").
 set -euo pipefail

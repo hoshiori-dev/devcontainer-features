@@ -1,5 +1,5 @@
 {
-  "exact_version": {
+  "test_exact_version": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {
@@ -8,7 +8,7 @@
       }
     }
   },
-  "reinstall_same_version": {
+  "test_reinstall_same_version": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -18,7 +18,7 @@
       }
     }
   },
-  "reinstall_latest": {
+  "test_reinstall_latest": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -28,7 +28,7 @@
       }
     }
   },
-  "prerequisites_present": {
+  "test_prerequisites_present": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -37,7 +37,7 @@
       "deno": {}
     }
   },
-  "uid_remap": {
+  "test_uid_remap": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {
@@ -46,7 +46,7 @@
       }
     }
   },
-  "fedora_remote_user": {
+  "test_fedora_remote_user": {
     "build": {
       "dockerfile": "Dockerfile"
     },

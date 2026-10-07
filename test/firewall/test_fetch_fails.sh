@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "fetch_fails": default options (the github preset, failureMode closed). The harness cannot start a
+# Scenario "test_fetch_fails": default options (the github preset, failureMode closed). The harness cannot start a
 # container whose start fails, so after the first start this test runs the start-time script again as root, three
 # times: while a table of the test's own drops outbound HTTPS, so that the GitHub fetch times out without reaching
 # GitHub ("Fetch fails", "Omitted failureMode", "Failed start leaves only the resolvers", "Failure reported as an

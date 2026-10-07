@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Scenario "image_registry_debian" ("Registry configured in the image"): a build scenario on debian:12 whose
-# Dockerfile wrote an unreachable registry for the @fission-ai scope into root's ~/.npmrc before the feature installed
-# with default options. Runs as root, whose configuration it is.
+# Scenario "test_image_registry_ubuntu" ("Registry configured in the image"): a build scenario on
+# mcr.microsoft.com/devcontainers/base:ubuntu24.04 whose Dockerfile wrote an unreachable registry for the @fission-ai
+# scope into root's ~/.npmrc before the feature installed with default options. Runs as root, whose configuration it
+# is.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -10,7 +11,7 @@ source dev-container-features-test-lib
 # shellcheck source=/dev/null
 source ./lib.sh
 
-# The registry image_registry_debian/Dockerfile writes for the @fission-ai scope.
+# The registry test_image_registry_ubuntu/Dockerfile writes for the @fission-ai scope.
 readonly OTHER_REGISTRY="https://example.invalid/"
 
 # The version the registry names as latest when the test runs; a release between build and test fails once.

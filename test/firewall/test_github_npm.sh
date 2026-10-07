@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "github_npm": presets github,npm ("Presets combine"), and an address learned for a name that resolves
+# Scenario "test_github_npm": presets github,npm ("Presets combine"), and an address learned for a name that resolves
 # inside a fetched GitHub range: raw.githubusercontent.com, whose addresses lie in the web range 185.199.108.0/22.
 set -euo pipefail
 

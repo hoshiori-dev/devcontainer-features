@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "runtime_python": defaults on the Ubuntu base image as vscode ("Runtime interpreter on the volume",
+# Scenario "test_runtime_python": defaults on the Ubuntu base image as vscode ("Runtime interpreter on the volume",
 # "Workspace install across filesystems").
 set -euo pipefail
 

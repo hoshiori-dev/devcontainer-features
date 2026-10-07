@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario backend_nfs (scenarios.json): spec scenario "Only the NFS backend selected", on an image that ships no
+# Scenario test_backend_nfs (scenarios.json): spec scenario "Only the NFS backend selected", on an image that ships no
 # hf-mount-fuse; with the mount dependencies enabled, only the NFS helper is installed.
 set -euo pipefail
 

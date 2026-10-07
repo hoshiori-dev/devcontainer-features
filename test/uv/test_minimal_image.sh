@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Scenario "minimal_image": debian:12 without curl or CA certificates, built from minimal_image/Dockerfile ("Minimal
+# Scenario "test_minimal_image": debian:12 without curl or CA certificates, built from test_minimal_image/Dockerfile ("Minimal
 # image").
 set -euo pipefail
 
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
 
-# Prints the checksum of every apt source and signing key, as minimal_image/Dockerfile records them before the install.
+# Prints the checksum of every apt source and signing key, as test_minimal_image/Dockerfile records them before the install.
 apt_sources_and_keys() {
   find /etc/apt /usr/share/keyrings -type f \
     \( -path '/etc/apt/sources.list*' -o -path '/etc/apt/trusted.gpg*' -o -path '/usr/share/keyrings/*' \) \

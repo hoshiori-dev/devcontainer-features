@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "node_switched_ubuntu": the default options written out (version latest, disableUpdateCheck true,
+# Scenario "test_node_switched_ubuntu": the default options written out (version latest, disableUpdateCheck true,
 # disableTelemetry false) on mcr.microsoft.com/devcontainers/base:ubuntu24.04, as vscode, who then makes a second
 # Node.js the current one with nvm. Covers "Omitted version" with version latest, "Update check disabled", "Caller's
 # update-check value wins", "Telemetry left to the user", and "Current Node.js switched later".

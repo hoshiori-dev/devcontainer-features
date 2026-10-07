@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario dependencies_disabled (scenarios.json): spec scenario "Dependencies disabled", on an image that ships
+# Scenario test_dependencies_disabled (scenarios.json): spec scenario "Dependencies disabled", on an image that ships
 # neither mount.nfs nor fusermount3.
 set -euo pipefail
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "repair_volume": the volume-repair script on the Ubuntu base image as vscode, who has passwordless sudo
+# Scenario "test_repair_volume": the volume-repair script on the Ubuntu base image as vscode, who has passwordless sudo
 # ("Volume filled under another UID", "Files left by root", "Executable special bits during repair", "No
 # passwordless sudo", "Volume that fits").
 set -euo pipefail

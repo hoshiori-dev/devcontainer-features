@@ -1,5 +1,5 @@
 #!/bin/sh
-# Scenario "changed_uid": group access after the dev container tooling changed the remote user's UID, on Alpine
+# Scenario "test_changed_uid": group access after the dev container tooling changed the remote user's UID, on Alpine
 # ("Changed UID", "Volume that fits"). POSIX sh, because alpine:3.24 ships no bash.
 set -eu
 
@@ -10,7 +10,7 @@ set -eu
 readonly VOLUME_DIR="/var/lib/uv"
 readonly SHARE_DIR="/usr/local/share/uv"
 readonly REPAIR="/usr/local/share/uv-feature/repair-volume"
-# The UID changed_uid/Dockerfile gives the remote user at build time.
+# The UID test_changed_uid/Dockerfile gives the remote user at build time.
 readonly BUILD_UID=23456
 
 owns_neither_location() {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "allow_all": defaultAction allow, deniedCidrs the private ranges
+# Scenario "test_allow_all": defaultAction allow, deniedCidrs the private ranges
 # 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10 ("Unlisted destination let
 # through", "Unlisted traffic already let through", "Other DNS server refused", and "Denied range under open egress"
 # by ruleset, since no test connects to a private address).

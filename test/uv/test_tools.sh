@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "tools": two tools, with surrounding whitespace and an empty entry, on the Ubuntu base image as vscode
+# Scenario "test_tools": two tools, with surrounding whitespace and an empty entry, on the Ubuntu base image as vscode
 # ("Tools on PATH", "Tools survive a replaced volume", "Remote user manages tools", "Default sources", "Nothing
 # writable by every user").
 set -euo pipefail

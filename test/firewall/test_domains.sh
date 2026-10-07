@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "domains": presets empty, allowedDomains githubusercontent.com ("Subdomain of an allowed domain", "No
+# Scenario "test_domains": presets empty, allowedDomains githubusercontent.com ("Subdomain of an allowed domain", "No
 # preset", "Address not obtained through the resolver", "GitHub preset not selected").
 set -euo pipefail
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Scenario "pinned_release": version 0.12.16 on alpine:3.24 ("Pinned release", "musl image"). POSIX sh, because
+# Scenario "test_pinned_release": version 0.12.16 on alpine:3.24 ("Pinned release", "musl image"). POSIX sh, because
 # alpine:3.24 ships no bash.
 set -eu
 

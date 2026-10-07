@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "denied_domains": defaultAction allow, presets empty, allowedDomains raw.githubusercontent.com,
+# Scenario "test_denied_domains": defaultAction allow, presets empty, allowedDomains raw.githubusercontent.com,
 # deniedDomains githubusercontent.com,registry.npmjs.org, deniedCidrs 185.199.108.0/22, the range in which
 # raw.githubusercontent.com resolves ("Allowed name inside a denied range", "Allowed subdomain of a denied domain",
 # "Denied domain refused", "Unlisted destination let through").

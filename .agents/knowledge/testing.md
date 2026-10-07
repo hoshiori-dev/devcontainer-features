@@ -36,8 +36,7 @@ script (Running the installer), so each `fail_*` script asserts at least one run
 holds both kinds of assertion takes the prefix of what it exists to show. `test.sh` and `duplicate.sh` keep the names
 the CLI fixes.
 
-The five package-list installers follow the rule. The other features and `test/_global` keep their names until #117
-renames them and adds the `just validate` rule; a scenario added to one of them before that follows the rule already.
+`just validate` rejects a scenario key without either prefix, in feature and global scenarios.
 
 ## Running the installer
 

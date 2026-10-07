@@ -1,5 +1,5 @@
 {
-  "backend_nfs": {
+  "test_backend_nfs": {
     "image": "debian:12",
     "features": {
       "hf-mount": {
@@ -7,7 +7,7 @@
       }
     }
   },
-  "backend_fuse": {
+  "test_backend_fuse": {
     "image": "debian:12",
     "features": {
       "hf-mount": {
@@ -15,7 +15,7 @@
       }
     }
   },
-  "dependencies_disabled": {
+  "test_dependencies_disabled": {
     "image": "debian:12",
     "features": {
       "hf-mount": {
@@ -23,7 +23,7 @@
       }
     }
   },
-  "pinned_version": {
+  "test_pinned_version": {
     "image": "debian:12",
     "features": {
       "hf-mount": {

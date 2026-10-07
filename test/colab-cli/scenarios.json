@@ -1,13 +1,13 @@
 {
-  "pinned_release": {
+  "test_pinned_release": {
     "image": "debian:12",
     "features": { "colab-cli": { "version": "0.7.2" } }
   },
-  "redirected_sources": {
+  "test_redirected_sources": {
     "build": { "dockerfile": "Dockerfile" },
     "features": { "colab-cli": { "version": "0.7.2" } }
   },
-  "changed_uid": {
+  "test_changed_uid": {
     "build": { "dockerfile": "Dockerfile" },
     "remoteUser": "developer",
     "features": {

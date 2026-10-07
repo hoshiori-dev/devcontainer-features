@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "denied_cidrs": defaultAction allow, presets empty, allowedCidrs 185.199.109.133/32,185.199.110.0/24,
+# Scenario "test_denied_cidrs": defaultAction allow, presets empty, allowedCidrs 185.199.109.133/32,185.199.110.0/24,
 # deniedCidrs 185.199.108.0/22,185.199.110.0/24 ("Denied range under open egress", "Allowed address inside a denied
 # range", "Same range allowed and denied", "Unlisted destination let through"). The addresses are
 # raw.githubusercontent.com's, reached without a lookup.

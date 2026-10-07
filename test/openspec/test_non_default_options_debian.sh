@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario "non_default_options_debian": version 1.13.2, disableUpdateCheck false, and disableTelemetry true on
+# Scenario "test_non_default_options_debian": version 1.13.2, disableUpdateCheck false, and disableTelemetry true on
 # debian:12, as root. Covers "Exact version", "Dependency released later", "Update check left to the user",
 # "Telemetry disabled", and "Caller's telemetry value wins".
 set -euo pipefail

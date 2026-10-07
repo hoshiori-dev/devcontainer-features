@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario pinned_version (scenarios.json): spec scenario "Pinned release", with a release older than the latest one,
+# Scenario test_pinned_version (scenarios.json): spec scenario "Pinned release", with a release older than the latest one,
 # so a pass cannot come from following `latest`.
 set -euo pipefail
 
