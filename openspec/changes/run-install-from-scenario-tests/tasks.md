@@ -27,7 +27,7 @@
 - [x] 2.4 Delete `test/apt-packages/direct_checks.ts` and `control_checks.ts` and correct the comments that name them;
       verify that `git grep -n -e direct_checks -e control_checks -- test/apt-packages src/apt-packages` finds nothing
       and that `just test apt-packages` and `just test-scenarios apt-packages` pass
-- [ ] 2.5 Push, and verify in CI that the scenario job of `apt-packages` and the global scenarios pass; record the
+- [x] 2.5 Push, and verify in CI that the scenario job of `apt-packages` and the global scenarios pass; record the
       scenario count and the job duration before and after
 
 ## 3. apk-packages
@@ -68,7 +68,7 @@
       proposal finds no line, every scenario is named `test_*` or `fail_*`, each `fail_*` script asserts a run that
       exits non-zero, no scenario sets `privileged`, `capAdd`, `securityOpt`, `mounts`, or `entrypoint`, and
       `git diff origin/main --stat -- src openspec/specs` is empty
-- [ ] 7.2 Run `just check`, and `just test <id>` and `just test-scenarios <id>` for the five installers, and
+- [x] 7.2 Run `just check`, and `just test <id>` and `just test-scenarios <id>` for the five installers, and
       `just test-global`; record the results, each Acceptance item, and the scenario counts and job durations in the
       PR's Validation section, and open the follow-up issue for the runners of `hf-cli` and `colab-cli` that the PR
       description names
