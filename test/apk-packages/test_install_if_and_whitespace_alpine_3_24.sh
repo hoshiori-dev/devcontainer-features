@@ -1,5 +1,5 @@
 #!/bin/sh
-# Scenario install_if_and_whitespace_alpine_3_24 (scenarios.json): spec scenarios "Install-if packages
+# Scenario test_install_if_and_whitespace_alpine_3_24 (scenarios.json): spec scenarios "Install-if packages
 # follow their conditions", "Spaces and empty entries are ignored", and "Caches are removed". The
 # value has spaces, a tab, and an empty entry; jq-doc is installed only through its install-if
 # conditions, jq and docs.

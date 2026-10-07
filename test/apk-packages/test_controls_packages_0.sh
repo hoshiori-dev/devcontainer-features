@@ -1,5 +1,5 @@
 #!/bin/sh
-# Scenario controls_packages_0 (scenarios.json, alpine:3.22): spec scenario "Only package files are cleaned",
+# Scenario test_controls_packages_0 (scenarios.json, alpine:3.22): spec scenario "Only package files are cleaned",
 # after an install of tree with cleanup=packages. The scenario's other controls (refreshPolicy=always,
 # networkTimeout=10, upgradePackages=true) are a smoke combination this script does not assert.
 # POSIX sh with the stand-in in checks.sh: the Alpine images ship no bash, which the CLI's
