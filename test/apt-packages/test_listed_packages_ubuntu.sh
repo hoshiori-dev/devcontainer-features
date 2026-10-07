@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Scenario listed_packages_ubuntu (scenarios.json): spec scenarios "Listed packages are installed", "Missing index is
-# refreshed" (the image ships no package index, so the installation succeeds only after a refresh), and "Caches are
+# Scenario test_listed_packages_ubuntu (scenarios.json): spec scenarios "Listed packages are installed", "Missing index
+# is refreshed" (the image ships no package index, so the installation succeeds only after a refresh), and "Caches are
 # removed".
 set -euo pipefail
 
@@ -12,7 +12,7 @@ installed() {
 }
 
 # The image's docker-clean APT hook deletes downloaded package files too, so this check cannot fail on it;
-# control_checks.ts proves the cleanup with a relocated archive directory.
+# the scenarios test_control_runs_* prove the cleanup with a relocated archive directory.
 no_package_files() {
   [[ -z "$(find /var/cache/apt/archives -name '*.deb' -print -quit)" ]]
 }

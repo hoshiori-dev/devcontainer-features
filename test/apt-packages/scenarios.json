@@ -1,5 +1,5 @@
 {
-  "listed_packages_ubuntu": {
+  "test_listed_packages_ubuntu": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "features": {
       "apt-packages": {
@@ -7,7 +7,7 @@
       }
     }
   },
-  "listed_packages_debian": {
+  "test_listed_packages_debian": {
     "image": "debian:12",
     "features": {
       "apt-packages": {
@@ -15,7 +15,7 @@
       }
     }
   },
-  "recommends_and_whitespace": {
+  "test_recommends_and_whitespace": {
     "image": "debian:12",
     "features": {
       "apt-packages": {
@@ -23,7 +23,7 @@
       }
     }
   },
-  "native_architecture": {
+  "test_native_architecture": {
     "image": "debian:12",
     "features": {
       "apt-packages": {
@@ -31,7 +31,7 @@
       }
     }
   },
-  "debconf_question": {
+  "test_debconf_question": {
     "image": "debian:12",
     "features": {
       "apt-packages": {
@@ -39,7 +39,7 @@
       }
     }
   },
-  "controls_packages_0": {
+  "test_controls_packages_0": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "features": {
       "apt-packages": {
@@ -51,7 +51,7 @@
       }
     }
   },
-  "controls_none_0": {
+  "test_controls_none_0": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "features": {
       "apt-packages": {
@@ -63,7 +63,7 @@
       }
     }
   },
-  "controls_packages_1": {
+  "test_controls_packages_1": {
     "image": "debian:12",
     "features": {
       "apt-packages": {
@@ -75,7 +75,7 @@
       }
     }
   },
-  "controls_none_1": {
+  "test_controls_none_1": {
     "image": "debian:12",
     "features": {
       "apt-packages": {
@@ -85,6 +85,147 @@
         "networkTimeout": "10",
         "installRecommends": true
       }
+    }
+  },
+  "fail_refused_input_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "fail_refused_input_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_empty_list_offline_debian": {
+    "image": "debian:12",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_empty_list_offline_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "fail_refresh_offline_debian": {
+    "image": "debian:12",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "fail_refresh_offline_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "fail_unresolvable_entries_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "fail_unresolvable_entries_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "fail_refresh_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "fail_refresh_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_second_install_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_second_install_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_entry_forms_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_entry_forms_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_control_runs_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_control_runs_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_present_index_offline_debian": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_present_index_offline_ubuntu": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "fail_image_without_apt_get": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
     }
   }
 }

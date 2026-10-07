@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Scenario recommends_and_whitespace (scenarios.json): spec scenarios "Recommended packages are left out", "Spaces and
-# empty entries are ignored", and "Caches are removed". wget recommends ca-certificates, which nothing else on
+# Scenario test_recommends_and_whitespace (scenarios.json): spec scenarios "Recommended packages are left out", "Spaces
+# and empty entries are ignored", and "Caches are removed". wget recommends ca-certificates, which nothing else on
 # debian:12 needs; the option value has spaces, a tab, and an empty entry.
 set -euo pipefail
 
@@ -16,7 +16,7 @@ not_installed() {
 }
 
 # The image's docker-clean APT hook deletes downloaded package files too, so this check cannot fail on it;
-# control_checks.ts proves the cleanup with a relocated archive directory.
+# the scenarios test_control_runs_* prove the cleanup with a relocated archive directory.
 no_package_files() {
   [[ -z "$(find /var/cache/apt/archives -name '*.deb' -print -quit)" ]]
 }

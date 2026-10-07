@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Scenario controls_none_0 (scenarios.json): spec scenario "Feature cleanup is disabled", with bc and file installed
-# under cleanup=none, refreshPolicy=always, networkTimeout=10, and installRecommends=true. Retained package files are
-# not asserted: the image's docker-clean APT hook deletes them whatever the feature does (spec scenario "Native package
-# retention is independent").
+# Scenario test_controls_none_0 (scenarios.json): spec scenario "Feature cleanup is disabled", with bc and file
+# installed under cleanup=none, refreshPolicy=always, networkTimeout=10, and installRecommends=true. Retained package
+# files are not asserted: the image's docker-clean APT hook deletes them whatever the feature does (spec scenario
+# "Native package retention is independent").
 set -euo pipefail
 
 # shellcheck source=/dev/null

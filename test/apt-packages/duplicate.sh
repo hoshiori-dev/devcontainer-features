@@ -13,7 +13,7 @@ installed() {
 }
 
 # The images' docker-clean APT hook deletes downloaded package files too, so this check cannot fail on them;
-# control_checks.ts proves the cleanup with a relocated archive directory.
+# the scenarios test_control_runs_* prove the cleanup with a relocated archive directory.
 no_package_files() {
   [[ -z "$(find /var/cache/apt/archives -name '*.deb' -print -quit)" ]]
 }

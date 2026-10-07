@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario controls_packages_0 (scenarios.json): spec scenario "Only package files are cleaned", with bc and file
+# Scenario test_controls_packages_0 (scenarios.json): spec scenario "Only package files are cleaned", with bc and file
 # installed under cleanup=packages, refreshPolicy=always, networkTimeout=10, and installRecommends=true.
 set -euo pipefail
 
@@ -11,7 +11,7 @@ installed() {
 }
 
 # The image's docker-clean APT hook deletes downloaded package files too, so this check cannot fail on it;
-# control_checks.ts proves the cleanup with a relocated archive directory.
+# the scenarios test_control_runs_* prove the cleanup with a relocated archive directory.
 no_package_files() {
   [[ -z "$(find /var/cache/apt/archives -name '*.deb' -print -quit)" ]]
 }

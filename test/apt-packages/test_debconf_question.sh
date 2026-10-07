@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scenario debconf_question (scenarios.json): spec scenarios "Package that asks a question installs unattended" and
+# Scenario test_debconf_question (scenarios.json): spec scenarios "Package that asks a question installs unattended" and
 # "Caches are removed". keyboard-configuration asks for the keyboard layout; the build has no terminal, so the package
 # is configured with the default answer, the US layout.
 set -euo pipefail
@@ -16,7 +16,7 @@ us_layout() {
 }
 
 # The image's docker-clean APT hook deletes downloaded package files too, so this check cannot fail on it;
-# control_checks.ts proves the cleanup with a relocated archive directory.
+# the scenarios test_control_runs_* prove the cleanup with a relocated archive directory.
 no_package_files() {
   [[ -z "$(find /var/cache/apt/archives -name '*.deb' -print -quit)" ]]
 }
