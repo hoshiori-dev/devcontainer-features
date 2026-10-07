@@ -6,6 +6,7 @@
 //   the global scenarios' too — exist and are executable;
 // - test/<id>/compatibility.json is valid, and every scenario image — the global scenarios' too —
 //   appears in the compatibility list of each feature it installs, for the scenario runners' arch;
+// - every feature and global scenario name starts with `test_` or `fail_`;
 // - every scenarios.json, test/_global/scenarios.json, and test/canary.json is readable;
 // - nothing exists at test/<id>/_feature and no scenario is named `_feature`: a test run puts a copy
 //   of src/<id>/ there;
@@ -310,9 +311,19 @@ function scenarioCompatProblems(model: RepoModel, id: string, compat: Compat, sc
     return problems;
 }
 
+/** Scenario keys name a normal test or an installation that must fail; report every invalid name. */
+export function scenarioNameProblems(scenarios: Pick<Scenario, "name">[], file: string): Problem[] {
+    return scenarios.filter(({ name }) => !name.startsWith("test_") && !name.startsWith("fail_"))
+        .map(({ name }) => ({
+            file,
+            message: `scenario "${name}" must start with test_ or fail_. Rename its key, script, and any ` +
+                "extra-files directory together; use fail_ when its subject is an installation that must fail.",
+        }));
+}
+
 /** A feature's scenarios: each has an executable script, and each feature it installs resolves. */
 async function scenarioProblems(model: RepoModel, id: string, feature: FeatureInfo): Promise<Problem[]> {
-    const problems: Problem[] = [];
+    const problems = scenarioNameProblems(feature.scenarios, `test/${id}/scenarios.json`);
     for (const scenario of feature.scenarios) {
         await requireExecutable(
             problems,
@@ -362,6 +373,7 @@ async function specProblems(id: string, inChanges: Set<string>): Promise<Problem
 async function repositoryProblems(model: RepoModel): Promise<Problem[]> {
     const problems: Problem[] = [];
     problems.push(...unreadableFiles(model));
+    problems.push(...scenarioNameProblems(model.globalScenarios, "test/_global/scenarios.json"));
     problems.push(...scenarioRefProblems(model, model.globalScenarios, "test/_global/scenarios.json"));
     problems.push(...scenarioImageProblems(model, model.globalScenarios, "test/_global/scenarios.json"));
     for (const scenario of model.globalScenarios) {

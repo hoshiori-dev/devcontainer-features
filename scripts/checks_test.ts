@@ -560,12 +560,12 @@ Deno.test("feature scenario owners are validated on every declared architecture"
         scenarioArchitectures: ["amd64", "arm64"],
     };
     a.scenarios = [
-        { name: "version", image: "debian:12", usesBuild: false, featureKeys: ["a"] },
-        { name: "built", image: "debian:12", usesBuild: true, featureKeys: ["a"] },
+        { name: "test_version", image: "debian:12", usesBuild: false, featureKeys: ["a"] },
+        { name: "test_built", image: "debian:12", usesBuild: true, featureKeys: ["a"] },
     ];
     const problems = (await checkFeatures(m, {})).filter((p) => p.file === "test/a/scenarios.json");
     assertEquals(problems.length, 1);
-    for (const part of ['scenario "version"', "test/a/compatibility.json", "debian:12", "arm64"]) {
+    for (const part of ['scenario "test_version"', "test/a/compatibility.json", "debian:12", "arm64"]) {
         assert(problems[0].message.includes(part), `${part} not in: ${problems[0].message}`);
     }
 });

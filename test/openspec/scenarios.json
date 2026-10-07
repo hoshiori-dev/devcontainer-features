@@ -1,5 +1,5 @@
 {
-  "non_default_options_ubuntu": {
+  "test_non_default_options_ubuntu": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {
@@ -10,7 +10,7 @@
       }
     }
   },
-  "non_default_options_debian": {
+  "test_non_default_options_debian": {
     "image": "debian:12",
     "features": {
       "openspec": {
@@ -20,7 +20,7 @@
       }
     }
   },
-  "node_switched_ubuntu": {
+  "test_node_switched_ubuntu": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {
@@ -31,7 +31,7 @@
       }
     }
   },
-  "node_switched_debian": {
+  "test_node_switched_debian": {
     "image": "debian:12",
     "features": {
       "openspec": {
@@ -41,7 +41,7 @@
       }
     }
   },
-  "image_registry_ubuntu": {
+  "test_image_registry_ubuntu": {
     "build": {
       "dockerfile": "Dockerfile"
     },
@@ -50,7 +50,7 @@
       "openspec": {}
     }
   },
-  "image_registry_debian": {
+  "test_image_registry_debian": {
     "build": {
       "dockerfile": "Dockerfile"
     },

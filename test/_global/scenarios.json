@@ -1,5 +1,5 @@
 {
-  "uv_and_hf_cli": {
+  "test_uv_and_hf_cli": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {
@@ -7,7 +7,7 @@
       "ghcr.io/hoshiori-dev/devcontainer-features/hf-cli:1": {}
     }
   },
-  "uv_and_colab_cli": {
+  "test_uv_and_colab_cli": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
     "features": {

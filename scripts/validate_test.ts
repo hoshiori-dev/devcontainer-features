@@ -3,7 +3,14 @@
 import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1.0.19";
 import { dirname, join } from "jsr:@std/path@1.1.6";
 import { exists, loadRepo } from "./lib/repo.ts";
-import { checkVersionBumps, installerCopyProblems, isExecutable, readBaseJsonc, versionBumpStep } from "./validate.ts";
+import {
+    checkVersionBumps,
+    installerCopyProblems,
+    isExecutable,
+    readBaseJsonc,
+    scenarioNameProblems,
+    versionBumpStep,
+} from "./validate.ts";
 
 const SCHEMA = await Deno.readTextFile("test/compatibility.schema.json");
 
@@ -320,5 +327,25 @@ Deno.test("isExecutable is false for a missing file and rethrows any other error
         await assertRejects(() => isExecutable(join(script, "child")), Deno.errors.NotADirectory);
     } finally {
         await Deno.remove(root, { recursive: true });
+    }
+});
+
+Deno.test("scenario names require test_ or fail_ at the start and report every invalid entry", () => {
+    const file = "test/a/scenarios.json";
+    for (const name of ["test_pinned_version", "fail_invalid_option", "test_", "fail_"]) {
+        assertEquals(scenarioNameProblems([{ name }], file), []);
+    }
+    const invalid = ["pinned_version", "contest_example", "failure_example"];
+    const problems = scenarioNameProblems(
+        ["test_plain", ...invalid, "fail_install"].map((name) => ({ name })),
+        file,
+    );
+    assertEquals(problems.length, invalid.length);
+    for (const [index, problem] of problems.entries()) {
+        assertEquals(problem.file, file);
+        assert(problem.message.includes(`scenario "${invalid[index]}"`));
+        for (const hint of ["test_", "fail_", "key", "script", "directory"]) {
+            assert(problem.message.includes(hint), problem.message);
+        }
     }
 });
