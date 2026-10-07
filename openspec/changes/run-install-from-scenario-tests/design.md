@@ -24,6 +24,12 @@
     `sudo env … ./_feature/install.sh`.
   - A scenario with `"runArgs": ["--network=none"]` built with a network and ran its script without one: name resolution
     failed, and `install.sh` exited 1 at the index refresh without installing.
+- Measured the same day on a second throwaway copy in which all 114 scenarios of the repository had been renamed to
+  `test_<name>` — key, script, and folder of extra files — and one `fail_*` scenario added: `scripts/validate.ts`
+  reported every feature as valid, shellcheck and the unit tests of `scripts/` passed, and a plain scenario, a `fail_*`
+  scenario, a `build` scenario with its folder, a global scenario, and `test.sh` with `duplicate.sh` beside the
+  `test_*.sh` files all passed in containers. No script under `scripts/` reads a scenario's name, and no test script
+  refers to another scenario's file; the old names appear only in comments.
 - Not measured, and assumed by this design:
   1. The test folder reaches the container the same way for a `build` scenario and on the arm64 runners.
   2. Every compatibility image of the five installers either runs its scenarios as root or offers `sudo` without a
@@ -92,6 +98,16 @@
   its scenario. A check that needs a prepared image and then no network prepares the image in the scenario's Dockerfile.
   An image outside the compatibility list — the one without the package manager — is a `build` scenario, which the image
   rule of `testing.md` already exempts.
+- **The prefix names the subject, not the outcome.** A `fail_*` scenario passes like any other: what fails is a run of
+  the installer inside its script. A script often holds both kinds of assertion — a refusal, then a list that installs —
+  so the prefix follows what the scenario exists to show: `fail_` when that is an installation that must fail, `test_`
+  otherwise. `test.sh` and `duplicate.sh` keep their names, which the CLI fixes. Rejected:
+  - Renaming every feature's scenarios here. It changes `test/` of nine features this change has no other reason to
+    touch, and CI then runs the whole collection's matrix for a rename.
+  - Enforcing the prefixes in `just validate` now. The rule would be false for nine features until they are renamed, so
+    enforcement goes with their renaming.
+  - Naming only the new scenarios and leaving the installers' existing ones. Each of the five folders would then hold
+    two conventions.
 - **A check that does not fit is not dropped.** If a runner's check cannot be written as a scenario — one of the four
   assumptions under Context fails for it, or it needs something no scenario offers — the work on that feature stops, the
   check is listed in the pull request with what it needs, and a maintainer decides whether it stays as a manual check,
@@ -117,6 +133,10 @@
 - **The staged copy carries the unrewritten metadata.** `_feature/devcontainer-feature.json` names GHCR, not the local
   registry. A script that runs `install.sh` does not read it; `testing.md` says the copy is for running the installer
   and not for resolving references.
+
+- **Two naming conventions exist until the follow-up lands.** Five features follow the rule and nine do not, and nothing
+  checks it. `testing.md` says so and names the issue; a scenario added to one of the nine in the meantime follows the
+  rule only if its author reads that.
 
 ## Migration Plan
 

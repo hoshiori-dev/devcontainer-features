@@ -25,6 +25,9 @@ set for starting.
   deleted.
 - `.agents/knowledge/testing.md` documents the test type: how a scenario runs the installer itself, what it can prepare
   beforehand, and which checks it cannot express.
+- Scenario names say what a scenario is for. One whose subject is an installation that must fail is named `fail_*`;
+  every other scenario is named `test_*`. `.agents/knowledge/testing.md` states the rule, the scenarios this change adds
+  follow it, and the existing scenarios of the five installers are renamed to it.
 - The name under which the installer reaches a test is reserved: `just validate` rejects a repository that commits a
   file or names a scenario there.
 
@@ -47,6 +50,9 @@ None. This change edits the harness and tests only (`skip_specs: true`).
   `test/` only. Nothing under `src/` changes, so no version is bumped.
 - CI: `scripts/lib/` is test infrastructure, so this pull request runs the global scenarios besides the five features'
   jobs. The scenario jobs of the five installers run more scenarios from then on.
+- Not touched: the scenarios of the other nine features and of `test/_global`, which keep their names, and a
+  `just validate` rule for the prefixes, which can hold only once every scenario follows them. Both are
+  [#117](https://github.com/hoshiori-dev/devcontainer-features/issues/117).
 - Not touched: the host-side runners of `hf-cli` and `colab-cli`, added after the issue was written. Some of their
   checks need more than one container. They are left for a follow-up issue, which this pull request's description names.
 
@@ -69,6 +75,10 @@ None. This change edits the harness and tests only (`skip_specs: true`).
 - `git grep -n -e direct_checks -e control_checks -- test/ src/ .agents/ CONTRIBUTING.md` finds no line about the five
   installers.
 - `.agents/knowledge/testing.md` lists the test type in its Layout table and states its limits.
+- Every scenario of the five installers, in `scenarios.json`, in its script's file name, and in its folder of extra
+  files, is named `test_*` or `fail_*`; each `fail_*` script asserts at least one run of the installer that exits
+  non-zero.
+- `.agents/knowledge/testing.md` states the naming rule and that the other features follow it with #117.
 - `just validate` fails, naming the path, for a repository that commits anything at the reserved name under `test/<id>/`
   or names a scenario after it.
 
@@ -83,5 +93,7 @@ None. This change edits the harness and tests only (`skip_specs: true`).
 - No scenario gains `privileged`, `capAdd`, `securityOpt`, `mounts`, or an `entrypoint` through this change.
 - `ci-gate` and the job names in `.agents/knowledge/github/checks.md` are unchanged, and the `main` ruleset is not
   touched.
-- Existing scenarios, `test.sh`, and `duplicate.sh` of every feature pass unchanged.
+- Existing scenarios, `test.sh`, and `duplicate.sh` of every feature pass with their checks unchanged; those of the five
+  installers under their new names.
+- Under `test/`, nothing outside the five installers' folders changes.
 - `just check` passes, and shellcheck covers every new test script through `just lint`.
