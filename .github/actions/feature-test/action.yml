@@ -23,6 +23,7 @@ runs:
     - uses: ./.github/actions/setup-tools
       with:
         devcontainer-cli: "true"
+        just: "false"
     - name: Run devcontainer features test
       shell: bash
       env:

@@ -25,6 +25,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-tools
+        with:
+          just: "false"
       - id: base
         uses: ./.github/actions/base-checks
         with:
@@ -44,6 +46,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-tools
+        with:
+          just: "false"
       - id: base
         uses: ./.github/actions/base-checks
         with:
@@ -62,6 +66,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-tools
+        with:
+          just: "false"
       - id: base
         uses: ./.github/actions/base-checks
         with:

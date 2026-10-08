@@ -36,6 +36,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-tools
+        with:
+          just: "false"
       # A dispatch has no previous commit to compare with, so it checks the metadata only.
       - env:
           BEFORE: ${{ github.event.before }}
