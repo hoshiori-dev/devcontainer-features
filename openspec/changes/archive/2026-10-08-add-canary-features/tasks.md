@@ -9,4 +9,4 @@
 
 - [x] 2.1 Run just check and verify the infrastructure-only plan has 15 compatibility jobs, two scenario jobs, and
       global scenarios; record the results in the PR Validation section.
-- [ ] 2.2 Verify the PR's selected canary tests pass in CI and record the run in the PR Validation section.
+- [x] 2.2 Verify the PR's selected canary tests pass in CI and record the run in the PR Validation section.
