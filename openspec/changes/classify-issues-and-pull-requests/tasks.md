@@ -68,34 +68,34 @@ publish gate, and is named with its command in the pull request's Validation sec
 
 ## 5. Area labels on the repository
 
-- [ ] 5.1 Show the maintainer the difference `just labels` prints, and on their command apply the declaration with
+- [x] 5.1 Show the maintainer the difference `just labels` prints, and on their command apply the declaration with
       `--apply --keep-undeclared`; verify `gh label list` shows the five area labels as declared and the nine default
       labels still present, and that a second run with the same flags writes nothing
 
 ## 6. Test issues
 
-- [ ] 6.1 Create a test Epic and a test Feature under it by following the edited skill, the Feature with an area label
+- [x] 6.1 Create a test Epic and a test Feature under it by following the edited skill, the Feature with an area label
       and the Priority the maintainer confirmed; verify by reading the Feature back before anything else is done to it
-- [ ] 6.2 Measure assumptions 1 to 7 on the two test issues: a Start date beside the Priority, a changed Priority, the
+- [x] 6.2 Measure assumptions 1 to 7 on the two test issues: a Start date beside the Priority, a changed Priority, the
       date cleared with `DELETE`; a creation with a label that does not exist; the filters; the parent and a "blocked
       by" relationship between the two as the page and the API show them; the Feature closed while the Epic is open;
       verify each has an observation and a conclusion, and stop if one the design relies on is refuted
-- [ ] 6.3 Close both test issues as not planned and post the conclusions for assumptions 1 to 9 as one comment on this
+- [x] 6.3 Close both test issues as not planned and post the conclusions for assumptions 1 to 9 as one comment on this
       pull request, 8 and 9 named as not measured with the reason; verify the comment is on the pull request
 
 ## 7. Open issues
 
-- [ ] 7.1 Create the two Epics, for phase 2 (#56–#60) and phase 3 (#61–#63) of the package-manager features, with the
+- [x] 7.1 Create the two Epics, for phase 2 (#56–#60) and phase 3 (#61–#63) of the package-manager features, with the
       `feature` label, and add the eight issues as their sub-issues; verify with `gh issue view --json subIssues`
-- [ ] 7.2 Mark #61, #62, and #63 as blocked by #56, #57, and #59; verify with `gh issue view --json blockedBy`
-- [ ] 7.3 Add the area label the proposal gives to each open issue; verify `is:issue is:open no:label` returns nothing
-- [ ] 7.4 Propose a Priority for each open Feature, Bug, and Task in one list, and write each value the maintainer
+- [x] 7.2 Mark #61, #62, and #63 as blocked by #56, #57, and #59; verify with `gh issue view --json blockedBy`
+- [x] 7.3 Add the area label the proposal gives to each open issue; verify `is:issue is:open no:label` returns nothing
+- [x] 7.4 Propose a Priority for each open Feature, Bug, and Task in one list, and write each value the maintainer
       confirms; verify by reading every value back and with the filter of the proposal's Acceptance
 
 ## 8. Integration
 
-- [ ] 8.1 Record the Priority field's id and the label set in `platform-settings.md` as read back after groups 5 to 7;
+- [x] 8.1 Record the Priority field's id and the label set in `platform-settings.md` as read back after groups 5 to 7;
       verify the readbacks match the file
-- [ ] 8.2 Run `just check`, with the OpenSpec version CI pins if the local one differs, and record the result and every
+- [x] 8.2 Run `just check`, with the OpenSpec version CI pins if the local one differs, and record the result and every
       remote write with its command in the pull request's Validation section; verify each Acceptance item of the
       proposal has its result there
