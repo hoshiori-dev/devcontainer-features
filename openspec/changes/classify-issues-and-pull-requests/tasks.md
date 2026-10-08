@@ -29,8 +29,8 @@ publish gate, and is named with its command in the pull request's Validation sec
       dispatch, with a job condition on the ref; `permissions: contents: read` at the top and `issues: write` on its one
       job; a checkout of `main` that keeps no credentials; the workflow's token passed to `gh`; one concurrency group
       that cancels nothing; actions pinned by full commit SHA; verify with a unit test in `scripts/checks_test.ts` that
-      parses the workflow and checks the triggers, the permissions, the checkout, and the command, which passes neither
-      `--delete-used` nor `--keep-undeclared`
+      parses the workflow and checks the triggers, the permissions, the checkout, and the command, which never passes
+      `--delete-used` (9.1 adds `--keep-undeclared`)
 - [x] 2.2 Add the job to the job map of `.agents/knowledge/github/checks.md` and note there that `gh` comes from the
       runner image; verify the row names the command the job runs
 
@@ -99,3 +99,14 @@ publish gate, and is named with its command in the pull request's Validation sec
 - [x] 8.2 Run `just check`, with the OpenSpec version CI pins if the local one differs, and record the result and every
       remote write with its command in the pull request's Validation section; verify each Acceptance item of the
       proposal has its result there
+
+## 9. Review follow-up
+
+- [x] 9.1 Make the workflow pass `--keep-undeclared` and run in this repository only, and say in its comments and in the
+      head of `scripts/sync_labels.ts` why no unattended run deletes; verify with the workflow test in
+      `scripts/checks_test.ts`
+- [x] 9.2 Fail the offline check for a declared name with white space around it, with a comma, or equal to `.` or `..`;
+      verify with one unit test over the three cases and over names that stay valid
+- [x] 9.3 Bring the proposal, the design, `github-workflow.md` (the harness review), `github/checks.md` (the `sync`
+      row), and `github/platform-settings.md` (the Labels row, its readback included) to the above; verify `just labels`
+      prints what the row says

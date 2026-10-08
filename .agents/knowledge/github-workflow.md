@@ -50,8 +50,9 @@ names them, and `.github/labels.yml` repeats each in the hover text of its label
 A triaged issue of any type has at least one area label, usually one. An Epic carries the area of its sub-issues.
 
 The repository's labels are exactly the set `.github/labels.yml` declares, and they change only by applying that file
-(`github/platform-settings.md`, Labels row). Who may apply it, and what an agent sets on an issue alone, is in
-`agent-authority.md`.
+(`github/platform-settings.md`, Labels row). The Labels workflow creates and updates; it never deletes, so a label the
+declaration lacks stays until a maintainer has it deleted with `just labels --apply`. Who may apply it, and what an
+agent sets on an issue alone, is in `agent-authority.md`.
 
 ## Relationships
 
@@ -204,4 +205,5 @@ before editing anything:
 - The canary set in `test/canary.json` is still small, fast, and representative.
 - "Deliberately not used" triggers in this file: has any fired?
 - `is:issue is:open no:label` is empty.
+- `just labels` prints no difference: no label is undeclared, missing, or changed by hand.
 - No open Epic is left without an open sub-issue.

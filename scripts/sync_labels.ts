@@ -9,12 +9,18 @@
 // --apply deletes an undeclared label only when no issue and no pull request, open or closed,
 // carries it; a label in use is listed, kept, and makes the run exit 1. --delete-used lifts that
 // refusal and --keep-undeclared skips every deletion; both also shape the printed difference.
+// The question and the deletion are separate calls, and GitHub has none that deletes only an
+// unused label, so a label put on an issue between the two is taken off it. A deletion is
+// therefore run by a person, on a maintainer's command; the Labels workflow passes
+// --keep-undeclared and deletes nothing (.github/workflows/labels.yml).
 //
 // --check reads files only: it uses no network and runs nothing. Every other form validates the
 // same way first and stops before its first call when the declaration is invalid. The calls go
 // through `gh api`, never `gh label`, against the repository named by REPO, whatever the clone's
 // remote is. The YAML parser is the standard library's: the job that runs --apply holds a write
-// token, and no npm package is evaluated under one (scripts/lib/repo.ts, compatSchemaErrors).
+// token, and this script evaluates no npm package under it (scripts/lib/repo.ts,
+// compatSchemaErrors). Its jsr imports are pinned by version; the repository keeps no lock file
+// (deno.json), so what those packages import in turn is resolved when the script runs.
 import { parseArgs } from "jsr:@std/cli@1.0.32/parse-args";
 import { join } from "jsr:@std/path@1.1.6";
 import { parse as parseYaml } from "jsr:@std/yaml@1.2.0";
@@ -107,6 +113,15 @@ export function parseDeclaration(text: string): { labels: Label[]; problems: str
             return;
         }
         const label = `Label "${name}"`;
+        if (name !== name.trim()) problems.push(`${label} has white space around its name; remove it.`);
+        if (name.includes(",")) {
+            problems.push(`${label} holds a comma; GitHub's list of issues by label cannot ask for such a name.`);
+        }
+        if (/^\.{1,2}$/.test(name.trim())) {
+            problems.push(
+                `${label} is not a usable name: it reads as a path segment in the calls that change a label.`,
+            );
+        }
         for (const unknown of Object.keys(rest)) {
             problems.push(`${label} has the unknown key "${unknown}"; the keys are name, color, and description.`);
         }

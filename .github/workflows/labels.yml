@@ -1,8 +1,8 @@
 # Applies the label declaration (.github/labels.yml) to this repository: creates the labels that
-# are missing, updates the ones that differ, and deletes an undeclared label only when no issue and
-# no pull request carries it (scripts/sync_labels.ts). A label still in use is left alone and fails
-# the run; a maintainer then declares it or removes it.
-# The `sync` job holds `issues: write` because creating, editing, and deleting a label needs it.
+# are missing and updates the ones that differ (scripts/sync_labels.ts). It deletes nothing: a
+# label the declaration lacks is listed and kept, and a maintainer has it deleted by command
+# (`just labels --apply`), because no call deletes a label only while nothing carries it.
+# The `sync` job holds `issues: write` because creating and editing a label needs it.
 # That permission also allows editing and closing issues, so the workflow never runs on a pull
 # request event: a write token stays out of reach of code that has not been reviewed and merged,
 # and the job takes no input from an issue or a pull request. Its triggers are a push to main that
@@ -28,11 +28,13 @@ concurrency:
 
 jobs:
   sync:
-    if: github.ref == 'refs/heads/main'
+    # On main only, and in this repository only: the script writes to the repository it names, so a
+    # fork's run would fail against it.
+    if: github.ref == 'refs/heads/main' && github.repository == 'hoshiori-dev/devcontainer-features'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      issues: write # create, update, and delete labels
+      issues: write # create and update labels
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,9 +44,8 @@ jobs:
       - uses: ./.github/actions/setup-tools
         with:
           just: "false"
-      # Neither --delete-used nor --keep-undeclared: an unattended run never removes a label in use,
-      # and never keeps an unused one the declaration lacks.
+      # --keep-undeclared: an unattended run deletes no label. --delete-used never appears here.
       - name: Apply the label declaration
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./scripts/sync_labels.ts --apply
+        run: ./scripts/sync_labels.ts --apply --keep-undeclared

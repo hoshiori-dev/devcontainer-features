@@ -44,7 +44,7 @@
   part of what an agent mirrors.
 - GitHub limits a label's description to 100 characters, so the declaration cannot hold an area's full definition.
 - What this design assumes without a documented statement or a measurement. The test issues measure 1 to 7 before any
-  other issue is written to (Decisions); 8 and 9 cannot be produced before the merge:
+  other issue is written to (Decisions); 8 cannot be produced before the merge, and 9 lost its subject in review:
   1. `POST` to the field-values endpoint with one field sets that field and leaves the issue's other fields alone.
   2. A second `POST` for a field that already has a value replaces the value, and `DELETE` clears it.
   3. The token the agent works with can write a field value. That it can create a label is shown by the first
@@ -56,8 +56,10 @@
   7. A sub-issue added with `--parent` and a relationship added with `--add-blocked-by` are what the issue page and the
      API show.
   8. Dependabot applies the `ci` label to the pull requests it opens.
-  9. The workflow's token can delete a label, and sees a label on a closed issue or on a pull request when it counts
-     use.
+  9. A run that deletes sees a label on a closed issue or on a pull request when it counts use. This was written for the
+     workflow's token. Since the review the workflow deletes nothing (Decisions), so it concerns the token of whoever
+     runs the deletion by hand; with the agent's token the list of issues by label returned closed issues, and no
+     labelled pull request existed to try.
 
 ## Goals / Non-Goals
 
@@ -104,29 +106,39 @@
   - A third-party action. It needs an entry in the allowed list and a pin for something a short Deno script does.
   - An entry that names the label it replaces, so that a rename keeps the label on its issues. Nothing needs it now, and
     it brings cases of its own (both names present, the old name declared elsewhere).
-- **Deleting is the guarded part.** `--apply` creates what is missing and updates what differs first. It then deletes an
-  undeclared label only when no issue and no pull request, open or closed, carries it, which it reads from the list of
-  issues filtered by that label, not from search; a label in use is listed, left alone, and makes the run exit non-zero.
-  `--delete-used` lifts the refusal and `--keep-undeclared` skips every deletion. A changed name reads as one deletion
-  and one creation and is caught the same way. Rejected: printing the difference and deleting anyway, which shows the
-  loss in a log after it happened.
+- **Deleting is the guarded part, and it is never unattended.** `--apply` creates what is missing and updates what
+  differs first. It then deletes an undeclared label only when no issue and no pull request, open or closed, carries it,
+  which it reads from the list of issues filtered by that label, not from search; a label in use is listed, left alone,
+  and makes the run exit non-zero. `--delete-used` lifts the refusal and `--keep-undeclared` skips every deletion. A
+  changed name reads as one deletion and one creation and is caught the same way. The question and the deletion are
+  separate calls, and GitHub offers none that deletes a label only while nothing carries it: a label put on an issue
+  between the two is taken off it, and a carrier the list does not return to the calling token reads as no carrier. Two
+  reviews of this pull request raised them, the automated one the first and a second review the other. The refusal is
+  therefore a guard for a person who has just read the printed difference, not an invariant, and the workflow passes
+  `--keep-undeclared`. Rejected: printing the difference and deleting anyway, which shows the loss in a log after it
+  happened; asking a second time just before the deletion, which narrows the gap and does not close it; letting the
+  workflow delete, which this change first specified, because the one irreversible call of the script would then run
+  with nobody reading its output.
+- **A declared name is checked for what the calls cannot carry.** White space around a name, a comma (the list of issues
+  by label takes a comma-separated list), and the names `.` and `..` (the name is a path segment in the calls that
+  change a label) fail the offline check.
 - **A workflow applies the declaration after it merges.** `.github/workflows/labels.yml` runs on a push to `main` that
   changes the declaration, and on a dispatch; a job condition on the ref makes a dispatch from another ref do nothing,
   as in `release.yml`. Its one job holds `issues: write` beside `contents: read`, checks out `main` without keeping
-  credentials, passes the workflow's token to `gh`, and runs `sync_labels.ts --apply`. One concurrency group lets a
-  running application finish; a pending run a newer one replaces is no loss, since each applies what `main` holds.
-  `checks.md` gains the job and notes that `gh` comes from the runner image. Rejected:
+  credentials, passes the workflow's token to `gh`, and runs `sync_labels.ts --apply --keep-undeclared`. A second job
+  condition names this repository, so a fork's run does nothing instead of failing against it. One concurrency group
+  lets a running application finish; a pending run a newer one replaces is no loss, since each applies what `main`
+  holds. `checks.md` gains the job and notes that `gh` comes from the runner image. Rejected:
   - Applying only by hand. The declaration and the repository would drift at the first forgotten run.
   - Applying on the pull request. It would put a write token within reach of a pull request, and a pull request from a
     fork gets none.
   - Running also when the script changes. The decision was the declaration and a dispatch; a changed script is applied
     by a dispatch when a maintainer wants it.
-- **Before the merge only the five area labels are created; the merge removes the seven.** The labels have to exist for
-  the open issues to be labelled and the acceptance filters to be read, and a workflow that is not on `main` cannot run.
-  On the maintainer's command, given after reading the printed difference, the declaration is applied from the branch
-  with `--keep-undeclared`. The removal of the seven default labels is left to the workflow's first run, so it happens
-  only if the pull request merges, and that run exercises creating nothing but deleting under the workflow's token
-  (assumption 9). Rejected:
+- **Before the merge only the five area labels are created; the seven are deleted by command.** The labels have to exist
+  for the open issues to be labelled and the acceptance filters to be read, and a workflow that is not on `main` cannot
+  run. On the maintainer's command, given after reading the printed difference, the declaration is applied from the
+  branch with `--keep-undeclared`. The deletion of the seven default labels is a second command of the maintainer's,
+  `just labels --apply`, given when they choose; this change does not depend on it. Rejected:
   - Applying the whole declaration before the merge. The seven labels would be gone even if the pull request were
     rejected.
   - Merging the declaration first and bringing the open issues to the rules in a second pull request, which leaves this
@@ -186,16 +198,13 @@
 
 ## Risks / Trade-offs
 
-- **The removal of the seven labels is first seen after the merge.** Before it, only the printed difference shows it.
-  Mitigation: the labels are on nothing, the refusal would stop the run if that changed, and a maintainer reads the
-  first run; a failure is fixed forward and leaves at worst seven unused labels.
+- **An undeclared label stays until someone has it deleted.** The seven default labels stay after the merge, and so does
+  a label made in the UI later: the workflow lists and keeps it, and its run succeeds. Mitigation: `just labels` prints
+  the difference, and the harness review in `github-workflow.md` gains the check that it prints none.
 - **A declared label may not exist yet.** The offline check compares references with the declaration, not with the
   repository. Between a merge and the workflow's run, or after a failed run, a label Dependabot names, or one a later
   form names, can be missing, and both skip it without an error. Mitigation: a failed run is visible, and the next one
   creates the label.
-- **A label made in the UI stops the workflow's deletions.** Someone with write access can still create a label by hand;
-  once it is on an issue, each later run creates and updates as declared, leaves that label, and fails. That is the
-  intended signal: the label is added to the declaration or removed by a maintainer.
 - **The tiers widen what an agent may do.** Setting the type, a label, and relationships alone means a wrong one is
   published before anyone reads it; each is visible on the issue, reversible, and bounded to issues the agent created or
   took. Writing a Priority moves from never to after a confirmation; a wrong value misorders work until someone notices,
@@ -208,8 +217,9 @@
 - **An agent-created issue can lack a Priority and still leave the list.** It gets its label at creation and its
   Priority in a second call; if that call fails, the issue has a label and no Priority. Mitigation: the skill reads both
   back after creating an issue.
-- **Assumptions 8 and 9 stay unmeasured until after the merge.** If Dependabot drops the label, its pull request has
-  none, as today. If the workflow's token cannot delete, the first run fails with the seven labels still there.
+- **Assumption 8 stays unmeasured until after the merge, and 9 in part.** If Dependabot drops the label, its pull
+  request has none, as today. Whether a deletion by hand sees a label that only a pull request carries is unknown; the
+  person who runs it reads the difference first.
 - **`issues: write` is more than labels.** It allows editing and closing issues. Mitigation: the job runs reviewed code
   from `main`, on no pull request event, with no input from an issue or a pull request.
 - **Priority has no order in a list.** A filter narrows by value, but nothing sorts by it. This is accepted.
@@ -221,8 +231,8 @@ is labelled and before the skill or Dependabot names one. The test issues are me
 to. Every remote write waits for the maintainer's command.
 
 Rollback is a revert through a pull request. It restores the files and nothing else: what the proposal lists as remote
-state stays. After a revert the workflow file is gone, so nothing runs, and the removed default labels can be created
-again by hand.
+state stays. After a revert the workflow file is gone, so nothing runs, and a deleted default label can be created again
+by hand.
 
 ## Open Questions
 

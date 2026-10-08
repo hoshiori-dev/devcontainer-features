@@ -182,7 +182,10 @@ Deno.test("labels.yml applies main's declaration with a write token no pull requ
     assertEquals(workflow.concurrency, { group: "${{ github.workflow }}", "cancel-in-progress": false });
     assertEquals(Object.keys(workflow.jobs), ["sync"]);
     const job = workflow.jobs.sync;
-    assertEquals(job.if, "github.ref == 'refs/heads/main'");
+    assertEquals(
+        job.if,
+        `github.ref == 'refs/heads/main' && github.repository == '${REPO}'`,
+    );
     assertEquals(job.permissions, { contents: "read", issues: "write" });
     const [checkout, tools, apply] = job.steps;
     assertEquals(job.steps.length, 3);
@@ -192,12 +195,11 @@ Deno.test("labels.yml applies main's declaration with a write token no pull requ
     assertEquals(tools.uses, "./.github/actions/setup-tools");
     assertEquals(tools.with, { just: "false" });
     assertEquals(apply.env, { GH_TOKEN: "${{ github.token }}" });
-    assertEquals(apply.run, "./scripts/sync_labels.ts --apply");
-    // Checked on every step, so a flag cannot arrive through a step added later.
+    // --keep-undeclared: an unattended run deletes no label, in use or not.
+    assertEquals(apply.run, "./scripts/sync_labels.ts --apply --keep-undeclared");
+    // Checked on every step, so the flag cannot arrive through a step added later.
     for (const step of job.steps) {
-        for (const flag of ["--delete-used", "--keep-undeclared"]) {
-            assert(!JSON.stringify(step).includes(flag), `${flag} in an unattended run`);
-        }
+        assert(!JSON.stringify(step).includes("--delete-used"), "--delete-used in an unattended run");
     }
 });
 

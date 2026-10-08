@@ -62,6 +62,20 @@ Deno.test("parseDeclaration rejects a name used twice, in any case", () => {
     assert(problemsOf([FEATURE, CI, { ...FEATURE, name: "Feature" }])[0].includes('as "feature" before'));
 });
 
+Deno.test("parseDeclaration rejects a name GitHub's calls cannot carry as written", () => {
+    for (const name of [" ci", "ci ", "ci\t", "ci\u00a0"]) {
+        assert(problemsOf([{ ...FEATURE, name }]).some((problem) => problem.includes("white space")), name);
+    }
+    assert(problemsOf([{ ...FEATURE, name: "ci,scripts" }])[0].includes("comma"));
+    for (const name of [".", ".."]) {
+        assert(problemsOf([{ ...FEATURE, name }])[0].includes("path segment"), name);
+    }
+    // A name of white space alone is no name at all.
+    assert(problemsOf([{ ...FEATURE, name: "  " }])[0].includes("has no name"));
+    // A dot or a space inside a name is fine: "good first issue" is declared.
+    assertEquals(problemsOf([{ ...FEATURE, name: "good first issue" }, { ...CI, name: "v1.x" }]), []);
+});
+
 Deno.test("parseDeclaration rejects the names Dependabot reserves", () => {
     for (const name of ["major", "minor", "patch", "Major"]) {
         assert(problemsOf([{ ...FEATURE, name }])[0].includes("must not be declared"), name);

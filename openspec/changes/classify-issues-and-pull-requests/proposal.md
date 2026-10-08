@@ -35,8 +35,8 @@ was last edited.
   knowledge base, the project skills, the templates and forms, the dev container, and the root documents). A triaged
   issue of any type has at least one, usually one. The kind stays with the type and the order with Priority.
 - **Label set.** The repository's labels are declared in one file: the five area labels and the two GitHub shows to new
-  contributors, `good first issue` and `help wanted`. The other seven default labels are removed. Agents and the
-  workflow change labels only by applying that file.
+  contributors, `good first issue` and `help wanted`. The other seven default labels stay until the maintainer has them
+  deleted by command. Agents and the workflow change labels only by applying that file.
 - **Scope name.** The harness area `openspec` is renamed `spec-workflow`, as an area and as a pull request title scope,
   so that `openspec` names only the feature of that id.
 - **Forms.** The Bug form accepts a harness defect, the Feature form names a behavior change, the Task form names upkeep
@@ -85,8 +85,9 @@ None.
   Epic and a test Feature, closed when their observations are recorded; one comment on this pull request with those
   observations. Reverting the pull request undoes none of it: the labels, values, and relationships stay, and the new
   issues stay unless someone with admin rights deletes them.
-- Remote state written by the merge: the workflow's first run removes the seven default labels. They are on nothing, and
-  they do not come back with a revert.
+- Remote state written by the merge: none. The workflow's run after the merge creates and updates as declared, which is
+  nothing by then, and deletes nothing. The seven default labels are on nothing; they stay until the maintainer has them
+  deleted by command, and once deleted they do not come back with a revert.
 - Remote settings: the `main` ruleset, its required checks, and the Actions settings stay as they are. The label set is
   the one setting this change takes over: `platform-settings.md` gains its row, and its opening rule, that agents never
   change a remote setting, gains the label set as its one exception, bound to the tiers above. The organization's types
@@ -119,9 +120,13 @@ None.
 - A unit test shows that applying a declaration the repository already matches writes nothing.
 - `just check` fails when the declaration is malformed, names a label twice, or names `major`, `minor`, or `patch`, and
   when an issue form or `.github/dependabot.yml` names a label the declaration does not hold. Each case has a unit test.
-- No unattended run removes a label that an issue or a pull request carries; a unit test shows the refusal.
+- No unattended run deletes a label, and a test of the workflow file shows it. Run by hand, `--apply` refuses to delete
+  a label that an issue or a pull request carries when it asks; a unit test shows the refusal.
+- `just check` fails for a declared name with white space around it, with a comma, or equal to `.` or `..`. A unit test
+  covers each.
 - No pull request event can start the workflow that applies the declaration: its triggers are a push to `main` that
-  changes the declaration and a dispatch. Its one job holds `issues: write` and `contents: read` and nothing else.
+  changes the declaration and a dispatch, and its job runs in this repository only. Its one job holds `issues: write`
+  and `contents: read` and nothing else.
 - In `01-bug.yml` the description covers the harness, the base image is not required, and the first input accepts a
   harness area; `02-feature.yml` names a behavior change; `03-task.yml` names upkeep of a feature; a fourth form sets
   the type Epic. No form sets a label.
