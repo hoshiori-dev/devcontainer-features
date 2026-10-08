@@ -6,7 +6,8 @@ every rule here is written in GitHub terms.
 
 `hoshiori-dev/devcontainer-features` (organization-owned, public). Maintainers are the repository collaborators with
 write access (`gh api repos/hoshiori-dev/devcontainer-features/collaborators`). The organization provides native issue
-types (Task / Bug / Feature); the default token cannot read them through the API, so verify them in the UI.
+types (Epic / Feature / Bug / Task) and issue fields; a token with the `read:org` scope reads them
+(`gh api orgs/hoshiori-dev/issue-types`, `gh api orgs/hoshiori-dev/issue-fields`).
 
 ## What this repository is
 
@@ -18,26 +19,80 @@ publishing a higher fixed version — a published version cannot be withdrawn fr
 
 ## Objects in use
 
-| Object                             | Meaning here                                                                                                                                                                   | What is lost without it                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| Issue                              | One independently acceptable outcome: a new feature, a behavior change to one feature, a defect, or a harness task. Typed with the native issue type.                          | The record of why a change exists and who asked for it; PRs would have nothing to close. |
-| Pull request                       | Every change to `main`. A draft PR is work in progress — including a draft whose first content is an OpenSpec change awaiting approval — never a placeholder for planned work. | Review, CI feedback, and the single place where acceptance happens.                      |
-| Acceptance                         | The required check `ci-gate` passes, the Acceptance of the PR's OpenSpec change is verified (see `spec-workflow.md`), and a maintainer merges.                                 | Merge would equal an unchecked release to every consumer.                                |
-| Issue types (Task / Bug / Feature) | The kind of work, set by the issue form.                                                                                                                                       | Filtering defects from new work.                                                         |
-| Tag `<id>/v<version>`              | Marks the commit a published feature version was built from; created by the release workflow, never by hand (see `git-workflow.md`).                                           | Mapping a GHCR version back to the commit it was built from.                             |
-| GHCR package version               | The delivery: what consumers actually install.                                                                                                                                 | — (it is the product).                                                                   |
+| Object                                    | Meaning here                                                                                                                                                                                                                                                                                                                                                                                                        | What is lost without it                                                                  |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Issue                                     | One independently acceptable outcome, or, as an Epic, the stage that groups several. Typed with one of the four native issue types.                                                                                                                                                                                                                                                                                 | The record of why a change exists and who asked for it; PRs would have nothing to close. |
+| Pull request                              | Every change to `main`. A draft PR is work in progress — including a draft whose first content is an OpenSpec change awaiting approval — never a placeholder for planned work.                                                                                                                                                                                                                                      | Review, CI feedback, and the single place where acceptance happens.                      |
+| Acceptance                                | The required check `ci-gate` passes, the Acceptance of the PR's OpenSpec change is verified (see `spec-workflow.md`), and a maintainer merges.                                                                                                                                                                                                                                                                      | Merge would equal an unchecked release to every consumer.                                |
+| Issue types (Epic / Feature / Bug / Task) | The kind of work, set by the issue form. Bug: a published feature or the harness behaves differently from its specification or documentation. Feature: a new feature for the collection, or a new capability or behavior change of an existing one. Task: all other planned work, a new capability of the harness included. Epic: one stage of the collection's functionality that takes several issues to deliver. | Filtering defects from new work.                                                         |
+| Epic                                      | Groups the issues of one stage as its sub-issues and shows how far the stage is (Epics).                                                                                                                                                                                                                                                                                                                            | The shared goal of related issues; they would be tied together by title wording alone.   |
+| Sub-issues                                | The parent of an issue: an Epic's Features, Bugs, and Tasks; no other type has sub-issues (Relationships).                                                                                                                                                                                                                                                                                                          | Progress of a stage read from one issue.                                                 |
+| "Blocked by" relationship                 | An issue that cannot start before another is marked as blocked by it (Relationships).                                                                                                                                                                                                                                                                                                                               | The order between issues; work would start on something that cannot finish.              |
+| Priority field                            | When an open Feature, Bug, or Task is worked on, relative to other work: Urgent, High, Medium, or Low (Fields).                                                                                                                                                                                                                                                                                                     | Picking the next issue from a filter instead of from memory.                             |
+| Target date of an Epic                    | The date a stage aims at; a goal, optional (Fields).                                                                                                                                                                                                                                                                                                                                                                | A stated horizon for a stage.                                                            |
+| Area labels                               | The part of the repository an issue concerns (Areas). The kind stays with the type and the order with Priority.                                                                                                                                                                                                                                                                                                     | Filtering by area; the title alone does not say it.                                      |
+| Tag `<id>/v<version>`                     | Marks the commit a published feature version was built from; created by the release workflow, never by hand (see `git-workflow.md`).                                                                                                                                                                                                                                                                                | Mapping a GHCR version back to the commit it was built from.                             |
+| GHCR package version                      | The delivery: what consumers actually install.                                                                                                                                                                                                                                                                                                                                                                      | — (it is the product).                                                                   |
+
+## Areas
+
+A label states the area of an issue and nothing else. This section is the one definition of the areas; every other file
+names them, and `.github/labels.yml` repeats each in the hover text of its label (Synchronization).
+
+| Label           | Covers                                                                                                      |
+| --------------- | ----------------------------------------------------------------------------------------------------------- |
+| `feature`       | A feature under `src/<id>/`, with its tests and its specification. The feature id stays in the issue title. |
+| `ci`            | The workflows, the composite actions, and Dependabot.                                                       |
+| `scripts`       | The Deno scripts and the `justfile`.                                                                        |
+| `spec-workflow` | The OpenSpec process, its configuration, and its generated skills.                                          |
+| `harness`       | The knowledge base, the project skills, the templates and forms, the dev container, and the root documents. |
+
+A triaged issue of any type has at least one area label, usually one. An Epic carries the area of its sub-issues.
+
+The repository's labels are exactly the set `.github/labels.yml` declares, and they change only by applying that file
+(`github/platform-settings.md`, Labels row). The Labels workflow creates and updates; it never deletes, so a label the
+declaration lacks stays until a maintainer has it deleted with `just labels --apply`; one that an issue or a pull
+request still carries is deleted only when the command names it (`--delete-used <name>`). Who may apply it, and what an
+agent sets on an issue alone, is in `agent-authority.md`.
+
+## Relationships
+
+| Type               | Sub-issues                | Parent                             |
+| ------------------ | ------------------------- | ---------------------------------- |
+| Epic               | Features, Bugs, and Tasks | None: an Epic is never a sub-issue |
+| Feature, Bug, Task | None                      | An Epic                            |
+
+An issue that cannot start before another is marked as blocked by it.
+
+## Epics
+
+- An Epic exists on a maintainer's word: the maintainer creates it, tells an agent to, or keeps one that arrived through
+  the form.
+- An Epic from the form is a proposal. At triage the maintainer keeps it, retypes it, or closes it; an Epic nobody has
+  kept gets no sub-issues.
+- No pull request closes an Epic: write `Closes #<n>` only for its sub-issues. The maintainer closes the Epic, or tells
+  an agent to, once its sub-issues are closed and the stage's outcome holds.
+
+## Fields
+
+| Field                                | Rule                                                                                                                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Priority                             | An open Feature, Bug, or Task without one is not triaged. An Epic has none: it is a long-running plan, and ordering such plans on a roadmap belongs in GitHub Projects, which stays unused. |
+| Effort                               | Not used here; leave it empty.                                                                                                                                                              |
+| Start date, Target date of a Feature | A plan; optional.                                                                                                                                                                           |
+| Target date of an Epic               | A goal; optional.                                                                                                                                                                           |
+
+The field ids and what each type offers are in `github/platform-settings.md`; the call that writes a Priority is in the
+`github-project-workflow` skill (Create issues).
 
 ## Deliberately not used
 
-| Object                                          | Enable when                                                                                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Milestones                                      | A theme spans several PRs across features and needs a completion view (e.g. "add a language toolchain family").                 |
-| GitHub Projects                                 | Three or more people work in parallel and filtered issue lists stop being enough.                                               |
-| Priority (org `Priority` issue field or labels) | The open backlog passes about 20 issues, or more than one person picks work from it and order starts to matter.                 |
-| Sub-issues                                      | One issue holds parts that each need their own PR and acceptance, and splitting into separate issues loses the shared goal.     |
-| Labels beyond GitHub's defaults                 | Filtering by feature or area becomes a routine need; until then the feature id lives in the issue title and the PR title scope. |
-| GitHub Releases                                 | Consumers need release notes beyond each feature's generated README; the tag and GHCR version are the release record today.     |
-| Discussions                                     | Outside users start asking questions that are not actionable issues.                                                            |
+| Object          | Enable when                                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Milestones      | A theme spans several PRs across features and needs a completion view (e.g. "add a language toolchain family").                 |
+| GitHub Projects | Three or more people work in parallel and filtered issue lists stop being enough, or the Epics need a roadmap that orders them. |
+| GitHub Releases | Consumers need release notes beyond each feature's generated README; the tag and GHCR version are the release record today.     |
+| Discussions     | Outside users start asking questions that are not actionable issues.                                                            |
 
 ## Decomposition
 
@@ -47,15 +102,39 @@ inside that outcome — writing the test scenarios, the compatibility list, the 
 `tasks.md`, not issues. A change that touches a feature and, through `dependsOn`, forces a version bump in its
 dependents is still one issue.
 
+A Task has no sub-issues: a batch of small work is one Task per piece that gets its own pull request, each naming the
+others it belongs with. An Epic is used when a stage of the collection takes several such outcomes to deliver (for
+example one phase of the package-manager features); the Epic holds the stage's outcome and each sub-issue its own.
+
 ## Triage
 
-A maintainer reads new issues as they arrive. An issue leaves triage when it has a type and enough detail to act on
-(feature id, image, reproduction for a bug). No automation applies labels.
+The working list is `is:issue is:open no:label`. An issue from a form arrives with its type and nothing else: no form
+sets a label, and no automation applies labels to issues. A maintainer reads the list and, once an issue has enough
+detail to act on (feature id, image, reproduction for a bug), sets:
+
+- the area label (Areas), on an issue of any type;
+- the Priority, on a Feature, Bug, or Task (Fields).
+
+Set both together: an issue with a label and no Priority has left the list untriaged. An Epic from the form is decided
+as Epics states.
+
+Note, measured on 2026-10-08 and found in no GitHub documentation: `is:issue is:open no:field.priority` through
+`gh issue list --search` returned the open issues without a Priority, and adding `-type:Epic` left the Epics out. The
+REST search endpoint treated `field.priority:` and `no:field.priority` as filters on the field only with
+`advanced_search=true`. This is an observation, not a rule. Before using the filter, check it against GitHub's
+documentation and against what the API returns now, and update this note when either differs.
 
 ## Planning view
 
-Filtered issue and PR lists (`is:open type:Bug`, `is:pr is:draft`). Any view is rebuildable; the facts live on issues,
-PRs, and the OpenSpec specs.
+Filtered issue and PR lists. Any view is rebuildable; the facts live on issues, PRs, and the OpenSpec specs.
+
+| List                                      | Filter                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------- |
+| Triage                                    | `is:issue is:open no:label`                                       |
+| Work to pick, by type, area, and Priority | `is:issue is:open type:"Bug" label:ci field.priority:urgent,high` |
+| Work in progress                          | `is:pr is:draft`                                                  |
+
+A filter narrows by Priority; nothing sorts by it.
 
 ## Agent authority
 
@@ -95,20 +174,23 @@ template link and path above.
 
 ## Synchronization
 
-| When this changes                                                          | Update in the same PR                                                                                                                                                                 | Owner                                      |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| A CI or PR job is renamed or added                                         | `github/checks.md` job map; the `main` ruleset's required checks (maintainer, `github/platform-settings.md`)                                                                          | PR author; maintainer for the ruleset      |
-| A `just` recipe CI calls                                                   | the job that calls it and the `github/checks.md` map                                                                                                                                  | PR author                                  |
-| PR template `##` headings or the security item                             | nothing else — `scripts/check_pr_body.ts` reads the template; keep the word "secrets" in the security item                                                                            | PR author                                  |
-| PR template specification block or checklist items                         | `spec-workflow.md` if a gate or the archive rule changed, else revert the template                                                                                                    | PR author                                  |
-| Issue form `type:` values                                                  | organization issue types row in `github/platform-settings.md`                                                                                                                         | Maintainer                                 |
-| Issue form `spec` field or acceptance descriptions                         | `spec-workflow.md` "Specifications and issues"                                                                                                                                        | PR author                                  |
-| `github-project-workflow` Take work / Create issues / Finish               | `spec-workflow.md` and `agent-authority.md` must still agree                                                                                                                          | PR author                                  |
-| An action is added to or changed in a workflow or composite action         | pin it by full commit SHA with its version in a comment (`@<sha> # vX.Y.Z`); a third-party action is added to the allowed list in `github/platform-settings.md` by a maintainer first | PR author; maintainer for the allowed list |
-| A tool pin in `.github/actions/setup-tools/action.yml`                     | run `just check` with that version; OpenSpec's permission flags stay identical to `.devcontainer/setup.sh`                                                                            | PR author                                  |
-| A file the test pipeline uses is added or moved (workflow, action, script) | `INFRA_PATHS` in `scripts/lib/repo.ts`                                                                                                                                                | PR author                                  |
-| The release tag format or namespace                                        | `git-workflow.md`, `scripts/tag_releases.ts`, `.github/workflows/release.yml`, `REPO` in `scripts/lib/repo.ts`                                                                        | PR author                                  |
-| The arch values a compatibility entry may name                             | `RUNNERS` in `scripts/lib/repo.ts` and the `arch` enum in `test/compatibility.schema.json`                                                                                            | PR author                                  |
+| When this changes                                                          | Update in the same PR                                                                                                                                                                                                                                             | Owner                                            |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| A CI or PR job is renamed or added                                         | `github/checks.md` job map; the `main` ruleset's required checks (maintainer, `github/platform-settings.md`)                                                                                                                                                      | PR author; maintainer for the ruleset            |
+| A `just` recipe CI calls                                                   | the job that calls it and the `github/checks.md` map                                                                                                                                                                                                              | PR author                                        |
+| PR template `##` headings or the security item                             | nothing else — `scripts/check_pr_body.ts` reads the template; keep the word "secrets" in the security item                                                                                                                                                        | PR author                                        |
+| PR template specification block or checklist items                         | `spec-workflow.md` if a gate or the archive rule changed, else revert the template                                                                                                                                                                                | PR author                                        |
+| Issue form `type:` values                                                  | organization issue types row in `github/platform-settings.md`                                                                                                                                                                                                     | Maintainer                                       |
+| An area is added, renamed, or redefined                                    | `.github/labels.yml` (the name and its hover text), the definitions under Areas here, the harness scopes in `git-workflow.md`, the comment at the top of `.github/pull_request_template.md`, the first input's description in `.github/ISSUE_TEMPLATE/01-bug.yml` | PR author; a maintainer commands the application |
+| A label named by an issue form or `.github/dependabot.yml`                 | `.github/labels.yml` must declare it (`just validate` checks it)                                                                                                                                                                                                  | PR author                                        |
+| The organization recreates the Priority field                              | its id in `github/platform-settings.md` and in the `github-project-workflow` skill                                                                                                                                                                                | Maintainer                                       |
+| Issue form `spec` field or acceptance descriptions                         | `spec-workflow.md` "Specifications and issues"                                                                                                                                                                                                                    | PR author                                        |
+| `github-project-workflow` Take work / Create issues / Finish               | `spec-workflow.md` and `agent-authority.md` must still agree                                                                                                                                                                                                      | PR author                                        |
+| An action is added to or changed in a workflow or composite action         | pin it by full commit SHA with its version in a comment (`@<sha> # vX.Y.Z`); a third-party action is added to the allowed list in `github/platform-settings.md` by a maintainer first                                                                             | PR author; maintainer for the allowed list       |
+| A tool pin in `.github/actions/setup-tools/action.yml`                     | run `just check` with that version; OpenSpec's permission flags stay identical to `.devcontainer/setup.sh`                                                                                                                                                        | PR author                                        |
+| A file the test pipeline uses is added or moved (workflow, action, script) | `INFRA_PATHS` in `scripts/lib/repo.ts`                                                                                                                                                                                                                            | PR author                                        |
+| The release tag format or namespace                                        | `git-workflow.md`, `scripts/tag_releases.ts`, `.github/workflows/release.yml`, `REPO` in `scripts/lib/repo.ts`                                                                                                                                                    | PR author                                        |
+| The arch values a compatibility entry may name                             | `RUNNERS` in `scripts/lib/repo.ts` and the `arch` enum in `test/compatibility.schema.json`                                                                                                                                                                        | PR author                                        |
 
 ## Harness review
 
@@ -123,3 +205,6 @@ before editing anything:
   `.github/workflows/secret.yml` — are not far behind upstream.
 - The canary set in `test/canary.json` is still small, fast, and representative.
 - "Deliberately not used" triggers in this file: has any fired?
+- `is:issue is:open no:label` is empty.
+- `just labels` prints no difference: no label is undeclared, missing, or changed by hand.
+- No open Epic is left without an open sub-issue.

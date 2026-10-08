@@ -46,7 +46,8 @@ Enforcement: squash-only is a repository setting, enforced since 2026-09-30 (see
 title is the PR title and must follow Conventional Commits: `<type>(<scope>)[!]: <subject>`.
 
 - `<scope>` is the feature id for a change to one feature (`feat(node): add pnpm option`); for a harness change use the
-  area (`ci`, `scripts`, `openspec`, `harness`); omit it for repository-wide changes.
+  area (`ci`, `scripts`, `spec-workflow`, `harness`; defined in `github-workflow.md`, Areas); omit it for
+  repository-wide changes.
 - `!` marks a breaking change and goes with a major version bump of that feature.
 - Human contributors keep their `Co-authored-by` trailers in the squash message. Never add AI or tool attribution to
   commits, PR titles, or PR bodies — see `agent-authority.md`.

@@ -1,5 +1,5 @@
 name: Task
-description: Planned work with an agreed outcome — usually harness, CI, or tooling.
+description: Planned work that is neither a feature nor a bug — the harness, CI, tooling, or upkeep of a feature.
 type: Task
 body:
   - type: textarea

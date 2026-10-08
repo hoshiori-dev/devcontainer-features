@@ -25,6 +25,18 @@ agent stops at a draft PR and a maintainer decides everything after it.
 - Change repository settings, rulesets, required checks, secrets, or package visibility.
 - Move or weaken any gate in this file, `spec-workflow.md`, or CI.
 
+## Issue metadata
+
+What an agent sets on an issue:
+
+- alone, on an issue it creates or has taken: the type, an existing area label, and the parent and "blocked by"
+  relationships the request states;
+- after the maintainer confirms the value, which the agent names when it asks to publish: a Priority;
+- only on a maintainer's command: applying the label declaration, creating or closing an Epic, setting a date field, and
+  changing the metadata of an issue it has not taken;
+- only on a maintainer's command that names the label: deleting a label that issues or pull requests still carry;
+- never: creating, renaming, or deleting a label by any means but the declaration, or setting Effort.
+
 ## No attribution
 
 The human who commits or publishes answers for the change; an agent or tool is never credited. Never add

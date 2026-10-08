@@ -11,10 +11,11 @@ description: >-
 
 # devcontainer-features GitHub Workflow
 
-Tool path: authenticated `gh`; `gh api` for comments and review threads. Every metadata change (assignee, type, state)
-is an explicit call — GitHub has no slash commands. This skill applies `.agents/knowledge/github-workflow.md` (objects
-in use), `.agents/knowledge/git-workflow.md` (branches, titles), `.agents/knowledge/spec-workflow.md` (the OpenSpec
-gates), and `.agents/knowledge/agent-authority.md` (what you may do alone).
+Tool path: authenticated `gh`; `gh api` for comments and review threads. Every metadata change (assignee, type, label,
+parent, blocked by, Priority, state) is an explicit call — GitHub has no slash commands. This skill applies
+`.agents/knowledge/github-workflow.md` (objects in use), `.agents/knowledge/git-workflow.md` (branches, titles),
+`.agents/knowledge/spec-workflow.md` (the OpenSpec gates), and `.agents/knowledge/agent-authority.md` (what you may do
+alone).
 
 ## Take work
 
@@ -52,9 +53,34 @@ earns its own state, each naming the Acceptance items or scenarios it closes. Ne
 issue.
 
 Non-interactive creation ignores the forms: build the body by mirroring the form's `### <label>` headings
-(`.github/ISSUE_TEMPLATE/01-bug.yml`, `02-feature.yml`, `03-task.yml`) and set the form's type in the same call:
-`gh issue create --title "…" --body-file body.md --type Bug|Feature|Task`. Milestones, Projects, and priority are
-deliberately not used (`github-workflow.md`); never create them.
+(`.github/ISSUE_TEMPLATE/01-bug.yml`, `02-feature.yml`, `03-task.yml`, `04-epic.yml`) and set the form's type and the
+area label in the same call:
+
+```sh
+gh issue create --title "…" --body-file body.md --type <type> --label <area>
+```
+
+- `<type>` is the form's type: Bug, Feature, Task, or Epic.
+- `<area>` is one of the labels `github-workflow.md` defines (Areas). A label that does not exist makes the call fail:
+  stop and report it, never create a label (`agent-authority.md`).
+- Add `--parent <n>` and `--blocked-by <n>` when the request states the relationship (`github-workflow.md`,
+  Relationships); on an existing issue use `gh issue edit <n> --parent <m>` and `--add-blocked-by <m>`.
+- An Epic is created only on a maintainer's word (`github-workflow.md`, Epics) and gets no Priority.
+- Priority, on a Feature, Bug, or Task: name the value you propose in the message that asks for the go-ahead to publish,
+  not only inside the reviewed payload. After the go-ahead, write it with exactly this call — one value, the option by
+  name (Urgent, High, Medium, Low):
+
+  ```sh
+  echo '{"issue_field_values":[{"field_id":28240578,"value":"High"}]}' |
+    gh api -X POST repos/hoshiori-dev/devcontainer-features/issues/<n>/issue-field-values --input -
+  ```
+
+  Never send `PUT` and never an empty list: each clears the issue's other values. Never set Effort.
+- Read back the type, the labels, and the Priority, and report a missing one:
+  `gh issue view <n> --json issueType,labels` and
+  `gh api repos/hoshiori-dev/devcontainer-features/issues/<n>/issue-field-values`.
+
+Milestones and Projects are deliberately not used (`github-workflow.md`); never create them.
 
 ## Publish gate
 

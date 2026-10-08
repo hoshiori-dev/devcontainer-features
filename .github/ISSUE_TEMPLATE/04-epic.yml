@@ -1,0 +1,25 @@
+name: Epic
+description: One stage of the collection's functionality that takes several issues to deliver. A maintainer decides whether it is kept.
+type: Epic
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: The observable state of the collection when this stage is complete.
+    validations:
+      required: true
+  - type: textarea
+    id: issues
+    attributes:
+      label: Expected issues
+      description: The features, bugs, and tasks expected under this stage — existing issues by number, the rest as one line each.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this stage leaves out. Leave empty if nothing needs saying.
+    validations:
+      required: false

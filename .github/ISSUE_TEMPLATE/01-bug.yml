@@ -1,26 +1,26 @@
 name: Bug report
-description: A published feature fails or behaves differently from its specification.
+description: A published feature or the harness behaves differently from its specification or documentation.
 type: Bug
 body:
   - type: input
     id: feature
     attributes:
       label: Feature
-      description: Feature id and the version or tag you used, e.g. `node:1.4.0`.
+      description: Feature id and the version or tag you used, e.g. `node:1.4.0`, or the harness area (`ci`, `scripts`, `spec-workflow`, `harness`).
     validations:
       required: true
   - type: input
     id: image
     attributes:
       label: Base image
-      description: The image (and architecture, if not amd64) the dev container was built from.
+      description: For a feature, the image (and architecture, if not amd64) the dev container was built from.
     validations:
-      required: true
+      required: false
   - type: textarea
     id: actual
     attributes:
       label: What happens
-      description: The observed behavior, exactly. Paste build or install output rather than paraphrasing it.
+      description: The observed behavior, exactly. Paste build, install, or CI output rather than paraphrasing it.
     validations:
       required: true
   - type: textarea
@@ -34,7 +34,7 @@ body:
     id: reproduction
     attributes:
       label: How to reproduce
-      description: The smallest devcontainer.json (feature options included) and steps that show the problem.
+      description: The smallest devcontainer.json (feature options included) and steps that show the problem; for the harness, the commands or the workflow run.
       render: jsonc
     validations:
       required: true
