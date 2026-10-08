@@ -25,9 +25,10 @@ scripts-check:
     deno lint scripts/ .agents/skills/github-project-workflow/scripts/
     deno test --allow-read --allow-write=/tmp --allow-run=git --allow-env=LOG_TOKENS,LOG_STREAM scripts/
 
-# Validate feature layout, metadata, and version bumps against a base ref
+# Validate feature layout, metadata, and version bumps against a base ref, and the label declaration
 validate base="origin/main":
     ./scripts/validate.ts --base "$1"
+    ./scripts/sync_labels.ts --check
 
 # Strict-validate OpenSpec specs and changes; check config.yaml rules, feature options, and generated files
 spec-check:
@@ -65,6 +66,10 @@ docs-check:
 # Scaffold src/<id> and test/<id> for a new feature (after its OpenSpec change exists); add --posix for POSIX sh
 new-feature id *args:
     ./scripts/new_feature.ts "$1" "${@:2}"
+
+# Print how the repository's labels differ from .github/labels.yml; --apply writes it (--keep-undeclared, --delete-used <name>)
+labels *args:
+    ./scripts/sync_labels.ts "$@"
 
 # Check a pull request title against the commit convention
 check-title title:

@@ -1,0 +1,53 @@
+# Applies the label declaration (.github/labels.yml) to this repository: creates the labels that
+# are missing and updates the ones that differ (scripts/sync_labels.ts). It deletes nothing: a
+# label the declaration lacks is listed and kept, and a maintainer has it deleted by command
+# (`just labels --apply`), because no call deletes a label only while nothing carries it.
+# The `sync` job holds `issues: write` because creating and editing a label needs it.
+# That permission also allows editing and closing issues, so the workflow never runs on a pull
+# request event: a write token stays out of reach of a pull request's code until it is reviewed
+# and merged, and the job takes no input from an issue or a pull request. What the script imports
+# runs under the token as well: its imports are pinned by exact version, and what those packages
+# import in turn is resolved when the run starts. Its triggers are a push to main that
+# changes the declaration and a dispatch by a maintainer — on main only, as in release.yml.
+# The checkout names main instead of the commit that started the run, so rerunning an old run
+# applies the declaration main holds now, never an older one.
+name: Labels
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/labels.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A running application finishes. A pending run replaced by a newer one is no loss: each applies
+# what main holds.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # On main only, and in this repository only: the script writes to the repository it names, so a
+    # fork's run would fail against it.
+    if: github.ref == 'refs/heads/main' && github.repository == 'hoshiori-dev/devcontainer-features'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write # create and update labels
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      # This job runs a Deno script directly, never just. gh is the runner image's.
+      - uses: ./.github/actions/setup-tools
+        with:
+          just: "false"
+      # --keep-undeclared: an unattended run deletes no label. --delete-used never appears here.
+      - name: Apply the label declaration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/sync_labels.ts --apply --keep-undeclared

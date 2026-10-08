@@ -1,5 +1,6 @@
 <!--
-The title is the squash commit title: `<type>(<scope>): <subject>`, scope = the feature id.
+The title is the squash commit title: `<type>(<scope>): <subject>`, scope = the feature id, or for a harness change
+the area (`ci`, `scripts`, `spec-workflow`, `harness`); omit the scope for a repository-wide change.
 Never add AI or tool attribution anywhere in this pull request.
 -->
 

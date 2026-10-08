@@ -1,0 +1,26 @@
+# The repository's labels, all of them: scripts/sync_labels.ts makes the repository match this list,
+# and `just validate` checks it offline. The five area labels are defined in
+# .agents/knowledge/github-workflow.md; a description here is GitHub's hover text, at most 100
+# characters. The last two are the labels GitHub shows to new contributors, with its defaults.
+# Colors are quoted: an unquoted one may be read as a number (123456, 001234, 123e45) and is then rejected.
+- name: feature
+  color: "1d76db"
+  description: A feature under src/<id>/, its tests, and its specification
+- name: ci
+  color: "fbca04"
+  description: The workflows, the composite actions, and Dependabot
+- name: scripts
+  color: "d93f0b"
+  description: The Deno scripts and the justfile
+- name: spec-workflow
+  color: "d876e3"
+  description: The OpenSpec process, its configuration, and its generated skills
+- name: harness
+  color: "6e7781"
+  description: The knowledge base, project skills, templates and forms, dev container, and root documents
+- name: good first issue
+  color: "7057ff"
+  description: Good for newcomers
+- name: help wanted
+  color: "008672"
+  description: Extra attention is needed

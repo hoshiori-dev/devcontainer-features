@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a new feature for the collection, or a new capability for an existing one.
+description: A new feature for the collection, or a new capability or behavior change of an existing one.
 type: Feature
 body:
   - type: dropdown
