@@ -142,7 +142,10 @@
   `is:issue is:open no:label`: an issue from a form arrives with its type and nothing else, and triage sets the area
   label and, where the type takes one, the Priority together. An Epic takes a label as well, so that it leaves the list
   and shares the area filter with its sub-issues. Rejected: the Feature and Epic forms setting `feature`, after which a
-  Feature from the form would carry a label and no Priority and drop out of the list.
+  Feature from the form would carry a label and no Priority and drop out of the list. Added after the measurements:
+  `no:field.priority`, for which no GitHub documentation was found, returned the issues without a Priority through
+  `gh issue list --search`. `github-workflow.md` keeps that as a note to be checked before use, not as a rule; the
+  working list stays the one filter.
 - **Who sets what.**
 
   | Value                  | Issue from a form        | Issue an agent creates                                 |

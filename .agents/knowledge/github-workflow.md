@@ -113,8 +113,14 @@ detail to act on (feature id, image, reproduction for a bug), sets:
 - the area label (Areas), on an issue of any type;
 - the Priority, on a Feature, Bug, or Task (Fields).
 
-Set both together: no documented filter finds a missing Priority, so an issue with a label and no Priority has left the
-list untriaged. An Epic from the form is decided as Epics states.
+Set both together: an issue with a label and no Priority has left the list untriaged. An Epic from the form is decided
+as Epics states.
+
+Note, measured on 2026-10-08 and found in no GitHub documentation: `is:issue is:open no:field.priority` through
+`gh issue list --search` returned the open issues without a Priority, and adding `-type:Epic` left the Epics out. The
+REST search endpoint treated `field.priority:` and `no:field.priority` as filters on the field only with
+`advanced_search=true`. This is an observation, not a rule. Before using the filter, check it against GitHub's
+documentation and against what the API returns now, and update this note when either differs.
 
 ## Planning view
 
