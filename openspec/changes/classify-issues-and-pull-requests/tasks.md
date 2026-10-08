@@ -17,8 +17,8 @@ publish gate, and is named with its command in the pull request's Validation sec
 - [x] 1.4 Add the application behind `--apply`, through `gh api` against the repository named by `REPO`: validate first
       and write nothing on failure, create and update, then delete an undeclared label only when the list of issues
       filtered by it, in any state, is empty; a label in use is listed, kept, and makes the exit status non-zero;
-      `--delete-used` lifts the refusal and `--keep-undeclared` skips deletions; verify with unit tests over a stubbed
-      API for each path, including that a matching repository causes no write
+      `--delete-used` lifts the refusal (9.5 makes it take the label's name) and `--keep-undeclared` skips deletions;
+      verify with unit tests over a stubbed API for each path, including that a matching repository causes no write
 - [x] 1.5 Add the `labels` recipe to the `justfile`, run `sync_labels.ts --check` from the `validate` recipe after
       `scripts/validate.ts`, and add the recipe to the Validation table of `AGENTS.md`; verify `just validate` fails
       with a broken declaration and passes with the real one, and `just scripts-check` passes
@@ -113,3 +113,7 @@ publish gate, and is named with its command in the pull request's Validation sec
 - [x] 9.4 On the maintainer's command, delete the seven default labels with `just labels --apply` after reading the
       printed difference; verify `just labels` prints that the labels match and record the row in
       `github/platform-settings.md` as enforced
+- [x] 9.5 Make `--delete-used` take the name of the one undeclared label it frees, repeatable and with no form for all
+      labels; stop before the first write when a name is empty, is not an undeclared label, or meets
+      `--keep-undeclared`; show one selected type in the skill's `gh issue create` call instead of the four joined by
+      `|`; verify with unit tests of the split, of the refusals, and of the command line

@@ -2,6 +2,7 @@ import { assert, assertEquals } from "jsr:@std/assert@1.0.19";
 import {
     type Api,
     compare,
+    deleteUsedProblems,
     deletions,
     dependabotLabels,
     formLabels,
@@ -131,10 +132,23 @@ Deno.test("compare reads a name that differs only in case as an update to the de
     });
 });
 
-Deno.test("deletions keeps a label in use unless told to delete it", () => {
-    const used = new Set(["bug"]);
-    assertEquals(deletions([BUG, CI], used, false), { remove: [CI], refused: [BUG] });
-    assertEquals(deletions([BUG, CI], used, true), { remove: [BUG, CI], refused: [] });
+Deno.test("deletions keeps a label in use unless it is named, and a name frees no other label", () => {
+    const WONTFIX = { ...BUG, name: "wontfix" };
+    const used = new Set(["bug", "wontfix"]);
+    assertEquals(deletions([BUG, CI, WONTFIX], used, []), { remove: [CI], refused: [BUG, WONTFIX] });
+    assertEquals(deletions([BUG, CI, WONTFIX], used, ["Bug"]), { remove: [BUG, CI], refused: [WONTFIX] });
+    assertEquals(deletions([BUG, CI, WONTFIX], used, ["bug", "wontfix"]), {
+        remove: [BUG, CI, WONTFIX],
+        refused: [],
+    });
+});
+
+Deno.test("deleteUsedProblems rejects a name that is not undeclared, an empty one, and --keep-undeclared", () => {
+    assertEquals(deleteUsedProblems([], [BUG], true), []);
+    assertEquals(deleteUsedProblems(["bug"], [BUG], false), []);
+    assert(deleteUsedProblems(["ci"], [BUG], false)[0].includes('names "ci", which is not an undeclared label'));
+    assert(deleteUsedProblems([""], [BUG], false)[0].includes("needs the name"));
+    assert(deleteUsedProblems(["bug"], [BUG], true)[0].includes("contradict"));
 });
 
 /** An Api over `existing` that records every call; labels named in `used` are carried by something. */
@@ -150,7 +164,7 @@ function stub(existing: Label[], used: string[] = []): { api: Api; calls: string
     return { api, calls, writes: () => calls.filter((call) => /^(create|update|remove) /.test(call)) };
 }
 
-const APPLY: Options = { apply: true, deleteUsed: false, keepUndeclared: false };
+const APPLY: Options = { apply: true, deleteUsed: [], keepUndeclared: false };
 const SHOW: Options = { ...APPLY, apply: false };
 
 Deno.test("sync writes nothing when the repository matches the declaration", async () => {
@@ -193,12 +207,28 @@ Deno.test("sync --apply refuses to delete a label in use, keeps it, and exits no
     assert(printed.some((line) => line.startsWith("keep    bug: undeclared, in use") && line.includes("not deleted")));
 });
 
-Deno.test("sync --apply --delete-used deletes a label in use", async () => {
-    const { api, writes } = stub([CI, BUG], ["bug"]);
+Deno.test("sync --apply --delete-used deletes the named label in use and no other", async () => {
+    const WONTFIX = { ...BUG, name: "wontfix" };
+    const { api, writes } = stub([CI, BUG, WONTFIX], ["bug", "wontfix"]);
     const printed: string[] = [];
-    assertEquals(await sync([CI], api, { ...APPLY, deleteUsed: true }, (line) => printed.push(line)), 0);
+    assertEquals(await sync([CI], api, { ...APPLY, deleteUsed: ["bug"] }, (line) => printed.push(line)), 1);
     assertEquals(writes(), ["remove bug"]);
     assert(printed[0].startsWith("deleted  bug: undeclared, in use"));
+    assert(printed[1].startsWith("keep    wontfix: undeclared, in use"));
+});
+
+Deno.test("sync writes nothing when --delete-used names a label it cannot delete", async () => {
+    const { api, writes } = stub([BUG], ["bug"]);
+    for (const deleteUsed of [["ci"], ["feature"], [""]]) {
+        let message = "";
+        try {
+            await sync([FEATURE, CI], api, { ...APPLY, deleteUsed }, () => {});
+        } catch (error) {
+            message = (error as Error).message;
+        }
+        assert(message.includes("Nothing was written."), JSON.stringify(deleteUsed));
+    }
+    assertEquals(writes(), []);
 });
 
 Deno.test("sync --apply --keep-undeclared deletes nothing and does not ask what is in use", async () => {
@@ -301,7 +331,7 @@ Deno.test("main --check validates the declaration and the references without a c
 
 Deno.test("main writes nothing and makes no call when the validation fails", async () => {
     const { api, calls } = stub([BUG]);
-    for (const args of [["--apply"], ["--apply", "--delete-used"], []]) {
+    for (const args of [["--apply"], ["--apply", "--delete-used", "bug"], []]) {
         assertEquals((await run(args, yaml([FEATURE, CI, { ...CI, name: "CI" }]), api)).status, 1);
         assertEquals((await run(args, yaml([FEATURE]), api)).status, 1, "dependabot.yml names an undeclared label");
     }
@@ -317,4 +347,11 @@ Deno.test("main --apply applies a valid declaration and rejects an unknown argum
     assertEquals(unknown.status, 1);
     assert(unknown.printed[0].includes("Unknown argument"));
     assert(!writes().some((call) => call.startsWith("remove")));
+    // --delete-used takes a name: alone it deletes nothing, and with one it deletes that label.
+    const bare = await run(["--apply", "--delete-used"], yaml([FEATURE, CI]), api);
+    assertEquals(bare.status, 1);
+    assert(bare.printed[0].includes("needs the name"), bare.printed[0]);
+    assert(!writes().some((call) => call.startsWith("remove")));
+    assertEquals((await run(["--apply", "--delete-used", "bug"], yaml([FEATURE, CI]), api)).status, 0);
+    assertEquals(writes().filter((call) => call.startsWith("remove")), ["remove bug"]);
 });

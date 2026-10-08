@@ -9,9 +9,9 @@
   on Feature, Bug, and Task; Start date and Target date on Feature; Target date on Epic. A pinned field is offered on an
   issue, not required. A token with the `read:org` scope reads all of this (`gh api orgs/hoshiori-dev/issue-types`,
   `gh api orgs/hoshiori-dev/issue-fields`, and `pinnedFields` of `IssueType` in GraphQL).
-- The repository on 2026-10-08: 68 issues (42 Task, 23 Feature, 3 Bug), 14 of them open; nine labels, GitHub's defaults,
-  none applied to anything, and no file on `main` names one; no pull request open before this one; every issue and pull
-  request so far opened by one account.
+- The repository on 2026-10-08, before this change wrote to it: 68 issues (42 Task, 23 Feature, 3 Bug), 14 of them open;
+  nine labels, GitHub's defaults, none applied to anything, and no file on `main` names one; no pull request open before
+  this one; every issue and pull request so far opened by one account.
 - What GitHub documents, read on 2026-10-08:
   - An issue form sets `type`, `labels`, `assignees`, and `projects`, never an issue field, and a label it names that
     does not exist is not added
@@ -109,16 +109,19 @@
 - **Deleting is the guarded part, and it is never unattended.** `--apply` creates what is missing and updates what
   differs first. It then deletes an undeclared label only when no issue and no pull request, open or closed, carries it,
   which it reads from the list of issues filtered by that label, not from search; a label in use is listed, left alone,
-  and makes the run exit non-zero. `--delete-used` lifts the refusal and `--keep-undeclared` skips every deletion. A
-  changed name reads as one deletion and one creation and is caught the same way. The question and the deletion are
-  separate calls, and GitHub offers none that deletes a label only while nothing carries it: a label put on an issue
-  between the two is taken off it, and a carrier the list does not return to the calling token reads as no carrier. Two
-  reviews of this pull request raised them, the automated one the first and a second review the other. The refusal is
-  therefore a guard for a person who has just read the printed difference, not an invariant, and the workflow passes
-  `--keep-undeclared`. Rejected: printing the difference and deleting anyway, which shows the loss in a log after it
-  happened; asking a second time just before the deletion, which narrows the gap and does not close it; letting the
-  workflow delete, which this change first specified, because the one irreversible call of the script would then run
-  with nobody reading its output.
+  and makes the run exit non-zero. `--delete-used <name>` lifts the refusal for the one undeclared label it names, and
+  `--keep-undeclared` skips every deletion. The flag takes a name because the authority tier does: a command that names
+  one label must not take another off its issues, so no form of the flag covers every label, and a name that is not an
+  undeclared label stops the run before its first write. The second automated review of this pull request raised that
+  the first version, a flag without a name, deleted every carried label at once. A changed name reads as one deletion
+  and one creation and is caught the same way. The question and the deletion are separate calls, and GitHub offers none
+  that deletes a label only while nothing carries it: a label put on an issue between the two is taken off it, and a
+  carrier the list does not return to the calling token reads as no carrier. Two reviews of this pull request raised
+  them, the automated one the first and a second review the other. The refusal is therefore a guard for a person who has
+  just read the printed difference, not an invariant, and the workflow passes `--keep-undeclared`. Rejected: printing
+  the difference and deleting anyway, which shows the loss in a log after it happened; asking a second time just before
+  the deletion, which narrows the gap and does not close it; letting the workflow delete, which this change first
+  specified, because the one irreversible call of the script would then run with nobody reading its output.
 - **A declared name is checked for what the calls cannot carry.** White space around a name, a comma (the list of issues
   by label takes a comma-separated list), and the names `.` and `..` (the name is a path segment in the calls that
   change a label) fail the offline check.
@@ -134,13 +137,14 @@
     fork gets none.
   - Running also when the script changes. The decision was the declaration and a dispatch; a changed script is applied
     by a dispatch when a maintainer wants it.
-- **Before the merge only the five area labels are created; the seven are deleted by command.** The labels have to exist
-  for the open issues to be labelled and the acceptance filters to be read, and a workflow that is not on `main` cannot
-  run. On the maintainer's command, given after reading the printed difference, the declaration is applied from the
-  branch with `--keep-undeclared`. The deletion of the seven default labels is a second command of the maintainer's,
+- **The five area labels are created first; the seven are deleted by a separate command.** The labels have to exist for
+  the open issues to be labelled and the acceptance filters to be read, and a workflow that is not on `main` cannot run.
+  On the maintainer's command, given after reading the printed difference, the declaration is applied from the branch
+  with `--keep-undeclared`. The deletion of the seven default labels is a second command of the maintainer's,
   `just labels --apply`, given on 2026-10-08 after the review, when the workflow had stopped deleting. Rejected:
-  - Applying the whole declaration before the merge. The seven labels would be gone even if the pull request were
-    rejected.
+  - Applying the whole declaration in the first application. The command that created the five labels would have deleted
+    the seven as well, before the deleting path had been reviewed. The maintainer had them deleted later by a command of
+    its own; they stay deleted if the pull request is rejected (proposal, Impact).
   - Merging the declaration first and bringing the open issues to the rules in a second pull request, which leaves this
     one unable to show its own acceptance.
 - **The declaration is checked offline, inside `just validate`.** `sync_labels.ts --check` uses no network and runs
@@ -209,8 +213,8 @@
   published before anyone reads it; each is visible on the issue, reversible, and bounded to issues the agent created or
   took. Writing a Priority moves from never to after a confirmation; a wrong value misorders work until someone notices,
   which naming the value in the request for the go-ahead is meant to prevent. Applying the declaration on command
-  creates labels and, with `--delete-used`, removes one from every issue that has it, which cannot be undone; that flag
-  needs a command that names the label.
+  creates labels and, with `--delete-used <name>`, removes the named one from every issue that has it, which cannot be
+  undone; the flag carries the name the maintainer's command gives.
 - **The triage list depends on someone reading it.** An issue from a form has no label and no Priority until a
   maintainer sets them, and nothing blocks on it. Mitigation: the harness review in `github-workflow.md` gains a check
   that `is:issue is:open no:label` is empty and that no open Epic is left without an open sub-issue.

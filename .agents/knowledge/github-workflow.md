@@ -51,7 +51,8 @@ A triaged issue of any type has at least one area label, usually one. An Epic ca
 
 The repository's labels are exactly the set `.github/labels.yml` declares, and they change only by applying that file
 (`github/platform-settings.md`, Labels row). The Labels workflow creates and updates; it never deletes, so a label the
-declaration lacks stays until a maintainer has it deleted with `just labels --apply`. Who may apply it, and what an
+declaration lacks stays until a maintainer has it deleted with `just labels --apply`; one that an issue or a pull
+request still carries is deleted only when the command names it (`--delete-used <name>`). Who may apply it, and what an
 agent sets on an issue alone, is in `agent-authority.md`.
 
 ## Relationships

@@ -7,8 +7,10 @@
 //   scripts/sync_labels.ts --apply    create what is missing, update what differs, delete what is undeclared
 //
 // --apply deletes an undeclared label only when no issue and no pull request, open or closed,
-// carries it; a label in use is listed, kept, and makes the run exit 1. --delete-used lifts that
-// refusal and --keep-undeclared skips every deletion; both also shape the printed difference.
+// carries it; a label in use is listed, kept, and makes the run exit 1. --delete-used <name> lifts
+// that refusal for the one undeclared label it names, and may be given once per label; it has no
+// form that covers every label. --keep-undeclared skips every deletion. Both also shape the printed
+// difference.
 // The question and the deletion are separate calls, and GitHub has none that deletes only an
 // unused label, so a label put on an issue between the two is taken off it. A deletion is
 // therefore run by a person, on a maintainer's command; the Labels workflow passes
@@ -61,7 +63,8 @@ export interface Difference {
 
 export interface Options {
     apply: boolean;
-    deleteUsed: boolean;
+    /** The undeclared labels to delete although something carries them, each named on the command line. */
+    deleteUsed: string[];
     keepUndeclared: boolean;
 }
 
@@ -233,14 +236,37 @@ export function compare(declared: Label[], existing: Label[]): Difference {
     return difference;
 }
 
-/** Splits the undeclared labels into those to delete and those kept because something carries them. */
+/**
+ * Splits the undeclared labels into those to delete and those kept because something carries them;
+ * `deleteUsed` names the ones to delete all the same, without regard to case.
+ */
 export function deletions(
     undeclared: Label[],
     used: Set<string>,
-    deleteUsed: boolean,
+    deleteUsed: string[],
 ): { remove: Label[]; refused: Label[] } {
-    const keep = (label: Label) => used.has(label.name) && !deleteUsed;
+    const named = new Set(deleteUsed.map(key));
+    const keep = (label: Label) => used.has(label.name) && !named.has(key(label.name));
     return { remove: undeclared.filter((label) => !keep(label)), refused: undeclared.filter(keep) };
+}
+
+/** Why `deleteUsed` cannot be carried out as given; empty when it can. Checked before the first write. */
+export function deleteUsedProblems(deleteUsed: string[], undeclared: Label[], keepUndeclared: boolean): string[] {
+    const problems: string[] = [];
+    if (deleteUsed.length > 0 && keepUndeclared) {
+        problems.push("--delete-used and --keep-undeclared contradict each other; pass one of them.");
+    }
+    for (const name of deleteUsed) {
+        if (name.trim() === "") {
+            problems.push("--delete-used needs the name of the label: --delete-used <name>.");
+        } else if (!undeclared.some((label) => key(label.name) === key(name))) {
+            problems.push(
+                `--delete-used names "${name}", which is not an undeclared label of the repository; ` +
+                    "a declared label is removed from the declaration first.",
+            );
+        }
+    }
+    return problems;
 }
 
 /**
@@ -255,6 +281,8 @@ export async function sync(
 ): Promise<number> {
     const { apply, deleteUsed, keepUndeclared } = options;
     const difference = compare(declared, await api.list());
+    const problems = deleteUsedProblems(deleteUsed, difference.undeclared, keepUndeclared);
+    if (problems.length > 0) throw new Error(`${problems.join(" ")} Nothing was written.`);
     for (const label of difference.create) {
         if (apply) await api.create(label);
         print(`${apply ? "created" : "create"}  ${label.name} (${colorOf(label.color)}): ${descriptionOf(label)}`);
@@ -277,7 +305,7 @@ export async function sync(
     for (const label of remove) {
         if (apply) await api.remove(label.name);
         const use = used.has(label.name)
-            ? "in use; --delete-used takes it off everything that carries it"
+            ? "in use; --delete-used names it, which takes it off everything that carries it"
             : "not in use";
         print(`${apply ? "deleted" : "delete"}  ${label.name}: undeclared, ${use}`);
     }
@@ -285,7 +313,8 @@ export async function sync(
         print(
             `keep    ${label.name}: undeclared, in use by an issue or a pull request; ` +
                 (apply ? "not deleted" : "--apply refuses to delete it") +
-                ". Declare it, take it off what carries it, or pass --delete-used on a maintainer's command.",
+                ". Declare it, take it off what carries it, or pass --delete-used <name> on a maintainer's " +
+                "command that names it.",
         );
     }
     if (difference.create.length + difference.update.length + difference.undeclared.length === 0) {
@@ -336,7 +365,9 @@ export function ghApi(gh: (args: string[]) => Promise<string> = runGh, repo = RE
 export async function main(args: string[], api: Api, root = "."): Promise<number> {
     try {
         const flags = parseArgs(args, {
-            boolean: ["check", "apply", "delete-used", "keep-undeclared"],
+            boolean: ["check", "apply", "keep-undeclared"],
+            string: ["delete-used"],
+            collect: ["delete-used"],
             unknown: (arg) => {
                 throw new Error(`Unknown argument ${JSON.stringify(arg)}; see the head of scripts/sync_labels.ts.`);
             },

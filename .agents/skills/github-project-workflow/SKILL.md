@@ -57,9 +57,10 @@ Non-interactive creation ignores the forms: build the body by mirroring the form
 area label in the same call:
 
 ```sh
-gh issue create --title "…" --body-file body.md --type Bug|Feature|Task|Epic --label <area>
+gh issue create --title "…" --body-file body.md --type <type> --label <area>
 ```
 
+- `<type>` is the form's type: Bug, Feature, Task, or Epic.
 - `<area>` is one of the labels `github-workflow.md` defines (Areas). A label that does not exist makes the call fail:
   stop and report it, never create a label (`agent-authority.md`).
 - Add `--parent <n>` and `--blocked-by <n>` when the request states the relationship (`github-workflow.md`,

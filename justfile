@@ -67,7 +67,7 @@ docs-check:
 new-feature id *args:
     ./scripts/new_feature.ts "$1" "${@:2}"
 
-# Print how the repository's labels differ from .github/labels.yml; --apply writes it (--keep-undeclared, --delete-used)
+# Print how the repository's labels differ from .github/labels.yml; --apply writes it (--keep-undeclared, --delete-used <name>)
 labels *args:
     ./scripts/sync_labels.ts "$@"
 

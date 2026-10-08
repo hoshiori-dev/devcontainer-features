@@ -122,7 +122,8 @@ None.
 - `just check` fails when the declaration is malformed, names a label twice, or names `major`, `minor`, or `patch`, and
   when an issue form or `.github/dependabot.yml` names a label the declaration does not hold. Each case has a unit test.
 - No unattended run deletes a label, and a test of the workflow file shows it. Run by hand, `--apply` refuses to delete
-  a label that an issue or a pull request carries when it asks; a unit test shows the refusal.
+  a label that an issue or a pull request carries when it asks; a unit test shows the refusal. Lifting the refusal takes
+  the label's name, and frees no other label; unit tests show both.
 - `just check` fails for a declared name with white space around it, with a comma, or equal to `.` or `..`. A unit test
   covers each.
 - No pull request event can start the workflow that applies the declaration: its triggers are a push to `main` that
