@@ -110,3 +110,6 @@ publish gate, and is named with its command in the pull request's Validation sec
 - [x] 9.3 Bring the proposal, the design, `github-workflow.md` (the harness review), `github/checks.md` (the `sync`
       row), and `github/platform-settings.md` (the Labels row, its readback included) to the above; verify `just labels`
       prints what the row says
+- [x] 9.4 On the maintainer's command, delete the seven default labels with `just labels --apply` after reading the
+      printed difference; verify `just labels` prints that the labels match and record the row in
+      `github/platform-settings.md` as enforced

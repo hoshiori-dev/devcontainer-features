@@ -35,8 +35,8 @@ was last edited.
   knowledge base, the project skills, the templates and forms, the dev container, and the root documents). A triaged
   issue of any type has at least one, usually one. The kind stays with the type and the order with Priority.
 - **Label set.** The repository's labels are declared in one file: the five area labels and the two GitHub shows to new
-  contributors, `good first issue` and `help wanted`. The other seven default labels stay until the maintainer has them
-  deleted by command. Agents and the workflow change labels only by applying that file.
+  contributors, `good first issue` and `help wanted`. The other seven default labels are deleted, by a command of the
+  maintainer's and not by the workflow. Agents and the workflow change labels only by applying that file.
 - **Scope name.** The harness area `openspec` is renamed `spec-workflow`, as an area and as a pull request title scope,
   so that `openspec` names only the feature of that id.
 - **Forms.** The Bug form accepts a harness defect, the Feature form names a behavior change, the Task form names upkeep
@@ -80,14 +80,15 @@ None.
   the forms.
 - Feature ids touched: none, so no version bump. No file under `src/`, `test/`, or `openspec/specs/` changes, and none
   of the changed files is test infrastructure (`INFRA_PATHS` in `scripts/lib/repo.ts`), so CI selects no feature test.
-- Remote state written before the merge, each write on the maintainer's command: the five area labels created; the
-  labels and Priority of the open issues; the two Epics with their sub-issues and the "blocked by" relationships; a test
-  Epic and a test Feature, closed when their observations are recorded; one comment on this pull request with those
-  observations. Reverting the pull request undoes none of it: the labels, values, and relationships stay, and the new
-  issues stay unless someone with admin rights deletes them.
+- Remote state written before the merge, each write on the maintainer's command: the five area labels created and the
+  seven default labels, which were on nothing, deleted; the labels and Priority of the open issues; the two Epics with
+  their sub-issues and the "blocked by" relationships; a test Epic and a test Feature, closed when their observations
+  are recorded; one comment on this pull request with those observations. Reverting the pull request undoes none of it:
+  the labels, values, and relationships stay, the deleted labels do not come back, and the new issues stay unless
+  someone with admin rights deletes them.
 - Remote state written by the merge: none. The workflow's run after the merge creates and updates as declared, which is
-  nothing by then, and deletes nothing. The seven default labels are on nothing; they stay until the maintainer has them
-  deleted by command, and once deleted they do not come back with a revert.
+  nothing by then, and deletes nothing. A label the declaration does not hold stays until a maintainer has it deleted by
+  command.
 - Remote settings: the `main` ruleset, its required checks, and the Actions settings stay as they are. The label set is
   the one setting this change takes over: `platform-settings.md` gains its row, and its opening rule, that agents never
   change a remote setting, gains the label set as its one exception, bound to the tiers above. The organization's types
@@ -114,9 +115,9 @@ None.
   by" rule, the field rules, and the five areas as What Changes states them, no longer lists Priority, sub-issues, or
   labels beyond GitHub's defaults under "Deliberately not used", and its Synchronization table names what has to change
   together when an area is added or renamed.
-- When this pull request is marked ready, the five area labels exist with the colors and descriptions the declaration
-  gives, and the difference the script reports between the declaration and the repository is exactly the removal of the
-  seven default labels, each carried by nothing.
+- The repository's labels are the seven the declaration holds, with its colors and descriptions, and the script reports
+  no difference between the two. Before the seven default labels were deleted, the difference it reported was exactly
+  their removal, each carried by nothing.
 - A unit test shows that applying a declaration the repository already matches writes nothing.
 - `just check` fails when the declaration is malformed, names a label twice, or names `major`, `minor`, or `patch`, and
   when an issue form or `.github/dependabot.yml` names a label the declaration does not hold. Each case has a unit test.

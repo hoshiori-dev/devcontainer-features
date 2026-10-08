@@ -138,7 +138,7 @@
   for the open issues to be labelled and the acceptance filters to be read, and a workflow that is not on `main` cannot
   run. On the maintainer's command, given after reading the printed difference, the declaration is applied from the
   branch with `--keep-undeclared`. The deletion of the seven default labels is a second command of the maintainer's,
-  `just labels --apply`, given when they choose; this change does not depend on it. Rejected:
+  `just labels --apply`, given on 2026-10-08 after the review, when the workflow had stopped deleting. Rejected:
   - Applying the whole declaration before the merge. The seven labels would be gone even if the pull request were
     rejected.
   - Merging the declaration first and bringing the open issues to the rules in a second pull request, which leaves this
@@ -198,9 +198,9 @@
 
 ## Risks / Trade-offs
 
-- **An undeclared label stays until someone has it deleted.** The seven default labels stay after the merge, and so does
-  a label made in the UI later: the workflow lists and keeps it, and its run succeeds. Mitigation: `just labels` prints
-  the difference, and the harness review in `github-workflow.md` gains the check that it prints none.
+- **An undeclared label stays until someone has it deleted.** A label made in the UI later stays: the workflow lists and
+  keeps it, and its run succeeds. Mitigation: `just labels` prints the difference, and the harness review in
+  `github-workflow.md` gains the check that it prints none.
 - **A declared label may not exist yet.** The offline check compares references with the declaration, not with the
   repository. Between a merge and the workflow's run, or after a failed run, a label Dependabot names, or one a later
   form names, can be missing, and both skip it without an error. Mitigation: a failed run is visible, and the next one
