@@ -16,7 +16,7 @@
   `openspec init --tools claude` generates.
 - `openspec --version` prints the bare version and a newline. `https://registry.npmjs.org/@fission-ai/openspec/latest`
   answers with a JSON document of about 3 kB whose `version` field is the release the `latest` tag points at; the
-  package also has a `beta` tag.
+  package also has the tags `beta` and `next`.
 - OpenSpec has an update check of its own. In 1.13.2 it runs only inside `openspec update`; 1.14.1 also runs it for
   `openspec version --check`. This repository runs neither (`spec-workflow.md` for `update`), and the check makes no
   request when `OPENSPEC_NO_UPDATE_CHECK` is set or telemetry is turned off, as the recipes do. Deno allows the
@@ -41,13 +41,14 @@
   two commands. The places that record a version OpenSpec was verified with (`spec-workflow.md`, comments in
   `scripts/check_openspec.ts`) are not pins and stay.
 - The lookup is a separate invocation, `--release`, that has no path to a non-zero exit status once the module has
-  loaded: it catches every error, argument and permission errors included. The recipe's first step loads the same file,
-  so a load failure fails there. Checked by unit tests that assert status 0 for every kind of answer and for a thrown
-  error.
+  loaded and under the permissions of its shebang: it catches every error, argument errors included, and the entry
+  point's read of the environment sits inside the same catch. The recipe's first step loads the same file, so a load
+  failure fails there. Checked by unit tests that assert status 0 for every kind of answer and for a thrown error.
 - The CI flag is read in the entry point only, and the lookup returns before it builds a request when the flag is set;
   the shebang allows `registry.npmjs.org` and no other host. Checked by a unit test whose stub fails the test when it is
   called, and by reading the shebang.
-- Every outside input of the script is a parameter. Checked by `just scripts-check` passing with its present
+- The functions under test take the text of the two files, the version call, the fetch, and the CI flag as arguments;
+  the entry point alone reads the files and the environment. Checked by `just scripts-check` passing with its present
   permissions.
 - The command the failure prints is built from the parsed files, not written in the script. Checked by a unit test.
 
@@ -62,15 +63,16 @@
 ## Decisions
 
 - **Two install commands and a check, not one file both read.** The command stays written in the action and in
-  `setup.sh`. A script reads both, takes from each the permission flags and the version after
-  `npm:@fission-ai/openspec@`, and fails when the versions or the flag sets differ. A version is exactly three numbers
-  separated by dots, followed by white space, a quote, or the end of the line; `latest`, a range, and a prerelease count
-  as no version. Each file must hold the install exactly once, so a comment that repeats the literal fails instead of
-  going stale. The flags are the `--allow-*` tokens between `deno install` and the package specifier, whatever the line
-  breaks; they compare as a set, a flag given twice fails, and the printed command uses the action's order. Rejected: a
-  version file that both read, which makes the action depend on a file outside `.github/actions/` and moves a CI pin out
-  of the place `checks.md` names as the only one; `setup.sh` extracting the version from the action with a text tool,
-  which fails in the one script that has no test.
+  `setup.sh`. A script reads both, takes from each the options and the version after `npm:@fission-ai/openspec@`, and
+  fails when the versions or the option sets differ. A version is exactly three numbers separated by dots, followed by
+  white space, a quote, or the end of the line; `latest`, a range, and a prerelease count as no version. Each file must
+  hold the install exactly once, so a comment that repeats the literal fails instead of going stale. The options are
+  every token between `deno install` and the package specifier, whatever the line breaks. Each must be `--global`,
+  `--force`, or an `--allow-*` flag; any other, `-A` or a `--deny-*` flag for example, fails. They compare as a set, an
+  option given twice fails, and the printed command uses the action's order. Rejected: a version file that both read,
+  which makes the action depend on a file outside `.github/actions/` and moves a CI pin out of the place `checks.md`
+  names as the only one; `setup.sh` extracting the version from the action with a text tool, which fails in the one
+  script that has no test.
 - **A new script, `scripts/check_openspec_version.ts`, with two modes.** Without arguments it compares the two files,
   then runs `openspec --version` and compares the trimmed answer with the pin as a string; a failure of the first step
   ends it, since there is then no pin to compare with. With `--release` it looks for a newer release and always exits
@@ -111,31 +113,31 @@
   installed version. An agent's own OpenSpec calls (`new change`, `archive`, `init`, through the generated skills) use
   the installed binary, so the checks would then pass over artifacts a different version wrote; one version in one
   place, with a check that says when it is wrong, has no such gap.
-- **Tests pass the three outside inputs.** Running `openspec --version`, fetching the registry document, and whether the
-  run is in CI are parameters. The fetch parameter has the shape of `fetch`: it returns a status and a body, or throws.
-  A redirect status, an abort, a body that is not JSON, and a version that is not three numbers are therefore all
-  handled in tested code. The one untested part is the default, which passes the three-second timeout and
-  `redirect: "manual"`; it is checked by review and by one run without network. The real implementations are the
-  defaults of the first two parameters, as `scripts/check_openspec.ts` does for the archive call; the CI flag is read
-  from the environment in the entry point only, as `scripts/check_spec_archived.ts` does. The tests pass all three, so
-  they behave the same locally and in CI's `scripts` job.
-- **The rule and the steps go into `checks.md`, Toolchain pins.** That section is where a reader about to change a
-  composite action or a pin is sent, and it holds the sentence "Before bumping a pin" today. It gains: a maintainer
-  decides when the OpenSpec pin is raised; an agent that sees the notice reports it and asks; and raising it is one pull
-  request that, in this order, changes both install commands, installs that version, regenerates the OpenSpec files with
-  `openspec init --tools claude`, re-verifies the behaviors `spec-workflow.md` and `scripts/check_openspec.ts` record as
-  verified with a version, and makes `just check` pass, which for a release that turns a message into a warning, as 1.14
-  does, means deciding what to do about the specs it now rejects. `spec-workflow.md` (where it records the verified
-  version, and in "Update this file when") and the Synchronization row for a tool pin point there and repeat nothing.
+- **Tests pass every outside input.** The text of the two files, running `openspec --version`, fetching the registry
+  document, and whether the run is in CI are parameters; the entry point alone reads the files. The fetch parameter has
+  the shape of `fetch`: it returns a status and a body, or throws. A redirect status, an abort, a body that is not JSON,
+  and a version that is not three numbers are therefore all handled in tested code. The one untested part is the
+  default, which passes the three-second timeout and `redirect: "manual"`; it is checked by review and by one run
+  without network. The real implementations are the defaults of the version call and the fetch, as
+  `scripts/check_openspec.ts` does for the archive call; the CI flag is read from the environment in the entry point
+  only, as `scripts/check_spec_archived.ts` does. The tests pass all of them, so they behave the same locally and in
+  CI's `scripts` job.
+- **The rule goes into `checks.md`, Toolchain pins.** That section is where a reader about to change a composite action
+  or a pin is sent, and it holds the sentence "Before bumping a pin" today. Its text has to cover: a maintainer decides
+  when the OpenSpec pin is raised; an agent that sees the notice reports it and asks; and what raising the pin includes
+  beyond the two install commands, namely the installed version, the regenerated OpenSpec files, the behaviors
+  `spec-workflow.md` and `scripts/check_openspec.ts` record as verified with a version, and a passing `just check`,
+  which for a release that turns a message into a warning, as 1.14 does, means deciding what to do about the specs it
+  now rejects. `spec-workflow.md` (in what `just spec-check` fails on, where it records the verified version, and in
+  "Update this file when") and the Synchronization row for a tool pin point there and repeat nothing.
   `agent-authority.md` is not edited: the rule narrows what an agent does, half of the pin is already ask-first through
   the `.devcontainer/` rule, and the notice carries the instruction to whoever meets it.
 - **The action's header and `checks.md` change with it.** Both say the dev container installs its own version. The
   header becomes: versions are pinned here for CI, and `.devcontainer/setup.sh` installs OpenSpec with the same command,
   which `scripts/check_openspec_version.ts` holds it to.
-- **How the dev container install is verified.** The agent cannot rebuild the container it runs in. It runs the install
-  line of `setup.sh` with `DENO_INSTALL_ROOT` set to a temporary directory and checks what the resulting binary prints,
-  then installs the pinned version in its own dev container with the command the failure prints and runs `just check`.
-  The rebuild is the maintainer's to do.
+- **The running dev container is brought to the pin in place.** Rejected: building a second dev container from the
+  branch with the devcontainer CLI under docker-in-docker, which builds the whole image and runs every installer of
+  `setup.sh` to exercise one changed line, and still is not the container the maintainer works in.
 
 ## Risks / Trade-offs
 
@@ -166,4 +168,5 @@ existing dev container has.
 ## Open Questions
 
 None. Settled in conversation on 2026-10-08: the notice only informs, CI does not look, raising the pin is a manual
-decision taken when wanted, and a declined release is not recorded.
+decision taken when wanted, and a declined release is not recorded. Approving this package confirms the edit of the
+OpenSpec install line in `.devcontainer/setup.sh` and the rule's place in `checks.md`.

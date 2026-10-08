@@ -7,14 +7,14 @@ Implements [#129](https://github.com/hoshiori-dev/devcontainer-features/issues/1
 `.devcontainer/setup.sh` installs the latest OpenSpec release and CI installs 1.13.2, so the two run different checks:
 with 1.14.1, the release a dev container built on 2026-10-08 gets, `just check` fails at `spec-check` on an unchanged
 `main` while CI's `spec` job passes. Nothing in the failure names the version as its cause, and once the versions are
-tied together nothing would say that the pin has fallen behind: OpenSpec published five releases between 2026-09-09 and
-2026-10-05.
+tied together nothing would say that the pin has fallen behind: OpenSpec published five releases to npm between
+2026-09-09 and 2026-10-05 (UTC).
 
 ## What Changes
 
-- **One version.** The dev container installs the OpenSpec version CI installs, with the same permission flags. The
-  install command is written in `.github/actions/setup-tools/action.yml` and in `.devcontainer/setup.sh`, and
-  `just check` fails when the two differ.
+- **One version.** The dev container installs the OpenSpec version CI installs, with the same options. The install
+  command is written in `.github/actions/setup-tools/action.yml` and in `.devcontainer/setup.sh`, and `just check` fails
+  when the two differ or when either carries an option the check does not know.
 - **Installed version.** `just spec-check` fails before it validates anything when the `openspec` it would run is not
   the pinned version. The failure names both versions and the command that installs the pinned one, so a dev container
   built before this change, or one whose OpenSpec was upgraded by hand, gets one message to act on.
@@ -72,31 +72,37 @@ None.
   the scripts' pinned `npm:` imports from. It sends nothing but the request, and it runs only outside CI.
 - An existing dev container keeps the OpenSpec it has until its user reinstalls or rebuilds; from the merge on,
   `just spec-check` fails there with the command to run.
+- Rebuilding a dev container from this branch is left to the maintainer during review: an agent cannot rebuild the
+  container it runs in. The Validation section of the pull request says so.
 
 ## Acceptance
 
 **Becomes true:**
 
-- `.devcontainer/setup.sh` installs `npm:@fission-ai/openspec` at the version, and with the permission flags,
+- `.devcontainer/setup.sh` installs `npm:@fission-ai/openspec` at the version, and with the options,
   `.github/actions/setup-tools/action.yml` installs it with, and `@latest` appears in neither.
-- `just check` fails when the two files name different OpenSpec versions or different permission flags, when either
-  names no version of the form `N.N.N`, and when either holds the install more than once. A unit test covers each case.
+- `just check` fails when the two files name different OpenSpec versions or different options of the install command,
+  when either names no version of the form `N.N.N`, when either holds the install more than once, and when either gives
+  the install an option the check does not know. A unit test covers each case.
 - `just spec-check` fails, before OpenSpec validates anything, when the installed `openspec` reports another version
   than the pin; the message holds the installed version, the pinned version, and the command that installs the pinned
   one. A unit test covers the mismatch, and one covers an `openspec` that is missing.
 - Outside CI, when every check passes and the registry answer is newer than the pin, the last output of
   `just spec-check` and of `just check` is a notice holding both versions and the instruction to ask the maintainer, and
-  the exit status is 0. A unit test covers a newer, an equal, and an older answer.
-- A registry lookup that fails, times out, is redirected, or returns something that is not a version changes neither the
-  exit status nor any other check. A unit test covers each.
+  the exit status is 0. A unit test covers a newer, an equal, and an older answer, and one run outside CI shows the
+  notice as the last output.
+- A registry lookup that fails, times out, is redirected, or returns something that is not a version prints one line
+  that says it was skipped and changes neither the exit status nor any other check. A unit test covers each.
+- A run of `just spec-check` or `just check` in which a check fails prints neither the notice nor the line of a skipped
+  lookup.
 - In CI the check makes no request to the registry. A unit test covers it.
 - The OpenSpec install line of `.devcontainer/setup.sh`, run with a temporary install root, produces an `openspec` that
-  prints the pinned version; and in a dev container that has the pinned version, `just check` passes. A maintainer who
-  rebuilds a dev container from this branch sees the same.
+  prints the pinned version; and in a dev container that has the pinned version, `just check` passes.
 - `github/checks.md` says that a maintainer decides when the pin is raised, that an agent asks and does not raise it
   alone, and what raising it takes; it no longer says the dev container installs OpenSpec at `@latest`; and its `spec`
-  row names the version check. `spec-workflow.md` and the tool pin row of `github-workflow.md` point to that rule, and
-  the header of `.github/actions/setup-tools/action.yml` no longer says the dev container installs its own version.
+  row names the version check. `spec-workflow.md` names the version check among what `just spec-check` fails on and
+  points to that rule, as does the tool pin row of `github-workflow.md`; and the header of
+  `.github/actions/setup-tools/action.yml` no longer says the dev container installs its own version.
 
 **Stays true:**
 
