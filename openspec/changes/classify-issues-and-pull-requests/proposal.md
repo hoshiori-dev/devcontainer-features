@@ -20,9 +20,8 @@ was last edited.
   or a new capability or behavior change of an existing one. A Task is all other planned work, a new capability of the
   harness included. An Epic is one stage of the collection's functionality that takes several issues to deliver.
 - **Relationships.** Issues are grouped and ordered with GitHub's relationships. An Epic has Features, Bugs, and Tasks
-  as sub-issues and is never a sub-issue itself. A Task may have Tasks as sub-issues, one level deep, for a batch of
-  small work. A Feature or a Bug has no sub-issues. An issue that cannot start before another is marked as blocked by
-  it.
+  as sub-issues and is never a sub-issue itself. A Feature, a Bug, or a Task has no sub-issues: only an Epic has them.
+  An issue that cannot start before another is marked as blocked by it.
 - **Epics.** An Epic exists on a maintainer's word: the maintainer creates it, tells an agent to, or keeps one that
   arrived through the form. No pull request closes an Epic; the maintainer closes it, or tells an agent to, once its
   sub-issues are closed and the stage's outcome holds.

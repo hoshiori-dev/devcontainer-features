@@ -26,7 +26,7 @@ publishing a higher fixed version — a published version cannot be withdrawn fr
 | Acceptance                                | The required check `ci-gate` passes, the Acceptance of the PR's OpenSpec change is verified (see `spec-workflow.md`), and a maintainer merges.                                                                                                                                                                                                                                                                      | Merge would equal an unchecked release to every consumer.                                |
 | Issue types (Epic / Feature / Bug / Task) | The kind of work, set by the issue form. Bug: a published feature or the harness behaves differently from its specification or documentation. Feature: a new feature for the collection, or a new capability or behavior change of an existing one. Task: all other planned work, a new capability of the harness included. Epic: one stage of the collection's functionality that takes several issues to deliver. | Filtering defects from new work.                                                         |
 | Epic                                      | Groups the issues of one stage as its sub-issues and shows how far the stage is (Epics).                                                                                                                                                                                                                                                                                                                            | The shared goal of related issues; they would be tied together by title wording alone.   |
-| Sub-issues                                | The parent of an issue: an Epic's Features, Bugs, and Tasks, or a Task's batch of small Tasks (Relationships).                                                                                                                                                                                                                                                                                                      | Progress of a stage or a batch read from one issue.                                      |
+| Sub-issues                                | The parent of an issue: an Epic's Features, Bugs, and Tasks; no other type has sub-issues (Relationships).                                                                                                                                                                                                                                                                                                          | Progress of a stage or a batch read from one issue.                                      |
 | "Blocked by" relationship                 | An issue that cannot start before another is marked as blocked by it (Relationships).                                                                                                                                                                                                                                                                                                                               | The order between issues; work would start on something that cannot finish.              |
 | Priority field                            | When an open Feature, Bug, or Task is worked on, relative to other work: Urgent, High, Medium, or Low (Fields).                                                                                                                                                                                                                                                                                                     | Picking the next issue from a filter instead of from memory.                             |
 | Target date of an Epic                    | The date a stage aims at; a goal, optional (Fields).                                                                                                                                                                                                                                                                                                                                                                | A stated horizon for a stage.                                                            |
@@ -55,11 +55,10 @@ The repository's labels are exactly the set `.github/labels.yml` declares, and t
 
 ## Relationships
 
-| Type         | Sub-issues                                                                                | Parent                             |
-| ------------ | ----------------------------------------------------------------------------------------- | ---------------------------------- |
-| Epic         | Features, Bugs, and Tasks                                                                 | None: an Epic is never a sub-issue |
-| Task         | Tasks, one level deep (a Task whose parent is a Task has none), for a batch of small work | An Epic or a Task                  |
-| Feature, Bug | None                                                                                      | An Epic                            |
+| Type               | Sub-issues                | Parent                             |
+| ------------------ | ------------------------- | ---------------------------------- |
+| Epic               | Features, Bugs, and Tasks | None: an Epic is never a sub-issue |
+| Feature, Bug, Task | None                      | An Epic                            |
 
 An issue that cannot start before another is marked as blocked by it.
 
@@ -101,9 +100,9 @@ inside that outcome — writing the test scenarios, the compatibility list, the 
 `tasks.md`, not issues. A change that touches a feature and, through `dependsOn`, forces a version bump in its
 dependents is still one issue.
 
-A Task takes sub-issues only for a batch of small work whose pieces each get their own pull request. An Epic is used
-when a stage of the collection takes several such outcomes to deliver (for example one phase of the package-manager
-features); the Epic holds the stage's outcome and each sub-issue its own.
+A Task has no sub-issues: a batch of small work is one Task per piece that gets its own pull request, each naming the
+others it belongs with. An Epic is used when a stage of the collection takes several such outcomes to deliver (for
+example one phase of the package-manager features); the Epic holds the stage's outcome and each sub-issue its own.
 
 ## Triage
 
