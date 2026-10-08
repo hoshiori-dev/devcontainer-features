@@ -147,8 +147,8 @@
     its own; they stay deleted if the pull request is rejected (proposal, Impact).
   - Merging the declaration first and bringing the open issues to the rules in a second pull request, which leaves this
     one unable to show its own acceptance.
-- **The declaration is checked offline, inside `just validate`.** `sync_labels.ts --check` uses no network and runs
-  nothing. Rejected:
+- **The declaration is checked offline, inside `just validate`.** `sync_labels.ts --check` calls neither GitHub nor `gh`
+  and runs nothing. Rejected:
   - A step of its own in `ci.yml`. That file is test infrastructure, so the edit would run the canary feature tests for
     a check that concerns no feature.
   - A unit test that reads the repository's files. The check has to be a command as well, for `just check` and before an

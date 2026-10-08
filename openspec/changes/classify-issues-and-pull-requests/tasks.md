@@ -7,10 +7,10 @@ publish gate, and is named with its command in the pull request's Validation sec
 
 - [x] 1.1 Add `.github/labels.yml` with the five area labels, `good first issue`, and `help wanted`, each with a color
       and a description of at most 100 characters; verify `scripts/sync_labels.ts --check` passes on it
-- [x] 1.2 Add `scripts/sync_labels.ts` with `--check`: no network, fails for an empty or malformed list, a color that is
-      not six hexadecimal digits, a description over 100 characters, a name used twice in any case, the names `major`,
-      `minor`, and `patch`, and a label named by an issue form or `.github/dependabot.yml` that the declaration lacks;
-      verify with one unit test per case in `scripts/sync_labels_test.ts`
+- [x] 1.2 Add `scripts/sync_labels.ts` with `--check`: no call to GitHub, fails for an empty or malformed list, a color
+      that is not six hexadecimal digits, a description over 100 characters, a name used twice in any case, the names
+      `major`, `minor`, and `patch`, and a label named by an issue form or `.github/dependabot.yml` that the declaration
+      lacks; verify with one unit test per case in `scripts/sync_labels_test.ts`
 - [x] 1.3 Add the comparison: names without regard to case with a case-only difference as an update, colors without `#`
       and in lower case, a missing description as empty; verify with unit tests that a matching repository yields no
       difference and that each kind of difference is reported once
@@ -117,3 +117,6 @@ publish gate, and is named with its command in the pull request's Validation sec
       labels; stop before the first write when a name is empty, is not an undeclared label, or meets
       `--keep-undeclared`; show one selected type in the skill's `gh issue create` call instead of the four joined by
       `|`; verify with unit tests of the split, of the refusals, and of the command line
+- [x] 9.6 Correct two comments after the third review: `--check` calls neither GitHub nor `gh`, while Deno may still
+      fetch modules; and the workflow's sentence about unreviewed code is about a pull request's code, with the script's
+      imports named beside it; verify the workflow test and the script tests still pass

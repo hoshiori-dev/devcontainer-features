@@ -3,7 +3,7 @@
 // (.agents/knowledge/github-workflow.md defines the areas the labels name).
 //
 //   scripts/sync_labels.ts            print the difference between the declaration and the repository
-//   scripts/sync_labels.ts --check    validate the declaration and the labels other files name; offline
+//   scripts/sync_labels.ts --check    validate the declaration and the labels other files name; no call
 //   scripts/sync_labels.ts --apply    create what is missing, update what differs, delete what is undeclared
 //
 // --apply deletes an undeclared label only when no issue and no pull request, open or closed,
@@ -16,8 +16,9 @@
 // therefore run by a person, on a maintainer's command; the Labels workflow passes
 // --keep-undeclared and deletes nothing (.github/workflows/labels.yml).
 //
-// --check reads files only: it uses no network and runs nothing. Every other form validates the
-// same way first and stops before its first call when the declaration is invalid. The calls go
+// --check reads files only: it calls neither GitHub nor `gh`. Deno itself fetches the script's
+// modules on a machine that has not cached them. Every other form validates the same way first
+// and stops before its first call when the declaration is invalid. The calls go
 // through `gh api`, never `gh label`, against the repository named by REPO, whatever the clone's
 // remote is. The YAML parser is the standard library's: the job that runs --apply holds a write
 // token, and this script evaluates no npm package under it (scripts/lib/repo.ts,
