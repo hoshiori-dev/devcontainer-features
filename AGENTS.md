@@ -72,6 +72,7 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 | Which features and images CI will test for this branch                                                        | `just affected`                                 |
 | Regenerate feature READMEs and the root feature list                                                          | `just docs`                                     |
 | Unarchived OpenSpec changes (`--ready`: non-zero when one exists, the verdict the PR workflow reads)          | `just spec-status`                              |
+| Difference between `.github/labels.yml` and the repository's labels (`--apply` writes it, on command only)    | `just labels`                                   |
 
 ## Workflow
 

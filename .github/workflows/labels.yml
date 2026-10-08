@@ -1,0 +1,50 @@
+# Applies the label declaration (.github/labels.yml) to this repository: creates the labels that
+# are missing, updates the ones that differ, and deletes an undeclared label only when no issue and
+# no pull request carries it (scripts/sync_labels.ts). A label still in use is left alone and fails
+# the run; a maintainer then declares it or removes it.
+# The `sync` job holds `issues: write` because creating, editing, and deleting a label needs it.
+# That permission also allows editing and closing issues, so the workflow never runs on a pull
+# request event: a write token stays out of reach of code that has not been reviewed and merged,
+# and the job takes no input from an issue or a pull request. Its triggers are a push to main that
+# changes the declaration and a dispatch by a maintainer — on main only, as in release.yml.
+# The checkout names main instead of the commit that started the run, so rerunning an old run
+# applies the declaration main holds now, never an older one.
+name: Labels
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/labels.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A running application finishes. A pending run replaced by a newer one is no loss: each applies
+# what main holds.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write # create, update, and delete labels
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      # This job runs a Deno script directly, never just. gh is the runner image's.
+      - uses: ./.github/actions/setup-tools
+        with:
+          just: "false"
+      # Neither --delete-used nor --keep-undeclared: an unattended run never removes a label in use,
+      # and never keeps an unused one the declaration lacks.
+      - name: Apply the label declaration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/sync_labels.ts --apply

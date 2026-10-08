@@ -168,6 +168,39 @@ Deno.test("pr.yml reports spec-archived only for an archived verdict, whatever t
     assertEquals(Object.keys(workflow.on), ["pull_request"]);
 });
 
+Deno.test("labels.yml applies main's declaration with a write token no pull request event reaches", async () => {
+    const text = await Deno.readTextFile(new URL("../.github/workflows/labels.yml", import.meta.url));
+    const workflow = parseYaml(text);
+    assertEquals(workflow.name, "Labels");
+    // The whole trigger list: a pull request event would put `issues: write` within reach of unmerged code.
+    assertEquals(Object.keys(workflow.on).sort(), ["push", "workflow_dispatch"]);
+    for (const event of ["pull_request", "pull_request_target", "workflow_run"]) {
+        assert(!(event in workflow.on), event);
+    }
+    assertEquals(workflow.on.push, { branches: ["main"], paths: [".github/labels.yml"] });
+    assertEquals(workflow.permissions, { contents: "read" });
+    assertEquals(workflow.concurrency, { group: "${{ github.workflow }}", "cancel-in-progress": false });
+    assertEquals(Object.keys(workflow.jobs), ["sync"]);
+    const job = workflow.jobs.sync;
+    assertEquals(job.if, "github.ref == 'refs/heads/main'");
+    assertEquals(job.permissions, { contents: "read", issues: "write" });
+    const [checkout, tools, apply] = job.steps;
+    assertEquals(job.steps.length, 3);
+    assert(/^actions\/checkout@[0-9a-f]{40}$/.test(checkout.uses), checkout.uses);
+    // `ref: main`, not the commit that started the run: a rerun of an old run applies the current declaration.
+    assertEquals(checkout.with, { ref: "main", "persist-credentials": false });
+    assertEquals(tools.uses, "./.github/actions/setup-tools");
+    assertEquals(tools.with, { just: "false" });
+    assertEquals(apply.env, { GH_TOKEN: "${{ github.token }}" });
+    assertEquals(apply.run, "./scripts/sync_labels.ts --apply");
+    // Checked on every step, so a flag cannot arrive through a step added later.
+    for (const step of job.steps) {
+        for (const flag of ["--delete-used", "--keep-undeclared"]) {
+            assert(!JSON.stringify(step).includes(flag), `${flag} in an unattended run`);
+        }
+    }
+});
+
 Deno.test("scaffold produces the required files for a valid id", () => {
     assert(ID_PATTERN.test("node-lts"));
     assert(!ID_PATTERN.test("Node"));

@@ -50,7 +50,8 @@ and the person who commits answers for the change.
 
 ## From issue to release
 
-1. **Issue.** Open one with the Bug, Feature, or Task form. Say what you need; acceptance criteria come later, in the
+1. **Issue.** Open one with the Bug, Feature, or Task form, or with the Epic form for a stage that takes several issues.
+   Say what you need; a maintainer adds the area label and the priority, and acceptance criteria come later, in the
    change.
 2. **Branch and draft pull request.** Work on a branch for the issue and open a draft pull request whose first content
    is the OpenSpec change. Nothing is implemented yet.
