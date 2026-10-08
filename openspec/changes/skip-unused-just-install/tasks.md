@@ -9,5 +9,5 @@
 ## 2. Integration verification
 
 - [x] 2.1 Run just check and record the results and invariant checks in the PR Validation section.
-- [ ] 2.2 Inspect executed PR/CI job steps to confirm successful jobs skip rust-just; record the unexecuted Release
+- [x] 2.2 Inspect executed PR/CI job steps to confirm successful jobs skip rust-just; record the unexecuted Release
       verification limitation in the PR Validation section.
