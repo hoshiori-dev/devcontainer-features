@@ -86,6 +86,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup-tools
+        with:
+          just: "false"
       - id: plan
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
