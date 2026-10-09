@@ -10,6 +10,9 @@ Upstream sources:
 - zypper source repository: https://github.com/openSUSE/zypper
 - zypper(8) manual page, zypper 1.14.101: https://github.com/openSUSE/zypper/blob/1.14.101/doc/zypper.8.txt
 - zypper manual: https://en.opensuse.org/SDB:Zypper_manual
+- libzypp source repository: https://github.com/openSUSE/libzypp
+- Configuration files specification that zypp.conf(5) refers to:
+  https://github.com/uapi-group/specifications/blob/main/specs/configuration_files_specification.md
 
 ## Requirements
 
