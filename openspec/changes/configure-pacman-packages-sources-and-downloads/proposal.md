@@ -20,13 +20,16 @@ used.
 - The spec states what the feature does not control because `pacman` offers no bounded native control for it: download
   retries, waiting for the database lock, numeric timeouts, and proxies. The image's and `pacman`'s own behavior
   applies, and NOTES.md documents it.
+- The spec's no-downgrade statement is made exact: the system upgrade never downgrades, while a listed entry whose
+  repository qualifier or version constraint leaves only an older version is installed as `pacman` selects it. Version
+  1.0.1 already behaves so for constraints; the wording is corrected because the qualifier makes the case reachable.
 - Entries that hold one `/` and were refused by every earlier version can now be accepted. Paths, URLs, and every other
   entry refused before stay refused.
 
 Not part of this change: custom `CacheDir` or `DBPath` handling (cleanup keeps its two default directories), a switch
-for `--disable-download-timeout`, enabling repositories the image ships disabled, historical versions, and any downgrade
-or conflict policy (phase 3). The design records why, and its open questions list what the maintainer is asked to
-confirm.
+for `--disable-download-timeout`, adding repositories or enabling ones the image's configuration does not define,
+historical versions, and any option or guard that governs downgrades or conflicts (phase 3). The design records why, and
+its open questions list what the maintainer is asked to confirm.
 
 ## Capabilities
 
@@ -37,8 +40,9 @@ None.
 ### Modified Capabilities
 
 - `pacman-packages`: the entry grammar gains the repository qualifier; the option `parallelDownloads` is added; the
-  validation, authentication, and install-twice requirements are extended to cover both; one requirement states the
-  controls the feature leaves to the image.
+  validation, authentication, and install-twice requirements are extended to cover both; the full-system-upgrade
+  requirement bounds its no-downgrade statement to the system upgrade; one requirement states the controls the feature
+  leaves to the image.
 
 ## Impact
 
@@ -62,15 +66,19 @@ None.
   "Malformed repository qualifier is refused" (Entries are validated before anything changes); "Qualified entry resolves
   in the named repository", "Qualified entry outside the named repository fails", "Unknown repository fails",
   "Repository name is matched exactly", "Qualified entry is not a pin", "Qualified entry reaches a repository not
-  enabled for installation", "Qualified entry offering an older version" (Entries select packages as pacman matches
-  them); "Explicit parallel downloads keep the image configuration" (Repository authentication stays in effect);
-  "Parallel download boundaries are validated" (Installation controls are validated before changes); "Download controls
-  do not persist to the second install" (Installing the feature twice).
+  enabled for installation", "Dependency only in a repository not enabled for installation fails", "Unqualified entry
+  does not reach a repository not enabled for installation", "Qualified entry offering an older version" (Entries select
+  packages as pacman matches them); "Explicit parallel downloads keep the image configuration" (Repository
+  authentication stays in effect); "Parallel download boundaries are validated" (Installation controls are validated
+  before changes); "Download controls do not persist to the second install", "Same qualified entry with a newer version
+  in an earlier repository" (Installing the feature twice). Scenarios that need repositories or a configuration the
+  compatibility images lack run in a container prepared from such an image.
 - `parallelDownloads` agrees between the delta spec, `devcontainer-feature.json`, NOTES.md, and the generated README,
   and the feature's version is 1.1.0.
 - NOTES.md carries the four sections the five package-manager features share ("What the feature sets explicitly", "What
   is inherited", "Proxy", "Locks and retries"), no longer says that every entry holding `/` is refused or that the
-  feature uses no pacman configuration of its own, and labels as not verified every upstream fact the design marks so.
+  feature uses no pacman configuration of its own or that nothing is ever downgraded, and labels as not verified every
+  upstream fact the design marks so.
 - `just check`, `just test pacman-packages`, and `just test-scenarios pacman-packages` pass.
 
 **Stays true:**
@@ -84,6 +92,6 @@ None.
 - Signature checking, the image's repositories, mirrors, keyring, sandbox and download-user settings, and every file
   under `/etc/pacman.conf` and `/etc/pacman.d` stay as the image has them; no setting of the feature outlives its run.
 - Every non-empty installation stays one transaction that is a full system upgrade; no partial upgrade, forced refresh,
-  or downgrade switch is introduced.
+  or downgrade switch is introduced, and the system upgrade downgrades nothing.
 - The compatibility images and architectures stay as they are, and the feature gains no privilege, mount, lifecycle
   hook, environment variable, or feature dependency.

@@ -22,18 +22,20 @@ none. A non-empty value SHALL be the upper bound of simultaneous downloads (`Par
 the feature's one `pacman` call, overriding only that setting and only for that call.
 
 `pacman` takes this setting from its configuration alone, so for a non-empty value and a non-empty package list the
-feature SHALL create a temporary configuration file outside `/etc` that holds nothing but an inclusion of
-`/etc/pacman.conf`, the configuration `pacman` reads by default on Arch Linux, followed by the one `ParallelDownloads`
-setting, and SHALL hand that file to `pacman` for the call. The feature SHALL remove the file, and any directory it
-created for it, when it exits, whether the installation succeeded or failed. It SHALL create no such file for an empty
-value or an empty list.
+feature SHALL create a temporary configuration file outside `/etc` that holds no setting other than an inclusion of
+`/etc/pacman.conf`, the configuration `pacman` reads by default on Arch Linux, and the one `ParallelDownloads` setting,
+and SHALL hand that file to `pacman` for the call. The setting SHALL be placed so that `pacman` reads it in the options
+section and after everything the inclusion brings, whichever section the image's configuration ends in. The feature
+SHALL remove the file, and any directory it created for it, when it exits, whether the installation succeeded or failed.
+It SHALL create no such file for an empty value or an empty list.
 
-Before the package databases are synchronized, the feature SHALL confirm that the configuration `pacman` resolves from
-the temporary file carries the requested value. When it does not, because `/etc/pacman.conf` is missing or unreadable,
-because the `pacman` found does not know the setting, or because the value cannot be confirmed, the feature SHALL exit
-with status 1 and a message naming `parallelDownloads`, without synchronizing, installing, or upgrading anything. It
-SHALL NOT continue with the image's value, and SHALL NOT run `pacman` with a configuration that lacks the image's
-repositories.
+Before the package databases are synchronized, the feature SHALL confirm with `pacman-conf`
+(https://man.archlinux.org/man/pacman-conf.8), the tool that reports the configuration `pacman` resolves, that the
+configuration resolved from the temporary file carries the requested value. When `pacman-conf` reports another value or
+none, fails, or cannot be run, whatever the cause, a missing or unreadable `/etc/pacman.conf` included, the feature
+SHALL exit with status 1 and a message naming `parallelDownloads`, without synchronizing, installing, or upgrading
+anything. It SHALL NOT continue with the image's value, and SHALL NOT run `pacman` with a configuration that lacks the
+image's repositories.
 
 The feature knowingly leaves three things in place. `pacman` writes its command line to `/var/log/pacman.log`, so the
 log keeps the path of the removed temporary file; the feature does not edit the log. An image whose `pacman` reads its
@@ -68,6 +70,20 @@ kept small for that reason.
 - **THEN** the feature exits with status 1, names `parallelDownloads`, synchronizes no database, installs and upgrades
   nothing, and leaves no temporary file behind
 
+#### Scenario: Unconfirmed value fails closed
+
+- **WHEN** `parallelDownloads` is non-empty, `packages` names at least one package, and `pacman-conf` is missing, fails,
+  or reports for the temporary configuration a `ParallelDownloads` value other than the requested one
+- **THEN** the feature exits with status 1, names `parallelDownloads`, synchronizes no database, installs and upgrades
+  nothing, and leaves no temporary file behind
+
+#### Scenario: Image configuration ending in a repository section
+
+- **WHEN** `parallelDownloads` holds an accepted value, `packages` names at least one package, and the last section of
+  the image's `/etc/pacman.conf` is a repository section
+- **THEN** the configuration `pacman` resolves for the feature's call has that value as `ParallelDownloads` and the
+  repositories of the image, and the listed packages are installed
+
 #### Scenario: Parallel downloads apply under every cleanup value
 
 - **WHEN** `parallelDownloads` is non-empty and `cleanup` is `all`, `packages`, or `none`
@@ -85,28 +101,21 @@ kept small for that reason.
 The feature SHALL declare no option for download retries, for waiting on the package database lock, for download
 timeouts, or for a proxy, because `pacman` has no bounded native control the feature could set for one call. It SHALL
 NOT set, change, or unset a proxy or any other environment variable for `pacman`, SHALL NOT pass an argument or setting
-that changes retries, lock handling, or timeouts, and SHALL NOT replace `pacman`'s downloader. What applies is the
-image's configuration and `pacman`'s own behavior: a download that fails is tried again only on the next server the
-image lists for that repository; a package database lock that is already held fails the installation at once, and the
-feature SHALL neither wait for the lock nor remove it; proxy variables of the build environment reach `pacman` as they
-are. These limits SHALL be documented.
+that changes retries, lock handling, or timeouts, SHALL NOT replace `pacman`'s downloader, SHALL NOT repeat a `pacman`
+call that failed, and SHALL neither wait for nor remove a package database lock that is already held. The image's
+configuration and `pacman`'s own behavior apply to each of them, and the feature SHALL document that it controls none.
 
 #### Scenario: Held database lock fails the installation
 
 - **WHEN** `packages` names at least one package and the lock file of the image's package database already exists
-- **THEN** the feature exits with a non-zero status without waiting, installs and upgrades nothing, and the lock file is
-  still there
+- **THEN** the feature exits with a non-zero status after its one `pacman` call, installs and upgrades nothing, and the
+  lock file is still there
 
 #### Scenario: Build environment proxy reaches pacman unchanged
 
-- **WHEN** the environment the feature runs in sets a proxy variable that `pacman`'s downloader honors
-- **THEN** `pacman` downloads through that proxy, and the feature has neither added, changed, nor removed a proxy
-  setting
-
-#### Scenario: Failing server falls back to the next one
-
-- **WHEN** the first server the image lists for a repository refuses the connection and a later one answers
-- **THEN** the feature succeeds with the downloads taken from the later server
+- **WHEN** the environment the feature runs in sets proxy variables
+- **THEN** the environment `pacman` receives holds those variables with the same values, and the feature has neither
+  added, changed, nor removed a proxy setting
 
 ## MODIFIED Requirements
 
@@ -168,29 +177,35 @@ name of a package in the configured repositories, otherwise a name that packages
 package group. An entry SHALL NOT be matched as a regular expression or a glob. A name that several packages provide
 installs the provider `pacman` offers first, and a group name installs every package of the group.
 
-An entry without a repository name is resolved across all repositories the image configures, in their configured order.
-A repository-qualified entry SHALL reach `pacman` unchanged, so that `pacman` resolves its target, by the same steps and
-with the same version constraints, only in the configured repository of that name. The feature SHALL NOT look up,
-enable, add, or reorder a repository itself. A repository name that the image's configuration does not define, compared
-exactly and with case, SHALL fail as `pacman` fails it: after the package databases were synchronized, before any
-package is installed or upgraded, with a non-zero status and `pacman`'s message naming the repository. A package's
-signature is checked as for any other entry (requirement "Repository authentication stays in effect").
+An entry without a repository name is resolved across the repositories the image's configuration enables for
+installation (`Usage`, pacman.conf(5)), in their configured order. A repository-qualified entry SHALL reach `pacman`
+unchanged, so that `pacman` resolves its target, by the same steps and with the same version constraints, only in the
+configured repository of that name. The feature SHALL NOT look up, enable, add, or reorder a repository itself. A
+repository name that the image's configuration does not define, compared exactly and with case, SHALL fail as `pacman`
+fails it: after the package databases were synchronized, before any package is installed or upgraded, with a non-zero
+status and `pacman`'s message naming the repository. A package's signature is checked as for any other entry
+(requirement "Repository authentication stays in effect").
 
 A qualified entry has `pacman`'s native properties, and the feature adds no check of its own to any of them:
 
-- It is not a pin. The full system upgrade of the same and of every later installation follows the configured order of
-  the repositories, so a package installed from a named repository is upgraded when another configured repository offers
-  a newer version.
-- It reaches a repository that the image's configuration does not enable for installation (a `Usage` setting without
-  `Install` or `All`, pacman.conf(5)), because `pacman` treats a named repository as valid for that target. The feature
-  knowingly leaves this in place: the repository is one the image configures and whose signatures it checks, the
-  qualifier names it visibly in the developer's configuration, and refusing it would need a second resolution beside
-  `pacman`'s own.
+- It is not a pin. The version the named repository offers stands for the installation that installs it: `pacman` leaves
+  a package it installs for a listed entry out of that transaction's system upgrade, also when another configured
+  repository offers a newer version. An installation that finds the entry already satisfied skips it, and its full
+  system upgrade then follows the configured order of the repositories, so the package is upgraded when a repository
+  earlier in that order offers a newer version.
+- It reaches a repository that the image's configuration synchronizes but does not enable for installation (a `Usage`
+  setting with `Sync` and without `Install` or `All`, pacman.conf(5)), because `pacman` treats a named repository as
+  valid for the named target, and for nothing else: the target's dependencies and every unqualified entry are still
+  resolved only in the repositories enabled for installation, so a qualified entry whose dependency only that repository
+  offers fails. The feature knowingly leaves the reach of the named target in place: the repository is one the image
+  configures and whose signatures it checks, the qualifier names it visibly in the developer's configuration, and
+  refusing it would need a second resolution beside `pacman`'s own.
 - It can select a version older than the installed one. When the named repository offers the target only at an older
-  version than the one installed, `pacman` selects that older version to replace the installed package, as it does for
-  an unqualified entry whose version constraint only an older offered version satisfies. The feature knowingly leaves
-  this in place for an explicit entry and adds no guard; it cannot occur while every configured repository offers one
-  version of a package name, as on the images of `test/pacman-packages/compatibility.json`.
+  version than the one installed, `pacman` replaces the installed package with that older version, as it does for an
+  unqualified entry whose version constraint only an older offered version satisfies (requirement "Full system upgrade",
+  which states this risk and its reason). It cannot occur while every configured repository offers one version of a
+  package name, as on the images of `test/pacman-packages/compatibility.json`. What repeated installations with such an
+  entry do is stated in the requirement "Installing the feature twice".
 
 #### Scenario: Unknown package fails
 
@@ -216,9 +231,10 @@ A qualified entry has `pacman`'s native properties, and the feature adds no chec
 #### Scenario: Qualified entry resolves in the named repository
 
 - **WHEN** `packages` holds repository-qualified entries naming a package, a provided name, a group, and a package with
-  a version constraint the offered version satisfies, each offered by the named repository
-- **THEN** the feature succeeds and each is installed from the named repository, also when a repository earlier in the
-  configured order offers a package of the same name
+  a version constraint the offered version satisfies, each offered by the named repository and none of them installed
+- **THEN** the feature succeeds and each named package, provider, or group member is installed from the named repository
+  at the version it offers, also when a repository earlier in the configured order offers a newer version of the same
+  name; their dependencies are resolved as for any other entry
 
 #### Scenario: Qualified entry outside the named repository fails
 
@@ -248,16 +264,54 @@ A qualified entry has `pacman`'s native properties, and the feature adds no chec
 
 #### Scenario: Qualified entry reaches a repository not enabled for installation
 
-- **WHEN** `packages` holds a repository-qualified entry whose repository the image configures with a `Usage` that
-  leaves out installation
-- **THEN** `pacman` resolves the target in that repository, under that repository's signature level
+- **WHEN** `packages` holds a repository-qualified entry whose repository the image configures with a `Usage` that holds
+  `Sync` and leaves out `Install`, and whose target needs no dependency that only this repository offers
+- **THEN** the feature succeeds and the package is installed from that repository, under that repository's signature
+  level
+
+#### Scenario: Dependency only in a repository not enabled for installation fails
+
+- **WHEN** `packages` holds a repository-qualified entry whose repository is not enabled for installation and whose
+  target depends on a package that only this repository offers and no entry names with the repository
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+#### Scenario: Unqualified entry does not reach a repository not enabled for installation
+
+- **WHEN** `packages` holds an unqualified entry for a package that only a repository not enabled for installation
+  offers, alongside a qualified entry naming that repository
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
 
 #### Scenario: Qualified entry offering an older version
 
 - **WHEN** `packages` holds a repository-qualified entry whose named repository offers the target only at a version
   older than the installed one
-- **THEN** the entry reaches `pacman` unchanged, `pacman` selects the older version to replace the installed one, and
-  the feature neither refuses the entry nor passes an argument that forces or prevents the replacement
+- **THEN** the feature succeeds, the installed version is the older one the named repository offers, and the feature
+  passed no argument that forces or prevents the replacement
+
+### Requirement: Full system upgrade
+
+Arch Linux supports only full system upgrades (https://wiki.archlinux.org/title/System_maintenance). When `packages`
+names at least one package, the feature SHALL, together with installing the list, upgrade every installed package for
+which the configured repositories offer a newer version and which the image's pacman configuration does not hold back,
+and SHALL replace an installed package with a package of the configured repositories that declares it replaces that
+package (`replaces`, https://man.archlinux.org/man/PKGBUILD.5), removing the replaced package. The system upgrade SHALL
+NOT downgrade any installed package, and the feature SHALL NOT pass an argument that allows a downgrade.
+
+A package that `pacman` installs for a listed entry of the same installation is not part of that installation's system
+upgrade: it is installed at the version the entry selects (requirements "Version constraints" and "Entries select
+packages as pacman matches them"). When an entry's repository qualifier or version constraint leaves only a version
+older than the installed one, `pacman` therefore replaces the installed package with that older version. This needs
+configured repositories that offer one package name at different versions. The feature knowingly leaves it in place and
+adds no guard: the developer's configuration names the entry, refusing it would need a resolution of the feature's own
+beside `pacman`'s before the one transaction, and the feature has no option that governs downgrades.
+
+#### Scenario: Outdated installed packages are upgraded
+
+- **WHEN** the image has installed packages older than the versions the configured repositories offer and `packages`
+  names at least one package
+- **THEN** after the feature succeeds, no installed package that the image's pacman configuration does not hold back is
+  older than the version the repositories offer, other than a package this installation installed for a listed entry
+  whose repository qualifier or version constraint selected that version
 
 ### Requirement: Repository authentication stays in effect
 
@@ -335,9 +389,18 @@ choices SHALL NOT override the later cleanup policy. Every non-empty invocation 
 upgrade.
 
 A `parallelDownloads` value SHALL apply to the installation that sets it and to no other: a later installation without
-it uses the image's setting, and finds no file an earlier one created for it. A package installed for a
-repository-qualified entry is kept like any other, and a later installation's upgrade treats it like any other
-(requirement "Entries select packages as pacman matches them").
+it uses the image's setting, and finds no file an earlier one created for it.
+
+A package installed for a repository-qualified entry is kept like any other, and a later installation that does not name
+it upgrades it like any other. A second installation with the same qualified entry finds the entry satisfied and changes
+nothing for it while no repository earlier in the configured order offers a newer version of that package name. When one
+does, the installed version alternates between installations with the same options: the installation that finds the
+named repository's version installed skips the entry and its system upgrade moves the package to the newer version, and
+the next one replaces that with the named repository's version again (requirements "Entries select packages as pacman
+matches them" and "Full system upgrade"). Every one of these installations succeeds. The same holds for an unqualified
+entry whose version constraint only the older of several offered versions satisfies. The feature knowingly leaves this
+in place: it keeps no state between installations, and each installation is the one `pacman` transaction its options
+describe.
 
 #### Scenario: Same list on the second install
 
@@ -353,7 +416,7 @@ repository-qualified entry is kept like any other, and a later installation's up
 #### Scenario: Constraint below the installed version on the second install
 
 - **WHEN** the second installation's `packages` holds `name<version` or `name=version` with a version older than the one
-  installed
+  installed, and no configured repository offers a version that satisfies it
 - **THEN** the second installation exits with a non-zero status and the installed version stays as it was
 
 #### Scenario: Later controls apply to the second installation
@@ -369,3 +432,10 @@ repository-qualified entry is kept like any other, and a later installation's up
   a non-empty list, sets no `parallelDownloads` or another value
 - **THEN** the second installation's `pacman` call uses the image's setting or its own value, no temporary configuration
   of the first exists, and the package the first installed for the qualified entry is still installed
+
+#### Scenario: Same qualified entry with a newer version in an earlier repository
+
+- **WHEN** the feature is installed three times with the same repository-qualified entry, the package is not installed
+  before the first, and a repository earlier in the configured order offers a newer version of that package name
+- **THEN** all three installations succeed; after the first the installed version is the named repository's, after the
+  second the newer one, and after the third the named repository's again
