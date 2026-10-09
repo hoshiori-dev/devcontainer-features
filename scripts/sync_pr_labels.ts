@@ -344,7 +344,7 @@ export function withdrawnAfter(events: LabelEvent[], id: number): boolean {
 
 const list = (changes: Change[]) => changes.map((change) => shown(change.name)).join(", ");
 
-/** Why the run its event started may not record the approval; undefined when it may. Reads the head again. */
+/** Why the run its event started may not record the approval, or the head and event it may record after reading both again. */
 async function recordingRefusal(
     api: Api,
     number: number,
@@ -374,6 +374,11 @@ async function recordingRefusal(
     const again = await api.pull(number);
     if (again.state !== "open") return { refusal: "the pull request was closed meanwhile" };
     if (again.head !== event.head) return { refusal: "the head moved while the run read the pull request" };
+    // The label history once more, after every other read: a withdrawal that landed while this run was reading
+    // is not restored, and a later adding belongs to the run it started.
+    const now = await api.labelEvents(number);
+    if (latestApproval(now)?.id !== latest.id) return { refusal: "spec:approved was added again while the run read" };
+    if (withdrawnAfter(now, latest.id)) return { refusal: "a person withdrew it while the run read" };
     return { pull: again, eventId: latest.id };
 }
 
@@ -397,7 +402,10 @@ export async function decide(api: Api, number: number, pull: Pull, event: Event 
                     "is not decided",
             };
         }
-        const archives = files.some((file) => file.status === "added" && file.path.startsWith(`${CHANGES}archive/`));
+        // A file that arrives under the archive, added or moved there from a change the base still held.
+        const archives = files.some((file) =>
+            (file.status === "added" || file.status === "renamed") && file.path.startsWith(`${CHANGES}archive/`)
+        );
         return archives
             ? { ...base, state: ARCHIVED, reason: "no unarchived change, and the pull request adds an archived one" }
             : { ...base, state: null, reason: "no unarchived change and no archived one added" };
@@ -439,7 +447,7 @@ export async function decide(api: Api, number: number, pull: Pull, event: Event 
         if (latest !== undefined && record.eventId !== latest.id) {
             problems.push("the record answers an earlier adding of spec:approved than the latest");
         }
-        const recorded = await api.tree(record.commit);
+        const recorded = record.commit === pull.head ? head : await api.tree(record.commit);
         if (recorded.truncated) {
             throw new Error("the tree of the approved commit is truncated, so the packages cannot be compared");
         }

@@ -91,6 +91,8 @@ interface World {
     permissions?: Record<string, string>;
     /** What later reads of the pull request return, in order; the last one repeats. */
     later?: Pull[];
+    /** What the second and later reads of the label events return. */
+    laterEvents?: LabelEvent[];
     /** A read that throws. */
     failing?: "files" | "tree" | "labelEvents" | "comments";
 }
@@ -99,6 +101,7 @@ interface World {
 function fake(world: World) {
     const calls: string[] = [];
     let reads = 0;
+    let eventReads = 0;
     let nextComment = 1000;
     const read = <T>(name: World["failing"], value: () => T): Promise<T> =>
         world.failing === name ? Promise.reject(new Error(`${name} failed`)) : Promise.resolve(value());
@@ -117,7 +120,10 @@ function fake(world: World) {
                 if (!tree) throw new Error(`no tree for ${commit}`);
                 return tree;
             }),
-        labelEvents: () => read("labelEvents", () => world.events ?? []),
+        labelEvents: () => {
+            const first = eventReads++ === 0;
+            return read("labelEvents", () => (first ? world.events : world.laterEvents ?? world.events) ?? []);
+        },
         comments: () => read("comments", () => world.comments ?? []),
         permission: (login) => Promise.resolve(world.permissions?.[login] ?? "none"),
         addLabels: (_number, names) => {
@@ -230,6 +236,11 @@ Deno.test("a record whose package equals the head's keeps spec:approved", async 
     assertEquals(await stateOf(approvedWorld({ ...CHANGE, "openspec/changes/add-x/tasks.md": "t9" })), APPROVED);
     assertEquals(await stateOf(approvedWorld({ ...CHANGE, "openspec/specs/y/spec.md": "my2" })), APPROVED);
     assertEquals(await stateOf(approvedWorld({ ...CHANGE, "src/x/install.sh": "i2", "README.md": "r2" })), APPROVED);
+    // A record of the head itself compares the head's tree with itself: no second tree is read.
+    const fresh = approvedWorld();
+    fresh.comments = [recordComment(1, C2, 10)];
+    delete fresh.trees[C1];
+    assertEquals(await stateOf(fresh), APPROVED);
 });
 
 Deno.test("a changed approval package gives spec:pending", async () => {
@@ -270,6 +281,13 @@ Deno.test("without an unarchived change the label is spec:archived for an added 
         trees: { [C2]: treeOf(ARCHIVE_ONLY) },
     };
     assertEquals(await stateOf(archived), ARCHIVED);
+    // A change the base still held arrives under the archive as a rename.
+    archived.files = [{
+        path: "openspec/changes/archive/2026-01-01-add-x/proposal.md",
+        status: "renamed",
+        previous: "openspec/changes/add-x/proposal.md",
+    }, { path: "openspec/changes/add-x/tasks.md", status: "removed" }];
+    assertEquals(await stateOf(archived), ARCHIVED, "a change moved into the archive");
     archived.pull.changedFiles = 1;
     archived.files = [{ path: "openspec/changes/archive/2026-01-01-add-x/proposal.md", status: "modified" }];
     assertEquals(await stateOf(archived), null, "an edit under the archive alone");
@@ -314,6 +332,32 @@ function recordingWorld(labels = [PENDING, APPROVED]): World {
         permissions: { [MAINTAINER]: "write" },
     };
 }
+
+Deno.test("the recording run reads the label history again after its other reads and records nothing withdrawn meanwhile", async () => {
+    const late: Record<string, LabelEvent[]> = {
+        "spec:approved removed": [bot(5, true, PENDING), ev(10, true, APPROVED), ev(11, false, APPROVED)],
+        "spec:pending added": [bot(5, true, PENDING), ev(10, true, APPROVED), ev(11, true, PENDING)],
+        "spec:approved added again": [
+            bot(5, true, PENDING),
+            ev(10, true, APPROVED),
+            ev(11, false, APPROVED),
+            ev(12, true, APPROVED),
+        ],
+    };
+    for (const [name, laterEvents] of Object.entries(late)) {
+        const world = recordingWorld();
+        world.laterEvents = laterEvents;
+        const result = await ran(world, { event: APPROVAL_EVENT });
+        assertEquals(result.status, 0, name);
+        assert(!result.calls.includes("create comment"), `${name}: no record`);
+        assertEquals(result.world.pull.labels.filter((label) => label.startsWith("spec:")), [PENDING], name);
+        assert(result.notes.some((note) => note.includes("while the run read")), name);
+    }
+    // The same events by a bot change nothing.
+    const world = recordingWorld();
+    world.laterEvents = [...world.events!, bot(11, false, APPROVED), bot(12, true, PENDING)];
+    assertEquals((await ran(world, { event: APPROVAL_EVENT })).calls[0], "create comment");
+});
 
 Deno.test("the run its event started records the approval, keeps spec:approved, and removes spec:pending", async () => {
     const result = await ran(recordingWorld(), { event: APPROVAL_EVENT });

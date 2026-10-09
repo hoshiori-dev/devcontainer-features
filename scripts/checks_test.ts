@@ -287,7 +287,9 @@ Deno.test("pr-labels.yml labels pull requests within the bounds the exception in
     }
     assert(!text.includes("secrets."), "no secret");
     // No cache is restored or saved, here or in the tool setup: a cache is a way into a job with a write token.
-    const action = parseYaml(await Deno.readTextFile(".github/actions/setup-tools/action.yml"));
+    const action = parseYaml(
+        await Deno.readTextFile(new URL("../.github/actions/setup-tools/action.yml", import.meta.url)),
+    );
     assertEquals(Object.keys(action.inputs).filter((input) => /cache/i.test(input)), []);
     for (const step of [...job.steps, ...action.runs.steps]) {
         assert(!/cache/i.test(step.uses ?? ""), step.uses);
