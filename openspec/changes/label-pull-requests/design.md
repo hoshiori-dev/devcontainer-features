@@ -63,13 +63,14 @@
 - Verifying who decided an approval beyond the account that added the label.
 - Protection against someone with write access, who can set any label by hand.
 - Keeping a pull request's area labels equal to its paths in both directions.
+- Telling work that began before an approval from work whose approval was withdrawn afterwards.
 
 ## Decisions
 
-- **One script decides both kinds of label.** `scripts/sync_pr_labels.ts` reads a pull request's state through the API,
-  decides the labels, and prints them; with `--apply` it writes the difference. Rejected: GitHub's labeler for the areas
-  beside a script for the state, which adds an action to the allow-list, a second configuration file, and a second
-  writer of labels on the same event for something one pass over a file list does.
+- **One script decides every label.** `scripts/sync_pr_labels.ts` reads a pull request's state through the API, decides
+  the labels, and prints them; with `--apply` it writes the difference. Rejected: GitHub's labeler for the areas beside
+  a script for the state, which adds an action to the allow-list, a second configuration file, and a second writer of
+  labels on the same event for something one pass over a file list does.
 - **The record is the approved commit, not a fingerprint.** The comment the workflow keeps holds the commit id, the
   account, and the id of the label event it answers. Each run reads the tree of that commit and the tree of the head and
   compares the approval package in both. The trees are addressed by commit, so a push between two reads cannot change
@@ -124,6 +125,17 @@
   the record, the label events, and the two trees. An agent reads the package gate that way. A label that lags a push, a
   run that failed, and a disabled workflow then all read as `spec:pending`, and no rule has to name a workflow run.
   Rejected: reading the bare label after the run for the head commit, which no API ties to a pull request's head.
+- **`implementing` is a function of the file list.** With an unarchived change at the head, the label is on the pull
+  request exactly when its file list holds a path, a renamed file's previous name included, that is neither under
+  `openspec/changes/` nor the `openspec/specs/<id>/spec.md` of a capability that an unarchived change has a delta for.
+  `tasks.md` lies under `openspec/changes/` and so is no implementation. With no unarchived change the label is removed,
+  whatever the file list holds: `spec:archived` or no change at all leaves nothing to warn of. Nothing is recorded and
+  no label event is read, so a person who sets or removes it by hand is overruled at the next run, and it enters no
+  decision about the state. A run that fails leaves it as it is. Rejected: a pair of labels, where the absence of one
+  already says the other; a name under `spec:`, which would break the rule of one state label; a check that fails on
+  `spec:pending` beside it, which is also what a withdrawn approval over finished work looks like, so that telling the
+  two apart needs a second record of history; counting `tasks.md`, which is written before any work and would set the
+  label on every approved pull request at once.
 - **Area labels are added, never removed.** The workflow adds the area of every changed path. Rejected: setting exactly
   the areas of the paths, which removes a label a person set and goes beyond what #123 settled.
 - **The map from paths to areas.** First match wins; a renamed file counts under both names:
@@ -142,7 +154,8 @@
   row gives no label, and the unit test over the tracked files makes a new top-level directory fail `just check` in the
   pull request that adds it. Rejected: `harness` for whatever matches nothing, which would hide a new area. When the
   file list is cut short, which the pull request's own count of changed files shows, no area label and no
-  `spec:archived` is decided; the state of an unarchived change does not depend on the list.
+  `spec:archived` is decided, and with an unarchived change at the head `implementing` is left as it is; the state of an
+  unarchived change does not depend on the list.
 - **The workflow.** `.github/workflows/pr-labels.yml`, one job, `label`; its checkable shape is the proposal's
   Acceptance item. One concurrency group per pull request cancels no running run; a pending run can still be replaced by
   a newer one, which is why no decision but the recording depends on a run's own event. The event reaches the script as
@@ -161,8 +174,8 @@
   agent may start one when it reads a state that a missed run explains. Adding `spec:approved` on the maintainer's
   instruction has no text to review; the agent names the pull request and its head commit before it adds the label and
   reads the workflow's comment back afterwards.
-- **Colors.** `spec:pending` light yellow, `spec:approved` green, `spec:archived` light blue, each with a description
-  for the reader of the list.
+- **Colors.** `spec:pending` light yellow, `spec:approved` green, `spec:archived` light blue, `implementing` light
+  purple, each with a description for the reader of the list.
 
 ## Risks / Trade-offs
 
@@ -183,6 +196,9 @@
   records again only if the head is still the commit it named.
 - **A second maintainer cannot add a label that is already there.** Approving again after a withdrawal means removing
   and adding it; after a withdrawal the workflow has already removed it.
+- **`spec:pending` beside `implementing` is not a verdict.** It shows on a pull request whose work began too early and
+  on one whose approved text was edited after the work. Mitigation: the knowledge base says it calls for a look, and the
+  record comment says whether an approval was withdrawn.
 - **Everything waits for GitHub Actions.** While the workflow cannot run, no approval is recorded and the gate reads as
   pending. See Open Questions.
 - **A stale area label stays.** When the last file of an area leaves a pull request, its label remains until someone
@@ -190,10 +206,10 @@
 
 ## Migration Plan
 
-One pull request. The merge changes `.github/labels.yml`, so the Labels workflow creates the three labels; a pull
-request event that arrives before it has finished fails and is repeated by dispatch. The assumptions of Context are
-measured after the merge on a test pull request, the fork case by whoever has a fork, and the results go into one
-comment on this pull request.
+One pull request. The merge changes `.github/labels.yml`, so the Labels workflow creates the four labels; a pull request
+event that arrives before it has finished fails and is repeated by dispatch. The assumptions of Context are measured
+after the merge on a test pull request, the fork case by whoever has a fork, and the results go into one comment on this
+pull request.
 
 Rollback is a revert: the workflow stops, labels and comments stay, and the knowledge base says again that the package
 gate closes in conversation.

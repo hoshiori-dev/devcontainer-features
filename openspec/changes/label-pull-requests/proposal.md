@@ -7,8 +7,9 @@ Implements [#123](https://github.com/hoshiori-dev/devcontainer-features/issues/1
 A pull request shows neither where its specification stands nor which areas it touches. Both approval gates close in
 conversation, and the only trace on GitHub is a line the agent writes into the description, so an approval is asked for
 again in the next session; nothing withdraws an approval when the approved text changes afterwards; a pull request that
-waits for its archive looks like a mergeable one in the list; and the area labels #12 gave to issues reach a pull
-request only when someone remembers them. The maintainer settled the direction in #123 on 2026-10-08.
+waits for its archive looks like a mergeable one in the list; nothing shows that a pull request already holds work
+beyond its specification; and the area labels #12 gave to issues reach a pull request only when someone remembers them.
+The maintainer settled the direction in #123 on 2026-10-08.
 
 ## What Changes
 
@@ -33,11 +34,18 @@ request only when someone remembers them. The maintainer settled the direction i
 - **The gate is read by recomputing it.** The same script, run for a pull request without writing, prints the state the
   rules give it now. An agent reads the package gate that way and never from the bare label, so a label that lags a
   push, or a workflow that did not run, reads as not approved.
+- **One label says that work beyond the specification is there.** A pull request whose head holds an unarchived change
+  carries `implementing` when it changes a path outside `openspec/changes/` and outside the main specs of the approval
+  package, so writing `tasks.md` or correcting a Purpose does not set it. The workflow adds it and removes it as the
+  paths change, and removes it once no change is unarchived. It is a notice and no gate: it does not enter the state, no
+  check reads it, and beside `spec:pending` it marks work that began before an approval as well as work whose approval
+  was withdrawn afterwards, which only a reader tells apart.
 - **Area labels on pull requests.** The workflow adds the area labels of the paths a pull request changes, one or
-  several. It never removes an area label and leaves every other label alone.
-- **One workflow keeps both.** It runs when a pull request is opened, reopened, updated, or relabelled, and by dispatch
-  for one pull request. It runs on `pull_request_target`, as GitHub's own labeler does, so that it can label a pull
-  request from a fork.
+  several, and never removes one. A label other than the five areas, the three states, and `implementing` it leaves
+  alone.
+- **One workflow keeps them all.** It runs when a pull request is opened, reopened, updated, or relabelled, and by
+  dispatch for one pull request. It runs on `pull_request_target`, as GitHub's own labeler does, so that it can label a
+  pull request from a fork.
 - **A named exception to "Never use `pull_request_target`".** `checks.md` keeps the rule and names this one workflow
   with the bounds that make it safe: it runs the default branch's script and never checks out, fetches, or runs anything
   of the pull request; it reads what it needs through the API; what a pull request controls reaches it as data; its
@@ -49,7 +57,8 @@ request only when someone remembers them. The maintainer settled the direction i
 - **The `Approval:` line stays, with a narrower job.** It no longer records the package approval. It keeps what no label
   holds: each reconciliation and the archive command. The checklist item of the template that speaks of a deliberation
   closed in conversation names the label. `Phase:`, which #123 named beside it, is left unchanged: it says whether the
-  description is still the specification's or already the implementation's, which no label says.
+  description is still the specification's or already the implementation's, a statement about the description that
+  `implementing`, which reads the diff, does not make.
 - **Authority.** `agent-authority.md` changes in these places and no other:
   - under "What agents may not do without a human", the first entry becomes "Implement a change before its pull request
     carries `spec:approved`, read as `spec-workflow.md` says.", and this entry is added:
@@ -80,15 +89,15 @@ None.
 ## Impact
 
 - Files: a new workflow under `.github/workflows/`; a new Deno script with its tests, and workflow tests in
-  `scripts/checks_test.ts`; `.github/labels.yml` (three labels); a `just` recipe; `.github/pull_request_template.md`
-  (the `Approval:` line and one checklist item); `openspec/config.yaml` (the rule for `tasks.md` and the guidance for
-  apply, which name the conversation); `.agents/knowledge/spec-workflow.md` (Lifecycle, Approval gates, and the
-  specification block under Specifications and issues), `agent-authority.md` (as above), `github-workflow.md` (Objects
-  in use, Areas, the sentence that there are no status labels, the specification block, Synchronization),
-  `github/checks.md` (Rules, the job map, Toolchain pins, Waiting for the archive), and `review-guidance.md` (one
-  accepted risk, below); the `github-project-workflow` skill (Take work, Finish, and how the label is read and added);
-  `AGENTS.md` (Core Conventions, Validation, Workflow); `SECURITY.md` (the same accepted risk in its overview);
-  `CONTRIBUTING.md` where it says how a specification is approved.
+  `scripts/checks_test.ts`; `.github/labels.yml` (four labels); a `just` recipe; `.github/pull_request_template.md` (the
+  `Approval:` line and one checklist item); `openspec/config.yaml` (the rule for `tasks.md` and the guidance for apply,
+  which name the conversation); `.agents/knowledge/spec-workflow.md` (Lifecycle, Approval gates, and the specification
+  block under Specifications and issues), `agent-authority.md` (as above), `github-workflow.md` (Objects in use, Areas,
+  the sentence that there are no status labels, the specification block, Synchronization), `github/checks.md` (Rules,
+  the job map, Toolchain pins, Waiting for the archive), and `review-guidance.md` (one accepted risk, below); the
+  `github-project-workflow` skill (Take work, Finish, and how the label is read and added); `AGENTS.md` (Core
+  Conventions, Validation, Workflow); `SECURITY.md` (the same accepted risk in its overview); `CONTRIBUTING.md` where it
+  says how a specification is approved.
 - Checked and left alone: `github/platform-settings.md`, `git-workflow.md`, `README.md`, `README.zh.md`,
   `.github/skills/`, `scripts/lib/repo.ts` (`INFRA_PATHS`), `scripts/check_pr_body.ts`, and the generated OpenSpec
   skills.
@@ -116,7 +125,7 @@ None.
   running workflow shows on a real pull request, one from a fork included, is measured after the merge on the
   maintainer's command; the design lists what is measured, and a refuted assumption is fixed forward or the workflow is
   reverted.
-- Remote state written by the merge: the Labels workflow creates the three labels. From then on the new workflow writes
+- Remote state written by the merge: the Labels workflow creates the four labels. From then on the new workflow writes
   labels and one comment on pull requests. A revert stops it and leaves labels and comments where they are.
 - A pull request open at the merge gets its labels at its next event or by dispatch. An approval given in conversation
   before the merge is carried over by the maintainer adding the label. None is open today.
@@ -129,7 +138,8 @@ None.
 
 **Becomes true:**
 
-- `.github/labels.yml` declares `spec:pending`, `spec:approved`, and `spec:archived`, and `just check` passes with them.
+- `.github/labels.yml` declares `spec:pending`, `spec:approved`, `spec:archived`, and `implementing`, and `just check`
+  passes with them.
 - For a pull request state given to it, the script decides the state label as What Changes states. A unit test covers
   each of these: an unarchived change and no record gives `spec:pending`; a record whose package equals the head's keeps
   `spec:approved`; a changed proposal, design, delta spec, or change metadata, an added or renamed change, and a changed
@@ -154,13 +164,21 @@ None.
   an open pull request with `spec:pending` when the script could still write: a unit test covers a failing read and a
   tree the API reports as truncated. A file list cut short decides no area label and no `spec:archived`, and a run that
   succeeds writes nothing on a closed pull request; a unit test covers each.
+- The script decides `implementing` as What Changes states. A unit test covers each of these, with an unarchived change
+  at the head: only files of the change give no `implementing`; a changed `tasks.md` of the change, and a changed main
+  spec of a capability the change has a delta for, each give none; a changed path anywhere else gives it, a changed main
+  spec of another capability included; a file renamed out of or into `openspec/changes/` gives it. Without an unarchived
+  change the result holds no `implementing`, and one that is on the pull request is removed, as is one set by hand where
+  the paths do not give it. With an unarchived change at the head, a file list cut short leaves the label as it is;
+  without one the label is removed all the same. With `spec:approved` and with `spec:pending` the state label is the
+  same whether `implementing` is there or not, and a person adding or removing `implementing` withdraws no approval.
 - The record comment holds nothing a pull request named: a unit test builds it for a change and files whose names hold
   comment, mention, and workflow-command syntax and finds none of it in the body. A record is accepted only from one
   comment written by `github-actions[bot]`, of type `Bot`, whose first line has the fixed form.
 - The script maps every path to its areas as the design's table gives them, counts a renamed file under both names, and
   a unit test fails when a file tracked in the repository matches no row of the map.
 - The script adds the area labels of the changed paths and removes none: a unit test shows an area label that the paths
-  do not give, and a label outside the five and the three, both left alone.
+  do not give, and a label outside the five, the three, and `implementing`, both left alone.
 - The script passes a value a pull request controls to `gh api` only as a string field or in a request body, and a name
   in a path only percent-encoded; it prints such a value only escaped; it accepts a dispatch number only when it is
   digits. A unit test covers each with hostile values.
@@ -175,8 +193,8 @@ None.
 - No other workflow uses `pull_request_target` or `workflow_run`: a unit test over every workflow file asserts it and
   names this workflow as the one exception.
 - The script's printing form makes no write and prints, for #124, `spec:archived`, `ci`, `scripts`, and `harness`; for
-  #132, `spec:archived` and `harness`; and for this pull request, while its change is unarchived, `spec:pending`, `ci`,
-  `scripts`, `harness`, and `spec-workflow`.
+  #132, `spec:archived` and `harness`; and for this pull request, while its change is unarchived, `spec:pending`,
+  `implementing`, `ci`, `scripts`, `harness`, and `spec-workflow`.
 - `checks.md` keeps "Never use `pull_request_target`" and names the one exception with its bounds; its job map holds the
   new job with the command that runs locally; Toolchain pins lists the job among those that run a script directly;
   Waiting for the archive says what the labels show in the list.
@@ -184,9 +202,10 @@ None.
   template's checklist name `spec:approved`, read by recomputing, as what closes the package gate; none still says that
   the package approval is given in conversation or that nothing is recorded on GitHub. `agent-authority.md` holds the
   texts of What Changes and differs from `main` in nothing else.
-- `github-workflow.md` lists the three labels among the objects in use, no longer says that a label states the area of
-  an issue and nothing else or that there are no status labels, says that a pull request gets its area labels from its
-  paths, and its Synchronization table names what changes with the map.
+- `github-workflow.md` lists the four labels among the objects in use, says that `implementing` beside `spec:pending`
+  calls for a look and is no verdict, no longer says that a label states the area of an issue and nothing else or that
+  there are no status labels, says that a pull request gets its area labels from its paths, and its Synchronization
+  table names what changes with the map.
 - `review-guidance.md` and `SECURITY.md` state the accepted risk of Impact.
 - The `Approval:` line of the template asks for the reconciliations and the archive command and no longer for the
   package approval, and `scripts/check_pr_body.ts` accepts a description built from the template.
@@ -206,6 +225,6 @@ None.
   every action is pinned by full commit SHA.
 - No step of any workflow checks out, fetches, or runs a pull request's code with a write token.
 - Labels on issues are set by people and agents as `agent-authority.md` says; no automation labels an issue.
-- The Labels workflow and `scripts/sync_labels.ts` are unchanged apart from the three declared labels.
+- The Labels workflow and `scripts/sync_labels.ts` are unchanged apart from the four declared labels.
 - The `Phase:` line of the pull request template is unchanged.
 - No file under `src/`, `test/`, or `openspec/specs/` changes, and `just check` passes.
