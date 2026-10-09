@@ -3,7 +3,7 @@
 ## Purpose
 
 The `dnf-packages` feature installs a list of system packages with `dnf` on Fedora and RHEL-compatible images, taking
-them only from the package repositories the image already configures and enables, and configures nothing else.
+them only from the package repositories the image already configures, and configures nothing else.
 
 Upstream sources:
 
