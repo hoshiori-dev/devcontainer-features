@@ -52,10 +52,10 @@ handled as a vulnerability:
   been compromised.
 - Where an upstream publishes no checksum or signature, a download relies on TLS alone. The feature's specification
   under `openspec/specs/` says so for each such download.
-- The scripts that build and release the features pin the packages they import to exact versions, and take them only
-  from widely used, well-maintained publishers. What those packages import in turn is their publishers' choice, and we
-  keep no lock file.
-- We cannot rule out that a maintainer's account is taken over.
+- Our scripts import packages by exact version from widely used, well-maintained publishers. What those packages import
+  in turn is their publishers' choice, and we keep no lock file, so the scripts cannot tell when a publisher has been
+  compromised.
+- We cannot rule out that a maintainer's account could be taken over.
 
 A report about one of these is welcome when it brings something we did not know.
 
