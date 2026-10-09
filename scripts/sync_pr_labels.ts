@@ -58,13 +58,17 @@ export const SPECS = "openspec/specs/";
 export const MAX_FILES = 3000;
 
 const NUMBER = /^[1-9][0-9]{0,9}$/;
-const COMMIT = /^[0-9a-f]{40}$/;
+// The three fields of the record, as patterns without anchors; the writer and the reader are built from the same ones.
+const COMMIT_PART = "[0-9a-f]{40}";
 /** A GitHub login: letters, digits, and single hyphens inside, 39 characters at most. */
-const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
-const EVENT_ID = /^[1-9][0-9]{0,17}$/;
+const LOGIN_PART = "[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}";
+const EVENT_ID_PART = "[1-9][0-9]{0,17}";
+const COMMIT = new RegExp(`^${COMMIT_PART}$`);
+const LOGIN = new RegExp(`^${LOGIN_PART}$`);
+const EVENT_ID = new RegExp(`^${EVENT_ID_PART}$`);
 
 /** The first line of the record comment: the approved commit, the account, and the id of the label event. */
-export const RECORD_LINE = /^Approval record: ([0-9a-f]{40}) ([A-Za-z0-9-]{1,39}) ([1-9][0-9]{0,17})$/;
+export const RECORD_LINE = new RegExp(`^Approval record: (${COMMIT_PART}) (${LOGIN_PART}) (${EVENT_ID_PART})$`);
 const STATUS_APPROVED = "Status: approved";
 const STATUS_WITHDRAWN = "Status: withdrawn";
 
@@ -171,6 +175,8 @@ export interface Decision {
     areas: string[] | undefined;
     /** The labels the pull request has at the last read. */
     labels: string[];
+    /** Whether the pull request was open at the last read; a run that succeeds writes nothing to a closed one. */
+    open: boolean;
     /** The record the recording run writes before the labels; `commentId` when it replaces the one comment. */
     record?: { body: string; commentId?: number };
     /** Records to mark withdrawn before the labels change. */
@@ -353,7 +359,7 @@ async function recordingRefusal(
     changes: Change[],
     events: LabelEvent[],
     records: Approval[],
-): Promise<{ refusal: string } | { pull: Pull; eventId: number }> {
+): Promise<{ refusal: string; pull?: Pull } | { pull: Pull; eventId: number }> {
     if (pull.state !== "open") return { refusal: "the pull request is closed" };
     if (!LOGIN.test(event.sender) || !COMMIT.test(event.head)) {
         return { refusal: "the event names no usable account or commit" };
@@ -372,8 +378,10 @@ async function recordingRefusal(
         return { refusal: `the account's permission is ${shown(permission)}, below write` };
     }
     const again = await api.pull(number);
-    if (again.state !== "open") return { refusal: "the pull request was closed meanwhile" };
-    if (again.head !== event.head) return { refusal: "the head moved while the run read the pull request" };
+    if (again.state !== "open") return { refusal: "the pull request was closed meanwhile", pull: again };
+    if (again.head !== event.head) {
+        return { refusal: "the head moved while the run read the pull request", pull: again };
+    }
     // The label history once more, after every other read: a withdrawal that landed while this run was reading
     // is not restored, and a later adding belongs to the run it started.
     const now = await api.labelEvents(number);
@@ -392,7 +400,7 @@ export async function decide(api: Api, number: number, pull: Pull, event: Event 
         throw new Error("the tree of the head commit is truncated, so the approval package cannot be read");
     }
     const changes = changesOf(head);
-    const base = { areas, labels: pull.labels, withdraw: [] as Approval[] };
+    const base = { areas, labels: pull.labels, open: pull.state === "open", withdraw: [] as Approval[] };
     if (changes.length === 0) {
         if (!complete) {
             return {
@@ -417,8 +425,14 @@ export async function decide(api: Api, number: number, pull: Pull, event: Event 
     let refused = "";
     if (event !== undefined && event.action === "labeled" && event.label === APPROVED) {
         const outcome = await recordingRefusal(api, number, pull, event, changes, events, records);
-        if ("refusal" in outcome) refused = `; not recorded: ${outcome.refusal}`;
-        else {
+        if ("refusal" in outcome) {
+            refused = `; not recorded: ${outcome.refusal}`;
+            // The pull request as the refusal last read it, so that a closing meanwhile stops the writes.
+            if (outcome.pull) {
+                base.open = outcome.pull.state === "open";
+                base.labels = outcome.pull.labels;
+            }
+        } else {
             return {
                 ...base,
                 state: APPROVED,
@@ -507,7 +521,7 @@ export async function run(input: Input, api: Api, out: Output): Promise<number> 
         );
         if (decision.areas === undefined) out.note("areas: not decided, the file list is cut short");
         if (!apply) return 0;
-        if (pull.state !== "open") {
+        if (!decision.open) {
             out.note("the pull request is closed: nothing written");
             return 0;
         }

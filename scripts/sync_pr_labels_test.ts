@@ -418,8 +418,9 @@ Deno.test("recording is refused, and the state is spec:pending, when the approva
         assertEquals(result.printed[0], PENDING, name);
         assert(result.notes.some((note) => note.includes("not recorded")), name);
         // A run that succeeds writes nothing on a closed pull request; every other refusal writes spec:pending.
-        if (name === "the pull request is closed") assertEquals(result.calls, [], name);
-        else assertEquals(result.world.pull.labels.filter((label) => label.startsWith("spec:")), [PENDING], name);
+        if (name === "the pull request is closed" || name === "the pull request closes meanwhile") {
+            assertEquals(result.calls, [], name);
+        } else assertEquals(result.world.pull.labels.filter((label) => label.startsWith("spec:")), [PENDING], name);
     }
 });
 
@@ -610,6 +611,13 @@ Deno.test("recordBody checks each field against its pattern", () => {
     ]);
     assertEquals(recordsOf([{ id: 4, body: withdrawn, author: null }]), []);
     assertEquals(recordsOf([{ id: 4, body: "Approval record: x y z\nStatus: approved\n", author: RECORDER }]), []);
+    // The reader accepts no field the writer would refuse.
+    for (
+        const [login, id] of [["-x", "1"], ["x-", "1"], ["a--b", "1"], ["x".repeat(40), "1"], ["ok", "0"], ["ok", "01"]]
+    ) {
+        const body = `Approval record: ${C1} ${login} ${id}\nStatus: approved\n`;
+        assertEquals(recordsOf([{ id: 4, body, author: RECORDER }]), [], body);
+    }
 });
 
 // ---- Areas -----------------------------------------------------------------------------------------
