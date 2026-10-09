@@ -8,4 +8,4 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
-    labels: ["ci"]
+    labels: ["area:ci"]

@@ -18,7 +18,10 @@ agent stops at a draft PR and a maintainer decides everything after it.
 
 ## What agents may not do without a human
 
-- Implement before a maintainer approves the specification in the current conversation.
+- Implement a change before its pull request carries `spec:approved`, read as `spec-workflow.md` says.
+- Add or remove a `spec:` label on a pull request. `spec:approved` is the maintainer's package approval: an agent adds
+  it only when a maintainer tells it to in the current conversation and names the pull request, never on its own
+  judgment, and otherwise only reads the labels.
 - Archive or sync an OpenSpec change before a maintainer explicitly commands the archive in the current conversation —
   the change may still need revision after review.
 - Approve a PR, merge, publish or tag a release, run the release workflow, or delete branches or tags.
@@ -46,19 +49,19 @@ trailers stay.
 
 ## Gates
 
-| Gate                                  | Meaning                                                                                                                                                                                       | Owner                                                               |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Specification approval (package gate) | The maintainer closes the deliberation on the draft PR's specification in the current conversation and the agent's reconciliation of the PR's threads finds nothing open (`spec-workflow.md`) | A maintainer; never the agent for its own change                    |
-| Review Admission                      | Accepting the implementation and admitting it to formal review — marking the PR ready and requesting review                                                                                   | The agent, under this policy, only after the specification approval |
-| Archive command (freeze gate)         | The maintainer, after review, commands the archive in the current conversation; the archive commit is the version the final approval names                                                    | A maintainer                                                        |
-| Integration                           | The PR is merged into `main`; this publishes every bumped feature version to consumers and transfers engineering responsibility                                                               | A maintainer                                                        |
+| Gate                                  | Meaning                                                                                                                                                                                                                                              | Owner                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Specification approval (package gate) | The maintainer adds `spec:approved` to the draft PR, or tells the agent to; the PR labels workflow keeps it only while the approval package is unchanged, and the agent's reconciliation of the PR's threads finds nothing open (`spec-workflow.md`) | A maintainer; never the agent for its own change                    |
+| Review Admission                      | Accepting the implementation and admitting it to formal review — marking the PR ready and requesting review                                                                                                                                          | The agent, under this policy, only after the specification approval |
+| Archive command (freeze gate)         | The maintainer, after review, commands the archive in the current conversation; the archive commit is the version the final approval names                                                                                                           | A maintainer                                                        |
+| Integration                           | The PR is merged into `main`; this publishes every bumped feature version to consumers and transfers engineering responsibility                                                                                                                      | A maintainer                                                        |
 
-An approval or command given in another session does not carry over; without one in this conversation, treat the gate as
-not passed and ask.
+The archive command does not carry over from another session: without one in this conversation, treat the freeze gate as
+not passed and ask. The package gate is read from the pull request.
 
 ## Escalation — stop and hand to a human when
 
-- No specification approval exists in this conversation for the change you are about to implement.
+- The pull request of the change you are about to implement does not carry `spec:approved`.
 - The work needs a feature, option, dependency (`dependsOn`, `installsAfter`), or file the approved change does not
   cover.
 - A required check (`ci-gate`, `pr-title`, `pr-checklist`, `spec-archived`, `secret-scan`) is unavailable or flaky, or

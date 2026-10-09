@@ -21,8 +21,8 @@ _Reserved: filled in when the pull request is marked ready._
 - Spec: [openspec/changes/NAME/](link to the change on this branch) — or "none" and why (Dependabot bump, typo)
 - Phase: specification
 - Records: proposal.md, specs/FEATURE/spec.md, design.md when warranted; tasks.md follows approval
-- Approval: package deliberation open on this draft — a maintainer reviews the package here and closes it in
-  conversation; tasks and the implementation follow the reconciled package
+- Approval: `spec:approved` on this pull request is the package approval, kept by the PR labels workflow while the
+  package is unchanged; noted here: each reconciliation of the threads before acting on it, and the archive command
 
 ## Validation
 
@@ -35,7 +35,7 @@ _Reserved: filled in when the pull request is marked ready._
 - [ ] `just check` passes locally
 - [ ] The Acceptance of the linked change's proposal, with the scenarios it points to, is met, or this PR has no
       OpenSpec change
-- [ ] The package deliberation was closed in conversation before the task list, or this PR has no OpenSpec change
+- [ ] This PR carried `spec:approved`, read with `just pr-labels`, before the task list, or it has no OpenSpec change
 - [ ] Every task of the change record is done and verified, or the specification is updated — the change is archived
       only on a maintainer's command, and `spec-archived` blocks the merge until it is
 - [ ] Every changed feature's `version` is bumped and its README regenerated with `just docs`

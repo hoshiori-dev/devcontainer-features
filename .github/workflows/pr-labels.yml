@@ -1,0 +1,84 @@
+# Keeps two kinds of label on every pull request: the state of its OpenSpec specification, one of
+# spec:pending, spec:approved, and spec:archived (.agents/knowledge/spec-workflow.md, Approval
+# gates), and the area labels of the paths it changes (.agents/knowledge/github-workflow.md, Areas).
+# scripts/sync_pr_labels.ts decides both from the pull request's present state through the API and
+# writes the difference; `just pr-labels <n>` prints the same decision without writing.
+#
+# This is the one workflow on pull_request_target (.agents/knowledge/github/checks.md, Rules): it
+# runs main's copy of this file and of the script with a token that can label a pull request from a
+# fork. It is safe only within these bounds, which scripts/checks_test.ts asserts on this file. It
+# never checks out, fetches, or runs anything of the pull request; what the pull request controls
+# reaches the script as environment variables, never as an expression in a run: line; the job alone
+# holds contents: read and pull-requests: write; the token is set on the two steps that call gh and
+# nowhere else; no secret and no action but the checkout and the repository's own tool setup; five
+# minutes per run.
+name: PR labels
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+  workflow_dispatch:
+    inputs:
+      number:
+        description: The pull request to reconcile; a dispatch cannot approve.
+        required: true
+        type: string
+
+# Nothing at the top level: a job added later starts with no permission.
+permissions: {}
+
+# One group per pull request. A running run finishes; only a pending run is replaced by a newer one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.number }}
+  cancel-in-progress: false
+
+jobs:
+  label:
+    # In this repository only, and a dispatch on main only.
+    if: github.repository == 'hoshiori-dev/devcontainer-features' && (github.event_name == 'pull_request_target' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write # labels and the record comment
+    steps:
+      # The default checkout of a pull_request_target run is main's newest commit; no ref is named.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # This job runs a Deno script directly, never just. gh is the runner image's.
+      - uses: ./.github/actions/setup-tools
+        with:
+          just: "false"
+      # The event reaches the script as these variables and nothing else; a dispatch gives its number.
+      # The step's own limit turns a hung script into a failed step, so that the last step runs; the
+      # job's limit alone would cancel the job, which runs no step conditioned on failure().
+      - name: Decide and write the labels
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+          EVENT_SENDER: ${{ github.event.sender.login }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          DISPATCH_NUMBER: ${{ inputs.number }}
+        run: ./scripts/sync_pr_labels.ts --apply
+      # A script that could not start, or failed before its own error path ran, may leave
+      # spec:approved where it is wrong; this takes it off, on a closed pull request as well. The
+      # next run that succeeds sets spec:pending. A label that is not there is no failure.
+      - name: Remove spec:approved after a failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DISPATCH_NUMBER: ${{ inputs.number }}
+        run: |
+          number="${PR_NUMBER:-${DISPATCH_NUMBER}}"
+          [[ "${number}" =~ ^[0-9]+$ ]] || exit 0
+          if ! output="$(gh api -X DELETE "repos/hoshiori-dev/devcontainer-features/issues/${number}/labels/spec%3Aapproved" 2>&1)"; then
+            case "${output}" in
+              *"HTTP 404"*) echo "spec:approved was not on the pull request." ;;
+              *) echo "${output}" >&2; exit 1 ;;
+            esac
+          fi

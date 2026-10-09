@@ -55,6 +55,9 @@ handled as a vulnerability:
 - Our scripts import packages by exact version from widely used, well-maintained publishers. What those packages import
   in turn is their publishers' choice, and we keep no lock file, so the scripts cannot tell when a publisher has been
   compromised.
+- Someone with write access to this repository can make a pull request's specification look approved: by adding the
+  approval label themselves, or by writing the comment our labelling workflow would write from a workflow on their own
+  branch. Someone working from a fork can do neither.
 - We cannot rule out that a maintainer's account could be taken over.
 
 A report about one of these is welcome when it brings something we did not know.

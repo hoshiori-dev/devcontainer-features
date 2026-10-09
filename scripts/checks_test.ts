@@ -203,6 +203,132 @@ Deno.test("labels.yml applies main's declaration with a write token no pull requ
     }
 });
 
+Deno.test("pr-labels.yml labels pull requests within the bounds the exception in checks.md names", async () => {
+    const text = await Deno.readTextFile(new URL("../.github/workflows/pr-labels.yml", import.meta.url));
+    const workflow = parseYaml(text);
+    assertEquals(workflow.name, "PR labels");
+    assertEquals(Object.keys(workflow.on).sort(), ["pull_request_target", "workflow_dispatch"]);
+    assertEquals(workflow.on.pull_request_target, {
+        types: ["opened", "reopened", "synchronize", "labeled", "unlabeled"],
+    });
+    assertEquals(Object.keys(workflow.on.workflow_dispatch.inputs), ["number"]);
+    // The top level grants nothing, so a job added later starts with no permission; only the job holds one.
+    assertEquals(workflow.permissions, {});
+    assertEquals(workflow.env, undefined);
+    assertEquals(workflow.concurrency, {
+        group: "${{ github.workflow }}-${{ github.event.pull_request.number || inputs.number }}",
+        "cancel-in-progress": false,
+    });
+    assertEquals(Object.keys(workflow.jobs), ["label"]);
+    const job = workflow.jobs.label;
+    assertEquals(
+        job.if,
+        `github.repository == '${REPO}' && ` +
+            "(github.event_name == 'pull_request_target' || github.ref == 'refs/heads/main')",
+    );
+    assertEquals(job.permissions, { contents: "read", "pull-requests": "write" });
+    assertEquals(job["timeout-minutes"], 5);
+    assertEquals(job.env, undefined);
+    assertEquals(job.container, undefined);
+    assertEquals(job.services, undefined);
+    assertEquals(job.steps.length, 4);
+    const [checkout, tools, decide, cleanup] = job.steps;
+    // The default branch, without credentials and without a ref: a rerun applies main as it is then.
+    assert(/^actions\/checkout@[0-9a-f]{40}$/.test(checkout.uses), checkout.uses);
+    assertEquals(checkout.with, { "persist-credentials": false });
+    assertEquals(tools.uses, "./.github/actions/setup-tools");
+    assertEquals(tools.with, { just: "false" });
+    assertEquals(decide.run, "./scripts/sync_pr_labels.ts --apply");
+    // A hung script fails its step, so the last step runs; a job cancelled by its own limit runs it not.
+    assert(decide["timeout-minutes"] < job["timeout-minutes"], "the script step has a limit under the job's");
+    const token = "${{ github.token }}";
+    const number = "${{ github.event.pull_request.number }}";
+    const dispatch = "${{ inputs.number }}";
+    assertEquals(decide.env, {
+        GH_TOKEN: token,
+        PR_NUMBER: number,
+        EVENT_ACTION: "${{ github.event.action }}",
+        EVENT_LABEL: "${{ github.event.label.name }}",
+        EVENT_SENDER: "${{ github.event.sender.login }}",
+        EVENT_HEAD: "${{ github.event.pull_request.head.sha }}",
+        DISPATCH_NUMBER: dispatch,
+    });
+    assertEquals(cleanup.if, "failure()");
+    assertEquals(cleanup.env, { GH_TOKEN: token, PR_NUMBER: number, DISPATCH_NUMBER: dispatch });
+    assert(
+        cleanup.run.includes(
+            `gh api -X DELETE "repos/${REPO}/issues/\${number}/labels/spec%3Aapproved"`,
+        ),
+        cleanup.run,
+    );
+    assertEquals(cleanup.run.match(/gh /g)?.length, 1, "one fixed gh api call");
+    for (const step of job.steps) {
+        if (step.run) assert(!step.run.includes("${{"), `an expression in a run: line: ${step.run}`);
+        if (step.uses) assert(step.uses === checkout.uses || step.uses === tools.uses, step.uses);
+        if (step.env !== undefined) assert(step === decide || step === cleanup, "the token reaches two steps");
+        for (const key of Object.keys(step.with ?? {})) {
+            assert(!["ref", "repository", "path", "token", "submodules"].includes(key), key);
+        }
+    }
+    // Every expression in the file names one of these and nothing else of the event.
+    const allowed = new Set([
+        "github.workflow",
+        "github.event.pull_request.number || inputs.number",
+        "github.token",
+        "github.event.pull_request.number",
+        "github.event.action",
+        "github.event.label.name",
+        "github.event.sender.login",
+        "github.event.pull_request.head.sha",
+        "inputs.number",
+    ]);
+    for (const [, expression] of text.matchAll(/\$\{\{([^}]*)\}\}/g)) {
+        assert(allowed.has(expression.trim()), expression);
+    }
+    assert(!text.includes("secrets."), "no secret");
+    // No cache is restored or saved, here or in the tool setup: a cache is a way into a job with a write token.
+    const action = parseYaml(
+        await Deno.readTextFile(new URL("../.github/actions/setup-tools/action.yml", import.meta.url)),
+    );
+    assertEquals(Object.keys(action.inputs).filter((input) => /cache/i.test(input)), []);
+    for (const step of [...job.steps, ...action.runs.steps]) {
+        assert(!/cache/i.test(step.uses ?? ""), step.uses);
+        assertEquals(Object.keys(step.with ?? {}).filter((input) => /cache/i.test(input)), [], step.uses);
+    }
+});
+
+Deno.test("pr-labels.yml is the one workflow on pull_request_target, and none runs on workflow_run", async () => {
+    const dir = new URL("../.github/workflows/", import.meta.url);
+    const names: string[] = [];
+    for await (const entry of Deno.readDir(dir)) {
+        if (entry.isFile && /\.ya?ml$/.test(entry.name)) names.push(entry.name);
+    }
+    assert(names.includes("pr-labels.yml"));
+    for (const name of names.sort()) {
+        const workflow = parseYaml(await Deno.readTextFile(new URL(name, dir)));
+        const on = workflow.on;
+        const triggers: string[] = typeof on === "string" ? [on] : Array.isArray(on) ? on : Object.keys(on);
+        assertEquals(
+            triggers.includes("pull_request_target"),
+            name === "pr-labels.yml",
+            `${name}: pull_request_target`,
+        );
+        assert(!triggers.includes("workflow_run"), `${name}: workflow_run`);
+        assert("permissions" in workflow, `${name} declares permissions`);
+        // No workflow that runs on a pull_request event holds a write permission.
+        if (triggers.includes("pull_request")) {
+            for (
+                const grants of [
+                    workflow.permissions,
+                    ...Object.values(workflow.jobs).map((job) => (job as { permissions?: unknown }).permissions),
+                ]
+            ) {
+                assert(!JSON.stringify(grants ?? {}).includes("write"), `${name} writes on pull_request`);
+            }
+        }
+    }
+});
+
 Deno.test("scaffold produces the required files for a valid id", () => {
     assert(ID_PATTERN.test("node-lts"));
     assert(!ID_PATTERN.test("Node"));

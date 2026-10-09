@@ -22,8 +22,10 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
   Talk to the user in the user's language.
 - Never add AI or tool attribution (`Co-Authored-By` for an AI, "Generated with …") to commits, PRs, issues, or
   comments; the human who commits answers for the change (`.agents/knowledge/agent-authority.md`).
-- Every change to a feature's behavior starts as an OpenSpec change and waits for a maintainer's approval in the
-  conversation; archive only on a maintainer's command (`.agents/knowledge/spec-workflow.md`).
+- Every change to a feature's behavior starts as an OpenSpec change and waits for `spec:approved` on its pull request,
+  which the maintainer adds and the PR labels workflow keeps while the approval package is unchanged (read it with
+  `just pr-labels <n>`); archive only on a maintainer's command in the conversation
+  (`.agents/knowledge/spec-workflow.md`).
 - Every change under `src/<id>/` bumps that feature's version; every feature survives being installed twice.
 - Scripts are Deno first, uv (PEP 723) second: permissions in the shebang, dependencies pinned inline (`jsr:`, `npm:`)
   so a script carries everything it needs — `no-import-prefix` is disabled on purpose. Run them via `just` or directly
@@ -73,13 +75,14 @@ scripts/              <- Deno scripts (selection, staging, validation, docs, PR 
 | Regenerate feature READMEs and the root feature list                                                          | `just docs`                                     |
 | Unarchived OpenSpec changes (`--ready`: non-zero when one exists, the verdict the PR workflow reads)          | `just spec-status`                              |
 | Difference between `.github/labels.yml` and the repository's labels (`--apply` writes it, on command only)    | `just labels`                                   |
+| The `spec:` and `area:` labels the rules give a pull request now, without writing (`--apply` writes them)     | `just pr-labels <n>`                            |
 
 ## Workflow
 
-Issue → `gh issue develop` branch → draft PR carrying the OpenSpec change → maintainer approves the spec in conversation
-→ implement, `just check`, tests → agent marks ready → review → maintainer commands the archive → maintainer
-squash-merges → the Release workflow publishes changed versions and tags them. Details live in the knowledge files
-above; this line is only the map.
+Issue → `gh issue develop` branch → draft PR carrying the OpenSpec change → maintainer adds `spec:approved` → implement,
+`just check`, tests → agent marks ready → review → maintainer commands the archive → maintainer squash-merges → the
+Release workflow publishes changed versions and tags them. Details live in the knowledge files above; this line is only
+the map.
 
 ## Keep In Sync
 
