@@ -56,7 +56,9 @@ and the person who commits answers for the change.
 2. **Branch and draft pull request.** Work on a branch for the issue and open a draft pull request whose first content
    is the OpenSpec change. Nothing is implemented yet.
 3. **Approval of the specification.** A maintainer reads the change and discusses it with you on the draft.
-   Implementation starts once the maintainer approves.
+   Implementation starts once the maintainer adds the label `spec:approved` to the pull request. A workflow notes the
+   approved commit in a comment and keeps the label only while the approved text is unchanged; a pull request whose
+   specification waits carries `spec:pending`.
 4. **Implementation.** Write the task list, the code, and the tests. A change under `src/<feature-id>/` bumps that
    feature's version, and every feature has to survive being installed twice.
 5. **Review.** Mark the pull request ready when the checks pass and its description says how each acceptance item was

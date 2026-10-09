@@ -21,9 +21,9 @@ alone).
 
 1. Read the issue; confirm it is open and its outcome is concrete. If another identity is assigned, stop and ask. An
    issue with no OpenSpec change yet is taken by committing the change to the draft PR first (step 3) and stopping there
-   until a maintainer closes the package deliberation in conversation; the proposal's Acceptance, with the scenarios it
-   points to, is then the acceptance criteria. A harness or tooling issue gets a change with `skip_specs: true`; a typo,
-   a dependency bump, or an edit of only a spec's "Upstream sources" list needs none.
+   until the pull request carries `spec:approved`; the proposal's Acceptance, with the scenarios it points to, is then
+   the acceptance criteria. A harness or tooling issue gets a change with `skip_specs: true`; a typo, a dependency bump,
+   or an edit of only a spec's "Upstream sources" list needs none.
 2. Assign yourself (`gh issue edit <n> --add-assignee @me`), re-read, and confirm you are the sole assignee.
 3. `gh issue develop -c <n>` to create and check out the linked branch; once the approval package is committed, push it
    and open a draft PR (`gh pr create --draft`) with `Closes #<n>` and a body built from
@@ -32,15 +32,23 @@ alone).
    change carries (`spec-workflow.md`, Scope of specifications), created through OpenSpec's propose flow and passing
    `just spec-check`; no `tasks.md` (the flow stops before it; delete one it wrote anyway) — and the body's `Phase:`
    line reads `specification` while Changes and Validation keep their reserved line. Then stop. The maintainer discusses
-   on the PR and directs changes in conversation; push each through the publish gate. When the maintainer closes the
-   package deliberation in conversation, read the PR's comments
+   on the PR and directs changes in conversation; push each through the publish gate. The package approval is the label
+   `spec:approved` on the pull request (`spec-workflow.md`, Approval gates), read by recomputing it, never from the bare
+   label: `just pr-labels <pr>` prints the state the rules give the pull request now, and anything but `spec:approved`
+   is not approved. When it prints `spec:approved`, read the PR's comments
    (`gh api repos/hoshiori-dev/devcontainer-features/issues/<pr>/comments`, where `<pr>` is the pull request number, not
    the issue's: a PR's conversation lives under the issues API with its own number) and its review threads with their
    resolution state (the GraphQL `reviewThreads` connection, field `isResolved`); list every unresolved thread, every
    adjustment requested in the discussion that the change does not carry, and every pair of conclusions that contradict
    each other; ask the maintainer to confirm them; and only when nothing is open or the open items are confirmed, write
-   `tasks.md` from `openspec instructions tasks --change <name> --json` and implement. Record the closing on the
-   `Approval:` line. The same reconciliation runs again at the implementation deliberation, before the archive.
+   `tasks.md` from `openspec instructions tasks --change <name> --json` and implement. Record each reconciliation on the
+   `Approval:` line. The same reconciliation runs again at the implementation deliberation, before the archive. An agent
+   never adds `spec:approved` on its own judgment. When a maintainer tells you in the current conversation to add it and
+   names the pull request, name the pull request and its head commit in your reply, add the label
+   (`gh pr edit <pr> --add-label spec:approved`), and read the workflow's record back with `just pr-labels <pr>`: the
+   comment it keeps names the approved commit. When `just pr-labels <pr>` disagrees with the labels on the pull request
+   and a missed run explains it, a dispatch reconciles that one pull request and cannot approve
+   (`gh workflow run pr-labels.yml -f number=<pr>`).
 4. Keep the PR description current; comment major discoveries and decisions. The repository is public: credentials,
    tokens, internal hosts, and personal data never go into an issue, PR, commit, or log.
 5. Abandon by un-assigning, closing the draft with a status comment, and leaving the issue open.
@@ -57,12 +65,13 @@ Non-interactive creation ignores the forms: build the body by mirroring the form
 area label in the same call:
 
 ```sh
-gh issue create --title "…" --body-file body.md --type <type> --label <area>
+gh issue create --title "…" --body-file body.md --type <type> --label area:<area>
 ```
 
 - `<type>` is the form's type: Bug, Feature, Task, or Epic.
-- `<area>` is one of the labels `github-workflow.md` defines (Areas). A label that does not exist makes the call fail:
-  stop and report it, never create a label (`agent-authority.md`).
+- `area:<area>` is one of the labels `github-workflow.md` defines (Areas), prefix included: `area:feature`, `area:ci`,
+  `area:scripts`, `area:spec-workflow`, or `area:harness`. A label that does not exist makes the call fail: stop and
+  report it, never create a label (`agent-authority.md`).
 - Add `--parent <n>` and `--blocked-by <n>` when the request states the relationship (`github-workflow.md`,
   Relationships); on an existing issue use `gh issue edit <n> --parent <m>` and `--add-blocked-by <m>`.
 - An Epic is created only on a maintainer's word (`github-workflow.md`, Epics) and gets no Priority.
@@ -114,13 +123,15 @@ survive deletion, and public content is indexed within minutes. Every remote or 
    directory for a broad one) and the reserved line of Validation with each Acceptance item and scenario and its result,
    linking the CI run; and confirm every task of the change is ticked. Then follow
    `.agents/knowledge/agent-authority.md`: green checks are evidence, not acceptance. Under it you may mark the PR ready
-   (`gh pr ready`) and request review once the package gate closed in this conversation, then hand the maintainer the
-   report it defines. Marking ready opens the implementation deliberation, and the PR waits for its archive: the PR
-   workflow run succeeds, and `spec-archived` is withheld until the archive commit lands. Its absence is the merge
-   block, not a defect, and the reported checks show a passing PR all the while (`checks.md`, Waiting for the archive),
-   so never report such a PR as mergeable. Archive only when the maintainer commands it in the conversation: the
-   `openspec-archive-change` skill (`/opsx:archive`), `just spec-check`, commit, push. A commit after the archive commit
-   spends the closing; say so and ask again. Auto-merge is not used; never edit the policy, protections, or required
-   checks to unblock yourself — propose the change to a maintainer instead.
+   (`gh pr ready`) and request review once `just pr-labels <pr>` prints `spec:approved` for the pull request, then hand
+   the maintainer the report it defines. Marking ready opens the implementation deliberation, and the PR waits for its
+   archive: the PR workflow run succeeds, and `spec-archived` is withheld until the archive commit lands. Its absence is
+   the merge block, not a defect, and the reported checks show a passing PR all the while (`checks.md`, Waiting for the
+   archive), so never report such a PR as mergeable; the PR labels workflow shows the wait in the list as
+   `spec:approved`, and the archive commit turns it into `spec:archived`. Archive only when the maintainer commands it
+   in the conversation: the `openspec-archive-change` skill (`/opsx:archive`), `just spec-check`, commit, push, and note
+   the command on the `Approval:` line. A commit after the archive commit spends the closing; say so and ask again.
+   Auto-merge is not used; never edit the policy, protections, or required checks to unblock yourself — propose the
+   change to a maintainer instead.
 3. A maintainer merges; the closing keyword closes the linked issue — verify it closed. Merging a version bump publishes
    it: the Release workflow publishes to GHCR and tags `<id>/v<version>` (`checks.md`).

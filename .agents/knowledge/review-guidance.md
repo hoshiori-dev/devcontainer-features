@@ -47,6 +47,10 @@ The collection accepts this for administration tooling:
   imports in turn, from whatever publisher, is its publisher's choice and resolves within the ranges it declares, and
   the repository keeps no lock file. Report an import without an exact version, and a directly imported package whose
   publisher does not meet that bar.
+- Someone with write access to the repository can forge a specification approval: by adding `spec:approved` to a pull
+  request themselves, or by writing a comment that looks like the PR labels workflow's record from a workflow on their
+  own branch. The record's account and the comment's author are not checked against the pull request's history of
+  events. A pull request from a fork can do neither.
 
 A risk one feature accepts is stated, with its reason, in a Requirement of `openspec/specs/<id>/spec.md`
 (feature-authoring.md, Developer trust and readability); read the spec before reporting. A risk the spec does not state

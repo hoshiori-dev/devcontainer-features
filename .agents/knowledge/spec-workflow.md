@@ -87,7 +87,8 @@ implements the Option requirements the way `install.sh` implements behavior, and
    `tasks.md` a flow wrote anyway is deleted before the commit), and committed on the issue's branch; the draft PR opens
    with the complete approval package (proposal, delta specs, design when warranted, and any Purpose correction the
    change carries) and the agent stops.
-2. **Approved** — a maintainer closes the package deliberation in the conversation (see Approval gates).
+2. **Approved** — a maintainer adds `spec:approved` to the draft PR, or tells the agent to, and the PR labels workflow
+   records the commit it approves (see Approval gates).
 3. **Implemented** — the agent writes `tasks.md` from the approved package (`openspec instructions tasks`), every task
    is done and every Acceptance item (with the scenarios it points to) verified in the PR's Validation section; the PR
    is marked ready for the second deliberation.
@@ -97,9 +98,9 @@ implements the Option requirements the way `install.sh` implements behavior, and
 
 ## Approval gates
 
-Both gates are owned by a maintainer (a repository collaborator with write access) who is in the conversation. An agent
-never passes a gate on a change it wrote. Agent authority levels are governed by `.agents/knowledge/agent-authority.md`;
-these gates are where they attach.
+Both gates are owned by a maintainer (a repository collaborator with write access): the package gate closes on the pull
+request, the freeze gate in the conversation. An agent never passes a gate on a change it wrote. Agent authority levels
+are governed by `.agents/knowledge/agent-authority.md`; these gates are where they attach.
 
 There are two. The **package gate** releases the task list and the implementation. The **freeze gate** releases the
 archive, and the maintainer's final approval applies to the archived version. The PR is marked ready before the archive,
@@ -117,14 +118,26 @@ secret or private data. A hand correction of a main spec's Purpose that the chan
 part of the package: it is committed before the draft opens, so the gate approves the corrected text. `tasks.md` does
 not exist yet at this gate; the gate approves the acceptance in the proposal, never a task list.
 
-Mode, both gates: conversational. A gate closes only when the maintainer says so in the current conversation — "spec
-approved" for the package gate, an explicit command to archive for the freeze gate. Nothing is recorded on GitHub. An
-approval given in another session does not carry over: if this conversation holds no approval, treat the gate as not
-passed and ask. Before acting on a closing, read the PR's comments and review threads with their resolution state, list
-every unresolved thread, every requested adjustment the change does not carry yet, and every pair of contradicting
+Mode of the package gate: the label `spec:approved` on the pull request. The maintainer adds it to the draft PR, or
+tells the agent to in the current conversation, naming the pull request; the PR labels workflow
+(`.github/workflows/pr-labels.yml`, `scripts/sync_pr_labels.ts`) records in one comment the commit it approves, the
+account that added the label, and the label event, and keeps the label only while the approval package at the head —
+every file of each unarchived change but its `tasks.md`, with the main spec of each capability the change has a delta
+for — equals the package at that commit. A change to the package, a person removing the label or adding `spec:pending`,
+and a run the workflow cannot stand behind each put `spec:pending` back; the maintainer approves again by adding the
+label again. The gate is read by recomputing it, never from the bare label: `just pr-labels <n>` prints the state the
+rules give the pull request now, so a label that lags a push, a failed run, or a workflow that cannot run reads as
+`spec:pending`. The approval survives the end of a session. A statement in the conversation does not close this gate,
+not even while the workflow cannot run.
+
+Mode of the freeze gate: conversational. It closes only on an explicit command to archive from the maintainer in the
+current conversation; it has no label, and a command given in another session does not carry over: if this conversation
+holds none, treat the gate as not passed and ask. Nothing revokes that command, so compare the branch tip with the
+commit the maintainer named before pushing further; if they differ, say so and ask again.
+
+Before acting on either closing, read the PR's comments and review threads with their resolution state, list every
+unresolved thread, every requested adjustment the change does not carry yet, and every pair of contradicting
 conclusions, confirm them with the maintainer, and proceed only when nothing is open or the open items are confirmed.
-Nothing revokes a closing, so compare the branch tip with the commit the maintainer approved before pushing further; if
-they differ, say so and ask again.
 
 ## PR shape
 
@@ -163,9 +176,10 @@ after the archive commit means the approved version no longer exists: say so and
   acceptance sketch is marked non-authoritative.
 - A PR description navigates to the change and carries no implementation until ready: a goal paragraph, a value section,
   the specification block (`Spec:` linking the change on the branch, `Phase:` specification or implementation, one link
-  per file of the approval package and `tasks.md` noted as following approval, `Approval:` noting the conversational
-  closing), `Closes #N`, and Changes and Validation left on their reserved line until the PR is marked ready — then
-  Changes as permalinks to the commits and Validation naming each Acceptance item and scenario with its result.
+  per file of the approval package and `tasks.md` noted as following approval, `Approval:` noting each reconciliation of
+  the threads and the archive command, while the package approval is the label `spec:approved`), `Closes #N`, and
+  Changes and Validation left on their reserved line until the PR is marked ready — then Changes as permalinks to the
+  commits and Validation naming each Acceptance item and scenario with its result.
 - Discussion of a specification in an issue thread is deliberation; the record is the file at the approved commit.
 
 ## Scope of specifications

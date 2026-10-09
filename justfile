@@ -71,6 +71,10 @@ new-feature id *args:
 labels *args:
     ./scripts/sync_labels.ts "$@"
 
+# Print the spec: and area: labels the rules give a pull request now, without writing; --apply writes the difference
+pr-labels number *args:
+    ./scripts/sync_pr_labels.ts "$1" "${@:2}"
+
 # Check a pull request title against the commit convention
 check-title title:
     ./scripts/check_title.ts "$1"
