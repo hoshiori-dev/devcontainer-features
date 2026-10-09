@@ -13,20 +13,22 @@ which tells a developer nothing about what a cache mode keeps.
 
 ## What Changes
 
-- apk-packages gains a version policy, `latest`, that requires the highest version the image's repositories offer for
-  the listed packages and their dependencies, and fails instead of keeping an older one. It stays separate from
-  `upgradePackages`.
+- apk-packages gains a version policy, `latest`, that requires the highest version the image's untagged repositories
+  offer for the packages listed without a repository tag and their dependencies, and fails instead of keeping an older
+  one. It stays separate from `upgradePackages`, and it leaves `name@tag` entries to resolve as before, because apk's
+  policy does not reach them.
 - apk-packages gains a bounded wait for apk's database lock, `lockTimeout`, for the feature's own apk calls.
 - The cleanup contract states what each `cleanup` value keeps in the feature's cache, replacing the "not guaranteed"
   wording, and names the one image setting under which nothing is kept.
 - The spec states what the feature inherits from the image and the build environment: apk configuration, proxy
   variables, and every control left at its default.
 - The Purpose of `openspec/specs/apk-packages/spec.md` is corrected by hand in the same commit: its "Upstream sources"
-  list gains the apk(8) and apk-add(8) manuals of the two apk generations the compatibility images ship, since the list
-  named no manual and the issue's links name a version no tested image runs.
+  list gains the manual directory of each of the two apk generations the compatibility images ship, since the list named
+  no manual and the issue's links name a version no tested image runs.
 - No retention option is added. Issue #58's Outcome asks to "explicitly control package retention separately from
   feature cleanup"; apk offers no such switch under the feature's cache (the design records the evidence), and `cleanup`
-  already yields the three states. This is a deviation from the issue's Outcome that the package gate decides.
+  already yields the three states. This is a deviation from the issue's Outcome: approving this package accepts it, and
+  the issue's Outcome then needs the maintainer's amendment.
 - No retry and no parallel-download option is added: apk has neither.
 
 ## Capabilities
@@ -63,9 +65,12 @@ None.
   recorded in the PR.
 - The scenarios the delta adds to modified requirements pass the same way: Lock wait boundaries are validated and
   Version policy value is validated (Installation controls are validated before changes), Highest version is required
-  without the upgrade option (Install the listed packages), Package files stay with cleanup disabled and Image
-  configuration that disables caching keeps nothing (Clean package caches), and Later version policy applies to the
-  second installation and Later lock wait applies to the second installation (Installing the feature twice).
+  without the upgrade option (Install the listed packages), Image configuration that disables caching keeps nothing
+  (Clean package caches), and Later version policy applies to the second installation, Later untagged entry keeps a
+  higher tagged version, and Earlier version policy and lock wait do not carry over (Installing the feature twice).
+- The scenarios whose content the delta changes under a kept name pass the same way: Listed package already installed
+  stays at its version (Install the listed packages), Feature cleanup is disabled (Clean package caches), and Later
+  entry replaces the earlier constraint (Installing the feature twice).
 - `latest` and `lockTimeout` agree between the delta spec, `devcontainer-feature.json`, `NOTES.md`, and the generated
   README, and the feature metadata has version 1.1.0.
 - `NOTES.md` documents, under the four headings the design names, what the feature sets, what it inherits, proxy

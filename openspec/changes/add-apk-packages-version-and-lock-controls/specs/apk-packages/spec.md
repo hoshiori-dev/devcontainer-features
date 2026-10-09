@@ -43,14 +43,19 @@ The feature SHALL accept the option `lockTimeout` as declared here.
 
 ### Requirement: Highest version is required on request
 
-When `latest=true`, the feature SHALL request, as `apk add --latest` resolves it, that every listed package and every
-dependency apk resolves for it ends at the highest version the image's repositories offer under the entry's pinning: the
-untagged repositories for an entry without a tag, and the repository the image configures with that tag for `name@tag`.
-When apk cannot select that version, because an entry's constraint or a constraint already in apk's world excludes it,
-the feature SHALL exit with a non-zero status and SHALL leave the installed packages and apk's world as they were; it
-SHALL NOT fall back to an older version and SHALL NOT check the combination itself before calling apk. This is the
-difference from `upgradePackages=true`, which succeeds and keeps a held-back version. With both options true the feature
-SHALL request both, and the outcome is that of `latest=true`.
+When `latest=true`, the feature SHALL request, as `apk add --latest` resolves it, that every package listed without a
+repository tag, and every dependency apk resolves for it, ends at the highest version the image's untagged repositories
+offer. When apk cannot select that version, because the entry's constraint or a constraint already in apk's world
+excludes it, the feature SHALL exit with a non-zero status and SHALL leave the installed packages and apk's world as
+they were; it SHALL NOT fall back to an older version. This is the difference from `upgradePackages=true`, which
+succeeds and keeps a held-back version.
+
+apk applies the policy neither to an entry `name@tag` nor to the dependencies it resolves for that entry, so with
+`latest=true` such an entry SHALL resolve exactly as it does with `latest=false`. The policy SHALL NOT lower an
+installed version: a package installed at a higher version than the untagged repositories offer, as an earlier
+`name@tag` entry can leave it, stays at that version when it is listed without a tag. With both `latest` and
+`upgradePackages` true the feature SHALL request both; an entry without a tag then has the outcome of `latest=true`, and
+an entry `name@tag` that of `upgradePackages=true`.
 
 When `latest=false`, the feature SHALL add no version policy, so apk resolves as it does without the option; a version
 policy that the image's own apk configuration sets stays the image's decision, as Repository authentication stays in
@@ -58,27 +63,30 @@ effect states. `latest` SHALL NOT change how an entry is recorded in apk's world
 SHALL NOT request a whole-system upgrade, and SHALL NOT persist: a later apk operation without it may keep an older
 version.
 
-The feature knowingly leaves two risks in place. The policy is a requirement, not a preference, so a build that used to
-succeed with a pinned or held-back package fails once `latest=true`; relaxing it would make the option a silent
-duplicate of `upgradePackages`. And the dependencies of the listed packages move to their highest versions too, which
-can change packages the developer did not list; apk offers no narrower form of the policy.
+The feature knowingly leaves three risks in place. The policy is a requirement, not a preference, so a build that used
+to succeed with a pinned or held-back package fails once `latest=true`; relaxing it would make the option a silent
+duplicate of `upgradePackages`. The policy also changes packages the developer did not list: the dependencies of the
+listed packages move to their highest versions, and so do installed packages that depend on a raised package at an exact
+version; apk offers no narrower form of the policy. And the policy does not reach `name@tag` entries, so `latest=true`
+alone can leave such a package at an older version without failing; apk offers no form of the policy that covers them,
+and `upgradePackages=true` is the control that raises them.
 
 #### Scenario: Listed package is raised to the highest version
 
-- **WHEN** `latest=true`, `upgradePackages=false`, and `packages` names, without a constraint, a package that is
-  installed at a version older than the highest one the image's untagged repositories offer
+- **WHEN** `latest=true`, `upgradePackages=false`, and `packages` names, without a constraint or a tag, a package that
+  is installed at a version older than the highest one the image's untagged repositories offer
 - **THEN** the feature succeeds, the package is at that highest version, and apk's world holds the entry as written
 
 #### Scenario: Dependencies are raised with the listed package
 
-- **WHEN** `latest=true` and a dependency of a listed package is installed at a version older than the highest one the
-  repositories offer
+- **WHEN** `latest=true` and a dependency of a package listed without a tag is installed at a version older than the
+  highest one the untagged repositories offer
 - **THEN** the feature succeeds and both the listed package and that dependency are at their highest offered versions
 
 #### Scenario: Held-back dependency fails instead of being kept
 
-- **WHEN** `latest=true` and apk's world already pins a dependency of a listed package to a version older than the
-  highest one the repositories offer
+- **WHEN** `latest=true` and apk's world already pins a dependency of a package listed without a tag to a version older
+  than the highest one the untagged repositories offer
 - **THEN** the feature exits with a non-zero status, and the installed versions and apk's world are as they were before
   it ran
 
@@ -90,30 +98,35 @@ can change packages the developer did not list; apk offers no narrower form of t
 
 #### Scenario: Entry constraint that excludes the highest version fails
 
-- **WHEN** `latest=true` and `packages` holds `name=version` or `name<version` that the repositories can satisfy only
-  with a version lower than the highest one they offer
+- **WHEN** `latest=true` and `packages` holds `name=version` or `name<version` that the untagged repositories can
+  satisfy only with a version lower than the highest one they offer
 - **THEN** the feature exits with a non-zero status, and the installed versions and apk's world are as they were before
   it ran
 
 #### Scenario: Entry constraint that admits the highest version succeeds
 
 - **WHEN** `latest=true` and `packages` holds `name=version`, `name>=version`, or `name~prefix` that the highest version
-  the repositories offer satisfies
+  the untagged repositories offer satisfies
 - **THEN** the feature succeeds, the package is at that highest version, and apk's world holds the entry with its
   constraint
 
-#### Scenario: Pinning limits the versions considered
+#### Scenario: Untagged entry does not take a tagged repository's version
 
-- **WHEN** `latest=true` and the image configures a repository with a tag that offers a higher version of a package than
-  its untagged repositories do
-- **THEN** the entry `name` installs the highest version of the untagged repositories, and the entry `name@tag` installs
-  the highest version of the tagged repository
+- **WHEN** `latest=true`, the image configures a repository with a tag that offers a higher version of a package than
+  its untagged repositories do, the package is not installed, and `packages` names it without a tag
+- **THEN** the feature succeeds and the package is at the highest version of the untagged repositories
+
+#### Scenario: Tagged entry resolves as without the policy
+
+- **WHEN** `latest=true` and `packages` holds `name@tag` for a tag the image configures
+- **THEN** the installed versions and apk's world are the same as the same invocation with `latest=false` leaves them,
+  also when that leaves the package or one of its dependencies at a version older than the highest one offered
 
 #### Scenario: Both version options are requested
 
 - **WHEN** `latest=true` and `upgradePackages=true`
-- **THEN** apk receives both policies, and the installed versions and apk's world are the same as with `latest=true`
-  alone
+- **THEN** apk receives both policies; for entries without a tag the installed versions and apk's world are the same as
+  with `latest=true` alone, and for entries `name@tag` the same as with `upgradePackages=true` alone
 
 #### Scenario: Policy behaves the same on every apk generation
 
@@ -126,14 +139,15 @@ can change packages the developer did not list; apk offers no narrower form of t
 An empty `lockTimeout` SHALL leave apk's lock behavior unchanged: the feature passes no lock wait, so apk fails at once
 when another process holds its database lock, unless the image's own apk configuration sets a wait, which only an apk
 generation that reads such configuration can do. A non-empty value SHALL be passed as apk's wait, in seconds, for its
-exclusive database lock on every refresh and install call the feature makes, and SHALL override a wait the image
-configures for that call only. Each call waits separately up to the value: it SHALL NOT be an overall build deadline, a
-retry of a call that failed, or a wait for anything other than the lock, and it SHALL NOT persist a setting in the
-image. When the lock is not released within the wait, the feature SHALL exit with a non-zero status without installing
-any listed package.
+exclusive database lock on every apk call the feature makes, including the offline index check of `refreshPolicy=never`,
+and SHALL override a wait the image configures for that call only. Each call waits separately up to the value: it SHALL
+NOT be an overall build deadline, a retry of a call that failed, or a wait for anything other than the lock, and it
+SHALL NOT persist a setting in the image. When the lock is not released within the wait, the feature SHALL exit with a
+non-zero status without installing any listed package.
 
-The feature knowingly leaves one risk in place: because the bound applies to each apk call and an installation makes
-two, a lock held across both can delay a failing build by up to twice the value. A single deadline would need the
+The feature knowingly leaves one risk in place: each of the two apk calls of an installation waits separately. A lock
+held without interruption fails the build after one wait, but a lock that is released during the first call's wait and
+taken again before the second call can delay a failing build by up to twice the value. A single deadline would need the
 feature to time apk itself, which apk's own wait does not offer.
 
 #### Scenario: Native lock behavior is inherited
@@ -145,7 +159,8 @@ feature to time apk itself, which apk's own wait does not offer.
 #### Scenario: Explicit lock wait reaches every apk call
 
 - **WHEN** `lockTimeout` is a valid non-empty value, with any `refreshPolicy`
-- **THEN** the refresh call and the install call each receive that value as apk's lock wait, and no other apk setting
+- **THEN** every apk call the feature makes, the install call and before it the refresh call or, with
+  `refreshPolicy=never`, the offline index check, receives that value as apk's lock wait, and no other apk setting
   changes
 
 #### Scenario: Lock released within the wait
@@ -156,8 +171,8 @@ feature to time apk itself, which apk's own wait does not offer.
 #### Scenario: Lock held beyond the wait
 
 - **WHEN** `lockTimeout` is set and another process holds apk's database lock for longer than that many seconds
-- **THEN** the feature exits with a non-zero status after about that many seconds, installs none of the listed packages,
-  and leaves apk's world as it was
+- **THEN** the feature exits with a non-zero status, not before that many seconds have passed, installs none of the
+  listed packages, and leaves apk's world as it was
 
 #### Scenario: Image wait setting is overridden for the invocation
 
@@ -168,17 +183,19 @@ feature to time apk itself, which apk's own wait does not offer.
 #### Scenario: Lock wait works with a network timeout
 
 - **WHEN** `lockTimeout` and `networkTimeout` are both valid non-empty values
-- **THEN** every refresh and install call receives both, each as its own apk setting
+- **THEN** every apk call the feature makes receives both, each as its own apk setting
 
 ### Requirement: Image configuration and environment are inherited
 
 The feature SHALL set, change, and unset no proxy variable and no environment variable that selects apk's configuration
 on its apk calls, and SHALL create no apk configuration file: apk runs with the environment the build gives the feature
-and with the configuration the image holds. Each of `networkTimeout`, `lockTimeout`, `latest`, and `upgradePackages` at
-its default SHALL add no argument, so the matching setting of the image, where its apk reads one, or apk's own default
-applies. A non-default value SHALL override only its matching apk setting, as a command-line argument of the feature's
-own apk calls, for that invocation. The feature SHALL offer no option that passes arbitrary arguments, environment
-variables, a proxy, or a configuration file to apk.
+and reads the configuration the image holds. Of the apk settings that `networkTimeout`, `lockTimeout`, `latest`, and
+`upgradePackages` govern (network timeout, lock wait, and version policy), each option at its default SHALL add no
+argument, so the matching setting of the image, where its apk reads one, or apk's own default applies. A non-default
+value SHALL override only its matching apk setting, as a command-line argument of the feature's own apk calls, for that
+invocation. What the feature sets on every apk call whatever these options hold stays its own and is not inherited:
+non-interactive mode, the feature's cache directory, and the index age that goes with it, as Non-interactive
+installation, Package index refresh, and Clean package caches define them.
 
 #### Scenario: Default controls add no argument
 
@@ -193,8 +210,8 @@ variables, a proxy, or a configuration file to apk.
 #### Scenario: Configuration selection is left to the image
 
 - **WHEN** the image holds an apk configuration file or the environment names one
-- **THEN** the feature neither writes, replaces, nor redirects it, and only the settings matching non-default feature
-  options are overridden, for the feature's own apk calls
+- **THEN** the feature neither writes, replaces, nor redirects it, and of the network timeout, the lock wait, and the
+  version policy only those whose option has a non-default value are overridden, for the feature's own apk calls
 
 ## MODIFIED Requirements
 
@@ -205,9 +222,11 @@ and its dependencies only from the repositories configured in the image, and SHA
 world (`/etc/apk/world`). Besides the listed packages and their dependencies, it SHALL install only the packages that
 apk selects automatically because all of their install-if conditions are met. When `upgradePackages=false` and
 `latest=false`, it SHALL NOT change the version of an installed package unless an entry's constraint or a package it
-installs requires another version. When `upgradePackages=true`, it SHALL request upgrades of the listed packages and
-their dependencies as `apk add --upgrade` resolves them. When `latest=true`, it SHALL select versions as Highest version
-is required on request states. Under every combination of the two options it SHALL NOT request a whole-system upgrade.
+installs requires another version, or the image's own apk configuration sets a version policy, which only an apk
+generation that reads such configuration honors and which stays the image's decision (Repository authentication stays in
+effect). When `upgradePackages=true`, it SHALL request upgrades of the listed packages and their dependencies as
+`apk add --upgrade` resolves them. When `latest=true`, it SHALL select versions as Highest version is required on
+request states. Under every combination of the two options it SHALL NOT request a whole-system upgrade.
 
 #### Scenario: Listed packages are installed
 
@@ -223,9 +242,9 @@ is required on request states. Under every combination of the two options it SHA
 
 #### Scenario: Listed package already installed stays at its version
 
-- **WHEN** `upgradePackages=false`, `latest=false`, and `packages` names, without a constraint, a package that is
-  installed at a version older than the one the repositories offer, and no other listed package requires a newer version
-  of it
+- **WHEN** `upgradePackages=false`, `latest=false`, the image's apk configuration sets no version policy, and `packages`
+  names, without a constraint, a package that is installed at a version older than the one the repositories offer, and
+  no other listed package requires a newer version of it
 - **THEN** the feature succeeds and the package stays at its installed version
 
 #### Scenario: Listed packages are upgraded on request
@@ -236,7 +255,8 @@ is required on request states. Under every combination of the two options it SHA
 
 #### Scenario: Highest version is required without the upgrade option
 
-- **WHEN** `latest=true`, `upgradePackages=false`, and a listed installed package has a newer installable version
+- **WHEN** `latest=true`, `upgradePackages=false`, and an installed package listed without a tag has a newer installable
+  version in the untagged repositories
 - **THEN** the listed package and the dependencies apk resolves for it are at their highest offered versions, install-if
   packages follow their conditions as before, and no whole-system upgrade is requested
 
@@ -256,10 +276,11 @@ that apk itself keeps in its cache directory beside indexes and package files ar
 `packages` and `none`.
 
 The feature knowingly leaves one exception in place: when the image's own apk configuration disables apk's cache, which
-only an apk generation that reads such configuration honors, apk stores nothing, so `packages` and `none` keep nothing
-although the installation succeeds. The feature neither overrides nor checks that setting, because options the image's
-apk configuration sets stay the image's decision (Repository authentication stays in effect) and no argument that
-restores caching exists on every supported apk generation.
+only an apk generation that reads such configuration honors, apk stores nothing, so with `refreshPolicy=default` or
+`always` the values `packages` and `none` keep nothing although the installation succeeds. The feature neither overrides
+nor checks that setting, because options the image's apk configuration sets stay the image's decision (Repository
+authentication stays in effect) and no argument that restores caching exists on every supported apk generation. This
+requirement states no outcome for `refreshPolicy=never` under such a configuration; Package index refresh governs it.
 
 #### Scenario: Caches are removed
 
@@ -274,25 +295,20 @@ restores caching exists on every supported apk generation.
 
 #### Scenario: Feature cleanup is disabled
 
-- **WHEN** cleanup=none and the feature has installed packages that apk had to download
-- **THEN** the feature leaves cached package files and metadata in place
+- **WHEN** `cleanup=none`, the image's apk configuration does not disable apk's cache, and the feature has installed a
+  package that apk had to download, on any image of the compatibility list
+- **THEN** the feature's cache holds the package index of every configured repository and the package file of that
+  package
 
 #### Scenario: Existing image caches are preserved
 
 - **WHEN** any cleanup mode is selected and pre-existing image caches contain sentinel files
 - **THEN** those files remain unchanged; cleanup affects feature-owned caches only
 
-#### Scenario: Package files stay with cleanup disabled
-
-- **WHEN** `cleanup=none`, the image's apk configuration does not disable apk's cache, and the feature has installed a
-  package that apk had to download, on any image of the compatibility list
-- **THEN** the feature's cache holds the package index of every configured repository and the package file of that
-  package
-
 #### Scenario: Image configuration that disables caching keeps nothing
 
-- **WHEN** `cleanup=none` or `cleanup=packages` and the image's apk configuration disables apk's cache on an apk
-  generation that reads such configuration
+- **WHEN** `refreshPolicy=default` or `always`, `cleanup=none` or `cleanup=packages`, and the image's apk configuration
+  disables apk's cache on an apk generation that reads such configuration
 - **THEN** the feature succeeds, the listed packages are installed, the feature's cache holds neither an index nor a
   package file, and the image's configuration file is unchanged
 
@@ -301,10 +317,11 @@ restores caching exists on every supported apk generation.
 Installing the feature a second time SHALL leave installed every package that either installation listed, and SHALL
 treat the second list as a first installation would. For a name that both lists hold, the second entry, with its
 constraint or without one, SHALL replace the first in apk's world. When its upgradePackages and its latest are both
-false, the second installation SHALL NOT change an installed version unless a constraint or dependency requires it; when
-upgradePackages is true, it SHALL request the target upgrades described by Install the listed packages; when latest is
-true, it SHALL select versions as Highest version is required on request states, also for a package the first
-installation left at an older version.
+false, the second installation SHALL NOT change an installed version unless a constraint or dependency requires it or
+the image's own apk configuration sets a version policy, as Install the listed packages states; when upgradePackages is
+true, it SHALL request the target upgrades described by Install the listed packages; when latest is true, it SHALL
+select versions as Highest version is required on request states, also for a package the first installation left at an
+older version, and SHALL NOT lower a version the first installation selected through a `name@tag` entry.
 
 The second invocation SHALL use its own control values, with no permanent override of image configuration. Earlier cache
 choices SHALL NOT override the later refresh or cleanup policy. A version policy or lock wait of the first invocation
@@ -324,8 +341,9 @@ NOT by itself lower a version an earlier `latest=true` selected.
 
 #### Scenario: Later entry replaces the earlier constraint
 
-- **WHEN** `upgradePackages=false` and `latest=false` on the second invocation and the first installation's `packages`
-  holds `name=version` and the second's holds `name` without a constraint
+- **WHEN** `upgradePackages=false` and `latest=false` on the second invocation, the image's apk configuration sets no
+  version policy, and the first installation's `packages` holds `name=version` and the second's holds `name` without a
+  constraint
 - **THEN** the second installation succeeds, apk's world holds `name` without a constraint, and the installed version
   stays as it was
 
@@ -350,7 +368,14 @@ NOT by itself lower a version an earlier `latest=true` selected.
 - **THEN** the second installation succeeds, the package is at the highest offered version, and apk's world holds the
   entry once
 
-#### Scenario: Later lock wait applies to the second installation
+#### Scenario: Later untagged entry keeps a higher tagged version
+
+- **WHEN** the first invocation lists `name@tag` and installs from the tagged repository a version higher than the
+  untagged repositories offer, and the second lists `name` without a tag with `latest=true`
+- **THEN** the second installation succeeds, the package stays at its installed version, and apk's world holds `name`
+  without the tag
+
+#### Scenario: Earlier version policy and lock wait do not carry over
 
 - **WHEN** the first invocation sets `latest=true` and a `lockTimeout`, and the second omits both with the same
   `packages`
