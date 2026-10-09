@@ -9,6 +9,10 @@ Upstream sources:
 
 - Alpine Package Keeper wiki page: https://wiki.alpinelinux.org/wiki/Alpine_Package_Keeper
 - apk-tools source repository: https://gitlab.alpinelinux.org/alpine/apk-tools
+- apk(8) manual, apk 3.0.8: https://gitlab.alpinelinux.org/alpine/apk-tools/-/blob/v3.0.8/doc/apk.8.scd
+- apk-add(8) manual, apk 3.0.8: https://gitlab.alpinelinux.org/alpine/apk-tools/-/blob/v3.0.8/doc/apk-add.8.scd
+- apk(8) manual, apk 2.14.12: https://gitlab.alpinelinux.org/alpine/apk-tools/-/blob/v2.14.12/doc/apk.8.scd
+- apk-add(8) manual, apk 2.14.12: https://gitlab.alpinelinux.org/alpine/apk-tools/-/blob/v2.14.12/doc/apk-add.8.scd
 
 ## Requirements
 
