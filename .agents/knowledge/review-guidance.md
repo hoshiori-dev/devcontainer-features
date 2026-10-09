@@ -40,6 +40,14 @@ The collection accepts these for every feature:
   (feature-authoring.md).
 - A maintainer account can be taken over.
 
+The collection accepts this for administration tooling:
+
+- A dependency of an administration script that comes from a widely used, well-maintained publisher (the Deno standard
+  library on JSR, for example) is trusted as published when the script imports it by exact version. What that package
+  imports in turn, from whatever publisher, is its publisher's choice and resolves within the ranges it declares, and
+  the repository keeps no lock file. Report an import without an exact version, and a directly imported package whose
+  publisher does not meet that bar.
+
 A risk one feature accepts is stated, with its reason, in a Requirement of `openspec/specs/<id>/spec.md`
 (feature-authoring.md, Developer trust and readability); read the spec before reporting. A risk the spec does not state
 is not accepted: report it.
