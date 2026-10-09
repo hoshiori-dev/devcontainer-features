@@ -8,6 +8,10 @@ only from the package repositories the image already configures, and configures 
 Upstream sources:
 
 - apt-get manual: https://manpages.debian.org/apt-get
+- apt.conf manual: https://manpages.debian.org/apt.conf
+- apt_preferences manual: https://manpages.debian.org/apt_preferences
+- apt-transport-http manual: https://manpages.debian.org/apt-transport-http
+- dpkg manual: https://manpages.debian.org/dpkg
 - APT source repository: https://salsa.debian.org/apt-team/apt
 
 ## Requirements
