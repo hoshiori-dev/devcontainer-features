@@ -804,6 +804,14 @@ Deno.test("parseInput accepts a number only when it is digits, from the argument
     assertEquals(parseInput(["8"], env(event)).event, undefined);
 });
 
+Deno.test("the script imports one dependency-free module and nothing remote", async () => {
+    const script = await Deno.readTextFile(new URL("./sync_pr_labels.ts", import.meta.url));
+    const imports = [...script.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1]);
+    assertEquals(imports, ["./lib/constants.ts"]);
+    assert(!/^\s*import\b|\bimport\(/m.test(await Deno.readTextFile(new URL("./lib/constants.ts", import.meta.url))));
+    assert(!/\bimport\(/.test(script), "no dynamic import");
+});
+
 Deno.test("the first line lets the script run gh and read the event variables, and grants nothing else", async () => {
     const [first] = (await Deno.readTextFile(new URL("./sync_pr_labels.ts", import.meta.url))).split("\n");
     assertEquals(first, `#!/usr/bin/env -S deno run --allow-run=gh --allow-env=${EVENT_VARIABLES.join(",")}`);

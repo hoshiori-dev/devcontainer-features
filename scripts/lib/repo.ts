@@ -4,9 +4,10 @@
 // repository.
 import { join } from "jsr:@std/path@1.1.6";
 import { parse as parseJsonc } from "jsr:@std/jsonc@1.0.3";
+import { REPO } from "./constants.ts";
 
-/** GitHub repository, which is also the OCI namespace path the features are published under. */
-export const REPO = "hoshiori-dev/devcontainer-features";
+/** GitHub repository, which is also the OCI namespace path the features are published under (lib/constants.ts). */
+export { REPO };
 
 /** OCI namespace every feature of this repository is published under. */
 export const NAMESPACE = `ghcr.io/${REPO}`;

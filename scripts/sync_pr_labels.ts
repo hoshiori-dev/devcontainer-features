@@ -24,9 +24,10 @@
 //
 // Everything is read through `gh api` with the token the environment gives gh; nothing of the pull
 // request is checked out or run. A value a pull request controls reaches `gh api` only in a request
-// body or percent-encoded in a path, and is printed only escaped. Deno confines what this script
-// imports no further than the script itself (.agents/knowledge/review-guidance.md, Accepted risks).
-import { REPO } from "./lib/repo.ts";
+// body or percent-encoded in a path, and is printed only escaped. The script imports one constant
+// from a module without imports and nothing remote, so no dependency runs under the job's token;
+// Deno would confine one no further than the script itself (.agents/knowledge/review-guidance.md).
+import { REPO } from "./lib/constants.ts";
 
 export const PENDING = "spec:pending";
 export const APPROVED = "spec:approved";
