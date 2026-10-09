@@ -47,7 +47,8 @@ settled the direction in #123 on 2026-10-08.
 - **A named exception to "Never use `pull_request_target`".** `checks.md` keeps the rule and names this one workflow
   with the bounds that make it safe: it runs the default branch's script and never checks out, fetches, or runs anything
   of the pull request; it reads what it needs through the API; what a pull request controls reaches it as data; its
-  token holds `contents: read` and `pull-requests: write`; it uses no secret.
+  token holds `contents: read` and `pull-requests: write` and reaches only the steps that write; it uses no secret and
+  no cache; its run is limited in time; and its script may run `gh` and nothing else.
 - **The package gate is recorded on GitHub.** The rules say that `spec:approved`, read as above, closes the package gate
   on a pull request that holds an OpenSpec change, in place of a sentence in the conversation. The freeze gate is
   unchanged: the archive is commanded in conversation and has no label. The reconciliation of the pull request's threads
@@ -187,8 +188,14 @@ None.
   repository, or path of the pull request in any step, has no `${{ }}` expression in a `run:` line, passes the pull
   request's number, the event's action, label, sender, and head commit, and for a dispatch its number input, as
   environment variables and no other field of the event, ends with a step that runs only after a failure and removes
-  `spec:approved`, and uses no secret and no action but the checkout and the repository's own tool setup. A unit test
-  asserts each of these on the workflow file.
+  `spec:approved`, and uses no secret and no action but the checkout and the repository's own tool setup. The workflow
+  grants no permission at its top level, so that only the job holds one. The job has a time limit of five minutes. The
+  token is set on the step that runs the script and on the step that runs after a failure, and on no other step and at
+  no level above them. No step restores or saves a cache, and neither the workflow nor the repository's tool setup names
+  a cache action or a cache input. A unit test asserts each of these on the workflow file, and the last also on the tool
+  setup.
+- The script's first line lets it run `gh` and read the environment variables it names, and grants nothing else: no
+  network, no reading or writing of files, no other program. A unit test asserts it on the file.
 - No other workflow uses `pull_request_target` or `workflow_run`: a unit test over every workflow file asserts it and
   names this workflow as the one exception.
 - The script's printing form makes no write and prints, for #124, `spec:archived`, `area:ci`, `area:scripts`, and

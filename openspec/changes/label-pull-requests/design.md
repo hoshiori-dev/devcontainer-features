@@ -159,13 +159,22 @@
   description; a changed base does not matter to an approval, and the areas and `spec:archived` follow at the next push.
   Rejected: `ref: main` on the checkout as in `labels.yml`, since the default checkout is already `main`'s newest commit
   and a test that forbids every `ref` is simpler to keep true.
+- **What the job is denied beyond its permissions.** A run of this workflow may start for any pull request, a fork's
+  included, so the job is bounded where its permissions are not. The token is an environment variable of the two steps
+  that call `gh` and of nothing else, so the tool setup runs without it. No cache is restored or saved: a cache is the
+  usual way into a job that holds a write token, and the tool setup turns none on today. The workflow's top level grants
+  no permission, so a job added later starts with none. Five minutes limit a run; with the concurrency group that bounds
+  what a pull request can make the workflow spend. Rejected: a linter for workflows, which is one more dependency beside
+  CodeQL, which reads the workflows already, and the tests of this workflow's shape; a code owner for the file, which
+  adds nothing with one maintainer.
 - **A run that succeeds writes nothing on a closed pull request.** A merged pull request so keeps `spec:archived`. A run
   that fails still takes `spec:approved` off, through the workflow's last step, and on a closed pull request the
   script's own error path does no more than that. The printing form prints what the rules decide for any pull request.
 - **`gh api`, and what the shebang does not give.** The rules for passing and printing what a pull request controls are
   the proposal's Acceptance item; the reason for the first is that `-F` reads a file for a value that begins with `@`.
-  The script's shebang grants `--allow-run=gh` and the named environment variables. That does not confine a dependency
-  (`review-guidance.md`, Accepted risks); the job's token does.
+  The script's shebang grants `--allow-run=gh` and the named environment variables and nothing else, which the
+  proposal's Acceptance item checks. Deno's permissions confine no dependency by themselves (`review-guidance.md`,
+  Accepted risks): what a dependency could do is run `gh` with the job's token, and that token is what bounds it.
 - **Who may dispatch, and the publish gate.** A dispatch only reconciles one pull request and cannot approve, so an
   agent may start one when it reads a state that a missed run explains. Adding `spec:approved` on the maintainer's
   instruction has no text to review; the agent names the pull request and its head commit before it adds the label and
