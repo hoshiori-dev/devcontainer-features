@@ -16,9 +16,8 @@ developer who needs one of them has to write a Dockerfile step instead of declar
   packages, choose between keeping and replacing a changed configuration file, bound download retries, and bound the
   wait for dpkg's locks. The delta spec owns the option contracts and their interactions.
 - An installation that sets none of the new options behaves exactly as apt-packages 1.1.1 does.
-- The feature states what it inherits from the image: it sets no proxy and selects no configuration file, an empty
-  option inherits the image's setting, and an explicit option overrides only its matching native setting for the
-  feature's own calls.
+- The feature states what it inherits from the image and what an explicit option overrides; the delta spec's requirement
+  "Image configuration is inherited" owns that contract, and the feature's notes explain it to developers.
 - The Purpose of `openspec/specs/apt-packages/spec.md` is corrected by hand in the same commit: its "Upstream sources"
   list gains the apt.conf, apt_preferences, apt-transport-http, and dpkg manuals, which the new controls rest on.
 
@@ -52,29 +51,33 @@ None.
 
 - Every scenario of the delta spec's ADDED requirements passes on each image of test/apt-packages/compatibility.json,
   with the test, image, architecture, and result recorded in the PR: the five Option requirements, "Target release
-  prefers a configured release", "Target release selects only among configured sources", "Target release leaves holds
-  and pins in force", "Configuration file policy covers dpkg conffiles", "Download retries are bounded", "Lock wait is
-  scoped to installation", and "Image configuration is inherited".
+  prefers a configured release", "Target release selects only among configured sources", "Target release ranks with
+  holds and pins as APT does", "Configuration file policy covers dpkg conffiles", "Download retries are bounded", "Lock
+  wait is scoped to installation", and "Image configuration is inherited".
 - Every scenario the delta adds to its MODIFIED requirements passes the same way: the suggestion scenarios of "Install
   the listed packages", the policy scenarios of "Non-interactive installation", the boundary and syntax scenarios of
   "Installation controls are validated before changes", and the two later-control scenarios of "Installing the feature
   twice".
 - Every declared option agrees between the spec, devcontainer-feature.json, NOTES.md, and the generated README; the
   feature metadata has version 1.2.0.
+- src/apt-packages/NOTES.md states which proxy settings APT honors at build time, and the order in which a configuration
+  file named by `APT_CONFIG`, the image's configuration, and the feature's options apply.
+- src/apt-packages/NOTES.md no longer promises that an APT pin the image set is never overridden: it states the pin
+  ranking of "Target release ranks with holds and pins as APT does".
 - just check, just test apt-packages, and just test-scenarios apt-packages pass.
 
 **Stays true:**
 
-- With none of the new options set, the feature gives APT the same arguments and produces the same result as 1.1.1:
-  every scenario of the main spec that the delta does not add keeps passing unchanged, including every scenario name the
-  MODIFIED requirements carry over.
+- With none of the new options set, the feature behaves exactly as 1.1.1: every scenario of the main spec that the delta
+  does not add keeps passing unchanged, including every scenario name the MODIFIED requirements carry over.
 - The five phase 1 options keep their names, types, defaults, and enum values.
-- A valid empty package list stays a no-op without the package manager, whatever the controls; an invalid control fails
-  with status 1 before any package-manager call, also for an empty list.
+- The empty-list and refusal guarantees of "Installation controls are validated before changes" hold with the new
+  options as they do with the phase 1 ones.
 - No option adds a source or key, weakens signature or TLS verification, permits removal or a downgrade, or changes a
   held package.
 - Nothing is persisted: no file under /etc/apt or /etc/dpkg is created or edited by the feature, and a later
   installation is not affected by an earlier one's controls.
-- The feature sets no proxy and no variable that selects an APT or dpkg configuration file.
+- What 1.1.1 leaves to the image and the build environment (proxy, configuration files) is still left to them, as "Image
+  configuration is inherited" now states.
 - Existing compatibility images and architectures stay supported; only apt-packages, its tests, its spec, and this
   change are touched; no privileges, mounts, lifecycle hooks, or feature dependencies are introduced.

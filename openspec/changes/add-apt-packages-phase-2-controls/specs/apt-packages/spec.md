@@ -44,7 +44,7 @@ The feature SHALL accept the option `conffilePolicy` as declared here.
 #### Scenario: Omitted conffilePolicy
 
 - **WHEN** `conffilePolicy` is omitted
-- **THEN** a configuration file that was changed in the image is kept when an upgrade ships a new version of it
+- **THEN** a conffile that was changed in the image is kept when an upgrade ships a new version of it
 
 ### Requirement: Option downloadRetries
 
@@ -78,11 +78,11 @@ The feature SHALL accept the option `lockTimeout` as declared here.
 
 ### Requirement: Target release prefers a configured release
 
-An empty `targetRelease` SHALL pass no release preference. A non-empty value SHALL make APT prefer that release, as its
-default release, on the install call only. It is a preference, not a filter: other releases stay usable, and a
-`name=version` entry keeps its version. Accepted risk: it can hold back a security update published under another
-release name and raises every suite sharing the name, backports included; the developer chooses that, and the feature
-does not warn.
+An empty `targetRelease` SHALL pass no release preference. A non-empty value SHALL make APT prefer that release on the
+install call only. It is a preference, not a filter: other releases stay usable, and a `name=version` entry keeps its
+version. Accepted risk: the name selects every suite whose suite name, codename, or version equals it, so it holds back
+security updates where suites differ in them (Debian) and raises backports where they share them (Ubuntu), without a
+warning.
 
 #### Scenario: Native release preference is inherited
 
@@ -115,9 +115,16 @@ does not warn.
 
 #### Scenario: Release name shared by several suites prefers all of them
 
-- **WHEN** `targetRelease` holds a codename or version that several configured suites carry, one of which the image
-  ranks below the default priority
+- **WHEN** the configured sources hold several suites that carry the same codename or version, one of which the image
+  ranks below the default priority, and `targetRelease` holds that codename or version
 - **THEN** every such suite is preferred, so a listed package can be installed from the lower-ranked suite
+
+#### Scenario: Release name carried by one suite prefers that suite alone
+
+- **WHEN** the configured sources hold several suites with distinct suite names, codenames, and versions, and
+  `targetRelease` holds the name of one of them
+- **THEN** only that suite is preferred: a listed package that is not installed comes from it, also when another suite
+  offers a newer version
 
 ### Requirement: Target release selects only among configured sources
 
@@ -142,12 +149,12 @@ with a non-zero status before any package changes.
 - **WHEN** `targetRelease` is non-empty and the feature refreshes the package index
 - **THEN** the refresh covers every configured repository exactly as it does without the option
 
-### Requirement: Target release leaves holds and pins in force
+### Requirement: Target release ranks with holds and pins as APT does
 
-A `targetRelease` SHALL NOT change a held package: an installation that would change one fails and leaves it as it was.
-It SHALL NOT downgrade an installed package. A pin with a priority above 990 and a negative pin SHALL keep their effect.
-A positive pin below 990 on a version outside the target release is outranked, because APT gives the target release
-priority 990; a developer who relies on such a pin leaves `targetRelease` empty or raises the pin.
+A `targetRelease` SHALL NOT change a held package or downgrade an installed one. APT gives each suite the name selects
+priority 990, in place of a pin the image set on that suite for all packages. A pin on another suite and a pin naming a
+package keep their priority: above 990 they win, negative they exclude, below 990 they lose; at 990 the newest version
+wins. Accepted risk: an image's pin of a whole suite, such as -1 on backports, is cancelled when the name selects it.
 
 #### Scenario: Held package is not changed
 
@@ -161,25 +168,40 @@ priority 990; a developer who relies on such a pin leaves `targetRelease` empty 
 
 #### Scenario: Higher-priority pin wins
 
-- **WHEN** the image pins another release with a priority above 990 and `targetRelease` names a different release
+- **WHEN** the image pins, with a priority above 990, a suite that `targetRelease` does not select
 - **THEN** the version the pin selects is installed
 
 #### Scenario: Negative pin still excludes
 
-- **WHEN** the image pins a listed package with a negative priority and `targetRelease` names a release that offers it
+- **WHEN** the image pins every version of a listed package, by the package's name, with a negative priority and
+  `targetRelease` names a release that offers it
 - **THEN** the feature exits with a non-zero status and the package is not installed
 
 #### Scenario: Lower-priority pin on another version is outranked
 
-- **WHEN** the image pins a version of a listed package outside the target release with a positive priority below 990
+- **WHEN** `targetRelease` names a release that offers a listed package, and the image pins a version of that package
+  outside the target release with a positive priority below 990
 - **THEN** the version of the target release is installed
+
+#### Scenario: Pin of exactly 990 yields to the newer version
+
+- **WHEN** `targetRelease` names a release that offers a listed package, and the image pins another version of that
+  package with priority 990
+- **THEN** the newer of the two versions is installed
+
+#### Scenario: Pin on the whole named suite is replaced
+
+- **WHEN** the image gives a suite a negative priority for all packages, `targetRelease` selects that suite, and a
+  listed package is offered by that suite alone
+- **THEN** the package is installed from that suite, and the image's pin is unchanged afterwards
 
 ### Requirement: Configuration file policy covers dpkg conffiles
 
-`conffilePolicy` SHALL apply only to files dpkg tracks as conffiles, when an installed package is upgraded. `keep`
-leaves the image's file and writes the packaged one beside it as `.dpkg-dist`. `replace` installs the packaged file,
-saves the image's file beside it as `.dpkg-old`, and installs again a conffile the image deleted. Accepted risk:
-`replace` overwrites configuration the image changed on purpose, for listed packages and every upgraded dependency.
+`conffilePolicy` SHALL apply only to dpkg conffiles, wherever a conffile's path holds other content than dpkg expects:
+on an upgrade, on a first installation over an existing file, and after a removal without purge. `keep` leaves the
+image's file and writes the packaged one as `.dpkg-dist`. `replace` installs the packaged file, saves the image's as
+`.dpkg-old`, and restores a deleted conffile. Accepted risk: `replace` overwrites deliberate image configuration,
+dependencies included.
 
 #### Scenario: Kept file has the packaged version beside it
 
@@ -202,10 +224,19 @@ saves the image's file beside it as `.dpkg-old`, and installs again a conffile t
 - **THEN** the packaged file is installed with either policy and no file with a `.dpkg-dist` or `.dpkg-old` suffix
   appears
 
-#### Scenario: Newly installed package is unaffected
+#### Scenario: Package without existing configuration files is unaffected
 
-- **WHEN** a listed package is not installed before the feature runs
-- **THEN** its configuration files are installed as packaged with either policy
+- **WHEN** a listed package is not installed before the feature runs and none of its conffile paths exists in the image
+- **THEN** its conffiles are installed as packaged with either policy and no file with a `.dpkg-dist` or `.dpkg-old`
+  suffix appears
+
+#### Scenario: Existing file at a new package's conffile path follows the policy
+
+- **WHEN** a listed package is not installed, or was removed without being purged, and the image holds a file with other
+  content at one of its conffile paths
+- **THEN** with `conffilePolicy=keep` the image's file stays and the packaged one is present with the suffix
+  `.dpkg-dist`; with `conffilePolicy=replace` the file holds the packaged content and the image's is present with the
+  suffix `.dpkg-old`
 
 ### Requirement: Download retries are bounded
 
@@ -222,13 +253,13 @@ lengthens the delay with each retry, so a high value can add minutes per file; t
 #### Scenario: Explicit retries reach refresh and install
 
 - **WHEN** `downloadRetries` is a valid non-empty value and the feature refreshes the index and installs packages
-- **THEN** every refresh and install call receives that retry count, and a download that keeps failing is attempted once
-  more than the value before the feature fails
+- **THEN** every refresh and install call receives that retry count, and a download whose connection keeps being closed
+  without an answer is retried that many times, with APT's growing delay, before the feature fails
 
 #### Scenario: Retries are disabled
 
-- **WHEN** `downloadRetries` is zero and a download fails
-- **THEN** the download is attempted once and the feature exits with a non-zero status
+- **WHEN** `downloadRetries` is zero and the connection of a download is closed without an answer
+- **THEN** the download is not retried, no retry delay passes, and the feature exits with a non-zero status
 
 #### Scenario: Missing file is not retried
 
@@ -265,7 +296,8 @@ offers no wait for the index and archive locks, so one of them held by another p
 #### Scenario: Lock held beyond the wait
 
 - **WHEN** another process holds a dpkg lock for longer than `lockTimeout` seconds
-- **THEN** the feature exits with a non-zero status after about that many seconds and no package is changed
+- **THEN** the feature exits with a non-zero status no earlier than `lockTimeout` seconds after the install call
+  started, and no package is changed
 
 #### Scenario: Index and archive locks do not wait
 
@@ -287,15 +319,16 @@ setting, on the feature's own calls only.
 
 #### Scenario: Explicit option overrides its image setting
 
-- **WHEN** one of those options is non-empty and the image's APT configuration sets a different value for the same
-  setting
-- **THEN** the feature's calls use the option's value, the other image settings stay in effect, and the image's
-  configuration files are the same as before the feature ran
+- **WHEN** `targetRelease`, `downloadRetries`, `lockTimeout`, or `networkTimeout` is non-empty and the image's APT
+  configuration sets a different value for the same setting
+- **THEN** the feature's calls use the option's value, the other image settings stay in effect, and the feature changes
+  no configuration file of the image
 
 #### Scenario: Proxy settings are inherited
 
 - **WHEN** the build environment or the image's APT configuration provides a proxy
-- **THEN** the feature passes no proxy setting of its own and APT applies the one provided
+- **THEN** the feature passes no proxy setting of its own and changes no proxy variable, so APT applies a proxy exactly
+  as it would without the feature
 
 #### Scenario: Configuration selected by the environment is honored
 
@@ -370,10 +403,11 @@ installed set can grow by orders of magnitude; the developer who enables it choo
 ### Requirement: Non-interactive installation
 
 The feature SHALL complete without reading any input: package configuration questions SHALL take their default answers,
-and when an upgrade ships a new version of a configuration file that was changed in the image, the changed file SHALL be
-kept with `conffilePolicy=keep` and replaced by the packaged file with `conffilePolicy=replace`. Either outcome SHALL be
-reached without a question and SHALL NOT depend on the configuration-file handling that the image's APT or dpkg
-configuration selects.
+and when an upgrade ships a new version of a conffile dpkg tracks that was changed in the image, the changed file SHALL
+be kept with `conffilePolicy=keep` and replaced by the packaged file with `conffilePolicy=replace`. Either outcome SHALL
+be reached without a question and SHALL NOT depend on the conffile handling that the image's APT or dpkg configuration
+selects. A configuration file that a package's own maintainer scripts manage, for example through ucf or debconf, is not
+a conffile: the feature passes no setting for it, and it is handled as that package decides under either policy.
 
 #### Scenario: Package that asks a question installs unattended
 
@@ -382,27 +416,32 @@ configuration selects.
 
 #### Scenario: Changed configuration file is kept
 
-- **WHEN** `conffilePolicy=keep` and a listed package is upgraded to a version that ships a new version of a
-  configuration file changed in the image
+- **WHEN** `conffilePolicy=keep` and a listed package is upgraded to a version that ships a new version of a conffile
+  changed in the image
 - **THEN** the feature completes without input and the file keeps the image's content
 
 #### Scenario: Changed configuration file is replaced
 
-- **WHEN** `conffilePolicy=replace` and a listed package is upgraded to a version that ships a new version of a
-  configuration file changed in the image
+- **WHEN** `conffilePolicy=replace` and a listed package is upgraded to a version that ships a new version of a conffile
+  changed in the image
 - **THEN** the feature completes without input and the file holds the packaged content
 
 #### Scenario: Image setting does not defeat keeping
 
 - **WHEN** `conffilePolicy=keep` and the image's APT or dpkg configuration selects the packaged version of changed
-  configuration files
-- **THEN** the changed file is kept
+  conffiles
+- **THEN** the changed conffile is kept
 
 #### Scenario: Image setting does not defeat replacing
 
 - **WHEN** `conffilePolicy=replace` and the image's APT or dpkg configuration selects the default action or the
-  installed version for changed configuration files
-- **THEN** the changed file is replaced by the packaged file
+  installed version for changed conffiles
+- **THEN** the changed conffile is replaced by the packaged file
+
+#### Scenario: File managed by maintainer scripts is outside the policy
+
+- **WHEN** a listed package manages a configuration file through its maintainer scripts and not as a conffile
+- **THEN** the feature completes without input and passes no setting for that file with either policy
 
 ### Requirement: Installation controls are validated before changes
 
@@ -414,13 +453,14 @@ accept only their declared values. A non-empty `networkTimeout` SHALL be a canon
 the same rule with the same range. A non-empty `downloadRetries` SHALL follow the same rule from `0` through `10`, where
 the single digit `0` is the only accepted value that starts with a zero. A non-empty `targetRelease` SHALL be one name
 of at most 64 characters that starts with an ASCII letter or digit and consists only of ASCII letters, digits, and the
-characters `.`, `+`, `_`, `~`, and `-`. Invalid options SHALL fail with status 1 and a message naming the option. With
-valid options and an empty package list, the feature SHALL succeed without refreshing, upgrading, cleaning, or changing
-any configuration, also without the package manager.
+characters `.`, `+`, `_`, `~`, and `-`, and SHALL NOT be `now` in any letter case. Invalid options SHALL fail with
+status 1 and a message naming the option. With valid options and an empty package list, the feature SHALL succeed
+without refreshing, upgrading, cleaning, or changing any configuration, also without the package manager.
 
 The feature SHALL refuse these values itself because APT does not: APT reads a negative or oversized retry count and a
-negative lock wait as unbounded, replaces any other malformed number with a value of its own, and ignores a release that
-holds `=` without an error.
+negative lock wait as unbounded, replaces any other malformed number with a value of its own, does not check a release
+given as a `key=value` selector, so a mistyped one is ignored without an error, and accepts `now`, which names the
+installed packages and no source.
 
 #### Scenario: Invalid control fails before any change
 
@@ -454,8 +494,8 @@ holds `=` without an error.
 #### Scenario: Target release syntax is validated
 
 - **WHEN** targetRelease is empty, a plain suite name, a codename, or a dotted version, or an invalid value that holds
-  `=`, `/`, `*`, `?`, `[`, a comma, whitespace, or shell text, that starts with `-`, or that is longer than 64
-  characters
+  `=`, `/`, `*`, `?`, `[`, a comma, whitespace, or shell text, that starts with `-`, that is longer than 64 characters,
+  or that is `now`, `NOW`, or `Now`
 - **THEN** empty and the plain names are accepted; every invalid value fails with status 1 naming `targetRelease` before
   a package-manager command
 
@@ -530,7 +570,8 @@ downgrade a package installed from another release, and SHALL NOT restore a conf
 #### Scenario: Earlier source and download controls do not persist
 
 - **WHEN** the first invocation sets `targetRelease`, `installSuggests=true`, `conffilePolicy=replace`,
-  `downloadRetries`, and `lockTimeout`, and the second sets none of them with a non-empty compatible package list
+  `downloadRetries`, and `lockTimeout`, the second sets none of them with a non-empty compatible package list, and no
+  package either invocation installs ships a file under /etc/apt or /etc/dpkg
 - **THEN** the second invocation gives APT no release preference, retry count, or lock wait, excludes suggestions, and
   keeps changed configuration files; the image's APT and dpkg configuration files are the same as before the first
   invocation
