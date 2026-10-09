@@ -91,8 +91,10 @@ None.
   "Selection and network controls do not carry over").
 - An empty package list with valid options succeeds without `zypper`, whatever the other options hold (scenarios "Empty
   list ignores installation controls", "Empty list ignores selection and network controls").
-- An installed package is never removed to resolve a conflict (requirement "Installed packages are not removed",
-  scenario "Conflict with a package of an unselected repository fails").
+- The feature passes zypper nothing that lets it remove an installed package to resolve a conflict, and such a conflict
+  fails the feature (requirement "Installed packages are not removed", scenario "Conflict with a package of an
+  unselected repository fails"); with a non-empty `repositories` this holds within the bound that the requirement
+  "Repository selection restricts the installation" states.
 - The feature fetches nothing itself: `install.sh` contains no URL and no download tool.
 - `devcontainer-feature.json` declares none of `privileged`, `capAdd`, `securityOpt`, `mounts`, `entrypoint`, `init`,
   `containerEnv`, lifecycle commands, `dependsOn`, or `installsAfter`.
