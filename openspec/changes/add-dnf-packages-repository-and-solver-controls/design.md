@@ -23,7 +23,7 @@ scaffolding only; none of these appears in the feature.
   `-source` repositories).
 - `almalinux:9`: `/etc/dnf/dnf.conf` sets `best=True` and `skip_if_unavailable=False`. Enabled: `appstream`, `baseos`,
   `extras`; 30 disabled identifiers, among them `crb`, `plus`, and `highavailability`.
-- `rockylinux/rockylinux:9`: `best=True`, `skip_if_unavailable=False`. Enabled: `appstream`, `baseos`, `extras`; 33
+- `rockylinux/rockylinux:9`: `best=True`, `skip_if_unavailable=False`. Enabled: `appstream`, `baseos`, `extras`; 36
   disabled identifiers, among them `crb`, `devel`, and `security`.
 - No identifier on the three images starts with a character other than a letter or digit. None of the images configures
   a proxy.
@@ -38,9 +38,13 @@ scaffolding only; none of these appears in the feature.
   upgrade on all three; `--setopt=best=False` answers "already installed. Nothing to do." on all three; without the
   option the EL9 images upgrade and Fedora does not. This settles the phase 1 open question: the setting is effective on
   dnf 4.14.0.
+- `best=False` does not hold an installed package back when the transaction needs the higher version: on `fedora:44`
+  with `glibc-2.43-8` installed and `2.43-9` in `updates`, `--setopt=best=False glibc glibc-devel` answers "already
+  installed" for `glibc` and then plans its upgrade to `2.43-9`, which `glibc-devel` requires; `glibc` alone is "Nothing
+  to do". No such pair was found on the EL9 images on the day of the test.
 - `--best` and `--nobest` exist in both generations; dnf5's primary spelling `--no-best` is a usage error (status 2) on
-  dnf 4.14. For `--setopt=*.best=True` dnf5 prints "Option \"best\" not found" once per repository, and dnf 4.14 prints
-  nothing: `best` is a main-level setting only.
+  dnf 4.14. For `--setopt=*.best=True` dnf5 prints "Option \"best\" not found" and dnf 4.14 prints "Repo … did not have
+  a best attr. before setopt", each once per configured repository: `best` is a main-level setting only.
 - Both generations refuse a non-boolean value themselves (`--setopt=best=maybe`: status 1 on dnf 4.14, status 2 on
   dnf5), also an empty one.
 - Pins under either value: phase 1 observed a pinned downgrade on Fedora (image `best` False) and on AlmaLinux (image
@@ -96,9 +100,9 @@ scaffolding only; none of these appears in the feature.
   `max_downloads_per_mirror=3`; `=10` with `max_downloads_per_mirror=10` 7.
 - A repository-level value wins over the main-level one (main 1 with repository 2: peak 2; main 2 with repository 1:
   peak 1).
-- Native parsing does not enforce the range: `=21` and `=-1` pass option parsing on both generations and abort when the
-  download starts ("Bad value of LRO_MAXPARALLELDOWNLOADS", status 1); `=05` is accepted; `=0` is refused with different
-  messages and statuses.
+- Native parsing does not enforce the range: `=21` and `=-1` pass option parsing on both generations and abort when
+  `dnf` sets up repository access, before any download and also under `--cacheonly` ("Bad value of
+  LRO_MAXPARALLELDOWNLOADS", status 1); `=05` is accepted; `=0` is refused with different messages and statuses.
 
 **Retries and locks**
 
@@ -157,13 +161,15 @@ the installers whose manager supports them); and an option is declared only when
 - The existence check reads one listing of configured repositories and counts an identifier as configured only when it
   equals, byte for byte, the first field of a row other than the header line. Checked by "Unknown repository fails
   before installation" on both generations, by "Identifier in another letter case is unknown", and by a check with a
-  repository whose identifier is `repo`.
+  repository whose identifier is `repo`. A listing call that fails ends the feature with status 1 before the install.
+  Checked by "Repository list cannot be read" with a stand-in `dnf` on `PATH` whose listing fails.
 - The existence check and the listing run only when the package list is not empty and at least one repository list is
   not empty. Checked by "Empty list ignores installation controls" on an image without `dnf` and by review.
 - The feature never passes `--repo`, `--repoid`, `--repofrompath`, `--nogpgcheck`, `--skip-file-locks`, a `<id>.enabled`
   setting, `retries`, `exit_on_lock`, `max_downloads_per_mirror`, or a proxy setting. Checked by review and by "No retry
   or lock setting is passed", which inspects the arguments the installer hands to `dnf`.
-- `dnf clean` keeps its phase 1 arguments. Checked by "Cleanup covers a temporarily enabled repository".
+- `dnf clean` keeps its phase 1 arguments. Checked by "Cleanup covers a temporarily enabled repository" and
+  "Package-file cleanup covers a temporarily enabled repository".
 
 **Non-Goals:**
 
@@ -181,10 +187,10 @@ the installers whose manager supports them); and an option is declared only when
   nothing needs removing. Rejected: a drop-in under `/etc/dnf`, which edits the image and must be undone on every exit
   path; `DNF_VAR_*` or other environment, which no control here needs.
 - **`best` through `--setopt=best=True|False`.** One spelling works on both generations and follows the phase 1
-  `install_weak_deps` argument. `best` is a main-level setting, so it gets no `*.` companion; dnf5 rejects one.
-  Rejected: `--best` / `--nobest`, where dnf5's primary spelling `--no-best` fails on dnf 4.14, so the common spelling
-  would rest on an alias; a boolean option, which cannot express "leave the image's setting", so its default would
-  override either Fedora or EL9.
+  `install_weak_deps` argument. `best` is a main-level setting, so it gets no `*.` companion; both generations report
+  one as unknown per repository. Rejected: `--best` / `--nobest`, where dnf5's primary spelling `--no-best` fails on dnf
+  4.14, so the common spelling would rest on an alias; a boolean option, which cannot express "leave the image's
+  setting", so its default would override either Fedora or EL9.
 - **Repository selection through `--disablerepo=<id>` then `--enablerepo=<id>`, one argument per identifier.** These are
   the only spellings common to both generations. One identifier per argument keeps `dnf`'s own comma and glob handling
   out of the path. Rejected: `--setopt=<id>.enabled=`, which dnf 4.14 silently ignores for an unknown identifier;
@@ -197,6 +203,12 @@ the installers whose manager supports them); and an option is declared only when
   set for the first character, which admits `-x`; accepting globs with a warning.
 - **An identifier in both lists is an error.** Otherwise the fixed argument order would silently make enable win.
   Rejected: enable wins; last-written wins, which the two separate options cannot express.
+- **The refresh requirement speaks of the enabled set.** The phase 1 scenario "Refresh is explicitly requested" says
+  "every configured or enabled repository is checked", which was harmless while the two words were not distinct terms.
+  This delta makes them distinct, so the requirement "Repository metadata refresh" is reproduced as modified with that
+  one THEN reading "every repository enabled for the invocation"; no behavior changes, and a configured, disabled
+  repository is not checked. Rejected: leaving the scenario, which after archive would require `refreshPolicy=always` to
+  check and fail on the 30 disabled repositories of `almalinux:9`.
 - **The feature checks that each identifier is configured.** dnf 4.14 warns and continues for an unknown
   `--disablerepo`, so a misspelled identifier would install from the repository the developer meant to leave out, on EL9
   only. One listing call after `require_dnf` gives the same failure, status 1 naming the identifier, on both generations
@@ -249,8 +261,11 @@ abbreviations the other options do not use; `0` or `inherit` as the word for an 
 uses the empty string as `networkTimeout` does; an upper bound other than `dnf`'s own 20.
 
 Descriptions in `devcontainer-feature.json` follow the phase 1 sentence pattern ("…, or empty to inherit image settings;
-applies only to this invocation."). The feature's `description` there ("…the repositories the image already enables") is
-revisited with the implementation, since a configured repository can now be enabled.
+applies only to this invocation."). The feature's `description` there ("…the repositories the image already enables")
+becomes "Installs listed system packages from the repositories the image already configures." with the implementation,
+matching the corrected Purpose, since a configured repository can now be enabled. The description is rendered in the
+root `README.md` feature list, so `just docs` regenerates that row and `README.zh.md` receives its translation in the
+same pull request (`AGENTS.md`, Keep In Sync). The wording is open question 11.
 
 ### Verification bounds
 
@@ -297,7 +312,8 @@ its content:
 - **Option injection:** identifiers are validated against an enumerated ASCII set and passed inside one argument each;
   numeric values are digits only; `best` is one of three words. No value is written to a file.
 - **Failure behavior:** invalid options exit 1 before any `dnf` call; an unconfigured identifier exits 1 after
-  `require_dnf` and before the install; a package that only a left-out repository offers fails with `dnf`'s own status.
+  `require_dnf` and before the install, the message naming the option and the identifier, and so does a listing that
+  fails; a package that only a left-out repository offers fails with `dnf`'s own status.
 - **Idempotency:** nothing persists, so a second run starts from the image's configuration; no `idempotencyExemption`.
 
 ## Risks / Trade-offs
@@ -312,7 +328,7 @@ its content:
   both generations, so a layout change fails a test rather than passing silently. An identifier is never matched
   loosely, so a misread can only refuse a configured repository, never accept an unconfigured one.
 - [The first-character rule is stricter than upstream: a repository whose identifier starts with `_`, `.`, `:`, or `-`
-  cannot be named] → None of the 81 identifiers on the tested images does; the rule is an open question below.
+  cannot be named] → None of the 84 identifiers on the tested images does; the rule is an open question below.
 - [Values of `parallelDownloads` above 3 usually show no effect because of the per-mirror limit, which reads as an
   ignored option] → Stated in "Parallel downloads are bounded" and in NOTES.md.
 - [`best` scenarios depend on repository state at test time] → Verification bounds: candidates are found at run time.
@@ -345,6 +361,11 @@ For the maintainer at the package gate; each has the recommendation the package 
    `basearch` behavior as observations tied to the tested versions? Carried: yes, so labeled.
 10. **Log line.** Whether the install log line also names `best` and the repository lists. Not a contract item; it
     affects tests that match output. Carried: decided with the implementation.
+11. **Feature description.** Carried: the metadata `description` changes to "…the repositories the image already
+    configures", which also changes one row of `README.md` and `README.zh.md`. Alternative: keep "enables", accurate for
+    the defaults only, and touch neither README.
+12. **Message for an unconfigured identifier.** Carried: it names the option and the identifier, like a refused
+    identifier. Alternative: the identifier alone.
 
 ## Follow-up work
 

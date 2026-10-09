@@ -67,8 +67,9 @@ for its install call only, whatever the image configures, in the same way on eve
 `true`, `dnf` uses the highest version the enabled repositories offer of each listed package or fails, so a listed
 package that is installed and named without a version is upgraded when a higher version is offered. Under `false`, `dnf`
 MAY fall back to a lower version of a listed package, and a listed package that is installed and named without a version
-stays as installed. The policy SHALL NOT change how a pinned version is installed, permit erasing an installed package,
-skip an unresolvable entry, or persist a setting in the image.
+stays as installed unless another package of the transaction requires a higher version of it. The policy SHALL NOT
+change how a pinned version is installed, permit erasing an installed package, skip an unresolvable entry, or persist a
+setting in the image.
 
 #### Scenario: Native best policy is inherited
 
@@ -79,14 +80,14 @@ skip an unresolvable entry, or persist a setting in the image.
 #### Scenario: Explicit best policy reaches the solver
 
 - **WHEN** `best=true` and `packages` names, without a version, an installed package of which the enabled repositories
-  offer a higher version
+  offer a higher version that can be installed
 - **THEN** the feature succeeds and the package is upgraded to that version, also on an image whose configuration turns
   the best-version policy off
 
 #### Scenario: Best policy is turned off for the invocation
 
 - **WHEN** `best=false` and `packages` names, without a version, an installed package of which the enabled repositories
-  offer a higher version
+  offer a higher version, and nothing else to install requires that higher version
 - **THEN** the feature succeeds and the package stays at its installed version, also on an image whose configuration
   turns the best-version policy on
 
@@ -108,10 +109,11 @@ the image's set applies, as before these options existed.
 
 Both options name only repositories the image already configures. A listed identifier that equals, in the same letter
 case, no identifier of a repository the image configures SHALL fail the feature with status 1 and a message naming the
-identifier, before `dnf` loads repository metadata or changes a package, alike on every supported `dnf` generation. The
-feature SHALL make this check itself, from `dnf`'s list of configured repositories and without network access, and only
-when the package list is not empty; when that list cannot be read, the feature SHALL fail with status 1 before
-installing. An identifier whose repository is already in the requested state SHALL be accepted and change nothing.
+option and the identifier, before `dnf` loads repository metadata or changes a package, alike on every supported `dnf`
+generation. The feature SHALL make this check itself, from `dnf`'s list of configured repositories and without network
+access, and only when the package list is not empty; when that list cannot be read, the feature SHALL fail with status 1
+before installing. An identifier whose repository is already in the requested state SHALL be accepted and change
+nothing.
 
 The selection SHALL apply to the feature's install call only: the feature SHALL NOT create, edit, or remove a repository
 file, SHALL NOT select an exclusive repository set, expand a pattern, or pass a repository location, and the image's
@@ -157,13 +159,21 @@ remaining repositories offer. The feature accepts this because the value is expl
 #### Scenario: Unknown repository fails before installation
 
 - **WHEN** either list names an identifier of no repository the image configures, with a non-empty package list
-- **THEN** on every supported `dnf` generation the feature exits with status 1, names the identifier, loads no
-  repository metadata, and installs none of the listed packages
+- **THEN** on every supported `dnf` generation the feature exits with status 1, names the option and the identifier,
+  loads no repository metadata, and installs none of the listed packages
 
 #### Scenario: Identifier in another letter case is unknown
 
-- **WHEN** either list names a configured repository's identifier spelled in a different letter case
-- **THEN** the feature exits with status 1, names the identifier, and installs none of the listed packages
+- **WHEN** either list names a configured repository's identifier spelled in a different letter case, with a non-empty
+  package list
+- **THEN** the feature exits with status 1, names the option and the identifier, and installs none of the listed
+  packages
+
+#### Scenario: Repository list cannot be read
+
+- **WHEN** a repository list is not empty, the package list is not empty, and `dnf` fails to list the configured
+  repositories
+- **THEN** the feature exits with status 1 and installs none of the listed packages
 
 #### Scenario: Refresh policy and timeout cover a temporarily enabled repository
 
@@ -186,6 +196,11 @@ remaining repositories offer. The feature accepts this because the value is expl
 
 - **WHEN** `cleanup=all` and the feature has installed a package from a temporarily enabled repository
 - **THEN** the image holds no downloaded package file and no repository metadata of that repository in `dnf`'s cache
+
+#### Scenario: Package-file cleanup covers a temporarily enabled repository
+
+- **WHEN** `cleanup=packages` and the feature has installed a package from a temporarily enabled repository
+- **THEN** the image holds no downloaded package file of that repository in `dnf`'s cache
 
 ### Requirement: Parallel downloads are bounded
 
@@ -221,10 +236,10 @@ persist a setting in the image.
 
 ### Requirement: Undeclared settings are inherited
 
-The feature SHALL pass `dnf` no setting other than those its options declare. It SHALL NOT set a proxy, SHALL NOT set,
-change, or unset a repository variable or any environment variable that selects `dnf` configuration, and SHALL NOT pass
-a retry count, a lock setting, or a switch that skips a lock: `dnf` offers no bounded retry and no bounded lock wait on
-the supported generations, so the feature declares no option for either and `dnf`'s own behavior applies. Proxy
+The feature SHALL pass `dnf` no proxy, repository-variable, retry, or lock setting. It SHALL NOT set a proxy, SHALL NOT
+set, change, or unset a repository variable or any environment variable that selects `dnf` configuration, and SHALL NOT
+pass a retry count, a lock setting, or a switch that skips a lock: `dnf` offers no bounded retry and no bounded lock
+wait on the supported generations, so the feature declares no option for either and `dnf`'s own behavior applies. Proxy
 settings, repository variables, retry behavior, and lock waiting therefore come from the image's configuration and the
 build environment, unchanged by the feature.
 
@@ -248,7 +263,8 @@ package-manager command or creating any cache. Boolean options SHALL accept only
 accept only their declared values, in the letter case declared, and never an empty value. A non-empty `networkTimeout`
 SHALL be a canonical ASCII decimal integer string from `1` through `3600`, with no sign, whitespace, leading zero, or
 other character. A non-empty `parallelDownloads` SHALL be such a string from `1` through `20`; the feature refuses every
-other value itself, because `dnf` accepts some of them and fails only when a download starts.
+other value itself, because `dnf` accepts some of them at option parsing and fails later, when it sets up repository
+access.
 
 `enableRepositories` and `disableRepositories` SHALL each be a comma-separated list of repository identifiers in which
 whitespace around an identifier and empty items are ignored and a repeated identifier counts once. An identifier SHALL
@@ -260,7 +276,8 @@ as part of one argument and SHALL NOT evaluate it as shell code.
 Invalid options SHALL fail with status 1 and a message naming the option, and for a refused identifier also that
 identifier. With valid options and an empty package list, the feature SHALL succeed without refreshing, upgrading,
 cleaning, or changing any configuration, also without the package manager, and without checking whether a listed
-repository exists.
+repository exists. Whether a listed repository is configured is not part of this validation; the requirement "Repository
+selection is scoped to installation" governs it.
 
 #### Scenario: Invalid control fails before any change
 
@@ -340,6 +357,61 @@ already has MAY be upgraded when the list names it without a version, as the `be
   unconstrained
 - **THEN** the package manager includes that recommendation in its resolution; required dependencies and conflict
   protection remain in effect
+
+### Requirement: Repository metadata refresh
+
+With `refreshPolicy=default`, DNF SHALL decide missing or expired metadata using the image configuration and MAY skip a
+repository the image marks skippable. With `always`, the feature SHALL force a metadata check of every enabled
+repository and SHALL fail before installation when any enabled repository cannot be refreshed or verified, including one
+the image marks skippable. With `never`, the feature SHALL use DNF cache-only mode, SHALL NOT fetch metadata or package
+files, and SHALL fail before installation if any enabled repository lacks usable cached metadata or a required package
+file is absent or invalid. Existing cached metadata MAY be expired. No policy SHALL change signature or TLS checks.
+
+#### Scenario: Missing metadata is downloaded
+
+- **WHEN** `refreshPolicy=default` and the image holds no metadata for the enabled repositories
+- **THEN** the feature downloads it from the image's enabled repositories before installing
+
+#### Scenario: Unexpired metadata is used as is
+
+- **WHEN** `refreshPolicy=default` and the image already holds metadata of every enabled repository that its `dnf`
+  configuration does not consider expired
+- **THEN** the feature installs from that metadata without downloading it again
+
+#### Scenario: Failed metadata download fails the feature
+
+- **WHEN** `refreshPolicy=default` and the metadata of an enabled repository that the image does not mark as skippable
+  cannot be downloaded
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+#### Scenario: Skippable repository is skipped
+
+- **WHEN** `refreshPolicy=default` and the metadata of an enabled repository that the image marks as skippable cannot be
+  downloaded, and the listed packages come from other repositories
+- **THEN** the feature installs the listed packages from the other repositories and exits with status 0
+
+#### Scenario: Refresh is explicitly requested
+
+- **WHEN** refreshPolicy=always with a non-empty package list and existing metadata
+- **THEN** every repository enabled for the invocation is checked before installing; failure of any of them fails before
+  packages change
+
+#### Scenario: Cached metadata is explicitly selected
+
+- **WHEN** refreshPolicy=never and every required index or metadata cache is usable and all required package files are
+  cached
+- **THEN** no metadata is fetched and installation uses the existing metadata under the package manager's normal
+  verification policy
+
+#### Scenario: Missing cached metadata fails without refresh
+
+- **WHEN** refreshPolicy=never and a required repository has no usable cached metadata
+- **THEN** the feature fails before installing without attempting a metadata download
+
+#### Scenario: Cache-only package miss fails
+
+- **WHEN** refreshPolicy=never with cached metadata but a missing or invalid required package file
+- **THEN** the feature fails without downloading or installing a package
 
 ### Requirement: Package signature checking stays in effect
 
