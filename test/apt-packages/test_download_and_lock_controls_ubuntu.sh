@@ -216,7 +216,7 @@ the release fields of the binary package lists are listed for the check that the
   calls_are \
   "CALL [--option] [Acquire::http::Timeout=7] [--option] [Acquire::https::Timeout=7] [--option] [Acquire::Retries=2]\
  [update] [--error-on=any]
-CALL [indextargets] [--format] [\$(SUITE)] [Created-By: Packages]
+CALL [indextargets] [Created-By: Packages]
 CALL [--option] [Acquire::http::Timeout=7] [--option] [Acquire::https::Timeout=7] [--option] [Acquire::Retries=2]\
  [install] [--yes] [--no-remove] [--option] [APT::Install-Recommends=false] [--option] [APT::Install-Suggests=true]\
  [--option] [APT::Cmd::Pattern-Only=true] [--target-release] [alpha] [--option] [DPkg::Lock::Timeout=5] [--option]\

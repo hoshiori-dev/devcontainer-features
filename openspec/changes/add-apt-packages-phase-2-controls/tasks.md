@@ -117,3 +117,18 @@ Open questions 14, 15, and 16 of design.md are taken as specified: the package w
       `oldstable-security`), and say that the version of Debian's main suite changes with each point release, so that
       `24.04` is the version example that lasts; regenerate README.md with `just docs`. Verify with `just docs-check`
       and by reading the sentence against `apt-get indextargets` on both images.
+- [x] 7.11 Read the release fields in `check_target_release` from the unformatted stanzas of
+      `apt-get indextargets "Created-By: Packages"` instead of `--format`: `--format` expands a placeholder that a
+      field's value holds (a `Suite: $(VERSION)` is listed as the release's version), so the check passed a value APT
+      prefers nothing for. The stanzas print the `Suite`, `Codename`, and `Version` values as APT holds them, omit a
+      field the release lacks, and print a multi-line value with continuation lines that start with a blank (observed on
+      both images); a value is taken only from a line that starts with the field's name, and a value that a continuation
+      line follows is dropped. Add to test_target_release_debian and \_ubuntu two fixture releases whose suite name and
+      whose codename are `$(VERSION)`, and their versions as refused values (APT accepts each as a target release on
+      both images and prefers nothing for it); update the expected call of test_download_and_lock_controls_debian and
+      \_ubuntu. Verify that the four scenarios pass, and that the two target-release scenarios fail on the new values
+      with the install.sh of the revision before this task.
+- [x] 7.12 In the refused values' loop of test_target_release_debian and \_ubuntu, require the words only the release
+      check prints (the kind of field and "of no release in the package index"), which an option refused for its form
+      does not print, and describe the groups of entries by what they are instead of by their position in the list.
+      Verify that both scenarios pass.

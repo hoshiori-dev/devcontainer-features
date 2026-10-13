@@ -254,15 +254,11 @@ check_target_release() {
   case "${TARGETRELEASE}" in
     [0123456789]*)
       check_target_release_kind="version"
-      # A placeholder of apt-get's --format, which the shell must not expand.
-      # shellcheck disable=SC2016
-      set -- '$(VERSION)'
+      set -- Version
       ;;
     *)
       check_target_release_kind="suite name or codename"
-      # Placeholders of apt-get's --format, which the shell must not expand.
-      # shellcheck disable=SC2016
-      set -- '$(SUITE)' '$(CODENAME)'
+      set -- Suite Codename
       ;;
   esac
   # APT compares without regard to the case of ASCII letters. The letters are spelled out, as in validate_options.
@@ -271,17 +267,29 @@ check_target_release() {
 ${TARGETRELEASE}
 EOF
   )"
-  # The index-target listing prints one field of each configured source as a line of its own, and the placeholder
-  # itself where a release lacks the field, which equals no accepted value. apt-cache policy is no source for the
-  # fields: it joins them with commas, so a field that holds a comma reads there as a further field. The filter keeps
-  # the binary package lists, which are what APT prefers a release for: a release that only a source-package (deb-src)
-  # source carries is one APT refuses as a target release.
+  # The index-target listing prints each configured source as lines of "Name: value", among them the fields of its
+  # release as APT holds them, and no line for a field the release lacks. apt-get's --format is no source for the
+  # fields: it expands a placeholder that a field's value holds, so a suite name of $(VERSION) reads there as the
+  # release's version. apt-cache policy is none either: it joins the fields with commas, so a field that holds a comma
+  # reads there as a further field. The filter keeps the binary package lists, which are what APT prefers a release
+  # for: a release that only a source-package (deb-src) source carries is one APT refuses as a target release.
+  check_target_release_targets="$(apt-get indextargets "Created-By: Packages")" \
+    || fail "apt-get indextargets failed with status $?;" \
+      "fix what apt-get reports above (APT configuration or the package index)"
   for check_target_release_field in "$@"; do
+    # A value is what follows the field's name at the start of a line. A line that starts with a blank continues the
+    # value of the line before it: it is no field, whatever it spells, and a value that it continues is one APT
+    # matches no name with, so that value is dropped.
     check_target_release_listed="$(
-      apt-get indextargets --format "${check_target_release_field}" "Created-By: Packages"
-    )" \
-      || fail "apt-get indextargets failed with status $?;" \
-        "fix what apt-get reports above (APT configuration or the package index)"
+      awk -v prefix="${check_target_release_field}: " '
+        /^[ \t]/ { held = 0; next }
+        held { print value; held = 0 }
+        index($0, prefix) == 1 { value = substr($0, length(prefix) + 1); held = 1 }
+        END { if (held) print value }
+      ' <<EOF
+${check_target_release_targets}
+EOF
+    )"
     check_target_release_listed="$(
       tr ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz <<EOF
 ${check_target_release_listed}

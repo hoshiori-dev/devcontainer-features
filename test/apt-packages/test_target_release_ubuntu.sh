@@ -5,7 +5,8 @@
 # ranks with holds and pins as APT does", and the scenarios "Omitted targetRelease", "Configuration selected by the
 # environment is honored", and "Later invocation keeps what the earlier one installed". The design's checks of the
 # release check are here as well: a release field that holds a comma, an unknown entry beside an unknown release, a
-# release that only a source-package source carries, and a value that is only a part of a release field.
+# release that only a source-package source carries, a value that is only a part of a release field, and a release
+# field that holds a placeholder of apt-get's index-target format.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -132,7 +133,15 @@ Checksums-Sha256:
 Directory: pool/source-only
 SOURCES
 publish_suite source-only source-only-code 4.0
-use_suites alpha beta shared-main shared-backports CaseSuite 9x
+# Two suites with a field that holds a placeholder of `apt-get indextargets --format`: the suite name of the first and
+# the codename of the second are the text $(VERSION). A listing that expands the placeholder prints the release's
+# version in the field's place; APT compares a name with the text itself. Each suite's other name is the one its
+# source line gives, and each version starts with a letter, so APT compares it with no name.
+add_package placeholder-suite refused 0.6
+publish_suite placeholder-suite placeholder-suite suite-decoy "Suite=\$(VERSION)"
+add_package placeholder-code refused 0.7
+publish_suite placeholder-code "\$(VERSION)" code-decoy
+use_suites alpha beta shared-main shared-backports CaseSuite 9x placeholder-suite placeholder-code
 echo "deb-src [signed-by=${REPOSITORY_KEYRING}] file:${REPOSITORY} source-only main" \
   | as_root tee -a "${REPOSITORY_SOURCES}" >/dev/null
 
@@ -173,7 +182,7 @@ check "targetRelease=alpha installs" exited_with 0
 check "only the suite that carries the name is preferred: the package comes from it, not at the newer version of beta" \
   has_version preferred 1.0
 check "with targetRelease the refresh covers every configured repository, as it does without the option" \
-  index_holds alpha beta shared-main shared-backports CaseSuite 9x
+  index_holds alpha beta shared-main shared-backports CaseSuite 9x placeholder-suite placeholder-code
 as_root sh -c 'rm -rf /var/lib/apt/lists/*'
 
 run_install PACKAGES=application TARGETRELEASE=alpha
@@ -219,12 +228,14 @@ check "the later invocation does not downgrade the package to the release it wou
 check "the later invocation does not remove the suggested package" installed later-suggestion
 
 # Target release selects only among configured sources
-# Each entry is a targetRelease that would make APT prefer no release, and what it is. APT itself accepts the three
-# that equal a field of the other kind and refuses the others; the feature's check ends every one of these runs before
-# the install call. The entries after the first nine hold the comparison to the whole value: each is a part of a field
-# of the kind it is compared with, or equals such a field only when its dot is read as "any character", as a regular
-# expression would read it. The error message is told from the installer's log line, which prints
-# targetRelease=<value>, by the words around the value.
+# Each entry is a targetRelease that would make APT prefer no release, and what it is. APT itself accepts those that
+# equal a field of the other kind, the version of a placeholder release among them, and refuses the others; the
+# feature's check ends every one of these runs before the install call. The entries that are a part of a field of the
+# kind they are compared with, or equal such a field only when a dot is read as "any character", as a regular
+# expression would read it, hold the comparison to the whole value. The entries that a placeholder stands for hold it
+# to the field's own text. The error message is told from the installer's log line, which prints
+# targetRelease=<value>, and from the error of a value that is refused for its form, which starts the same way, by the
+# words around the value.
 unpreferred_releases=(
   "nosuch a well-formed name that no release of the package index carries"
   "9x a name starting with a digit that equals a suite name and the version of no release"
@@ -244,16 +255,23 @@ unpreferred_releases=(
   "9 a proper prefix of the release version 9.0"
   "1aB the end of the release version 7.1aB"
   "7.1.B a version that equals the release version 7.1aB only if its second dot stands for any character"
+  "suite-decoy a release version that stands for a suite name only if the placeholder \$(VERSION) is expanded"
+  "code-decoy a release version that stands for a codename only if the placeholder \$(VERSION) is expanded"
 )
 configuration_before="$(apt_configuration)"
 for unpreferred_release in "${unpreferred_releases[@]}"; do
   name="${unpreferred_release%% *}"
   kind="${unpreferred_release#* }"
+  # The kind of field the error names: the one APT compares the value with, by the value's first character.
+  case "${name}" in
+    [0-9]*) field="version" ;;
+    *) field="suite name or codename" ;;
+  esac
   status_before="$(dpkg_status)"
   run_recorded_install PACKAGES=refused TARGETRELEASE="${name}"
   check "targetRelease=${name}, ${kind}, fails the feature with status 1" exited_with 1
-  check "targetRelease=${name}: the output names targetRelease and the given value" \
-    printed "error: option targetRelease is \"${name}\""
+  check "targetRelease=${name}: the output names targetRelease and the given value as the ${field} of no release" \
+    printed "error: option targetRelease is \"${name}\", which is the ${field} of no release in the package index"
   check "targetRelease=${name}: the install call is not made" made_no_install_call
   check "targetRelease=${name}: no package is installed" not_installed refused
   check "targetRelease=${name}: no package is changed" dpkg_status_is "${status_before}"
