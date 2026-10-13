@@ -103,3 +103,6 @@ unchanged when none of the four options is set.
       cache holds it; verify that the two checks "… leaves no downloaded package file …" fail on the three images when
       `install.sh` runs no `dnf clean packages` and `dnf clean metadata` in place of `dnf clean all`, and that
       `test_repository_selection_0`, `_1`, and `_2` pass with `install.sh` as it is.
+- [x] 6.3 In `src/dnf-packages/NOTES.md`, state that `dnf`'s messages reach the build log unfiltered and can hold a
+      repository URL with its credentials, also for a repository enabled for the invocation; regenerate `README.md` with
+      `just docs`; verify with `just docs-check`.

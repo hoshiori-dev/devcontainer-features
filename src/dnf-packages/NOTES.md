@@ -105,7 +105,10 @@ The devcontainer CLI evaluates option values in a shell before the feature runs.
 The feature keeps the image's signature and TLS configuration; repositories the image explicitly leaves unchecked stay
 unchecked. `enableRepositories` lets a `devcontainer.json` install from a repository the image's author configured and
 left disabled, for example a testing repository, one whose signature check is turned off, or one that names a remote
-key; review the identifiers it lists as you would review a repository file. Installed packages may themselves ship
+key; review the identifiers it lists as you would review a repository file. DNF's own messages go to the build log
+unfiltered: on both tested versions a failed download printed the repository's URL in full, credentials included, and a
+proxy URL deserves the same care. Keep credentials in DNF's `username` and `password` settings or in build secrets, not
+in a URL; a repository enabled for an invocation is covered by this too. Installed packages may themselves ship
 configuration or keys. A second invocation uses its own list and controls, retaining earlier packages except where
 native resolution replaces them: a repository the first invocation enabled or left out, its `best` value, and its
 download bound do not carry over, and a package installed from a temporarily enabled repository stays installed.
