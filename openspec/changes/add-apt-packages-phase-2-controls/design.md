@@ -108,7 +108,8 @@ version. The preference compares the value with one kind of field only, chosen b
 means versions, anything else suite names and codenames. A value that only a field of the other kind carries is
 therefore accepted by APT and prefers nothing. The feature applies the preference's comparison itself: the whole value,
 without regard to letter case, against the fields of that kind of every release of the index, with a non-empty list
-only, after the refresh and before the install call. No match fails with status 1 naming `targetRelease`.
+only, after the refresh and the name check and before the install call. No match fails with status 1 naming
+`targetRelease` and the value.
 
 - The same check covers a name that no release carries in any field, so APT's refusal (experiment 1) is no longer the
   path that ends such a run. It stays behind the feature's check and needs no handling of its own.
@@ -119,9 +120,22 @@ only, after the refresh and before the install call. No match fails with status 
 - The release fields are taken from APT one field at a time: its index-target listing prints the suite name, codename,
   and version of each configured source as separate values. The release line of the policy listing is not a source for
   them, because it joins the fields with commas and a field that holds a comma reads there as a further field
-  (experiment 11).
+  (experiment 11). Checked with a fixture release whose Origin or Label holds a comma followed by text that reads as
+  another field, and a `targetRelease` equal to the name in that text, which no field of that kind carries: the run
+  fails as for an unknown release.
 - Letter case is folded for ASCII letters only, with the letters spelled out as in the syntax check; the accepted
-  character set of the option holds no other letter.
+  character set of the option holds no other letter. Checked by "Letter case of the release name is not significant"
+  with upper- and lower-case letters on both sides, the value and the release field, and by "Target release syntax is
+  validated", which keeps any other letter out of the value; a release field that holds another letter is left as it is
+  and equals no accepted value.
+- The release check comes after the name and version check of "Entries name packages exactly", directly before the
+  install call. When an entry and the release would both fail, the entry's failure ends the run. This order needs the
+  least change to the implementation, which refreshes, checks the names, and then makes the install call: the new check
+  takes the place where APT's refusal of the release ended a run until now, so a run in which both fail ends with the
+  message it ends with today, and the order of the existing checks stays. Rejected: the release check before the name
+  check, which would change which failure such a run reports for no gain, since neither check changes anything. Checked
+  by a run whose list names an unknown package and whose `targetRelease` no release carries: the output names the entry
+  and not `targetRelease`.
 
 Rejected: leaving existence to APT, which this design chose first, on the grounds that a second lookup in the feature
 would duplicate APT's matching rules and could disagree with them. A code audit of the implementation refuted it with a
@@ -329,6 +343,11 @@ lock and was not shown to conflict). Each scenario runs on both package generati
   fixture suites with distinct names, so both run on both images whatever the image's own suites look like. The same
   holds for a suite name or codename that starts with a digit and a version that starts with a letter, which no stock
   suite of the supported images has.
+- "The install call is not made" is observed in what a recording `apt-get` wrapper on `PATH` records: no install call.
+  That wrapper forwards every call to the real `apt-get`, as the one of the existing control-run scenarios does, because
+  the release check reads the index through `apt-get`; behind a stub that only records, the check would fail for want of
+  an index and show nothing. The absent install call is what tells the feature's check from APT's own refusal, which
+  ends a run inside that call.
 - A retry is observed as elapsed back-off against a server that closes the connection without answering: none at 0, at
   least 1 s at 1, at least 3 s at 2. A request count is not the observable there, because APT sends two requests per
   attempt. "Missing file is not retried" counts requests: one, for a 404.
@@ -383,6 +402,10 @@ lock and was not shown to conflict). Each scenario runs on both package generati
     only names that a field of the other kind carries.
 15. The check folds letter case as APT does (experiment 11), so `Bookworm` prefers what `bookworm` prefers. Confirm, or
     refuse a name whose letter case differs from the release's.
+16. The overall choice for a `targetRelease` that APT accepts and that prefers no release: the feature checks and fails
+    (specified, taken on the maintainer's word of 2026-10-13), or the requirement is reworded to promise only what APT
+    refuses and the silent case is carried as a stated accepted risk. Approving the package confirms the first;
+    questions 14 and 15 are details of it.
 
 ## Follow-up work
 
