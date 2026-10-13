@@ -79,3 +79,12 @@ The open questions of design.md are taken as the design resolves them: the maint
       version 1.0.1.
 - [x] 5.4 Record each Acceptance item of the proposal and each scenario with its check, image, and result in the pull
       request's Validation section.
+
+## 6. Audit follow-up
+
+- [x] 6.1 In `test/pacman-packages/fail_download_controls.sh`, make `failed_closed` assert an error message that names
+      `parallelDownloads` (`printed_error` in `installer.sh`: a line with the prefix `pacman-packages: error:`) instead
+      of the word anywhere in the output, which the line logged before the temporary configuration is written always
+      holds; verify by mutation that the six fail-closed checks pass with `install.sh` as it is, that four of them fail
+      once the `|| fail` after the `pacman-conf` call is removed, and that the other two fail once the unconfirmed-value
+      message no longer names the option.

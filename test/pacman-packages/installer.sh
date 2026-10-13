@@ -46,6 +46,17 @@ printed() {
   fi
 }
 
+# The last run printed an error message that holds the text $1: a line with the prefix install.sh gives its error
+# messages, and not one it only logs.
+printed_error() {
+  local line
+  while IFS= read -r line; do
+    if [[ "${line}" == "pacman-packages: error: "*"$1"* ]]; then return 0; fi
+  done <<<"${install_output}"
+  printf 'install.sh printed no line that starts with "pacman-packages: error: " and contains "%s"\n' "$1" >&2
+  return 1
+}
+
 # The last run named the entry $1 as refused. Not the bare entry: "-" is also in the "pacman-packages:" prefix of every
 # message, and quoted in the accepted characters the refusal spells out.
 refused() {

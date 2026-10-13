@@ -23,10 +23,11 @@ replace_pacman_conf() {
   chmod +x "${STAND_IN_DIR}/pacman-conf"
 }
 
-# The last run exited with status 1 and named parallelDownloads before it called pacman, so it synchronized, installed,
-# and upgraded nothing, and it left no temporary file.
+# The last run exited with status 1 and named parallelDownloads in an error message before it called pacman, so it
+# synchronized, installed, and upgraded nothing, and it left no temporary file. Not the word anywhere in the output: the
+# line install.sh logs before it writes the temporary configuration names the option in every run.
 failed_closed() {
-  exited_with 1 && printed "parallelDownloads" && pacman_was_called 0 && no_sync_databases \
+  exited_with 1 && printed_error "parallelDownloads" && pacman_was_called 0 && no_sync_databases \
     && temporary_files_are "${temporary_before}"
 }
 
