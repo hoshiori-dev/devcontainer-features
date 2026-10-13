@@ -91,3 +91,17 @@ Open questions 14, 15, and 16 of design.md are taken as specified: the package w
 - [x] 7.5 Run `just check` with the OpenSpec version CI pins, `just test apt-packages`, and
       `just test-scenarios apt-packages` on this revision; all pass. (CI passed the scenario job on the earlier head
       b244e3c, before this revision.)
+- [x] 7.6 Compare `targetRelease` with the release fields of the binary package lists only
+      (`apt-get indextargets … "Created-By: Packages"`), so that a release only a source-package (`deb-src`) source
+      carries fails the check, as design.md's bound requires: APT refuses such a release as a target release on both
+      images and prefers nothing for it. Add that fixture release to test_target_release_debian and \_ubuntu (its suite
+      name, codename, and version each fail as an unknown release, with no install call and nothing changed), and the
+      filter to the expected calls of test_download_and_lock_controls_debian and \_ubuntu. Verify that the four
+      scenarios pass and that the two target-release scenarios fail with the filter removed.
+- [x] 7.7 State in src/apt-packages/NOTES.md that the check reads the release fields through `apt-get indextargets` and
+      that an image which sets `APT::Get::IndexTargets::ReleaseInfo` to false gets every `targetRelease` refused
+      (observed on both images; the feature does not override the setting), and replace the example "`12` is not
+      `12.15`" with one that cannot be read as `targetRelease=12` failing on Debian 12; regenerate README.md with
+      `just docs`. Verify with `just docs-check` and by reading the paragraph.
+- [x] 7.8 Run `just check` with the OpenSpec version CI pins, `just test apt-packages`, and
+      `just test-scenarios apt-packages` on this revision; all pass.
