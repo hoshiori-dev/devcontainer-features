@@ -3,7 +3,8 @@
 # its own in it (repository.sh) and runs install.sh against them. Every scenario of the spec requirements "Target
 # release prefers a configured release", "Target release selects only among configured sources", and "Target release
 # ranks with holds and pins as APT does", and the scenarios "Omitted targetRelease", "Configuration selected by the
-# environment is honored", and "Later invocation keeps what the earlier one installed".
+# environment is honored", and "Later invocation keeps what the earlier one installed". The design's checks of the
+# release check are here as well: a release field that holds a comma, and an unknown entry beside an unknown release.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -16,6 +17,8 @@ source "$(dirname "$0")/repository.sh"
 readonly DEFAULT_RELEASE="/etc/apt/apt.conf.d/99-scenario-default-release"
 readonly PREFERENCES="/etc/apt/preferences.d/scenario"
 readonly SELECTED_CONFIGURATION="/tmp/selected-apt.conf"
+readonly CALL_LOG="/tmp/native-calls"
+readonly RECORDING_PATH="/tmp/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # The image's APT configuration names the release $1 as its default release.
 image_prefers() {
@@ -38,10 +41,28 @@ index_holds() {
   done
 }
 
+# Runs install.sh as run_install does, behind an apt-get that records each call and forwards it to the image's
+# apt-get, and keeps only this run's calls.
+run_recorded_install() {
+  as_root rm -f "${CALL_LOG}"
+  run_install PATH="${RECORDING_PATH}" "$@"
+}
+
+# The last recorded run called apt-get, and never to install. The search reads the saved calls: a run that never
+# reached apt-get leaves no record, which must not pass for "no install call".
+made_no_install_call() {
+  local calls
+  calls="$(<"${CALL_LOG}")" || return
+  if grep --fixed-strings --quiet ' [install]' <<<"${calls}"; then
+    printf 'the calls were:\n%s\n' "${calls}" >&2
+    return 1
+  fi
+}
+
 # Two suites with distinct suite names, codenames, and versions. Each package of the list is in alpha at 1.0 and in
 # beta at 2.0, and each check installs one of its own.
 for package in unpreferred preferred inherited inherited-empty exact overridden held newer suite-pinned outranked \
-  tied selected selected-explicit; do
+  tied selected selected-explicit refused; do
   add_package alpha "${package}" 1.0
   add_package beta "${package}" 2.0
 done
@@ -64,10 +85,34 @@ add_package shared-backports later 2.0 "Suggests: later-suggestion"
 add_package shared-backports later-suggestion 2.0
 publish_suite shared-main shared 9.0
 publish_suite shared-backports shared 9.0 NotAutomatic=yes ButAutomaticUpgrades=yes
+# A suite whose suite name, codename, and version hold upper- and lower-case letters. Each package of the list is in
+# it at 1.0 and in beta at 2.0.
+for package in spelled-suite spelled-code spelled-version case-suite case-code case-version; do
+  add_package CaseSuite "${package}" 1.0
+  add_package beta "${package}" 2.0
+done
+publish_suite CaseSuite CaseCode 7.1aB
+# A suite whose fields are of the kind APT does not compare such a name with: a suite name and a codename that start
+# with a digit, and a version that starts with a letter. Its Origin and Label hold a comma followed by text that
+# `apt-cache policy` prints as if it were a suite name (a=ghost) and a version (v=8.8) of the release.
+add_package 9x refused 0.5
+publish_suite 9x 9code v7 "Origin=Scenario,a=ghost" "Label=Scenario,v=8.8"
 # A suite that the repository offers and that no source of the image names.
 add_package gamma preferred 3.0
 publish_suite gamma gamma-code 3.0
-use_suites alpha beta shared-main shared-backports
+use_suites alpha beta shared-main shared-backports CaseSuite 9x
+
+# An apt-get that records its arguments and then runs the image's apt-get. It forwards every call, because the
+# feature's release check reads the index through apt-get.
+mkdir /tmp/bin
+cat >/tmp/bin/apt-get <<RECORDER
+#!/bin/sh
+printf 'CALL' >>${CALL_LOG}
+for argument do printf ' [%s]' "\${argument}" >>${CALL_LOG}; done
+printf '\n' >>${CALL_LOG}
+exec $(command -v apt-get) "\$@"
+RECORDER
+chmod +x /tmp/bin/apt-get
 
 run_install PACKAGES=unpreferred
 check "premise: without a release preference the newer version, which beta offers, is installed" \
@@ -94,7 +139,7 @@ check "targetRelease=alpha installs" exited_with 0
 check "only the suite that carries the name is preferred: the package comes from it, not at the newer version of beta" \
   has_version preferred 1.0
 check "with targetRelease the refresh covers every configured repository, as it does without the option" \
-  index_holds alpha beta shared-main shared-backports
+  index_holds alpha beta shared-main shared-backports CaseSuite 9x
 as_root sh -c 'rm -rf /var/lib/apt/lists/*'
 
 run_install PACKAGES=application TARGETRELEASE=alpha
@@ -115,6 +160,23 @@ check "both suites are preferred: the newer version comes from the lower-ranked 
 run_install PACKAGES=later TARGETRELEASE=9.0 INSTALLSUGGESTS=true
 check "targetRelease=9.0, a version two suites carry, prefers both as well" has_version later 2.0
 
+# Letter case of the release name is not significant
+run_install PACKAGES=spelled-suite TARGETRELEASE=CaseSuite
+check "premise: the suite name in the release's own spelling prefers that release" has_version spelled-suite 1.0
+run_install PACKAGES=case-suite TARGETRELEASE=cASEsUITE
+check "targetRelease=cASEsUITE, the suite name CaseSuite in another letter case, installs" exited_with 0
+check "the release is preferred as with the suite name in its own spelling" has_version case-suite 1.0
+run_install PACKAGES=spelled-code TARGETRELEASE=CaseCode
+check "premise: the codename in the release's own spelling prefers that release" has_version spelled-code 1.0
+run_install PACKAGES=case-code TARGETRELEASE=cASEcODE
+check "targetRelease=cASEcODE, the codename CaseCode in another letter case, installs" exited_with 0
+check "the release is preferred as with the codename in its own spelling" has_version case-code 1.0
+run_install PACKAGES=spelled-version TARGETRELEASE=7.1aB
+check "premise: the version in the release's own spelling prefers that release" has_version spelled-version 1.0
+run_install PACKAGES=case-version TARGETRELEASE=7.1Ab
+check "targetRelease=7.1Ab, the version 7.1aB in another letter case, installs" exited_with 0
+check "the release is preferred as with the version in its own spelling" has_version case-version 1.0
+
 # Later invocation keeps what the earlier one installed
 check "premise: the first invocation installed a suggested package from the target release" installed later-suggestion
 run_install PACKAGES=later
@@ -123,12 +185,38 @@ check "the later invocation does not downgrade the package to the release it wou
 check "the later invocation does not remove the suggested package" installed later-suggestion
 
 # Target release selects only among configured sources
-status_before="$(dpkg_status)"
+# Each entry is a targetRelease that would make APT prefer no release, and what it is. APT itself refuses only the
+# first one and the last two; the feature's check ends every one of these runs before the install call. The error
+# message is told from the installer's log line, which prints targetRelease=<value>, by the words around the value.
+unpreferred_releases=(
+  "nosuch a well-formed name that no release of the package index carries"
+  "9x a name starting with a digit that equals a suite name and the version of no release"
+  "9code a name starting with a digit that equals a codename and the version of no release"
+  "v7 a name starting with a letter that equals a release version and no suite name or codename"
+  "ghost a name that only the text after a comma in an Origin field spells as a suite name"
+  "8.8 a name that only the text after a comma in a Label field spells as a version"
+)
 configuration_before="$(apt_configuration)"
-run_install PACKAGES=preferred TARGETRELEASE=nosuch
-check "a release that the package index does not hold fails the feature" failed
-check "the output names the release" printed "nosuch"
-check "the unknown release changes no package" dpkg_status_is "${status_before}"
+for unpreferred_release in "${unpreferred_releases[@]}"; do
+  name="${unpreferred_release%% *}"
+  kind="${unpreferred_release#* }"
+  status_before="$(dpkg_status)"
+  run_recorded_install PACKAGES=refused TARGETRELEASE="${name}"
+  check "targetRelease=${name}, ${kind}, fails the feature with status 1" exited_with 1
+  check "targetRelease=${name}: the output names targetRelease and the given value" \
+    printed "error: option targetRelease is \"${name}\""
+  check "targetRelease=${name}: the install call is not made" made_no_install_call
+  check "targetRelease=${name}: no package is installed" not_installed refused
+  check "targetRelease=${name}: no package is changed" dpkg_status_is "${status_before}"
+done
+
+run_recorded_install PACKAGES=nosuchpackage TARGETRELEASE=nosuch
+check "an entry that names no package beside a targetRelease that no release carries fails the feature" exited_with 1
+check "the entry's failure ends the run: the output names the entry" \
+  printed "the entry 'nosuchpackage' names no package"
+check "the output does not name targetRelease" did_not_print "targetRelease"
+
+status_before="$(dpkg_status)"
 run_install PACKAGES=preferred TARGETRELEASE=gamma
 check "a suite that the repository offers and no source configures fails the feature" failed
 check "the output names the unconfigured suite" printed "gamma"

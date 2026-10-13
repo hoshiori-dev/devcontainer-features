@@ -211,9 +211,11 @@ run_logged_install PACKAGES=controlled TARGETRELEASE=alpha INSTALLSUGGESTS=true 
   DOWNLOADRETRIES=2 LOCKTIMEOUT=5 NETWORKTIMEOUT=7 REFRESHPOLICY=always
 check "controlled installs with every new option set" exited_with 0
 check "the retry count and the timeout reach the refresh and the install call, each with its own value; the lock wait \
-and the target release reach the install call alone; the refresh is called as it is without them" calls_are \
+and the target release reach the install call alone; the refresh is called as it is without them; between the two \
+the release fields are listed for the check that the target release prefers a release" calls_are \
   "CALL [--option] [Acquire::http::Timeout=7] [--option] [Acquire::https::Timeout=7] [--option] [Acquire::Retries=2]\
  [update] [--error-on=any]
+CALL [indextargets] [--format] [\$(SUITE)]
 CALL [--option] [Acquire::http::Timeout=7] [--option] [Acquire::https::Timeout=7] [--option] [Acquire::Retries=2]\
  [install] [--yes] [--no-remove] [--option] [APT::Install-Recommends=false] [--option] [APT::Install-Suggests=true]\
  [--option] [APT::Cmd::Pattern-Only=true] [--target-release] [alpha] [--option] [DPkg::Lock::Timeout=5] [--option]\

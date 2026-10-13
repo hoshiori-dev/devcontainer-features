@@ -52,6 +52,14 @@ printed() {
   fi
 }
 
+# The last run did not print the text $1.
+did_not_print() {
+  if [[ "${install_output}" == *"$1"* ]]; then
+    printf 'the output of install.sh contains "%s"\n' "$1" >&2
+    return 1
+  fi
+}
+
 # A line of the last run's output matches the extended regular expression $1; further grep options may follow.
 output_matches() {
   grep --extended-regexp --quiet "${@:2}" -- "$1" <<<"${install_output}"
