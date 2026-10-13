@@ -9,7 +9,8 @@
 # settings", "One timeout leaves the other inherited", "Override file is removed after success", "Override file is
 # removed after failure", "Feature does not repeat a failed call", "Inherited ZYPP_CONF fails an explicit override",
 # "Inherited ZYPP_CONF is kept without an override", and "Zypp configuration is unchanged"; and the accepted bounds of
-# the four boundary scenarios with a non-empty list.
+# the four boundary scenarios with a non-empty list. It also shows that the file exists at the repository listing a
+# selection begins with, the first zypper call of such a run.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -18,7 +19,7 @@ source dev-container-features-test-lib
 source "$(dirname "$0")/installer.sh"
 
 readonly RECORD_DIR="/tmp/zypper-record"
-# A PATH on which zypper is the recording stand-in, and mktemp one that records its environment.
+# A PATH on which zypper is the recording stand-in, and mktemp and rm are stand-ins that record their environment.
 readonly RECORDER_PATH="/tmp/recorder:/usr/sbin:/usr/bin:/sbin:/bin"
 readonly ZYPP_CONF_FILE="/tmp/inherited-zypp.conf"
 
@@ -100,17 +101,31 @@ no_call_saw_run_zypp() {
   done
 }
 
-# The command the installer runs beside zypper, mktemp, had the line $1 in its environment.
-other_command_had() {
-  grep -qxF -- "$1" "${RECORD_DIR}/mktemp-env"
+# The commands the installer runs beside zypper, mktemp before the first zypper call and rm after the last one, each
+# ran and had the line $1 in its environment.
+other_commands_had() {
+  local command
+  for command in mktemp rm; do
+    if ! grep -qxF -- "$1" "${RECORD_DIR}/${command}-env"; then
+      echo "${command} did not run with the line $1 in its environment" >&2
+      return 1
+    fi
+  done
 }
 
-# mktemp did not have the variable $1 in its environment.
-other_command_had_no() {
-  if grep -q "^$1=" "${RECORD_DIR}/mktemp-env"; then
-    echo "mktemp had $1 in its environment" >&2
-    return 1
-  fi
+# mktemp and rm each ran, and neither had the variable $1 in its environment.
+other_commands_had_no() {
+  local command
+  for command in mktemp rm; do
+    if [[ ! -e "${RECORD_DIR}/${command}-env" ]]; then
+      echo "${command} did not run" >&2
+      return 1
+    fi
+    if grep -q "^$1=" "${RECORD_DIR}/${command}-env"; then
+      echo "${command} had $1 in its environment" >&2
+      return 1
+    fi
+  done
 }
 
 # Runs install.sh like run_recorded, with a stand-in whose calls of the zypper command $1 fail.
@@ -123,8 +138,13 @@ run_recorded_failing() {
 
 mkdir /tmp/recorder
 install -m 0755 "$(dirname "$0")/zypper_recorder.sh" /tmp/recorder/zypper
-printf '#!/bin/sh\nenv >%s/mktemp-env\nexec /usr/bin/mktemp "$@"\n' "${RECORD_DIR}" >/tmp/recorder/mktemp
-chmod +x /tmp/recorder/mktemp
+# The installer runs mktemp for its temporary file, before the first zypper call of these runs, and rm when it exits,
+# after the last one.
+for command in mktemp rm; do
+  printf '#!/bin/sh\nenv >%s/%s-env\nexec /usr/bin/%s "$@"\n' "${RECORD_DIR}" "${command}" "${command}" \
+    >"/tmp/recorder/${command}"
+  chmod +x "/tmp/recorder/${command}"
+done
 configuration_before="$(libzypp_configuration)"
 
 run_recorded PACKAGES=bc
@@ -156,14 +176,15 @@ run_recorded PACKAGES=bc LOCKTIMEOUT=1 CONNECTTIMEOUT=5
 check "lockTimeout=1, the lowest value, succeeds" exited_with 0
 check "lockTimeout=1 makes the calls of the default run" calls_are "${DEFAULT_CALLS}"
 check "lockTimeout=1 reaches the refresh, the installation, and the cleanup call" every_call_had ZYPP_LOCK_TIMEOUT=1
-check "lockTimeout=1 reaches no other command the feature runs" other_command_had_no ZYPP_LOCK_TIMEOUT
+check "lockTimeout=1 reaches no other command the feature runs, before or after the zypper calls" \
+  other_commands_had_no ZYPP_LOCK_TIMEOUT
 
 run_recorded PACKAGES=bc LOCKTIMEOUT=3600 CONNECTTIMEOUT=5 ZYPP_LOCK_TIMEOUT=7
 check "lockTimeout=3600, the highest value, succeeds" exited_with 0
 check "lockTimeout=3600 overrides the lock wait of the build environment on every call" \
   every_call_had ZYPP_LOCK_TIMEOUT=3600
-check "another command the feature runs still has the build environment's lock wait" \
-  other_command_had ZYPP_LOCK_TIMEOUT=7
+check "the other commands the feature runs, before and after the zypper calls, have the build environment's lock wait" \
+  other_commands_had ZYPP_LOCK_TIMEOUT=7
 
 run_recorded PACKAGES=bc CONNECTTIMEOUT=1 TRANSFERTIMEOUT=3600 DOWNLOADRETRIES=10
 check "connectTimeout=1, transferTimeout=3600, and downloadRetries=10, each a bound, succeed" exited_with 0
@@ -209,6 +230,17 @@ check "a failing refresh fails the feature" failed
 check "with downloadRetries=3 the failing refresh is called once, and nothing follows" \
   calls_are "--non-interactive refresh"
 check "after the failing refresh neither the file nor a directory of the feature exists" no_override_left
+
+# A selection begins with zypper's listing of the repositories, which can download: the file is there for that call
+# too. The stand-in lists no repository, so the alias is refused, and the file goes with the failed run.
+run_recorded PACKAGES=bc REPOSITORIES=repo-oss CONNECTTIMEOUT=5 DOWNLOADRETRIES=2
+check "with a selection the feature lists the repositories first" \
+  calls_are "--xmlout --non-interactive --no-refresh repos"
+check "the listing of a selection, the feature's first zypper call, saw the file" every_call_saw_the_override "[main]
+download.connect_timeout = 5
+download.max_silent_tries = 3"
+check "an alias the listing does not hold fails with status 1" exited_with 1
+check "after the refused alias neither the file nor a directory of the feature exists" no_override_left
 
 # An image that has the directory already, with a file of its own in it: the feature removes only what it created.
 mkdir -p /run/zypp/zypp.conf.d

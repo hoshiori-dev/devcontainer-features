@@ -96,3 +96,15 @@ do. `just test-scenarios zypper-packages` runs them all; a task is verified when
       scenario passes.
 - [x] 7.3 Record the result of each Acceptance item and scenario, with its test, image, and architecture, in the pull
       request's Validation section; verify by reading the section against the proposal's Acceptance.
+
+## 8. Audit follow-up
+
+- [x] 8.1 Write the temporary file before the alias check of a selection, so that the repository listing, the feature's
+      first `zypper` call of such a run, is made with the timeout and retry options like every later call; a failed
+      alias check removes the file through the EXIT trap. Verify with the scenario `test_control_calls`: with
+      `repositories` and a timeout option set, the listing call sees the file, and after the refused alias nothing is
+      left under `/run/zypp`; the check fails when the file is written after the alias check.
+- [x] 8.2 Observe the scope of `lockTimeout` on a command that runs after the `zypper` calls as well: in the scenario
+      `test_control_calls`, `rm` in the EXIT trap records its environment beside `mktemp`, and both must lack the
+      override, or hold the build environment's value (scenarios "Explicit lock wait reaches zypper calls", "Explicit
+      lock wait overrides an inherited one"). Verify that both checks fail when `run_zypper` exports the variable.

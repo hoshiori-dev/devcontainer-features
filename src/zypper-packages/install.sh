@@ -520,13 +520,15 @@ main() {
 
   require_zypper
   # What a selection or an override needs from the image is checked here, before the first refresh, and only when the
-  # option is set: with the options at their defaults none of these steps runs.
-  if [ -n "${override_options}" ]; then require_override_support; fi
-  if [ -n "${selection}" ]; then check_selection; fi
+  # option is set: with the options at their defaults none of these steps runs. The temporary file is written before
+  # the selection is checked, because that check is the first zypper call and the file is to govern every one of them;
+  # a check that fails removes the file through the trap.
   if [ -n "${override_options}" ]; then
+    require_override_support
     trap remove_overrides EXIT
     write_overrides
   fi
+  if [ -n "${selection}" ]; then check_selection; fi
   if [ "${REFRESHPOLICY}" = "never" ]; then
     check_cache
     build_parsed_cache
