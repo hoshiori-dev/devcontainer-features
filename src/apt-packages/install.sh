@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs the packages listed in the option `packages` with apt-get from the image's repositories, to the paths the
-# packages define. Runs as root at image build time; the options arrive as PACKAGES, INSTALLRECOMMENDS, REFRESHPOLICY,
-# CLEANUP, and NETWORKTIMEOUT.
+# packages define. Runs as root at image build time; the options arrive as PACKAGES, INSTALLRECOMMENDS, INSTALLSUGGESTS,
+# REFRESHPOLICY, CLEANUP, CONFFILEPOLICY, NETWORKTIMEOUT, DOWNLOADRETRIES, LOCKTIMEOUT, and TARGETRELEASE.
 # POSIX sh, because an empty list must succeed, and a missing apt-get be reported, on images that ship no bash.
 set -eu
 
@@ -11,9 +11,14 @@ readonly DEBIAN_FRONTEND
 
 PACKAGES="${PACKAGES-}"
 INSTALLRECOMMENDS="${INSTALLRECOMMENDS-false}"
+INSTALLSUGGESTS="${INSTALLSUGGESTS-false}"
 REFRESHPOLICY="${REFRESHPOLICY-default}"
 CLEANUP="${CLEANUP-all}"
+CONFFILEPOLICY="${CONFFILEPOLICY-keep}"
 NETWORKTIMEOUT="${NETWORKTIMEOUT-}"
+DOWNLOADRETRIES="${DOWNLOADRETRIES-}"
+LOCKTIMEOUT="${LOCKTIMEOUT-}"
+TARGETRELEASE="${TARGETRELEASE-}"
 
 # APT's package index directory, which cleanup=all empties. It is no constant: an image's APT configuration may move
 # it, so resolve_lists_dir asks apt-config for it at run time.
@@ -36,15 +41,17 @@ has_index() {
   return 1
 }
 
-# Runs apt-get with the arguments given, and with the option networkTimeout, unless it is empty, as APT's HTTP and
-# HTTPS timeout.
+# Runs apt-get with the arguments given. Before them come the option downloadRetries, unless it is empty, as APT's
+# retry count, and the option networkTimeout, unless it is empty, as APT's HTTP and HTTPS timeout.
 apt_network() {
-  if [ -n "${NETWORKTIMEOUT}" ]; then
-    apt-get --option "Acquire::http::Timeout=${NETWORKTIMEOUT}" \
-      --option "Acquire::https::Timeout=${NETWORKTIMEOUT}" "$@"
-  else
-    apt-get "$@"
+  if [ -n "${DOWNLOADRETRIES}" ]; then
+    set -- --option "Acquire::Retries=${DOWNLOADRETRIES}" "$@"
   fi
+  if [ -n "${NETWORKTIMEOUT}" ]; then
+    set -- --option "Acquire::http::Timeout=${NETWORKTIMEOUT}" \
+      --option "Acquire::https::Timeout=${NETWORKTIMEOUT}" "$@"
+  fi
+  apt-get "$@"
 }
 
 validate_options() {
@@ -53,6 +60,11 @@ validate_options() {
     *) fail "option installRecommends is \"${INSTALLRECOMMENDS}\"; use true or false" ;;
   esac
   readonly INSTALLRECOMMENDS
+  case "${INSTALLSUGGESTS}" in
+    true | false) ;;
+    *) fail "option installSuggests is \"${INSTALLSUGGESTS}\"; use true or false" ;;
+  esac
+  readonly INSTALLSUGGESTS
   case "${REFRESHPOLICY}" in
     default | always | never) ;;
     *) fail "option refreshPolicy is \"${REFRESHPOLICY}\"; use default, always, or never" ;;
@@ -63,6 +75,11 @@ validate_options() {
     *) fail "option cleanup is \"${CLEANUP}\"; use all, packages, or none" ;;
   esac
   readonly CLEANUP
+  case "${CONFFILEPOLICY}" in
+    keep | replace) ;;
+    *) fail "option conffilePolicy is \"${CONFFILEPOLICY}\"; use keep or replace" ;;
+  esac
+  readonly CONFFILEPOLICY
   validate_options_hint="leave it empty or use whole seconds from 1 through 3600 without a leading zero"
   case "${NETWORKTIMEOUT}" in
     "") ;;
@@ -76,6 +93,55 @@ validate_options() {
       ;;
   esac
   readonly NETWORKTIMEOUT
+  # APT would read a negative or oversized retry count as unbounded and replace any other malformed number with a
+  # value of its own, so only the canonical spelling of 0 through 10 passes.
+  validate_options_hint="leave it empty or use a number from 0 through 10 without a leading zero"
+  case "${DOWNLOADRETRIES}" in
+    "" | 0) ;;
+    0* | *[!0123456789]*) fail "option downloadRetries is \"${DOWNLOADRETRIES}\"; ${validate_options_hint}" ;;
+    *)
+      # The length test comes first, as for networkTimeout.
+      if [ "${#DOWNLOADRETRIES}" -gt 2 ] || [ "${DOWNLOADRETRIES}" -gt 10 ]; then
+        fail "option downloadRetries is \"${DOWNLOADRETRIES}\"; ${validate_options_hint}"
+      fi
+      ;;
+  esac
+  readonly DOWNLOADRETRIES
+  # APT would read a negative lock wait as unbounded and any other malformed number as no wait.
+  validate_options_hint="leave it empty or use whole seconds from 1 through 3600 without a leading zero"
+  case "${LOCKTIMEOUT}" in
+    "") ;;
+    0* | *[!0123456789]*) fail "option lockTimeout is \"${LOCKTIMEOUT}\"; ${validate_options_hint}" ;;
+    *)
+      # The length test comes first, as for networkTimeout.
+      if [ "${#LOCKTIMEOUT}" -gt 4 ] || [ "${LOCKTIMEOUT}" -gt 3600 ]; then
+        fail "option lockTimeout is \"${LOCKTIMEOUT}\"; ${validate_options_hint}"
+      fi
+      ;;
+  esac
+  readonly LOCKTIMEOUT
+  # APT would also take a pattern, a regular expression, a key=value selector, which it does not check, and "now",
+  # which names the installed packages and no source. The character sets are spelled out, because some shells read a
+  # range such as a-z by locale collation.
+  validate_options_hint="leave it empty or use one suite name, codename, or version of at most 64 characters:"
+  validate_options_hint="${validate_options_hint} letters, digits, and . + _ ~ -, starting with a letter or digit"
+  case "${TARGETRELEASE}" in
+    "") ;;
+    [nN][oO][wW])
+      fail "option targetRelease is \"${TARGETRELEASE}\", which names the installed packages and no release;" \
+        "leave it empty or name a release of the image's sources"
+      ;;
+    [!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789]* | \
+      *[!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.+_~-]*)
+      fail "option targetRelease is \"${TARGETRELEASE}\"; ${validate_options_hint}"
+      ;;
+    *)
+      if [ "${#TARGETRELEASE}" -gt 64 ]; then
+        fail "option targetRelease is \"${TARGETRELEASE}\"; ${validate_options_hint}"
+      fi
+      ;;
+  esac
+  readonly TARGETRELEASE
 }
 
 # Succeeds when the entry $1 has the form that the spec requirement "Entries are validated before anything changes"
@@ -181,16 +247,38 @@ EOF
 
 # Installs the entries given, each as one argument after --.
 install_packages() {
-  log "installing $* from the image's repositories (installRecommends=${INSTALLRECOMMENDS})"
-  # apt-get removes no package, installs no suggested package, matches no entry as a pattern, and keeps a
-  # configuration file that the image changed.
+  install_packages_controls="installRecommends=${INSTALLRECOMMENDS}, installSuggests=${INSTALLSUGGESTS}"
+  install_packages_controls="${install_packages_controls}, conffilePolicy=${CONFFILEPOLICY}"
+  if [ -n "${TARGETRELEASE}" ]; then
+    install_packages_controls="${install_packages_controls}, targetRelease=${TARGETRELEASE}"
+  fi
+  if [ -n "${LOCKTIMEOUT}" ]; then
+    install_packages_controls="${install_packages_controls}, lockTimeout=${LOCKTIMEOUT}"
+  fi
+  log "installing $* from the image's repositories (${install_packages_controls})"
+  # The arguments that depend on an option go before the entries; the one added last comes first.
+  set -- -- "$@"
+  # dpkg decides without asking about a configuration file that the image changed. keep prefers dpkg's default
+  # action, which keeps the file. replace refuses that default action first: where the image's own configuration
+  # enables it, --force-confnew alone would keep the file.
+  case "${CONFFILEPOLICY}" in
+    keep) set -- --option Dpkg::Options::=--force-confdef --option Dpkg::Options::=--force-confold "$@" ;;
+    replace) set -- --option Dpkg::Options::=--refuse-confdef --option Dpkg::Options::=--force-confnew "$@" ;;
+  esac
+  # Only the install call waits: APT waits for dpkg's locks and for no other.
+  if [ -n "${LOCKTIMEOUT}" ]; then
+    set -- --option "DPkg::Lock::Timeout=${LOCKTIMEOUT}" "$@"
+  fi
+  # Only the install call prefers a release: the refresh would accept and ignore a release that does not exist.
+  if [ -n "${TARGETRELEASE}" ]; then
+    set -- --target-release "${TARGETRELEASE}" "$@"
+  fi
+  # apt-get removes no package and matches no entry as a pattern.
   apt_network install --yes --no-remove \
     --option "APT::Install-Recommends=${INSTALLRECOMMENDS}" \
-    --option APT::Install-Suggests=false \
+    --option "APT::Install-Suggests=${INSTALLSUGGESTS}" \
     --option APT::Cmd::Pattern-Only=true \
-    --option Dpkg::Options::=--force-confdef \
-    --option Dpkg::Options::=--force-confold \
-    -- "$@" \
+    "$@" \
     || fail "apt-get install failed with status $?; fix what apt-get reports above (entries, repositories, or network)"
 }
 
