@@ -99,19 +99,19 @@ no_index() {
   fi
 }
 
-# Prints a digest of the apt configuration: the names, types, modes, and link targets under /etc/apt and
-# /usr/share/keyrings, and the content of every file there.
+# Prints a digest of the apt and dpkg configuration: the names, types, modes, and link targets under /etc/apt,
+# /etc/dpkg, and /usr/share/keyrings, and the content of every file there.
 apt_configuration() {
   as_root sh -c '{
-    find /etc/apt /usr/share/keyrings -printf "%p %y %m %l\n" | sort
-    find /etc/apt /usr/share/keyrings -type f -exec sha256sum {} + | sort
+    find /etc/apt /etc/dpkg /usr/share/keyrings -printf "%p %y %m %l\n" | sort
+    find /etc/apt /etc/dpkg /usr/share/keyrings -type f -exec sha256sum {} + | sort
   } | sha256sum'
 }
 
-# The apt configuration still has the digest $1.
+# The apt and dpkg configuration still has the digest $1.
 apt_configuration_is() {
   if [[ "$(apt_configuration)" != "$1" ]]; then
-    echo "/etc/apt or /usr/share/keyrings changed" >&2
+    echo "/etc/apt, /etc/dpkg, or /usr/share/keyrings changed" >&2
     return 1
   fi
 }
