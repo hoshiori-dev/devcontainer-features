@@ -104,11 +104,17 @@ selector, and `now` are refused. The feature never adds a source to make a relea
 
 APT compares the whole value, without regard to letter case, with one kind of release field only: a value that starts
 with a digit with the versions of the releases in the package index, and any other value with their suite names and
-codenames. So `Bookworm` prefers what `bookworm` prefers, `12` is not `12.15`, and a suite name or codename that starts
-with a digit, or a version that starts with a letter, cannot be named. A value that would prefer no release fails the
-feature with a message naming `targetRelease`, before any package is installed or upgraded. That covers a name no
-release carries and a name only a field of the other kind carries, which `apt-get` itself would accept and then ignore.
-The check runs only for a list that names a package, after the index is ready.
+codenames. So `Bookworm` prefers what `bookworm` prefers, a release whose version is `24.04` is named by `24.04` and not
+by `24`, and a suite name or codename that starts with a digit, or a version that starts with a letter, cannot be named.
+A value that would prefer no release fails the feature with a message naming `targetRelease`, before any package is
+installed or upgraded. That covers a name no release carries, a name only a source-package (`deb-src`) source carries,
+and a name only a field of the other kind carries, which `apt-get` itself would accept and then ignore. The check runs
+only for a list that names a package, after the index is ready.
+
+The feature reads the release fields from `apt-get indextargets`, for the binary package lists of the configured
+sources. An image whose APT configuration turns the release information of that listing off
+(`APT::Get::IndexTargets::ReleaseInfo "false"`) gets every `targetRelease` refused: the feature does not override the
+image's setting.
 
 It is a preference, not a filter: a dependency the release does not offer still comes from another release, and
 `name=version` keeps its version. The name selects every suite that carries it in a field of that kind, which has two

@@ -273,9 +273,13 @@ EOF
   )"
   # The index-target listing prints one field of each configured source as a line of its own, and the placeholder
   # itself where a release lacks the field, which equals no accepted value. apt-cache policy is no source for the
-  # fields: it joins them with commas, so a field that holds a comma reads there as a further field.
+  # fields: it joins them with commas, so a field that holds a comma reads there as a further field. The filter keeps
+  # the binary package lists, which are what APT prefers a release for: a release that only a source-package (deb-src)
+  # source carries is one APT refuses as a target release.
   for check_target_release_field in "$@"; do
-    check_target_release_listed="$(apt-get indextargets --format "${check_target_release_field}")" \
+    check_target_release_listed="$(
+      apt-get indextargets --format "${check_target_release_field}" "Created-By: Packages"
+    )" \
       || fail "apt-get indextargets failed with status $?;" \
         "fix what apt-get reports above (APT configuration or the package index)"
     check_target_release_listed="$(
