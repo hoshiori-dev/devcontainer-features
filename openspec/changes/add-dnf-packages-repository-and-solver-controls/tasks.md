@@ -86,6 +86,6 @@ unchanged when none of the four options is set.
       `almalinux:9`, and `rockylinux/rockylinux:9`.
 - [x] 5.3 Run `just test-scenarios dnf-packages`; verify that every scenario passes, the phase 1 scenarios unchanged in
       name and result.
-- [ ] 5.4 Record each Acceptance item of the proposal and each scenario it points to, with its test, image,
+- [x] 5.4 Record each Acceptance item of the proposal and each scenario it points to, with its test, image,
       architecture, and result, in the Validation section of the pull request; verify by reading the section back from
       the pull request.
