@@ -129,3 +129,25 @@ apk_configuration_is() {
     return 1
   fi
 }
+
+# Holds apk's database lock from a second process for $1 seconds and returns once it is held. The caller waits for
+# that process with `wait` after its run.
+hold_apk_lock() {
+  flock -x /lib/apk/db/lock sleep "$1" &
+  while flock -n -x /lib/apk/db/lock true; do sleep 0.1; done
+}
+
+# Installs the packages given after $1 from the Alpine branch $1 (such as v3.23), which precedes the image's, with the
+# image's apk and its trusted keys, then puts the image's repositories back: those packages are then installed in a
+# version older than the image's repositories offer, which no compatibility image guarantees for a named package.
+install_from_branch() {
+  install_from_branch_name="$1"
+  shift
+  cp /etc/apk/repositories /tmp/repositories.image
+  sed "s#/v[0-9][0-9.]*/#/${install_from_branch_name}/#" /tmp/repositories.image >/etc/apk/repositories
+  install_from_branch_status=0
+  apk add --no-cache "$@" || install_from_branch_status=$?
+  cat /tmp/repositories.image >/etc/apk/repositories
+  rm /tmp/repositories.image
+  return "${install_from_branch_status}"
+}

@@ -2,8 +2,8 @@
 # Scenario fail_refused_input_alpine_3_22 (scenarios.json): the feature is installed with an empty list, the container
 # has no network, and this script then runs install.sh with input that validation refuses. Spec scenarios "URL or path
 # is refused", "Option-like entry is refused", "Conflict marker is refused", "Shell metacharacters and inner whitespace
-# are refused", "Invalid control fails before any change", "Empty list ignores installation controls", and "Timeout
-# boundaries are validated".
+# are refused", "Invalid control fails before any change", "Empty list ignores installation controls", "Timeout
+# boundaries are validated", "Lock wait boundaries are validated", and "Version policy value is validated".
 # POSIX sh with the stand-in in checks.sh: the Alpine images ship no bash, which the CLI's
 # dev-container-features-test-lib needs.
 set -eu
@@ -80,7 +80,14 @@ for control in \
   "networkTimeout NETWORKTIMEOUT=0" "networkTimeout NETWORKTIMEOUT=3601" "networkTimeout NETWORKTIMEOUT=01" \
   "networkTimeout NETWORKTIMEOUT=-1" "networkTimeout NETWORKTIMEOUT=+1" "networkTimeout NETWORKTIMEOUT=1 " \
   "networkTimeout NETWORKTIMEOUT=1.5" "networkTimeout NETWORKTIMEOUT=１２" \
-  "networkTimeout NETWORKTIMEOUT=\$(touch /tmp/pwned)" "networkTimeout NETWORKTIMEOUT=999999999999999999999999"; do
+  "networkTimeout NETWORKTIMEOUT=\$(touch /tmp/pwned)" "networkTimeout NETWORKTIMEOUT=999999999999999999999999" \
+  "lockTimeout LOCKTIMEOUT=0" "lockTimeout LOCKTIMEOUT=3601" "lockTimeout LOCKTIMEOUT=01" \
+  "lockTimeout LOCKTIMEOUT=-1" "lockTimeout LOCKTIMEOUT=+1" "lockTimeout LOCKTIMEOUT=3x" \
+  "lockTimeout LOCKTIMEOUT=1 " "lockTimeout LOCKTIMEOUT= 1" "lockTimeout LOCKTIMEOUT=1.5" \
+  "lockTimeout LOCKTIMEOUT=abc" "lockTimeout LOCKTIMEOUT=１２" \
+  "lockTimeout LOCKTIMEOUT=\$(touch /tmp/pwned)" "lockTimeout LOCKTIMEOUT=999999999999999999999999" \
+  "latest LATEST=" "latest LATEST=True" "latest LATEST=TRUE" "latest LATEST=yes" "latest LATEST=1" \
+  "latest LATEST=true "; do
   check "'${control#* }' fails with status 1 and names ${control%% *}, with an empty list" \
     refuses_control "${control}" ""
   check "'${control#* }' fails with status 1 and names ${control%% *}, with the list tree" \
@@ -95,6 +102,18 @@ for timeout in "" 1 3600; do
   run_install PATH="${STUB_PATH}" PACKAGES="" NETWORKTIMEOUT="${timeout}"
   check "an empty list succeeds with networkTimeout='${timeout}'" exited_with 0
 done
+
+for lock_timeout in "" 1 3600; do
+  run_install PATH="${STUB_PATH}" PACKAGES="" LOCKTIMEOUT="${lock_timeout}"
+  check "an empty list succeeds with lockTimeout='${lock_timeout}'" exited_with 0
+done
+for latest in true false; do
+  run_install PATH="${STUB_PATH}" PACKAGES="" LATEST="${latest}"
+  check "an empty list succeeds with latest=${latest}" exited_with 0
+done
+run_install PATH="${STUB_PATH}" PACKAGES="" LATEST=true LOCKTIMEOUT=30 UPGRADEPACKAGES=true NETWORKTIMEOUT=30 \
+  CLEANUP=none REFRESHPOLICY=never
+check "an empty list succeeds with every control at a valid non-default value" exited_with 0
 
 check "no run called apk or ran shell text from a value" nothing_ran
 check "no run changed apk's world, its installed database, or a cache" apk_state_is "${state_before}"

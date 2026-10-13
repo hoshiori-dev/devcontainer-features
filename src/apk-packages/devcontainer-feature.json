@@ -1,6 +1,6 @@
 {
   "id": "apk-packages",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "name": "APK packages",
   "description": "Installs a list of system packages with apk from the repositories the Alpine Linux image already configures.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apk-packages",
@@ -32,7 +32,7 @@
         "packages",
         "none"
       ],
-      "description": "Remove all managed caches, package files only, or skip feature cleanup. Native retention remains independent."
+      "description": "What the feature's own package cache keeps after installation: all removes it, packages keeps the package indexes without package files, none keeps the indexes and the downloaded package files."
     },
     "networkTimeout": {
       "type": "string",
@@ -43,6 +43,16 @@
       "type": "boolean",
       "default": false,
       "description": "Request upgrades of listed packages and their dependencies with apk add, preserving world constraints."
+    },
+    "latest": {
+      "type": "boolean",
+      "default": false,
+      "description": "Require the highest version the image's untagged repositories offer for packages listed without a tag and their dependencies; the build fails when apk cannot select it. name@tag entries resolve as without it; applies only to this invocation."
+    },
+    "lockTimeout": {
+      "type": "string",
+      "default": "",
+      "description": "Seconds (1\u20133600) each apk call of the feature waits for apk's database lock, or empty to inherit image settings; applies only to this invocation."
     }
   }
 }
