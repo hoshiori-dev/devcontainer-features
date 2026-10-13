@@ -1,5 +1,6 @@
 {
   "$schema": "../compatibility.schema.json",
+  "scenarioArchitectures": ["amd64", "arm64"],
   "images": [
     { "image": "alpine:3.24", "arch": ["amd64", "arm64"] },
     { "image": "alpine:3.22", "arch": ["amd64", "arm64"] }

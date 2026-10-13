@@ -83,3 +83,7 @@
 - [x] 5.3 Run `just test-scenarios apk-packages` and verify every scenario passes
 - [x] 5.4 Verify every Acceptance item of the proposal, with the scenarios it points to, and record each result with its
       test, image, and architecture in the pull request's Validation section
+- [ ] 5.5 Run the scenarios on arm64 in CI as well, since the proposal's Acceptance speaks of each image and each
+      architecture: set `scenarioArchitectures` to `["amd64", "arm64"]` in `test/apk-packages/compatibility.json`, which
+      supersedes 4.2's "`compatibility.json` stays unchanged" and changes no supported image or architecture; verify
+      that the pull request's CI run passes the apk-packages scenarios job on arm64
