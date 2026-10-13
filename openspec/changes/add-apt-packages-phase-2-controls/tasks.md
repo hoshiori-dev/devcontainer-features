@@ -5,35 +5,35 @@ written.
 
 ## 1. Options and validation
 
-- [ ] 1.1 Declare `installSuggests`, `conffilePolicy`, `downloadRetries`, `lockTimeout`, and `targetRelease` in
+- [x] 1.1 Declare `installSuggests`, `conffilePolicy`, `downloadRetries`, `lockTimeout`, and `targetRelease` in
       src/apt-packages/devcontainer-feature.json as the delta's Option requirements state them, and set the version to
       1.2.0; verify with `just spec-check` (options equal the spec) and `just validate` (version bump).
-- [ ] 1.2 Validate the five options in install.sh before any package-manager call and for an empty list, in the order
+- [x] 1.2 Validate the five options in install.sh before any package-manager call and for an empty list, in the order
       and with the bounds of "Installation controls are validated before changes"; verify with `just lint`.
-- [ ] 1.3 Extend fail_refused_input_debian.sh and fail_refused_input_ubuntu.sh with the refused and the accepted values
+- [x] 1.3 Extend fail_refused_input_debian.sh and fail_refused_input_ubuntu.sh with the refused and the accepted values
       of "Retry boundaries are validated", "Lock timeout boundaries are validated", "Target release syntax is
       validated", and "Undeclared policy or boolean value is refused", each with an empty list and with a package;
       verify that both scenarios pass in `just test-scenarios apt-packages`.
-- [ ] 1.4 Extend fail_image_without_apt_get.sh with valid and invalid new controls beside an empty list on an image
+- [x] 1.4 Extend fail_image_without_apt_get.sh with valid and invalid new controls beside an empty list on an image
       without `apt-get`; verify that the scenario passes.
 
 ## 2. Native arguments
 
-- [ ] 2.1 Pass `downloadRetries` as `Acquire::Retries` on the refresh and the install call, `lockTimeout` as
+- [x] 2.1 Pass `downloadRetries` as `Acquire::Retries` on the refresh and the install call, `lockTimeout` as
       `DPkg::Lock::Timeout` and `targetRelease` as `--target-release` on the install call only, `installSuggests` as
       `APT::Install-Suggests`, and `conffilePolicy` as the two dpkg options of its policy, so that the calls with none
       of the options set equal those of 1.1.1; verify with the argument checks of task 2.3.
-- [ ] 2.2 Add test/apt-packages/repository.sh, with which a scenario script publishes signed suites of its own in the
+- [x] 2.2 Add test/apt-packages/repository.sh, with which a scenario script publishes signed suites of its own in the
       container, and the Dockerfiles that add apt-ftparchive and gpg to both compatibility images; verify that the
       scenarios of 2.3, 3.1, and 4.1 build and refresh from it without a network.
-- [ ] 2.3 Add test_download_and_lock_controls_debian and \_ubuntu: the logged calls with no option and with every
+- [x] 2.3 Add test_download_and_lock_controls_debian and \_ubuntu: the logged calls with no option and with every
       option, "Earlier source and download controls do not persist", every scenario of "Download retries are bounded"
       and "Lock wait is scoped to installation", "Empty options inherit the image configuration", "Explicit option
       overrides its image setting", and "Proxy settings are inherited"; verify that both scenarios pass.
 
 ## 3. Target release
 
-- [ ] 3.1 Add test_target_release_debian and \_ubuntu with suites that have distinct names and suites that share a
+- [x] 3.1 Add test_target_release_debian and \_ubuntu with suites that have distinct names and suites that share a
       codename and a version: every scenario of "Target release prefers a configured release", "Target release selects
       only among configured sources", and "Target release ranks with holds and pins as APT does", "Configuration
       selected by the environment is honored", and "Later invocation keeps what the earlier one installed"; verify that
@@ -41,27 +41,27 @@ written.
 
 ## 4. Suggested packages and configuration files
 
-- [ ] 4.1 Add test_suggests_and_conffiles_debian and \_ubuntu: the three suggestion scenarios of "Install the listed
+- [x] 4.1 Add test_suggests_and_conffiles_debian and \_ubuntu: the three suggestion scenarios of "Install the listed
       packages", every scenario of "Configuration file policy covers dpkg conffiles", and the policy scenarios of
       "Non-interactive installation", with image settings that select the opposite handling; verify that both scenarios
       pass.
-- [ ] 4.2 Add test_source_controls_debian and \_ubuntu, which install through the devcontainer CLI with the five options
+- [x] 4.2 Add test_source_controls_debian and \_ubuntu, which install through the devcontainer CLI with the five options
       set, and update duplicate.sh for the non-default values the CLI now derives (`installSuggests=true`,
       `conffilePolicy=replace`); test.sh and compatibility.json need no change. Verify with `just test apt-packages` and
       the two scenarios.
 
 ## 5. Documentation
 
-- [ ] 5.1 Update src/apt-packages/NOTES.md: the five options, the target-release effects and the pin ranking in place of
+- [x] 5.1 Update src/apt-packages/NOTES.md: the five options, the target-release effects and the pin ranking in place of
       the promise that no image pin is overridden, the size effect of suggestions, the scope of `conffilePolicy`, what a
       retry covers, the proxy settings APT honors at build time, and the order of `APT_CONFIG`, image configuration, and
       options; verify each Acceptance item on NOTES.md by reading the file against the proposal.
-- [ ] 5.2 Regenerate src/apt-packages/README.md with `just docs`; verify with `just docs-check` that it is current and
+- [x] 5.2 Regenerate src/apt-packages/README.md with `just docs`; verify with `just docs-check` that it is current and
       that the root README's feature list did not change.
 
 ## 6. Verification
 
-- [ ] 6.1 Run `just check`; it passes.
-- [ ] 6.2 Run `just test apt-packages`; the autogenerated and the install-twice test pass on both compatibility images.
+- [x] 6.1 Run `just check` with the OpenSpec version CI pins; it passes.
+- [x] 6.2 Run `just test apt-packages`; the autogenerated and the install-twice test pass on both compatibility images.
 - [ ] 6.3 Run `just test-scenarios apt-packages`; every scenario passes.
-- [ ] 6.4 Record the result of every Acceptance item and scenario in the Validation section of the pull request.
+- [x] 6.4 Record the result of every Acceptance item and scenario in the Validation section of the pull request.
