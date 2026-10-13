@@ -11,12 +11,16 @@ readonly INSTALLER
 
 install_status=0
 install_output=""
+install_seconds=0
 
 # Runs install.sh with the environment assignments given (PACKAGES=bc CLEANUP=none) and prints its output. Keeps the
-# exit status in install_status and stdout with stderr in install_output.
+# exit status in install_status, stdout with stderr in install_output, and the whole seconds the run took in
+# install_seconds.
 run_install() {
+  local started="${SECONDS}"
   install_status=0
   install_output="$(env "$@" "${INSTALLER}" 2>&1)" || install_status=$?
+  install_seconds="$((SECONDS - started))"
   printf '%s\n' "${install_output}"
 }
 
@@ -40,6 +44,14 @@ failed() {
 printed() {
   if [[ "${install_output}" != *"$1"* ]]; then
     printf 'the output of install.sh does not contain "%s"\n' "$1" >&2
+    return 1
+  fi
+}
+
+# The last run did not print the text $1.
+did_not_print() {
+  if [[ "${install_output}" == *"$1"* ]]; then
+    printf 'the output of install.sh contains "%s"\n' "$1" >&2
     return 1
   fi
 }
@@ -124,6 +136,96 @@ zypp_configuration() {
 zypp_configuration_is() {
   if [[ "$(zypp_configuration)" != "$1" ]]; then
     echo "a file under /etc/zypp changed" >&2
+    return 1
+  fi
+}
+
+# Prints a digest of every directory libzypp reads configuration from: the name of all that /etc/zypp, /usr/etc/zypp,
+# and /run/zypp hold, and the content of each file.
+libzypp_configuration() {
+  (
+    shopt -s globstar nullglob dotglob
+    for path in /etc/zypp/** /usr/etc/zypp/** /run/zypp/**; do
+      if [[ -f "${path}" ]]; then sha256sum "${path}"; else printf '%s\n' "${path}"; fi
+    done
+  ) | sha256sum
+}
+
+# The directories libzypp reads configuration from still have the digest $1.
+libzypp_configuration_is() {
+  if [[ "$(libzypp_configuration)" != "$1" ]]; then
+    echo "a file or directory under /etc/zypp, /usr/etc/zypp, or /run/zypp changed" >&2
+    return 1
+  fi
+}
+
+# Nothing is left of the feature's temporary configuration file: the images have no /run/zypp of their own.
+no_override_left() {
+  if [[ -e /run/zypp ]]; then
+    echo "/run/zypp exists" >&2
+    return 1
+  fi
+}
+
+# Prints the alias of the enabled repository whose alias ends in $1. Leap's aliases carry a service prefix, so the
+# scripts read an alias when they run instead of fixing it.
+enabled_alias() {
+  zypper --xmlout --non-interactive --no-refresh repos \
+    | sed -n "/enabled=\"1\"/s/.*alias=\"\\([^\"]*$1\\)\".*/\\1/p"
+}
+
+# Prints the repositories of which zypper's cache holds raw metadata, one per line.
+raw_metadata_repositories() {
+  local directory
+  for directory in /var/cache/zypp/raw/*; do
+    if [[ -d "${directory}" ]]; then printf '%s\n' "${directory##*/}"; fi
+  done
+}
+
+# zypper's cache holds raw metadata of exactly the repositories given.
+raw_metadata_only_of() {
+  local expected
+  expected="$(printf '%s\n' "$@" | sort)"
+  if [[ "$(raw_metadata_repositories | sort)" != "${expected}" ]]; then
+    printf 'raw metadata is cached of: %s\n' "$(raw_metadata_repositories | tr '\n' ' ')" >&2
+    return 1
+  fi
+}
+
+no_raw_metadata() {
+  if [[ -n "$(raw_metadata_repositories)" ]]; then
+    printf 'raw metadata is cached of: %s\n' "$(raw_metadata_repositories | tr '\n' ' ')" >&2
+    return 1
+  fi
+}
+
+# Prints the package files in zypper's cache.
+package_files() {
+  (
+    shopt -s globstar nullglob
+    for file in /var/cache/zypp/packages/**/*.rpm; do printf '%s\n' "${file}"; done
+  )
+}
+
+no_package_files() {
+  if [[ -n "$(package_files)" ]]; then
+    echo "zypper's cache holds package files" >&2
+    return 1
+  fi
+}
+
+# The last run took at least $1 whole seconds.
+took_at_least() {
+  if [[ "${install_seconds}" -lt "$1" ]]; then
+    echo "install.sh took ${install_seconds} s, less than $1 s" >&2
+    return 1
+  fi
+}
+
+# The last run took less than $1 whole seconds.
+took_less_than() {
+  if [[ "${install_seconds}" -ge "$1" ]]; then
+    echo "install.sh took ${install_seconds} s, not less than $1 s" >&2
     return 1
   fi
 }

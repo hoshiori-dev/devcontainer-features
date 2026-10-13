@@ -1,6 +1,6 @@
 {
   "id": "zypper-packages",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "name": "ZYPPER packages",
   "description": "Installs listed system packages from the repositories the image already enables.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/zypper-packages",
@@ -37,6 +37,36 @@
         "none"
       ],
       "description": "Remove all managed caches, package files only, or skip feature cleanup. Native retention remains independent."
+    },
+    "exactNames": {
+      "type": "boolean",
+      "default": false,
+      "description": "Match entries by package name only, without falling back to a package that provides the name; applies only to this invocation."
+    },
+    "repositories": {
+      "type": "string",
+      "default": "",
+      "description": "Comma-separated aliases of repositories the image enables, to refresh and install from these only, or empty to use every enabled repository; applies only to this invocation."
+    },
+    "lockTimeout": {
+      "type": "string",
+      "default": "",
+      "description": "Seconds from 1 to 3600 that each zypper call waits for the libzypp lock, or empty to inherit image settings; applies only to this invocation."
+    },
+    "connectTimeout": {
+      "type": "string",
+      "default": "",
+      "description": "Seconds from 1 to 3600 allowed for the connection phase of each download, or empty to inherit image settings; applies only to this invocation."
+    },
+    "transferTimeout": {
+      "type": "string",
+      "default": "",
+      "description": "Seconds from 1 to 3600 without received data before a download is aborted, or empty to inherit image settings; applies only to this invocation."
+    },
+    "downloadRetries": {
+      "type": "string",
+      "default": "",
+      "description": "Retries from 0 to 10 of a failed repository metadata request, or empty to inherit image settings; applies only to this invocation."
     }
   }
 }

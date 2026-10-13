@@ -216,5 +216,100 @@
     "features": {
       "zypper-packages": {}
     }
+  },
+  "fail_refused_controls_0": {
+    "image": "opensuse/leap:16.0",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_control_calls_0": {
+    "image": "opensuse/leap:16.0",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_exact_names_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_repository_selection_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_lock_wait_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_download_controls_0": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "fail_refused_controls_1": {
+    "image": "opensuse/tumbleweed",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_control_calls_1": {
+    "image": "opensuse/tumbleweed",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_exact_names_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_repository_selection_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_lock_wait_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "test_download_controls_1": {
+    "image": "opensuse/tumbleweed",
+    "features": {
+      "zypper-packages": {}
+    }
+  },
+  "fail_libzypp_without_dropins": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "zypper-packages": {}
+    }
   }
 }
