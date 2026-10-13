@@ -245,6 +245,55 @@ EOF
   done
 }
 
+# Fails unless the option targetRelease, when it is set, would make APT prefer at least one release of the package
+# index. APT's own refusal is narrower: it accepts a value that equals any release's suite name, codename, or version,
+# but prefers a release by one kind of field only, chosen by the value's first character. A value that only a field of
+# the other kind carries would pass APT and prefer nothing, without an error.
+check_target_release() {
+  if [ -z "${TARGETRELEASE}" ]; then return 0; fi
+  case "${TARGETRELEASE}" in
+    [0123456789]*)
+      check_target_release_kind="version"
+      # A placeholder of apt-get's --format, which the shell must not expand.
+      # shellcheck disable=SC2016
+      set -- '$(VERSION)'
+      ;;
+    *)
+      check_target_release_kind="suite name or codename"
+      # Placeholders of apt-get's --format, which the shell must not expand.
+      # shellcheck disable=SC2016
+      set -- '$(SUITE)' '$(CODENAME)'
+      ;;
+  esac
+  # APT compares without regard to the case of ASCII letters. The letters are spelled out, as in validate_options.
+  check_target_release_wanted="$(
+    tr ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz <<EOF
+${TARGETRELEASE}
+EOF
+  )"
+  # The index-target listing prints one field of each configured source as a line of its own, and the placeholder
+  # itself where a release lacks the field, which equals no accepted value. apt-cache policy is no source for the
+  # fields: it joins them with commas, so a field that holds a comma reads there as a further field.
+  for check_target_release_field in "$@"; do
+    check_target_release_listed="$(apt-get indextargets --format "${check_target_release_field}")" \
+      || fail "apt-get indextargets failed with status $?;" \
+        "fix what apt-get reports above (APT configuration or the package index)"
+    check_target_release_listed="$(
+      tr ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz <<EOF
+${check_target_release_listed}
+EOF
+    )"
+    if grep --fixed-strings --line-regexp --quiet -- "${check_target_release_wanted}" <<EOF; then
+${check_target_release_listed}
+EOF
+      return 0
+    fi
+  done
+  fail "option targetRelease is \"${TARGETRELEASE}\", which is the ${check_target_release_kind} of no release in the" \
+    "package index, so APT would prefer no release; use the ${check_target_release_kind} of a configured source" \
+    "(a value that starts with a digit is compared with versions, any other with suite names and codenames)"
+}
+
 # Installs the entries given, each as one argument after --.
 install_packages() {
   install_packages_controls="installRecommends=${INSTALLRECOMMENDS}, installSuggests=${INSTALLSUGGESTS}"
@@ -270,6 +319,7 @@ install_packages() {
     set -- --option "DPkg::Lock::Timeout=${LOCKTIMEOUT}" "$@"
   fi
   # Only the install call prefers a release: the refresh would accept and ignore a release that does not exist.
+  # check_target_release has made sure that the value prefers one.
   if [ -n "${TARGETRELEASE}" ]; then
     set -- --target-release "${TARGETRELEASE}" "$@"
   fi
@@ -324,12 +374,14 @@ main() {
     return 0
   fi
 
-  # The spec fixes the place of two checks that the guide would put before this point: apt-get is required only for a
-  # list that names a package, and exact names can be checked only against the index that refresh_index selects.
+  # The spec fixes the place of three checks that the guide would put before this point: apt-get is required only for
+  # a list that names a package, and exact names and the release that targetRelease names can be checked only against
+  # the index that refresh_index selects. A failing entry ends the run before the release is looked at.
   require_apt_get
   resolve_lists_dir
   refresh_index
   check_names "$@"
+  check_target_release
   install_packages "$@"
   clean_caches
 }

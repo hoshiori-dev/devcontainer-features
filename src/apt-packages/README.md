@@ -100,12 +100,19 @@ stays installed, and a replaced configuration file is not restored.
 `targetRelease` makes APT prefer one release among the sources the image already configures, on the install call only
 (`apt-get --target-release`). The value is one plain name: a suite name (`bookworm-security`, `noble-updates`), a
 codename (`bookworm`, `noble`), or a version (`12.15`, `24.04`). A pattern, a regular expression, a `key=value`
-selector, and `now` are refused. A name that no release of the package index carries fails before any package changes;
-the feature never adds a source to make a release available.
+selector, and `now` are refused. The feature never adds a source to make a release available.
+
+APT compares the whole value, without regard to letter case, with one kind of release field only: a value that starts
+with a digit with the versions of the releases in the package index, and any other value with their suite names and
+codenames. So `Bookworm` prefers what `bookworm` prefers, `12` is not `12.15`, and a suite name or codename that starts
+with a digit, or a version that starts with a letter, cannot be named. A value that would prefer no release fails the
+feature with a message naming `targetRelease`, before any package is installed or upgraded. That covers a name no
+release carries and a name only a field of the other kind carries, which `apt-get` itself would accept and then ignore.
+The check runs only for a list that names a package, after the index is ready.
 
 It is a preference, not a filter: a dependency the release does not offer still comes from another release, and
-`name=version` keeps its version. The name selects every suite whose suite name, codename, or version equals it, which
-has two effects that are easy to miss:
+`name=version` keeps its version. The name selects every suite that carries it in a field of that kind, which has two
+effects that are easy to miss:
 
 - Debian's suites have distinct codenames, so `bookworm` prefers the main suite alone. A package that is not installed
   yet then comes from it even when `bookworm-security` offers a newer version: the option holds back security updates.
