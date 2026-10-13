@@ -77,5 +77,5 @@ The open questions of design.md are taken as the design resolves them: the maint
       image.
 - [x] 5.3 Run `just test-scenarios pacman-packages`; verify every scenario passes, including the unchanged ones of
       version 1.0.1.
-- [ ] 5.4 Record each Acceptance item of the proposal and each scenario with its check, image, and result in the pull
+- [x] 5.4 Record each Acceptance item of the proposal and each scenario with its check, image, and result in the pull
       request's Validation section.
