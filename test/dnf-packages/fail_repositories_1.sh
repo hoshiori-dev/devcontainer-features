@@ -2,7 +2,8 @@
 # Scenario fail_repositories_1 (scenarios.json): this script runs install.sh in a container whose repositories it has
 # broken, one way at a time. Spec scenarios "Refresh is explicitly requested" (a skippable repository that cannot be
 # reached, without and beside existing metadata), "Explicit timeout reaches network operations" (a repository that
-# accepts the connection and never answers), "Skippable repository is skipped", and "Unverifiable package fails".
+# accepts the connection and never answers), "Skippable repository is skipped", "Unverifiable package fails", and
+# "Temporarily enabled repository keeps its own checks".
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -16,6 +17,9 @@ readonly REPOSITORIES_BACKUP="/tmp/yum.repos.d.backup"
 readonly STALL_PORT=8099
 readonly STALL_LOG="/tmp/stall-connections"
 readonly WRONG_KEY="/tmp/wrong-key"
+# A repository the image configures and leaves disabled, with the signature check on, and a package that only it offers.
+readonly DISABLED_REPOSITORY="crb"
+readonly ONLY_DISABLED_PACKAGE="ninja-build"
 
 # Listens on the loopback port STALL_PORT and holds each connection open without answering, one after the other, adding
 # a line to STALL_LOG for each. gawk is part of every compatibility image; python3 and perl are not.
@@ -127,5 +131,14 @@ run_install PACKAGES=file
 check "a package whose signature cannot be verified fails the feature" failed
 check "the unverifiable file is not installed" not_installed file
 check "the failed verification changed no installed package and imported no key" rpm_database_is "${database_before}"
+
+# The repository file of the disabled repository turns the signature check on, and its key file now holds no key too.
+run_install PACKAGES="${ONLY_DISABLED_PACKAGE}" ENABLEREPOSITORIES="${DISABLED_REPOSITORY}"
+check "a package of the temporarily enabled ${DISABLED_REPOSITORY} whose signature cannot be verified fails the feature" \
+  failed
+check "premise: the run reached the packages of ${DISABLED_REPOSITORY}" has_metadata_of "${DISABLED_REPOSITORY}"
+check "the unverifiable ${ONLY_DISABLED_PACKAGE} is not installed" not_installed "${ONLY_DISABLED_PACKAGE}"
+check "the failed verification of ${ONLY_DISABLED_PACKAGE} changed no installed package and imported no key" \
+  rpm_database_is "${database_before}"
 
 reportResults

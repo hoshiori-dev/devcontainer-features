@@ -8,9 +8,60 @@
 
 INSTALLER="$(dirname "$0")/_feature/install.sh"
 readonly INSTALLER
+# Where the dnf that record_dnf_calls creates writes its calls, and a PATH on which it precedes the image's dnf.
+readonly DNF_CALLS="/tmp/dnf-calls"
+readonly RECORDING_PATH="/tmp/recording-dnf:/usr/sbin:/usr/bin:/sbin:/bin"
 
 install_status=0
 install_output=""
+
+# Puts a dnf on RECORDING_PATH that adds one line to DNF_CALLS for each call, "CALL [argument] [argument] ...", and then
+# runs the image's dnf with the same arguments.
+record_dnf_calls() {
+  local dnf
+  dnf="$(command -v dnf)"
+  mkdir -p "${RECORDING_PATH%%:*}"
+  cat >"${RECORDING_PATH%%:*}/dnf" <<RECORDER
+#!/bin/sh
+printf 'CALL' >>${DNF_CALLS}
+for argument do printf ' [%s]' "\${argument}" >>${DNF_CALLS}; done
+printf '\n' >>${DNF_CALLS}
+exec ${dnf} "\$@"
+RECORDER
+  chmod +x "${RECORDING_PATH%%:*}/dnf"
+}
+
+# Runs install.sh like run_install, with the recording dnf first on PATH and DNF_CALLS holding the calls of this run
+# only.
+run_recorded_install() {
+  rm -f "${DNF_CALLS}"
+  run_install PATH="${RECORDING_PATH}" "$@"
+}
+
+# Prints the install calls of the last recorded run; fails when it made none.
+install_calls() {
+  grep --fixed-strings '[install]' "${DNF_CALLS}"
+}
+
+# Every install call of the last recorded run carries the argument $1.
+install_call_has() {
+  local calls
+  calls="$(install_calls)" || return
+  if grep --invert-match --fixed-strings --quiet -e "[$1]" <<<"${calls}"; then
+    printf 'the install call does not carry %s:\n%s\n' "$1" "${calls}" >&2
+    return 1
+  fi
+}
+
+# No install call of the last recorded run matches the extended regular expression $1.
+install_call_lacks() {
+  local calls
+  calls="$(install_calls)" || return
+  if grep --extended-regexp --quiet -e "$1" <<<"${calls}"; then
+    printf 'the install call matches %s:\n%s\n' "$1" "${calls}" >&2
+    return 1
+  fi
+}
 
 # Runs install.sh with the environment assignments given (PACKAGES=bc CLEANUP=none) and prints its output. Keeps the
 # exit status in install_status and stdout with stderr in install_output.
@@ -108,6 +159,70 @@ has_metadata() {
 no_metadata() {
   if [[ -n "$(cached_metadata)" ]]; then
     echo "dnf's cache holds repository metadata" >&2
+    return 1
+  fi
+}
+
+# Prints the metadata of the repository $1 in dnf's cache, whose directories are named "<identifier>-<16 hex digits>".
+cached_metadata_of() {
+  local metadata
+  metadata="$(cached_metadata)"
+  grep --extended-regexp "/$1-[0-9a-f]{16}/repodata/" <<<"${metadata}" || true
+}
+
+has_metadata_of() {
+  if [[ -z "$(cached_metadata_of "$1")" ]]; then
+    echo "dnf's cache holds no repository metadata of $1" >&2
+    return 1
+  fi
+}
+
+no_metadata_of() {
+  if [[ -n "$(cached_metadata_of "$1")" ]]; then
+    echo "dnf's cache holds repository metadata of $1" >&2
+    return 1
+  fi
+}
+
+# Prints the downloaded package files in dnf's cache, of every repository.
+cached_package_files() {
+  find /var/cache/dnf /var/cache/libdnf5 -name '*.rpm' 2>/dev/null || true
+}
+
+no_package_files() {
+  if [[ -n "$(cached_package_files)" ]]; then
+    echo "dnf's cache holds downloaded package files" >&2
+    return 1
+  fi
+}
+
+# Prints every repository the image configures with its state, "<identifier> enabled" or "<identifier> disabled", as
+# dnf lists them without loading metadata.
+repository_states() {
+  local listing
+  listing="$(dnf -q repolist --all)"
+  awk 'NR > 1 { print $1, $NF }' <<<"${listing}" | sort
+}
+
+# The image enables and disables the same repositories as in the listing $1.
+repository_states_are() {
+  if [[ "$(repository_states)" != "$1" ]]; then
+    echo "the repositories the image enables changed" >&2
+    return 1
+  fi
+}
+
+# Prints the keys in the RPM keyring.
+rpm_keys() {
+  local keys
+  keys="$(rpm -q gpg-pubkey)" || true
+  sort <<<"${keys}"
+}
+
+# The RPM keyring still holds exactly the keys $1.
+rpm_keys_are() {
+  if [[ "$(rpm_keys)" != "$1" ]]; then
+    echo "the keys in the RPM keyring changed" >&2
     return 1
   fi
 }
