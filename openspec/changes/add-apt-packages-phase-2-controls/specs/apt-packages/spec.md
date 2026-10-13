@@ -80,9 +80,10 @@ The feature SHALL accept the option `lockTimeout` as declared here.
 
 An empty `targetRelease` SHALL pass no release preference. A non-empty value SHALL make APT prefer that release on the
 install call only. It is a preference, not a filter: other releases stay usable, and a `name=version` entry keeps its
-version. Accepted risk: the name selects every suite whose suite name, codename, or version equals it, so it holds back
-security updates where suites differ in them (Debian) and raises backports where they share them (Ubuntu), without a
-warning.
+version. APT compares the whole value, without regard to letter case, with one kind of release field only: a value that
+starts with a digit with release versions, and any other value with suite names and codenames. Accepted risk: the name
+selects every suite that carries it in a field of that kind, so it holds back security updates where suites differ in
+them (Debian) and raises backports where they share them (Ubuntu), without a warning.
 
 #### Scenario: Native release preference is inherited
 
@@ -126,18 +127,44 @@ warning.
 - **THEN** only that suite is preferred: a listed package that is not installed comes from it, also when another suite
   offers a newer version
 
+#### Scenario: Letter case of the release name is not significant
+
+- **WHEN** `targetRelease` differs only in letter case from a suite name or codename that one release of the package
+  index carries
+- **THEN** that release is preferred as it is with the name in the release's own spelling
+
 ### Requirement: Target release selects only among configured sources
 
 A `targetRelease` SHALL select only among the releases present in the package index the feature uses. It SHALL add no
 source, component, or key, SHALL NOT be passed to the index refresh, and SHALL NOT be matched as a pattern, a regular
-expression, or a `key=value` selector. When the index holds no release of that name, APT's refusal SHALL end the feature
-with a non-zero status before any package changes.
+expression, or a `key=value` selector.
+
+When a non-empty package list is given and the value would make APT prefer no release of that index, by the comparison
+that "Target release prefers a configured release" states, the feature SHALL fail with status 1 and a message naming
+`targetRelease`, after the index refresh when one runs and before the install call, without installing or upgrading
+anything. The feature SHALL make this check itself because APT's own refusal is narrower: APT accepts a value that
+equals a release field of the other kind, a suite name or codename that starts with a digit or a version that starts
+with a letter, and then prefers no release, without an error.
 
 #### Scenario: Unknown release fails before any change
 
 - **WHEN** `targetRelease` is a well-formed name that no release of the package index carries
-- **THEN** the feature exits with a non-zero status, the output names the release, and no package is installed or
-  changed
+- **THEN** the feature exits with status 1, the output names `targetRelease` and the release, and no package is
+  installed or changed
+
+#### Scenario: Name starting with a digit matches no suite name or codename
+
+- **WHEN** `targetRelease` starts with a digit and equals a suite name or a codename of the package index, but the
+  version of no release
+- **THEN** the feature exits with status 1, the output names `targetRelease`, the install call is not made, and no
+  package is installed or changed
+
+#### Scenario: Name starting with a letter matches no release version
+
+- **WHEN** `targetRelease` starts with a letter and equals the version of a release of the package index, but no suite
+  name or codename
+- **THEN** the feature exits with status 1, the output names `targetRelease`, the install call is not made, and no
+  package is installed or changed
 
 #### Scenario: Release the image does not configure is not added
 
@@ -461,6 +488,10 @@ The feature SHALL refuse these values itself because APT does not: APT reads a n
 negative lock wait as unbounded, replaces any other malformed number with a value of its own, does not check a release
 given as a `key=value` selector, so a mistyped one is ignored without an error, and accepts `now`, which names the
 installed packages and no source.
+
+Whether a well-formed `targetRelease` is carried by a release of the package index is not part of this validation: that
+check needs the index and a non-empty package list, and "Target release selects only among configured sources" states
+its place and its failure.
 
 #### Scenario: Invalid control fails before any change
 

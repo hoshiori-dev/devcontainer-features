@@ -64,6 +64,9 @@ None.
   file named by `APT_CONFIG`, the image's configuration, and the feature's options apply.
 - src/apt-packages/NOTES.md no longer promises that an APT pin the image set is never overridden: it states the pin
   ranking of "Target release ranks with holds and pins as APT does".
+- src/apt-packages/NOTES.md states which release fields a `targetRelease` is compared with, and that a name preferring
+  no release fails, as "Target release prefers a configured release" and "Target release selects only among configured
+  sources" state them.
 - just check, just test apt-packages, and just test-scenarios apt-packages pass.
 
 **Stays true:**

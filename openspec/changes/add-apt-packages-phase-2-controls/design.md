@@ -34,8 +34,9 @@ confirm at the package gate (Open questions):
   refusal runs with an empty package list on an image without `apt-get`.
 - An explicit control is never silently ineffective. Checked for `conffilePolicy` against image configurations that
   select the opposite handling (the delta's two "Image setting does not defeat" scenarios); for `targetRelease` by the
-  unknown-release failure and by refusing the two well-formed-looking values APT accepts without selecting a configured
-  source, a `key=value` selector it does not check and `now`.
+  feature's own check that the value prefers a release of the index (the delta's unknown-release scenario and its two
+  scenarios for a name that only a field of the other kind carries), and by refusing the two well-formed-looking values
+  APT accepts without selecting a configured source, a `key=value` selector it does not check and `now`.
 - The existing shell (POSIX sh) and the supported image list stay. Checked with shellcheck and the compatibility tests.
 
 **Non-Goals:**
@@ -101,9 +102,39 @@ Rejected option shapes:
 The option value is passed as `--target-release <value>`. It is not passed to `apt-get update`, which accepts and
 ignores an unknown release, and not to the `apt-cache` name and version lookups, which are release-independent.
 
-Existence is not checked by the feature: APT refuses a release absent from the index with status 100 before changing
-anything (experiment 1), on both images, and that native failure is the specified outcome. A second lookup in the
-feature would duplicate APT's matching rules (suite, codename, version) and could disagree with them.
+The feature checks that the value prefers a release, because APT's availability check and its preference do not compare
+alike (experiment 11). The availability check accepts a value that equals any release's suite name, codename, or
+version. The preference compares the value with one kind of field only, chosen by the value's first character: a digit
+means versions, anything else suite names and codenames. A value that only a field of the other kind carries is
+therefore accepted by APT and prefers nothing. The feature applies the preference's comparison itself: the whole value,
+without regard to letter case, against the fields of that kind of every release of the index, with a non-empty list
+only, after the refresh and before the install call. No match fails with status 1 naming `targetRelease`.
+
+- The same check covers a name that no release carries in any field, so APT's refusal (experiment 1) is no longer the
+  path that ends such a run. It stays behind the feature's check and needs no handling of its own.
+- The check never refuses a value APT would prefer a release for, and never passes one APT would prefer nothing for.
+  Checked by the delta's two scenarios for a name of the other kind, by "Letter case of the release name is not
+  significant", and by the scenarios of "Target release prefers a configured release", which still have to install from
+  the named release.
+- The release fields are taken from APT one field at a time: its index-target listing prints the suite name, codename,
+  and version of each configured source as separate values. The release line of the policy listing is not a source for
+  them, because it joins the fields with commas and a field that holds a comma reads there as a further field
+  (experiment 11).
+- Letter case is folded for ASCII letters only, with the letters spelled out as in the syntax check; the accepted
+  character set of the option holds no other letter.
+
+Rejected: leaving existence to APT, which this design chose first, on the grounds that a second lookup in the feature
+would duplicate APT's matching rules and could disagree with them. A code audit of the implementation refuted it with a
+reproduction: two local repositories, the second with a suite name that starts with a digit and an older version of one
+package; the option set to that suite name; the run exited 0 and installed the first repository's newer version, with
+both sources at the default priority. That is a silently ineffective control, which the honored-or-refused constraint
+(Context) forbids. The duplication is accepted in its place: it is one first-character test and whole-value comparisons,
+APT applied them alike on both package generations (experiment 11), and the effect scenarios hold the check to APT's
+behavior on each.
+
+Rejected: asking APT for the priorities the value produces and requiring one source at 990. An image pin of 990 on a
+suite for all packages gives the same listing with an ineffective value, with a value naming that suite, and with no
+target release (experiment 11), so the listing cannot tell the three apart.
 
 Syntax is checked by the feature, because APT's own check has two holes (a `key=value` selector is not checked, and
 `now` is accepted) and its accepted forms are wider than the contract. The accepted set is spelled out in the script as
@@ -183,15 +214,16 @@ apk and zypper features; issue #56 lists it under "Investigate" (see Open questi
 One code shape for both numbers, identical to `networkTimeout`: digits only, no leading zero (the single digit `0` where
 0 is in range), evaluated with the character set spelled out, and a length check before any arithmetic comparison,
 because dash cannot compare beyond its integer range. All of it runs before the first package-manager call and also for
-an empty list. Nothing in this change needs a check that requires the tool, so an empty list with valid controls stays a
-no-op on an image without `apt-get`.
+an empty list. One check in this change requires the tool and the index, whether `targetRelease` prefers a release
+(Target release, above); it is not part of this validation and runs for a non-empty list only, so an empty list with
+valid controls stays a no-op on an image without `apt-get`.
 
 ### Facts the notes rest on
 
 The proposal's Acceptance names what src/apt-packages/NOTES.md must state. The user-facing facts for it are in the
-experiments below: the proxy spellings APT honors and the configuration order (10), the target-release traps (3, 9), the
-size effect of suggestions (4, as an order of magnitude and never as a count), the scope of `conffilePolicy` (5, 10),
-and what a retry covers (7). Facts listed under "Not verified" are not established by this change.
+experiments below: the proxy spellings APT honors and the configuration order (10), the target-release traps (3, 9, 11),
+the size effect of suggestions (4, as an order of magnitude and never as a count), the scope of `conffilePolicy` (5,
+10), and what a retry covers (7). Facts listed under "Not verified" are not established by this change.
 
 ## Upstream facts and experiments
 
@@ -265,6 +297,19 @@ mcr.microsoft.com/devcontainers/base:ubuntu24.04, amd64, identical results unles
     line last. Neither image ships ucf; ucf 3.0043, installed from each image's repositories, reads
     `UCF_FORCE_CONFFOLD`/`UCF_FORCE_CONFFNEW` and holds no reference to `DPKG_FORCE`, so ucf-managed files are outside
     `conffilePolicy`. This was read from the script, not exercised with a ucf-managed file.
+11. Target-release matching (two local file repositories; the second offers an older version of one package, and its
+    release fields vary): APT compares the whole value, without regard to letter case, with one kind of field, chosen by
+    the value's first character. `-t 9x` against the suite name `9x`, `-t 9code` against the codename `9code`, and
+    `-t v7` against the version `v7` pass APT's availability check, exit 0, leave both sources at priority 500, and
+    install the first repository's newer version. `-t 7.1` against the version `7.1`, and `-t lettersuite` or
+    `-t lettercode` against that suite name or codename, give the second repository 990; so do `-t LetterSuite`,
+    `-t LETTERCODE`, and `-t 7.1A` against the version `7.1a`. `-t 7` against the version `7.1`, and `-t 7.1` against
+    `7.1a` or `7.10`, are refused as in experiment 1. With the suite name `9x` on one source and the version `9x` on
+    another, `-t 9x` raises the second alone. `apt-get indextargets` prints `$(SUITE)`, `$(CODENAME)`, and `$(VERSION)`
+    of each source as separate values, and the placeholder itself for a field the release lacks. `apt-cache policy`
+    joins the fields with commas: a release with the origin `Some Org,a=9x` is listed as
+    `o=Some Org,a=9x,a=lettersuite`. With an image pin of 990 on one suite for all packages, `apt-cache policy` lists
+    the same priorities with the ineffective `-t 9x`, with `-t` naming the pinned suite, and with no target release.
 
 Not verified: arm64; `https://` sources and their proxy variables; whether a hash mismatch is retried; how ucf treats a
 changed file during an unattended upgrade; whether the devcontainer CLI forwards proxy build arguments into the
@@ -281,7 +326,9 @@ lock and was not shown to conflict). Each scenario runs on both package generati
 
 - Release metadata is the fixture's, never the distribution's: "Release name shared by several suites prefers all of
   them" uses fixture suites that share a codename, and "Release name carried by one suite prefers that suite alone"
-  fixture suites with distinct names, so both run on both images whatever the image's own suites look like.
+  fixture suites with distinct names, so both run on both images whatever the image's own suites look like. The same
+  holds for a suite name or codename that starts with a digit and a version that starts with a letter, which no stock
+  suite of the supported images has.
 - A retry is observed as elapsed back-off against a server that closes the connection without answering: none at 0, at
   least 1 s at 1, at least 3 s at 2. A request count is not the observable there, because APT sends two requests per
   attempt. "Missing file is not retried" counts requests: one, for a 404.
@@ -298,6 +345,9 @@ lock and was not shown to conflict). Each scenario runs on both package generati
 - With `targetRelease`, a positive pin below 990 that the image set on a specific package version loses to the target
   release, which is less than issue #56's "preserve specific package pins"; the developer raises the pin or leaves the
   option empty.
+- The feature's release check repeats APT's comparison rule. Should a later APT compare differently, the check could
+  refuse a name APT would prefer a release for; the effect scenarios run on every supported package generation and would
+  show it.
 - `conffilePolicy=replace` overwrites deliberate image configuration for every package installed or upgraded,
   dependencies included, also a file the image placed at a conffile's path before the package was ever installed; the
   previous content survives as `.dpkg-old`. It needs a prepared image to test.
@@ -328,6 +378,11 @@ lock and was not shown to conflict). Each scenario runs on both package generati
     the pin, are rejected under Decisions.
 12. Refuse `targetRelease=now` (specified), or accept it as APT's "prefer what is installed"?
 13. Confirm the three cross-feature constraints stated in Context, or name the file that should record them.
+14. The feature's release check also ends a run whose `targetRelease` no release carries at all, with status 1 naming
+    `targetRelease`, where APT's own message ended it before. Confirm, or keep APT's refusal for that case and check
+    only names that a field of the other kind carries.
+15. The check folds letter case as APT does (experiment 11), so `Bookworm` prefers what `bookworm` prefers. Confirm, or
+    refuse a name whose letter case differs from the release's.
 
 ## Follow-up work
 
