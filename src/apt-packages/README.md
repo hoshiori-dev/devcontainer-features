@@ -98,9 +98,11 @@ stays installed, and a replaced configuration file is not restored.
 ## Target release
 
 `targetRelease` makes APT prefer one release among the sources the image already configures, on the install call only
-(`apt-get --target-release`). The value is one plain name: a suite name (`bookworm-security`, `noble-updates`), a
-codename (`bookworm`, `noble`), or a version (`12.15`, `24.04`). A pattern, a regular expression, a `key=value`
-selector, and `now` are refused. The feature never adds a source to make a release available.
+(`apt-get --target-release`). The value is one plain name: a suite name (`noble-updates` on Ubuntu 24.04,
+`oldstable-security` on Debian 12, where the suite names move with each new Debian release), a codename (`noble`,
+`bookworm`, `bookworm-security`), or a version (`24.04` on Ubuntu; the version of Debian's main suite is its point
+release, such as `12.15`, and changes with each point release). A pattern, a regular expression, a `key=value` selector,
+and `now` are refused. The feature never adds a source to make a release available.
 
 APT compares the whole value, without regard to letter case, with one kind of release field only: a value that starts
 with a digit with the versions of the releases in the package index, and any other value with their suite names and

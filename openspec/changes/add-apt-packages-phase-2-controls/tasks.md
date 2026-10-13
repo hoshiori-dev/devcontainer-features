@@ -105,3 +105,15 @@ Open questions 14, 15, and 16 of design.md are taken as specified: the package w
       `just docs`. Verify with `just docs-check` and by reading the paragraph.
 - [x] 7.8 Run `just check` with the OpenSpec version CI pins, `just test apt-packages`, and
       `just test-scenarios apt-packages` on this revision; all pass.
+- [x] 7.9 Add to test_target_release_debian and \_ubuntu refused values that hold the comparison of 7.1 to the whole
+      value: a proper prefix and an inner part of a fixture suite name and of a fixture codename, a proper prefix and
+      the end of a fixture version, and a name and a version that equal a fixture field only when a dot of the value is
+      read as a regular expression's "any character" (`al.ha` for `alpha`, `7.1.B` for `7.1aB`). APT refuses each as a
+      target release on both images and prefers nothing for it. Verify that both scenarios pass, and, extending the
+      mutations of 7.2, that each fails with `--line-regexp` removed from the check's `grep` and with `--fixed-strings`
+      removed from it.
+- [x] 7.10 Label the `targetRelease` examples of src/apt-packages/NOTES.md as the release fields they are on the
+      compatibility images after an index refresh (`bookworm-security` is a codename of Debian 12, whose suite name is
+      `oldstable-security`), and say that the version of Debian's main suite changes with each point release, so that
+      `24.04` is the version example that lasts; regenerate README.md with `just docs`. Verify with `just docs-check`
+      and by reading the sentence against `apt-get indextargets` on both images.

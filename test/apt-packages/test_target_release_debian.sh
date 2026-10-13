@@ -4,8 +4,8 @@
 # release prefers a configured release", "Target release selects only among configured sources", and "Target release
 # ranks with holds and pins as APT does", and the scenarios "Omitted targetRelease", "Configuration selected by the
 # environment is honored", and "Later invocation keeps what the earlier one installed". The design's checks of the
-# release check are here as well: a release field that holds a comma, an unknown entry beside an unknown release, and a
-# release that only a source-package source carries.
+# release check are here as well: a release field that holds a comma, an unknown entry beside an unknown release, a
+# release that only a source-package source carries, and a value that is only a part of a release field.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -221,8 +221,10 @@ check "the later invocation does not remove the suggested package" installed lat
 # Target release selects only among configured sources
 # Each entry is a targetRelease that would make APT prefer no release, and what it is. APT itself accepts the three
 # that equal a field of the other kind and refuses the others; the feature's check ends every one of these runs before
-# the install call. The error message is told from the installer's log line, which prints targetRelease=<value>, by
-# the words around the value.
+# the install call. The entries after the first nine hold the comparison to the whole value: each is a part of a field
+# of the kind it is compared with, or equals such a field only when its dot is read as "any character", as a regular
+# expression would read it. The error message is told from the installer's log line, which prints
+# targetRelease=<value>, by the words around the value.
 unpreferred_releases=(
   "nosuch a well-formed name that no release of the package index carries"
   "9x a name starting with a digit that equals a suite name and the version of no release"
@@ -233,6 +235,15 @@ unpreferred_releases=(
   "source-only a suite name that only a source-package source carries"
   "source-only-code a codename that only a source-package source carries"
   "4.0 a version that only a source-package source carries"
+  "alph a proper prefix of the suite name alpha and of the codename alpha-code"
+  "shared-m a proper prefix of the suite name shared-main that is longer than the codename shared"
+  "lph a part inside the suite name alpha"
+  "eta-cod a part inside the codename beta-code"
+  "al.ha a name that equals the suite name alpha only if its dot stands for any character"
+  "7.1a a proper prefix of the release version 7.1aB"
+  "9 a proper prefix of the release version 9.0"
+  "1aB the end of the release version 7.1aB"
+  "7.1.B a version that equals the release version 7.1aB only if its second dot stands for any character"
 )
 configuration_before="$(apt_configuration)"
 for unpreferred_release in "${unpreferred_releases[@]}"; do
