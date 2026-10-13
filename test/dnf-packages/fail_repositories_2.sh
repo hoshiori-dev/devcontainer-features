@@ -124,6 +124,19 @@ check "refreshPolicy=always installs nothing from the repositories that answered
 check "no run wrote skip_if_unavailable to the dnf configuration" dnf_configuration_is "${configuration_before}"
 rm "${UNAVAILABLE_REPOSITORY}"
 
+# While signatures can still be verified, one run installs what ONLY_DISABLED_PACKAGE needs from the image's enabled
+# repositories. With the package itself removed again, DISABLED_REPOSITORY alone supplies what the run below must
+# verify, so only the signature check of that repository can fail it.
+run_install PACKAGES="${ONLY_DISABLED_PACKAGE}" ENABLEREPOSITORIES="${DISABLED_REPOSITORY}"
+check "premise: with verifiable signatures ${ONLY_DISABLED_PACKAGE} is installed from ${DISABLED_REPOSITORY}" \
+  exited_with 0
+rpm -e "${ONLY_DISABLED_PACKAGE}"
+dnf install --assumeyes --downloadonly --setopt=install_weak_deps=False "--enablerepo=${DISABLED_REPOSITORY}" \
+  "${ONLY_DISABLED_PACKAGE}"
+check "premise: only ${DISABLED_REPOSITORY} supplies what is left to install for ${ONLY_DISABLED_PACKAGE}" \
+  only_package_files_of "${DISABLED_REPOSITORY}"
+dnf clean all
+
 changed="$(make_signatures_unverifiable)"
 check "premise: every repository names a key file that holds no key" test "${changed}" -gt 0
 database_before="$(rpm_database)"

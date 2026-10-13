@@ -89,3 +89,17 @@ unchanged when none of the four options is set.
 - [x] 5.4 Record each Acceptance item of the proposal and each scenario it points to, with its test, image,
       architecture, and result, in the Validation section of the pull request; verify by reading the section back from
       the pull request.
+
+## 6. Audit follow-up
+
+- [x] 6.1 In `test/dnf-packages/fail_repositories_*.sh`, install what the package of the temporarily enabled repository
+      needs from the image's enabled repositories before the signatures are made unverifiable, with a premise that that
+      repository alone supplies what is left to install; verify that the check "a package of the temporarily enabled …
+      fails the feature" fails on the three images when `install.sh` passes `--setopt=<id>.gpgcheck=0` for each
+      identifier of `enableRepositories`, and that `fail_repositories_0`, `_1`, and `_2` pass with `install.sh` as it
+      is.
+- [x] 6.2 In `test/dnf-packages/test_repository_selection_*.sh`, plant a package file of the temporarily enabled
+      repository in `dnf`'s cache before the runs with `cleanup=packages` and `cleanup=all`, with a premise that the
+      cache holds it; verify that the two checks "… leaves no downloaded package file …" fail on the three images when
+      `install.sh` runs no `dnf clean packages` and `dnf clean metadata` in place of `dnf clean all`, and that
+      `test_repository_selection_0`, `_1`, and `_2` pass with `install.sh` as it is.

@@ -18,6 +18,8 @@ source "$(dirname "$0")/installer.sh"
 # A repository the image configures and leaves disabled, and a package that only it offers.
 readonly DISABLED_REPOSITORY="fedora-debuginfo"
 readonly ONLY_DISABLED_PACKAGE="bc-debuginfo"
+# Another package of that repository, which no run installs.
+readonly PLANTED_PACKAGE="tree-debuginfo"
 # A repository the image enables, and a package that only it offers.
 readonly ENABLED_REPOSITORY="fedora-cisco-openh264"
 readonly ONLY_ENABLED_PACKAGE="openh264"
@@ -44,6 +46,14 @@ disables_before_enabling() {
   [[ "${calls}" == *"[--disablerepo=$1]"*"[--enablerepo=$2]"* ]]
 }
 
+# Puts the package file of PLANTED_PACKAGE into the cache of DISABLED_REPOSITORY. dnf's default keepcache=0 deletes the
+# files of a transaction when it succeeds, and dnf 4 then also deletes the files an earlier call downloaded without
+# keepcache, so a run of the feature leaves a package file for `dnf clean` only if one is planted this way.
+plant_package_file() {
+  dnf install --assumeyes --downloadonly --setopt=keepcache=1 --setopt=install_weak_deps=False \
+    "--enablerepo=${DISABLED_REPOSITORY}" "${PLANTED_PACKAGE}"
+}
+
 record_dnf_calls
 configuration_before="$(dnf_configuration)"
 keys_before="$(rpm_keys)"
@@ -68,6 +78,9 @@ check "refreshPolicy=never fetched no metadata of ${DISABLED_REPOSITORY}" no_met
 check "refreshPolicy=never did not install ${ONLY_DISABLED_PACKAGE}" not_installed "${ONLY_DISABLED_PACKAGE}"
 
 # The list holds spaces, an empty item, and the identifier twice.
+plant_package_file
+check "premise: the cache holds a downloaded package file of ${DISABLED_REPOSITORY}" \
+  has_package_files_of "${DISABLED_REPOSITORY}"
 run_recorded_install PACKAGES="${ONLY_DISABLED_PACKAGE}" \
   ENABLEREPOSITORIES=" ${DISABLED_REPOSITORY} ,, ${DISABLED_REPOSITORY}" CLEANUP=packages
 check "enableRepositories=${DISABLED_REPOSITORY} exits with status 0" exited_with 0
@@ -94,6 +107,9 @@ check "${ONLY_DISABLED_PACKAGE}, installed from ${DISABLED_REPOSITORY} before, s
   installed "${ONLY_DISABLED_PACKAGE}"
 
 dnf remove --assumeyes "${ONLY_DISABLED_PACKAGE}"
+plant_package_file
+check "premise: the cache holds a downloaded package file of ${DISABLED_REPOSITORY} again" \
+  has_package_files_of "${DISABLED_REPOSITORY}"
 run_recorded_install PACKAGES="${ONLY_DISABLED_PACKAGE}" ENABLEREPOSITORIES="${DISABLED_REPOSITORY}" \
   DISABLEREPOSITORIES="${ENABLED_REPOSITORY}" REFRESHPOLICY=always NETWORKTIMEOUT=30 CLEANUP=all
 check "both lists together exit with status 0" exited_with 0
@@ -105,7 +121,7 @@ check "refreshPolicy=always reaches the call that enables ${DISABLED_REPOSITORY}
 check "networkTimeout=30 covers every repository of the call that enables ${DISABLED_REPOSITORY}" \
   install_call_has "--setopt=*.timeout=30"
 check "cleanup=all leaves no metadata, also none of ${DISABLED_REPOSITORY}" no_metadata
-check "cleanup=all leaves no downloaded package file" no_package_files
+check "cleanup=all leaves no downloaded package file, also none of ${DISABLED_REPOSITORY}" no_package_files
 check "with both lists the repository files, the dnf configuration, and the key files are unchanged" \
   dnf_configuration_is "${configuration_before}"
 check "with both lists the keys in the RPM keyring are unchanged" rpm_keys_are "${keys_before}"

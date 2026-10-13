@@ -196,6 +196,31 @@ no_package_files() {
   fi
 }
 
+# Prints the downloaded package files of the repository $1 in dnf's cache, which keeps them in the directory
+# "<identifier>-<16 hex digits>/packages".
+cached_package_files_of() {
+  local files
+  files="$(cached_package_files)"
+  grep --extended-regexp "/$1-[0-9a-f]{16}/packages/" <<<"${files}" || true
+}
+
+has_package_files_of() {
+  if [[ -z "$(cached_package_files_of "$1")" ]]; then
+    echo "dnf's cache holds no downloaded package file of $1" >&2
+    return 1
+  fi
+}
+
+# dnf's cache holds downloaded package files, and every one of them is of the repository $1.
+only_package_files_of() {
+  local files
+  files="$(cached_package_files)"
+  if [[ -z "${files}" || "${files}" != "$(cached_package_files_of "$1")" ]]; then
+    printf 'the downloaded package files in the cache are not those of %s alone:\n%s\n' "$1" "${files}" >&2
+    return 1
+  fi
+}
+
 # Prints every repository the image configures with its state, "<identifier> enabled" or "<identifier> disabled", as
 # dnf lists them without loading metadata.
 repository_states() {
