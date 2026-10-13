@@ -106,3 +106,5 @@ unchanged when none of the four options is set.
 - [x] 6.3 In `src/dnf-packages/NOTES.md`, state that `dnf`'s messages reach the build log unfiltered and can hold a
       repository URL with its credentials, also for a repository enabled for the invocation; regenerate `README.md` with
       `just docs`; verify with `just docs-check`.
+- [x] 6.4 In `src/dnf-packages/NOTES.md`, record the known limit of the existence check for a repository name of several
+      lines on dnf 4.14; regenerate `README.md` with `just docs`; verify with `just docs-check`.

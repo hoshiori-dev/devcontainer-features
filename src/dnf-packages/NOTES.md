@@ -47,6 +47,13 @@ image does not configure, before anything is installed. An identifier whose repo
 is accepted. Neither option creates, edits, or removes a repository file, and the image enables the same repositories
 after the feature as before it.
 
+Known limit: DNF 4.14 prints a repository name that spans several lines of its repository file over several lines of
+that listing, and the feature takes the first word of each further line for the identifier of a configured repository.
+`disableRepositories` naming such a word is therefore not refused, although the image configures no repository of that
+name: DNF warns `No repository match` and goes on with nothing left out. With `enableRepositories`, DNF itself stops
+with `Unknown repo` in place of the feature's message. DNF5 5.4.3 prints such a name on one row, and the feature refuses
+the word.
+
 Controls apply separately on each invocation; disabling optional dependencies does not remove installed packages.
 Invalid controls fail even with an empty list. Native hooks can remove downloaded packages independently of cleanup.
 
