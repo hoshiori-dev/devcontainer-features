@@ -4,7 +4,8 @@
 # release prefers a configured release", "Target release selects only among configured sources", and "Target release
 # ranks with holds and pins as APT does", and the scenarios "Omitted targetRelease", "Configuration selected by the
 # environment is honored", and "Later invocation keeps what the earlier one installed". The design's checks of the
-# release check are here as well: a release field that holds a comma, and an unknown entry beside an unknown release.
+# release check are here as well: a release field that holds a comma, an unknown entry beside an unknown release, and a
+# release that only a source-package source carries.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -39,6 +40,18 @@ index_holds() {
       return 1
     fi
   done
+}
+
+# The package index holds the source package list of the suite $1 and no binary package list of it.
+index_holds_only_sources() {
+  if ! compgen -G "/var/lib/apt/lists/*_dists_$1_main_source_Sources*" >/dev/null; then
+    echo "the package index holds no source package list of $1" >&2
+    return 1
+  fi
+  if compgen -G "/var/lib/apt/lists/*_dists_$1_main_binary-*_Packages*" >/dev/null; then
+    echo "the package index holds a package list of $1" >&2
+    return 1
+  fi
 }
 
 # Runs install.sh as run_install does, behind an apt-get that records each call and forwards it to the image's
@@ -100,7 +113,28 @@ publish_suite 9x 9code v7 "Origin=Scenario,a=ghost" "Label=Scenario,v=8.8"
 # A suite that the repository offers and that no source of the image names.
 add_package gamma preferred 3.0
 publish_suite gamma gamma-code 3.0
+# A suite that only a source-package (deb-src) source of the image names. The repository offers its binary package
+# list too, with a newer version of a package, and no source of the image configures that list. APT lists the
+# release fields of such a source and prefers nothing for it.
+add_package source-only refused 4.0
+mkdir -p "${REPOSITORY}/dists/source-only/main/source"
+cat >"${REPOSITORY}/dists/source-only/main/source/Sources" <<'SOURCES'
+Package: refused
+Binary: refused
+Version: 4.0
+Maintainer: Scenario <scenario@example.invalid>
+Architecture: all
+Format: 3.0 (native)
+Files:
+ d41d8cd98f00b204e9800998ecf8427e 0 refused_4.0.dsc
+Checksums-Sha256:
+ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 0 refused_4.0.dsc
+Directory: pool/source-only
+SOURCES
+publish_suite source-only source-only-code 4.0
 use_suites alpha beta shared-main shared-backports CaseSuite 9x
+echo "deb-src [signed-by=${REPOSITORY_KEYRING}] file:${REPOSITORY} source-only main" \
+  | as_root tee -a "${REPOSITORY_SOURCES}" >/dev/null
 
 # An apt-get that records its arguments and then runs the image's apt-get. It forwards every call, because the
 # feature's release check reads the index through apt-get.
@@ -185,9 +219,10 @@ check "the later invocation does not downgrade the package to the release it wou
 check "the later invocation does not remove the suggested package" installed later-suggestion
 
 # Target release selects only among configured sources
-# Each entry is a targetRelease that would make APT prefer no release, and what it is. APT itself refuses only the
-# first one and the last two; the feature's check ends every one of these runs before the install call. The error
-# message is told from the installer's log line, which prints targetRelease=<value>, by the words around the value.
+# Each entry is a targetRelease that would make APT prefer no release, and what it is. APT itself accepts the three
+# that equal a field of the other kind and refuses the others; the feature's check ends every one of these runs before
+# the install call. The error message is told from the installer's log line, which prints targetRelease=<value>, by
+# the words around the value.
 unpreferred_releases=(
   "nosuch a well-formed name that no release of the package index carries"
   "9x a name starting with a digit that equals a suite name and the version of no release"
@@ -195,6 +230,9 @@ unpreferred_releases=(
   "v7 a name starting with a letter that equals a release version and no suite name or codename"
   "ghost a name that only the text after a comma in an Origin field spells as a suite name"
   "8.8 a name that only the text after a comma in a Label field spells as a version"
+  "source-only a suite name that only a source-package source carries"
+  "source-only-code a codename that only a source-package source carries"
+  "4.0 a version that only a source-package source carries"
 )
 configuration_before="$(apt_configuration)"
 for unpreferred_release in "${unpreferred_releases[@]}"; do
@@ -209,6 +247,8 @@ for unpreferred_release in "${unpreferred_releases[@]}"; do
   check "targetRelease=${name}: no package is installed" not_installed refused
   check "targetRelease=${name}: no package is changed" dpkg_status_is "${status_before}"
 done
+check "premise: the package index holds the source package list, and no binary package list, of the suite that only \
+a source-package source names" index_holds_only_sources source-only
 
 run_recorded_install PACKAGES=nosuchpackage TARGETRELEASE=nosuch
 check "an entry that names no package beside a targetRelease that no release carries fails the feature" exited_with 1
