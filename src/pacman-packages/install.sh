@@ -133,10 +133,17 @@ remove_temporary_configuration() {
 }
 
 # Writes the temporary configuration, which gives pacman the image's whole configuration with ParallelDownloads
-# replaced, and fails unless pacman-conf resolves the requested value from it. pacman takes the setting from its
-# configuration alone. The second [options] header puts the setting in the options section whichever section the
-# included file ends in, and after the inclusion, because the last assignment wins.
+# replaced, and fails unless pacman-conf resolves the image's configuration by itself and the requested value from the
+# temporary one. pacman takes the setting from its configuration alone. The second [options] header puts the setting in
+# the options section whichever section the included file ends in, and after the inclusion, because the last assignment
+# wins.
 write_temporary_configuration() {
+  # The first [options] header below would also take in lines that stand before the first section header of the
+  # included file, which pacman refuses when it reads that file itself. So the file must resolve without the wrapper.
+  pacman-conf --config "${IMAGE_CONFIGURATION}" ParallelDownloads >/dev/null \
+    || fail "cannot apply parallelDownloads=${PARALLELDOWNLOADS}: pacman-conf did not resolve ${IMAGE_CONFIGURATION}" \
+      "by itself; check that the file exists and is one pacman accepts, and that this pacman provides pacman-conf" \
+      "and the setting"
   trap remove_temporary_configuration EXIT
   # A trapped signal ends the script through the exit trap; each status is 128 plus the signal's number.
   trap 'exit 129' HUP

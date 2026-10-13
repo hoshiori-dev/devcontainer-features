@@ -3,7 +3,8 @@
 # runs install.sh in a container it has prepared so that an explicit parallelDownloads cannot be confirmed, or so that
 # the package database is locked. A stand-in before pacman on PATH records each call and then runs the real pacman.
 # Spec scenarios "Image configuration that cannot be included fails closed", "Unconfirmed value fails closed", and
-# "Held database lock fails the installation".
+# "Held database lock fails the installation". An /etc/pacman.conf that pacman itself refuses is a pacman-conf failure
+# of "Unconfirmed value fails closed".
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -44,6 +45,22 @@ ln -s /nonexistent/pacman.conf "${CONFIGURATION}"
 run_install_with_stand_in PACKAGES=tree PARALLELDOWNLOADS=3
 check "with /etc/pacman.conf unreadable, parallelDownloads=3 fails closed" failed_closed
 rm "${CONFIGURATION}"
+mv "${CONFIGURATION_ASIDE}" "${CONFIGURATION}"
+
+# A directive before the first section header: pacman refuses the file, and an [options] header written before its
+# inclusion would take the line in as a setting.
+cp "${CONFIGURATION}" "${CONFIGURATION_ASIDE}"
+sed -i '1i Color' "${CONFIGURATION}"
+check "premise: pacman-conf refuses /etc/pacman.conf with a directive before its first section" \
+  bash -c "! '${PACMAN_CONF}' ParallelDownloads"
+run_install_with_stand_in PACKAGES=tree PARALLELDOWNLOADS=3
+check "with a directive before the first section of /etc/pacman.conf, parallelDownloads=3 fails closed" failed_closed
+run_install_with_stand_in PACKAGES=tree PARALLELDOWNLOADS=
+check "without parallelDownloads the same /etc/pacman.conf fails the installation with status 1" exited_with 1
+check "the failure is pacman's own: it refuses the directive" printed "All directives must belong to a section"
+check "the feature reports the failed pacman call" printed_error "pacman --sync failed with status 1"
+check "the feature called pacman once" pacman_was_called 1
+check "pacman synchronized no database" no_sync_databases
 mv "${CONFIGURATION_ASIDE}" "${CONFIGURATION}"
 
 mv "${PACMAN_CONF}" "${PACMAN_CONF_ASIDE}"

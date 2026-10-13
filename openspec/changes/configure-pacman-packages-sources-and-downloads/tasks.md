@@ -88,3 +88,9 @@ The open questions of design.md are taken as the design resolves them: the maint
       holds; verify by mutation that the six fail-closed checks pass with `install.sh` as it is, that four of them fail
       once the `|| fail` after the `pacman-conf` call is removed, and that the other two fail once the unconfirmed-value
       message no longer names the option.
+- [x] 6.2 In `install.sh`, before the temporary configuration is written, require that `pacman-conf` resolves
+      `/etc/pacman.conf` by itself, so that a file with a directive before its first section header, which `pacman`
+      refuses and the `[options]` header before the inclusion would accept, fails closed with a message naming
+      `parallelDownloads`; verify in `fail_download_controls.sh` that such a file gives status 1, that error line, no
+      `pacman` call, no sync database, and no temporary file, that without `parallelDownloads` it fails as `pacman`'s
+      own error, and by mutation that the fail-closed check fails once the new call is removed.
