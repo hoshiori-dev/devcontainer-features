@@ -1,0 +1,81 @@
+# Tasks
+
+The open questions of design.md are taken as the design resolves them: the maintainer approved the package as written
+(`spec:approved` on pull request #140, reconciled on 2026-10-13).
+
+## 1. Option and entry validation
+
+- [ ] 1.1 Add `parallelDownloads` (string, default `""`, proposals `"1"`, `"3"`, `"10"`) to
+      `src/pacman-packages/devcontainer-feature.json`, mention the repository qualifier in the description of
+      `packages`, and set the version to 1.1.0; verify with `just spec-check` and `just validate` (options equal the
+      delta spec, bump accepted).
+- [ ] 1.2 In `src/pacman-packages/install.sh`, validate `PARALLELDOWNLOADS` with `cleanup` and the entries under
+      `LC_ALL=C`, before `pacman` is looked for: empty or a canonical decimal integer from 1 through 20; verify with the
+      checks of "Parallel download boundaries are validated" and "Invalid control fails before any change" in
+      `test/pacman-packages/fail_refused_input.sh`, and under busybox `sh` in `fail_image_without_pacman.sh`.
+- [ ] 1.3 In `install.sh`, accept `repository/target` entries and refuse every other entry holding `/` with one of two
+      messages (path or URL; malformed repository qualifier); verify with the checks of "URL or path is refused",
+      "Malformed repository qualifier is refused", and "Repository-qualified entry is accepted" in
+      `fail_refused_input.sh` and `fail_image_without_pacman.sh`, and that the checks of "Option-like entry is refused"
+      and "Shell metacharacters and inner whitespace are refused" still pass there.
+- [ ] 1.4 Add to `test/pacman-packages/installer.sh` the stand-in for `pacman` that records a call (arguments,
+      environment, the configuration file and what `pacman-conf` resolves from it) and the assertions the scripts share;
+      verify that without `parallelDownloads` and without a qualified entry the recorded arguments are those of version
+      1.0.1 and `/tmp` is unchanged (`fail_refused_input.sh`, `test_parallel_downloads.sh`).
+
+## 2. Parallel downloads
+
+- [ ] 2.1 In `install.sh`, for a non-empty value and a non-empty list, write the temporary configuration (an `[options]`
+      header, the inclusion of `/etc/pacman.conf`, a second `[options]` header, the `ParallelDownloads` line) with
+      `mktemp` under `/tmp`, remove it by a trap on exit and on HUP, INT, and TERM, confirm the value with `pacman-conf`
+      before the call, and pass the file to the one `pacman` call with `--config`; verify with
+      `test/pacman-packages/test_parallel_downloads.sh`: "Native parallel downloads are inherited", "Explicit parallel
+      downloads reach pacman", "Temporary configuration is removed", "Parallel downloads apply under every cleanup
+      value", "Parallel downloads apply to repository-qualified entries", "Explicit parallel downloads keep the image
+      configuration" (resolved configuration), and "Download controls do not persist to the second install".
+- [ ] 2.2 Add the scenario `fail_download_controls`; verify "Image configuration that cannot be included fails closed",
+      "Unconfirmed value fails closed" (`pacman-conf` missing, failing, reporting another value, reporting none), and
+      "Held database lock fails the installation".
+- [ ] 2.3 Verify "Build environment proxy reaches pacman unchanged" with the stand-in in `test_parallel_downloads.sh`,
+      with and without `parallelDownloads`.
+- [ ] 2.4 Extend `fail_refresh_and_signature.sh` and `test_keyring_and_configuration.sh` for "Explicit parallel
+      downloads keep the image configuration": an untrusted signature still fails with `parallelDownloads`, and
+      `/etc/pacman.conf` and `/etc/pacman.d` are unchanged after a run with it; verify both scenarios pass.
+- [ ] 2.5 Add the scenario `test_controls_parallel_downloads_0`, installed through the devcontainer CLI with
+      `packages="extra/bc, tree"` and `parallelDownloads=3`; verify that the option reaches `install.sh` through the CLI
+      (the logged `pacman` call) and that both packages are installed.
+
+## 3. Repository-qualified entries
+
+- [ ] 3.1 Extend `fail_unresolvable_entries.sh`; verify "Qualified entry outside the named repository fails", "Unknown
+      repository fails", and "Repository name is matched exactly" on the image's own repositories.
+- [ ] 3.2 Add the scenario `test_fixture_repositories`, which prepares three local repositories with signed package
+      files in its container; verify "Qualified entry resolves in the named repository", "Qualified entry is not a pin",
+      "Qualified entry offering an older version", "Same qualified entry with a newer version in an earlier repository",
+      "Qualified entry reaches a repository not enabled for installation", "Dependency only in a repository not enabled
+      for installation fails", "Unqualified entry does not reach a repository not enabled for installation", and "Image
+      configuration ending in a repository section".
+
+## 4. Autogenerated tests, documentation, compatibility
+
+- [ ] 4.1 Update `test/pacman-packages/test.sh` (defaults create no file) and `duplicate.sh` (first install with
+      `parallelDownloads=3`, the second proposal; no temporary configuration left); verify with
+      `just test pacman-packages`.
+- [ ] 4.2 Leave `test/pacman-packages/compatibility.json` unchanged; verify with `git diff` that it has no change.
+- [ ] 4.3 Update `src/pacman-packages/NOTES.md`: the qualifier with its three native properties, the bound of the
+      no-downgrade statement, the alternation on repeated installation, `parallelDownloads`, the path left in
+      `pacman.log`, and the four sections "What the feature sets explicitly", "What is inherited", "Proxy", and "Locks
+      and retries", with every fact the design lists as not verified labeled so; verify by reading it against the
+      proposal's Acceptance item on NOTES.md.
+- [ ] 4.4 Regenerate `src/pacman-packages/README.md` with `just docs`; verify with `just docs-check` and that the root
+      `README.md` is unchanged, so `README.zh.md` needs no edit.
+
+## 5. Integration
+
+- [ ] 5.1 Run `just check`; verify it passes.
+- [ ] 5.2 Run `just test pacman-packages`; verify the autogenerated and install-twice tests pass on every compatibility
+      image.
+- [ ] 5.3 Run `just test-scenarios pacman-packages`; verify every scenario passes, including the unchanged ones of
+      version 1.0.1.
+- [ ] 5.4 Record each Acceptance item of the proposal and each scenario with its check, image, and result in the pull
+      request's Validation section.
