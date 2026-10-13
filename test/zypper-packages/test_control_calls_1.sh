@@ -10,7 +10,8 @@
 # removed after failure", "Feature does not repeat a failed call", "Inherited ZYPP_CONF fails an explicit override",
 # "Inherited ZYPP_CONF is kept without an override", and "Zypp configuration is unchanged"; and the accepted bounds of
 # the four boundary scenarios with a non-empty list. It also shows that the file exists at the repository listing a
-# selection begins with, the first zypper call of such a run.
+# selection begins with, the first zypper call of such a run, and that the directories the feature creates for the
+# file have mode 755 under a umask that masks nothing.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -85,6 +86,20 @@ every_call_saw_the_override() {
     call="${call##*.}"
     if [[ ! -e "${RECORD_DIR}/override.${call}" || "$(<"${RECORD_DIR}/override.${call}")" != "$1" ]]; then
       echo "call ${call} did not see the configuration file with: $1" >&2
+      return 1
+    fi
+  done
+}
+
+# While every recorded call ran, /run/zypp and /run/zypp/zypp.conf.d each had the octal mode $1.
+every_call_saw_the_directories_with_mode() {
+  local call
+  for call in "${RECORD_DIR}"/env.*; do
+    call="${call##*.}"
+    if [[ ! -e "${RECORD_DIR}/modes.${call}" || "$(<"${RECORD_DIR}/modes.${call}")" != "$1 /run/zypp
+$1 /run/zypp/zypp.conf.d" ]]; then
+      echo "call ${call} did not see /run/zypp and /run/zypp/zypp.conf.d with mode $1, but:" >&2
+      if [[ -e "${RECORD_DIR}/modes.${call}" ]]; then cat "${RECORD_DIR}/modes.${call}" >&2; fi
       return 1
     fi
   done
@@ -241,6 +256,18 @@ download.connect_timeout = 5
 download.max_silent_tries = 3"
 check "an alias the listing does not hold fails with status 1" exited_with 1
 check "after the refused alias neither the file nor a directory of the feature exists" no_override_left
+
+# A build environment whose umask masks nothing: the directories the feature creates are still not writable by others
+# while they exist. The stand-in records their mode at each zypper call.
+umask_before="$(umask)"
+umask 000
+run_recorded PACKAGES=bc CONNECTTIMEOUT=30
+umask "${umask_before}"
+check "under umask 000 the feature succeeds" exited_with 0
+check "under umask 000 the feature makes the calls of the default run" calls_are "${DEFAULT_CALLS}"
+check "under umask 000 both directories the feature creates have mode 755 at every call" \
+  every_call_saw_the_directories_with_mode 755
+check "after the run under umask 000 neither the file nor a directory of the feature exists" no_override_left
 
 # An image that has the directory already, with a file of its own in it: the feature removes only what it created.
 mkdir -p /run/zypp/zypp.conf.d

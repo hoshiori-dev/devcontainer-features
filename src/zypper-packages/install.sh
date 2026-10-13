@@ -317,17 +317,19 @@ EOF
 
 # Writes the timeout and retry options that are set into the temporary configuration file, as a [main] section that
 # holds their keys and nothing else. The values are digits that check_number accepted; downloadRetries counts the
-# retries after the first attempt, and libzypp's key the attempts.
+# retries after the first attempt, and libzypp's key the attempts. A directory the feature creates for the file gets
+# mode 0755 whatever umask the build environment hands down, so that one it cannot remove again is not left writable
+# by others.
 write_overrides() {
   log "writing ${override_options} to a temporary libzypp configuration file in ${ZYPP_OVERRIDE_DIR}," \
     "removed when the feature exits"
   if [ ! -d "${ZYPP_OVERRIDE_PARENT}" ]; then
-    mkdir "${ZYPP_OVERRIDE_PARENT}" \
+    mkdir --mode 0755 "${ZYPP_OVERRIDE_PARENT}" \
       || fail "cannot create ${ZYPP_OVERRIDE_PARENT}; leave ${override_options} empty, or fix the image's /run"
     override_parent_created="yes"
   fi
   if [ ! -d "${ZYPP_OVERRIDE_DIR}" ]; then
-    mkdir "${ZYPP_OVERRIDE_DIR}" \
+    mkdir --mode 0755 "${ZYPP_OVERRIDE_DIR}" \
       || fail "cannot create ${ZYPP_OVERRIDE_DIR}; leave ${override_options} empty, or fix the image's /run"
     override_dir_created="yes"
   fi

@@ -108,3 +108,9 @@ do. `just test-scenarios zypper-packages` runs them all; a task is verified when
       `test_control_calls`, `rm` in the EXIT trap records its environment beside `mktemp`, and both must lack the
       override, or hold the build environment's value (scenarios "Explicit lock wait reaches zypper calls", "Explicit
       lock wait overrides an inherited one"). Verify that both checks fail when `run_zypper` exports the variable.
+- [x] 8.3 Create `/run/zypp` and `/run/zypp/zypp.conf.d` with `mkdir --mode 0755`, so that the mode of a directory the
+      feature creates for the temporary file does not follow the umask of the build environment; which directories are
+      created, the record of them, the file, and the cleanup stay as they are. Verify with the scenario
+      `test_control_calls`: in a run under `umask 000` the `zypper` stand-in records mode 755 for both directories at
+      every call, and nothing is left under `/run/zypp` afterwards; the check fails, with mode 777, when the option is
+      removed.
