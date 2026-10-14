@@ -1,7 +1,8 @@
 #!/bin/sh
 # Scenario fail_image_without_apk (scenarios.json): the scenario's Dockerfile builds a Debian image, which has no apk,
 # and the container has no network. Spec scenarios "Image without apk fails clearly", "Omitted packages" and "Empty
-# list is a no-op" on an image without apk, and "URL or path is refused" there: validation comes before the apk check.
+# list is a no-op" on an image without apk, and "URL or path is refused", "Lock wait boundaries are validated", and
+# "Version policy value is validated" there: validation comes before the apk check.
 # POSIX sh with the stand-in in checks.sh, as every script of this feature; installer.sh's assertions about apk are
 # not used here.
 set -eu
@@ -61,5 +62,17 @@ check "with packages='file,/tmp/tree.apk' the feature exits with status 1" exite
 check "the message refuses the entry /tmp/tree.apk" printed "refusing the entry '/tmp/tree.apk'"
 check "the refusal comes before the check for apk" did_not_look_for_apk
 check "the refused run changed nothing in the image" image_state_is "${state_before}"
+
+# Each control is "<option> <environment assignment>" with a value the option does not accept; the list is not empty,
+# so a run that got past validation would fail on the missing apk instead.
+for control in "lockTimeout LOCKTIMEOUT=0" "lockTimeout LOCKTIMEOUT=3x" "latest LATEST=" "latest LATEST=True"; do
+  run_install PACKAGES=tree "${control#* }"
+  check "with '${control#* }' the feature exits with status 1" exited_with 1
+  check "the message for '${control#* }' names ${control%% *}" printed "option ${control%% *}"
+  check "the refusal of '${control#* }' comes before the check for apk" did_not_look_for_apk
+done
+run_install PACKAGES="" LATEST=true LOCKTIMEOUT=3600
+check "with an empty list, latest=true, and lockTimeout=3600 the feature exits with status 0" exited_with 0
+check "the runs with latest and lockTimeout changed nothing in the image" image_state_is "${state_before}"
 
 reportResults
