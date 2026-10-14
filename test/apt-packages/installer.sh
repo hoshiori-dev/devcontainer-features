@@ -52,6 +52,14 @@ printed() {
   fi
 }
 
+# The last run did not print the text $1.
+did_not_print() {
+  if [[ "${install_output}" == *"$1"* ]]; then
+    printf 'the output of install.sh contains "%s"\n' "$1" >&2
+    return 1
+  fi
+}
+
 # A line of the last run's output matches the extended regular expression $1; further grep options may follow.
 output_matches() {
   grep --extended-regexp --quiet "${@:2}" -- "$1" <<<"${install_output}"
@@ -99,19 +107,19 @@ no_index() {
   fi
 }
 
-# Prints a digest of the apt configuration: the names, types, modes, and link targets under /etc/apt and
-# /usr/share/keyrings, and the content of every file there.
+# Prints a digest of the apt and dpkg configuration: the names, types, modes, and link targets under /etc/apt,
+# /etc/dpkg, and /usr/share/keyrings, and the content of every file there.
 apt_configuration() {
   as_root sh -c '{
-    find /etc/apt /usr/share/keyrings -printf "%p %y %m %l\n" | sort
-    find /etc/apt /usr/share/keyrings -type f -exec sha256sum {} + | sort
+    find /etc/apt /etc/dpkg /usr/share/keyrings -printf "%p %y %m %l\n" | sort
+    find /etc/apt /etc/dpkg /usr/share/keyrings -type f -exec sha256sum {} + | sort
   } | sha256sum'
 }
 
-# The apt configuration still has the digest $1.
+# The apt and dpkg configuration still has the digest $1.
 apt_configuration_is() {
   if [[ "$(apt_configuration)" != "$1" ]]; then
-    echo "/etc/apt or /usr/share/keyrings changed" >&2
+    echo "/etc/apt, /etc/dpkg, or /usr/share/keyrings changed" >&2
     return 1
   fi
 }
