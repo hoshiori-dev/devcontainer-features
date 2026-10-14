@@ -1,7 +1,8 @@
 # Runs scripts/test_feature.ts — the same command `just test` runs locally — for one feature and
-# image, one feature's scenarios, or the global scenarios. The script publishes a staged copy of
+# image, one scenario of a feature, or the global scenarios. The script publishes a staged copy of
 # the repository to a throwaway local registry, so in-repo dependencies resolve to this checkout,
-# not to GHCR.
+# not to GHCR. Every input reaches the script as a quoted argument through an environment variable,
+# never as text in the shell source.
 name: Test a feature
 description: Run the devcontainer feature tests for one CI matrix entry.
 inputs:
@@ -17,6 +18,9 @@ inputs:
   remote-user:
     description: Remote user for mode default; empty for the image's default.
     default: ""
+  scenario:
+    description: Exact scenario name for mode scenarios; empty runs every scenario of the feature.
+    default: ""
 runs:
   using: composite
   steps:
@@ -31,9 +35,11 @@ runs:
         FEATURE: ${{ inputs.feature }}
         IMAGE: ${{ inputs.image }}
         REMOTE_USER: ${{ inputs.remote-user }}
+        SCENARIO: ${{ inputs.scenario }}
       run: |
         args=(--mode "${MODE}")
         if [[ -n "${FEATURE}" ]]; then args+=(--feature "${FEATURE}"); fi
         if [[ -n "${IMAGE}" ]]; then args+=(--image "${IMAGE}"); fi
         if [[ -n "${REMOTE_USER}" ]]; then args+=(--remote-user "${REMOTE_USER}"); fi
+        if [[ -n "${SCENARIO}" ]]; then args+=(--scenario "${SCENARIO}"); fi
         ./scripts/test_feature.ts "${args[@]}"

@@ -158,6 +158,40 @@ export function scenarioArchesOf(compat: Compat): Arch[] {
     return compat.scenarioArchitectures ?? [SCENARIO_ARCH];
 }
 
+/** The feature and the exact scenario name one scenario job runs. */
+export interface ScenarioSelection {
+    feature: string;
+    scenario: string;
+}
+
+/**
+ * Why `selection` cannot run against `feature` (the loaded src/<id>, or undefined when there is none): the message
+ * names the feature, the name that failed, and the names that would work. Undefined when the selection is exact.
+ */
+export function scenarioSelectionProblem(
+    feature: FeatureInfo | undefined,
+    selection: ScenarioSelection,
+): string | undefined {
+    const { feature: id, scenario } = selection;
+    if (!feature || feature.jsonError) {
+        return `feature "${id}" has no readable src/${id}/devcontainer-feature.json` +
+            (feature?.jsonError ? ` (${feature.jsonError})` : "") + "; pass the id of a feature under src/.";
+    }
+    if (feature.scenariosError) {
+        return `test/${id}/scenarios.json is unreadable: ${feature.scenariosError}. Run \`just validate\`.`;
+    }
+    const names = feature.scenarios.map((s) => s.name);
+    if (names.length === 0) {
+        return `feature "${id}" has no scenarios: test/${id}/scenarios.json is missing or empty. Add one, or run the ` +
+            "feature's other tests.";
+    }
+    if (scenario === "") return `the scenario name is empty; the scenarios of ${id} are: ${names.join(", ")}.`;
+    if (!names.includes(scenario)) {
+        return `feature "${id}" has no scenario named "${scenario}"; its scenarios are: ${names.join(", ")}.`;
+    }
+    return undefined;
+}
+
 /** Default architecture list of a compatibility entry. */
 export function archesOf(entry: CompatEntry): Arch[] {
     return entry.arch ?? ["amd64"];
@@ -263,7 +297,8 @@ export async function loadFeature(root: string, id: string): Promise<FeatureInfo
     return info;
 }
 
-function scenarioRefs(scenarios: Scenario[]): string[] {
+/** In-repo feature ids the given scenarios install, in first-seen order, the owner included when a key names it. */
+export function scenarioRefs(scenarios: Scenario[]): string[] {
     return unique(
         scenarios.flatMap((s) => s.featureKeys).map(scenarioKeyId).filter((ref): ref is string => ref !== undefined),
     );
@@ -462,14 +497,25 @@ export interface TestJob {
     remoteUser: string;
 }
 
+/** One CI job: the named scenario of `feature`, alone, on the native runner of `arch`. */
+export interface ScenarioJob {
+    feature: string;
+    scenario: string;
+    arch: Arch;
+    runner: string;
+}
+
 export interface Plan {
     tests: TestJob[];
-    scenarios: { feature: string; arch: Arch; runner: string }[];
+    scenarios: ScenarioJob[];
     runGlobal: boolean;
     reasons: Record<string, string>;
 }
 
-/** Expands a selection into CI matrices; throws with a fix-it message on unusable input. */
+/**
+ * Expands a selection into CI matrices; throws with a fix-it message on unusable input. Scenario entries are one per
+ * feature x scenario x declared architecture: features sorted, scenarios in file order, architectures as declared.
+ */
 export function buildPlan(selection: Selection, model: RepoModel): Plan {
     const tests: TestJob[] = [];
     const scenarios: Plan["scenarios"] = [];
@@ -494,9 +540,9 @@ export function buildPlan(selection: Selection, model: RepoModel): Plan {
                 });
             }
         }
-        if (feature.scenarios.length > 0) {
+        for (const { name } of feature.scenarios) {
             for (const arch of scenarioArchesOf(feature.compat)) {
-                scenarios.push({ feature: id, arch, runner: RUNNERS[arch] });
+                scenarios.push({ feature: id, scenario: name, arch, runner: RUNNERS[arch] });
             }
         }
     }
