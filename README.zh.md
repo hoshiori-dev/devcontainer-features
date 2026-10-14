@@ -54,7 +54,7 @@
 | [apt-packages](src/apt-packages/README.md)                         | 用 apt-get 从 Debian 或 Ubuntu 镜像已配置的软件源安装一组系统软件包。                                                                                                 |
 | [colab-cli](src/colab-cli/README.md)                               | 用 uv 和隔离的 Python 3.12 为远程用户安装 Google Colab CLI。                                                                                                          |
 | [deno](src/deno/README.md)                                         | 安装 Deno CLI 并按官方发布的校验和验证；用 deno install --global 安装的工具放在共用的 PATH 位置。                                                                     |
-| [dnf-packages](src/dnf-packages/README.md)                         | 从镜像已启用的软件源安装列出的系统软件包。                                                                                                                            |
+| [dnf-packages](src/dnf-packages/README.md)                         | 从镜像已配置的软件源安装列出的系统软件包。                                                                                                                            |
 | [firewall](src/firewall/README.md)                                 | 把容器的出站和转发流量限制在由预设、域名和 CIDR 组成的允许列表内（或拦截拒绝列表中的目标），每次启动时通过 nftables 和 dnsmasq 应用这些规则。它是护栏，不是安全边界。 |
 | [glab](src/glab/README.md)                                         | 从经过校验和验证的 GitLab 发布包安装 GitLab CLI（glab），不配置任何认证。                                                                                             |
 | [hf-cli](src/hf-cli/README.md)                                     | 用官方独立安装器为远程用户安装 Hugging Face CLI，可选安装上游的 hf-cli agent skill。                                                                                  |

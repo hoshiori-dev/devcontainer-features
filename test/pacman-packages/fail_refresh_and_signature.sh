@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Scenario fail_refresh_and_signature (scenarios.json): the feature is installed with an empty list, and this script
 # then runs install.sh in a container whose repositories or keyring it has broken, one way at a time. Spec scenarios
-# "Failed refresh fails the feature" (one repository of several cannot be retrieved) and "Untrusted signature fails the
-# install".
+# "Failed refresh fails the feature" (one repository of several cannot be retrieved), "Untrusted signature fails the
+# install", and "Explicit parallel downloads keep the image configuration" (an untrusted signature still fails).
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -46,6 +46,12 @@ run_install PACKAGES=bc
 check "with a keyring that lacks the Arch Linux keys the feature fails" failed
 check "the failure names the signature" names_the_signature
 check "with a keyring that lacks the Arch Linux keys nothing is installed or upgraded" \
+  local_database_is "${database_before}"
+remove_caches
+run_install PACKAGES=bc PARALLELDOWNLOADS=3
+check "with parallelDownloads=3 and a keyring that lacks the Arch Linux keys the feature still fails" failed
+check "that failure names the signature" names_the_signature
+check "with parallelDownloads=3 and that keyring nothing is installed or upgraded" \
   local_database_is "${database_before}"
 
 reportResults

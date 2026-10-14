@@ -19,6 +19,8 @@ import {
     readJsonc,
     REPO,
     type RepoModel,
+    type ScenarioSelection,
+    scenarioSelectionProblem,
     unreadableFiles,
 } from "./repo.ts";
 
@@ -78,14 +80,17 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 /**
  * Stages `root` into the empty or missing directory `out` for the registry at `host` (`localhost:<port>`). `roots`
  * picks the features under test from the loaded model; src/ gets them plus their install closure (all features when
- * omitted). A staged feature with a test folder finds its sources, unrewritten, in test/<id>/_feature. Returns the
- * staged feature ids.
+ * omitted). A staged feature with a test folder finds its sources, unrewritten, in test/<id>/_feature. With a
+ * `selection`, the staged scenario file of that feature holds only the named scenario, so the CLI discovers that one
+ * and no other; the selection is checked against the model before anything is copied, and the source stays whole.
+ * Returns the staged feature ids.
  */
 export async function stage(
     root: string,
     out: string,
     host: string,
     roots?: (model: RepoModel) => Iterable<string>,
+    selection?: ScenarioSelection,
 ): Promise<string[]> {
     const model = await loadRepo(root);
     const unreadable = unreadableFiles(model);
@@ -93,6 +98,10 @@ export async function stage(
         throw new Error(
             `cannot stage: ${unreadable.map((p) => `${p.file}: ${p.message}`).join("; ")}. Run \`just validate\`.`,
         );
+    }
+    if (selection) {
+        const problem = scenarioSelectionProblem(model.features.get(selection.feature), selection);
+        if (problem) throw new Error(`cannot stage: ${problem}`);
     }
     const staged = roots ? installClosure(model, roots(model)) : [...model.features.keys()].sort();
     await Deno.mkdir(join(out, "src"), { recursive: true });
@@ -113,7 +122,12 @@ export async function stage(
         const path = join(testDir, entry.name, "scenarios.json");
         if (!entry.isDirectory || !(await exists(path))) continue;
         const scenarios = await readJsonc(path);
-        if (isObject(scenarios)) await writeJson(path, rewriteScenarioKeys(scenarios, host, model));
+        if (!isObject(scenarios)) continue;
+        // The selected scenario alone, by its exact key: the CLI's own --filter would match by substring.
+        const kept = selection && entry.name === selection.feature
+            ? { [selection.scenario]: scenarios[selection.scenario] }
+            : scenarios;
+        await writeJson(path, rewriteScenarioKeys(kept, host, model));
     }
     return staged;
 }

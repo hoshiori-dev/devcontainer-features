@@ -2,7 +2,7 @@
 // Selects the features a change affects — changed directly, depending on a changed feature through
 // dependsOn / installsAfter / test scenarios, or chosen as canaries when test infrastructure
 // changed — and prints the CI test plan: one job per feature x compatibility image x architecture, one scenario
-// job per feature x declared architecture, and whether the global scenarios run.
+// job per feature x scenario x declared architecture, and whether the global scenarios run.
 //
 //   scripts/affected.ts [--base origin/main] [--head HEAD] [--all] [--github]
 //
