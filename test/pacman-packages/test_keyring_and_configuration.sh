@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Scenario test_keyring_and_configuration (scenarios.json): the feature is installed with an empty list, and this script
 # then runs install.sh and compares the pacman configuration and the keyring before and after. Spec scenarios "Pacman
-# configuration is unchanged" and "Missing certified key is fetched".
+# configuration is unchanged", "Explicit parallel downloads keep the image configuration" (the files under /etc), and
+# "Missing certified key is fetched".
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -87,6 +88,19 @@ check "premise: no installed or upgraded package owns /etc/pacman.conf or a file
   own_no_pacman_configuration "${changed[@]}"
 check "premise: the run imported no packager key" imported_no_key
 check "/etc/pacman.conf and /etc/pacman.d, the mirror list and the keyring included, are as before the run" \
+  pacman_configuration_is "${configuration_before}"
+
+# The same comparison for a run with parallelDownloads. which, because the image does not ship it.
+check "premise: which is not installed" not_installed which
+database_before="$(local_database)"
+run_install PACKAGES=which PARALLELDOWNLOADS=3
+check "which installs with parallelDownloads=3" exited_with 0
+readarray -t changed < <(changed_packages "${database_before}")
+echo "the transaction with parallelDownloads=3 installed or upgraded: ${changed[*]}"
+check "premise: no package that run installed or upgraded owns /etc/pacman.conf or a file under /etc/pacman.d" \
+  own_no_pacman_configuration "${changed[@]}"
+check "premise: the run with parallelDownloads=3 imported no packager key" imported_no_key
+check "/etc/pacman.conf and /etc/pacman.d are as before the run with parallelDownloads=3" \
   pacman_configuration_is "${configuration_before}"
 
 # The key that signs tree, which is not installed: read from the package's detached signature.

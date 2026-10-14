@@ -16,6 +16,7 @@ import {
     type RepoModel,
     scenarioArchesOf,
     scenarioKeyId,
+    scenarioSelectionProblem,
     selectAffected,
     unreadableFiles,
 } from "./repo.ts";
@@ -193,7 +194,7 @@ Deno.test("buildPlan expands images and architectures and lists scenario jobs", 
         { feature: "a", image: "debian:12", arch: "arm64", runner: "ubuntu-24.04-arm", remoteUser: "" },
         { feature: "a", image: "ubuntu:24.04", arch: "amd64", runner: "ubuntu-24.04", remoteUser: "ubuntu" },
     ]);
-    assertEquals(plan.scenarios, [{ feature: "a", arch: "amd64", runner: "ubuntu-24.04" }]);
+    assertEquals(plan.scenarios, [{ feature: "a", scenario: "s", arch: "amd64", runner: "ubuntu-24.04" }]);
 });
 
 Deno.test("buildPlan of an empty selection is an empty matrix", () => {
@@ -296,8 +297,8 @@ Deno.test("buildPlan expands explicit scenario architectures without changing de
     const selection = selectAffected(["test/a/compatibility.json", "test/b/test.sh"], m);
     const dual = buildPlan(selection, m);
     assertEquals(dual.scenarios, [
-        { feature: "a", arch: "amd64", runner: "ubuntu-24.04" },
-        { feature: "a", arch: "arm64", runner: "ubuntu-24.04-arm" },
+        { feature: "a", scenario: "s", arch: "amd64", runner: "ubuntu-24.04" },
+        { feature: "a", scenario: "s", arch: "arm64", runner: "ubuntu-24.04-arm" },
     ]);
     a.compat = { images: a.compat!.images, scenarioArchitectures: ["arm64"] };
     const arm = buildPlan(selection, m);
@@ -314,4 +315,67 @@ Deno.test("buildPlan counts architecture expansion toward the scenario matrix li
     const m = model(features);
     const selection = selectAffected(features.map((f) => `test/${f.id}/scenarios.json`), m);
     assertThrows(() => buildPlan(selection, m), Error, "258 scenario jobs");
+});
+
+function scenario(name: string, featureKeys: string[] = []) {
+    return { name, image: "debian:12", usesBuild: false, featureKeys };
+}
+
+Deno.test("buildPlan lists one scenario job per feature, scenario, and declared architecture", () => {
+    const m = model([
+        feature("b", {
+            compat: { images: [{ image: "debian:12" }], scenarioArchitectures: ["arm64", "amd64"] },
+            // Overlapping names stay separate entries; the planner never matches by substring.
+            scenarios: [scenario("test_version_explicit"), scenario("test_version_explicit_alpine")],
+        }),
+        feature("a", { scenarios: [scenario("test_one")] }),
+        feature("c"),
+    ]);
+    const plan = buildPlan(selectAffected(["src/a/x", "src/b/x", "src/c/x"], m), m);
+    assertEquals(plan.scenarios, [
+        { feature: "a", scenario: "test_one", arch: "amd64", runner: "ubuntu-24.04" },
+        { feature: "b", scenario: "test_version_explicit", arch: "arm64", runner: "ubuntu-24.04-arm" },
+        { feature: "b", scenario: "test_version_explicit", arch: "amd64", runner: "ubuntu-24.04" },
+        { feature: "b", scenario: "test_version_explicit_alpine", arch: "arm64", runner: "ubuntu-24.04-arm" },
+        { feature: "b", scenario: "test_version_explicit_alpine", arch: "amd64", runner: "ubuntu-24.04" },
+    ]);
+    // A feature without scenarios adds no scenario job, and neither does an empty selection.
+    assertEquals(buildPlan(selectAffected(["src/c/x"], m), m).scenarios, []);
+    assertEquals(buildPlan(selectAffected(["README.md"], m), m).scenarios, []);
+});
+
+Deno.test("buildPlan counts expanded scenario entries: 256 fit one matrix and 257 do not", () => {
+    const scenarios = (count: number) => Array.from({ length: count }, (_, i) => scenario(`test_${i}`));
+    const fits = model([feature("a", { scenarios: scenarios(256) })]);
+    assertEquals(buildPlan(selectAffected(["test/a/scenarios.json"], fits), fits).scenarios.length, 256);
+    const over = model([feature("a", { scenarios: scenarios(257) })]);
+    assertThrows(
+        () => buildPlan(selectAffected(["test/a/scenarios.json"], over), over),
+        Error,
+        "257 scenario jobs, over GitHub's 256-job matrix limit. Split the pull request",
+    );
+});
+
+Deno.test("scenarioSelectionProblem accepts only an exact, existing scenario name", () => {
+    const a = feature("a", {
+        scenarios: [scenario("test_version_explicit"), scenario("test_version_explicit_alpine")],
+    });
+    assertEquals(scenarioSelectionProblem(a, { feature: "a", scenario: "test_version_explicit" }), undefined);
+    assertEquals(scenarioSelectionProblem(a, { feature: "a", scenario: "test_version_explicit_alpine" }), undefined);
+    const message = (selection: Parameters<typeof scenarioSelectionProblem>[1], info = a) =>
+        scenarioSelectionProblem(info, selection) ?? "";
+    // A substring, a superstring, and a case difference are not that name.
+    for (const scenario of ["test_version", "test_version_explicit_alpine_extra", "TEST_VERSION_EXPLICIT", "x"]) {
+        const problem = message({ feature: "a", scenario });
+        for (const part of ['feature "a"', `"${scenario}"`, "test_version_explicit, test_version_explicit_alpine"]) {
+            assert(problem.includes(part), `${problem} names ${part}`);
+        }
+    }
+    assert(message({ feature: "a", scenario: "" }).includes("the scenario name is empty"));
+    assert(message({ feature: "gone", scenario: "test_x" }, undefined).includes('feature "gone"'));
+    assert(message({ feature: "a", scenario: "test_x" }, feature("a")).includes("has no scenarios"));
+    const broken = feature("a", { scenariosError: "not an object" });
+    assert(message({ feature: "a", scenario: "test_x" }, broken).includes("test/a/scenarios.json is unreadable"));
+    const unreadable = feature("a", { json: undefined, jsonError: "missing" });
+    assert(message({ feature: "a", scenario: "test_x" }, unreadable).includes("no readable src/a/"));
 });

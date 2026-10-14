@@ -33,6 +33,15 @@
       }
     }
   },
+  "test_controls_parallel_downloads_0": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {
+        "packages": "extra/bc, tree",
+        "parallelDownloads": "3"
+      }
+    }
+  },
   "fail_refused_input": {
     "image": "archlinux:latest",
     "features": {
@@ -94,6 +103,24 @@
     }
   },
   "test_control_runs": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "test_parallel_downloads": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "fail_download_controls": {
+    "image": "archlinux:latest",
+    "features": {
+      "pacman-packages": {}
+    }
+  },
+  "test_fixture_repositories": {
     "image": "archlinux:latest",
     "features": {
       "pacman-packages": {}
