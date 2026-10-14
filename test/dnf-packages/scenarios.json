@@ -322,5 +322,95 @@
     "features": {
       "dnf-packages": {}
     }
+  },
+  "test_controls_selection_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {
+        "packages": "bc-debuginfo",
+        "enableRepositories": " fedora-debuginfo ,",
+        "disableRepositories": "fedora-cisco-openh264",
+        "best": "true",
+        "parallelDownloads": "2"
+      }
+    }
+  },
+  "test_controls_selection_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "ninja-build",
+        "enableRepositories": " crb ,",
+        "disableRepositories": "extras",
+        "best": "true",
+        "parallelDownloads": "2"
+      }
+    }
+  },
+  "test_controls_selection_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {
+        "packages": "ninja-build",
+        "enableRepositories": " crb ,",
+        "disableRepositories": "extras",
+        "best": "true",
+        "parallelDownloads": "2"
+      }
+    }
+  },
+  "test_repository_selection_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_repository_selection_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_repository_selection_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_solver_controls_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_solver_controls_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_solver_controls_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_parallel_downloads_0": {
+    "image": "fedora:44",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_parallel_downloads_1": {
+    "image": "almalinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
+  },
+  "test_parallel_downloads_2": {
+    "image": "rockylinux/rockylinux:9",
+    "features": {
+      "dnf-packages": {}
+    }
   }
 }

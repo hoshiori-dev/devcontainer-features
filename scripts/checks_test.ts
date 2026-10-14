@@ -23,7 +23,16 @@ import {
     scenarioImageProblems,
     scenarioImages,
 } from "./validate.ts";
-import { type Compat, type FeatureInfo, NAMESPACE, REPO, type RepoModel } from "./lib/repo.ts";
+import {
+    buildPlan,
+    type Compat,
+    type FeatureInfo,
+    NAMESPACE,
+    REPO,
+    type RepoModel,
+    type ScenarioJob,
+    selectAffected,
+} from "./lib/repo.ts";
 import { optionDifferences, parseOptionRequirements } from "./lib/options.ts";
 
 Deno.test("titleProblems accepts the convention", () => {
@@ -728,5 +737,57 @@ Deno.test("feature scenario owners are validated on every declared architecture"
     assertEquals(problems.length, 1);
     for (const part of ['scenario "test_version"', "test/a/compatibility.json", "debian:12", "arm64"]) {
         assert(problems[0].message.includes(part), `${part} not in: ${problems[0].message}`);
+    }
+});
+
+Deno.test("ci.yml runs one scenario per job and hands the name to the action as data", async () => {
+    const workflow = parseYaml(await Deno.readTextFile(new URL("../.github/workflows/ci.yml", import.meta.url)));
+    const job = workflow.jobs["test-scenarios"];
+    // The feature, the exact scenario, and the architecture in the job list name a failed scenario directly.
+    assertEquals(job.name, "scenarios (${{ matrix.feature }}, ${{ matrix.scenario }}, ${{ matrix.arch }})");
+    assertEquals(job.needs, "plan");
+    assertEquals(job["runs-on"], "${{ matrix.runner }}");
+    assertEquals(job.strategy, {
+        "fail-fast": false,
+        matrix: { include: "${{ fromJSON(needs.plan.outputs.scenarios) }}" },
+    });
+    const test = job.steps.at(-1);
+    assertEquals(test.uses, "./.github/actions/feature-test");
+    assertEquals(test.with, {
+        mode: "scenarios",
+        feature: "${{ matrix.feature }}",
+        scenario: "${{ matrix.scenario }}",
+    });
+    assertEquals(job.if, "needs.plan.outputs.scenarios != '[]'");
+    assertEquals(job["timeout-minutes"], 60);
+    // The planner's entries carry what the job reads — the inputs it passes plus the fields it selects on.
+    const planned = repoWith({ a: "1.0.0" });
+    const a = planned.features.get("a")!;
+    a.compat = { images: [{ image: "debian:12" }] };
+    a.scenarios = [{ name: "test_s", image: "debian:12", usesBuild: false, featureKeys: ["a"] }];
+    const [entry]: ScenarioJob[] = buildPlan(selectAffected(["src/a/install.sh"], planned), planned).scenarios;
+    const read = Object.keys(test.with).filter((key) => key !== "mode").concat("arch", "runner").sort();
+    assertEquals(Object.keys(entry).sort(), read);
+    for (const key of read) assert(JSON.stringify(job).includes(`matrix.${key}`) || key === "runner", key);
+    assert(workflow.jobs["ci-gate"].needs.includes("test-scenarios"));
+    // Default and global jobs pass no scenario.
+    assertEquals(workflow.jobs.test.steps.at(-1).with.scenario, undefined);
+    assertEquals(workflow.jobs["test-global"].steps.at(-1).with, { mode: "global" });
+
+    const action = parseYaml(
+        await Deno.readTextFile(new URL("../.github/actions/feature-test/action.yml", import.meta.url)),
+    );
+    assertEquals(action.inputs.scenario, {
+        description: "Exact scenario name for mode scenarios; empty runs every scenario of the feature.",
+        default: "",
+    });
+    const run = action.runs.steps.at(-1);
+    assertEquals(run.env.SCENARIO, "${{ inputs.scenario }}");
+    // Through the environment and a quoted array element: a name is never pasted into the shell source.
+    assert(run.run.includes('if [[ -n "${SCENARIO}" ]]; then args+=(--scenario "${SCENARIO}"); fi\n'), run.run);
+    assert(run.run.endsWith('./scripts/test_feature.ts "${args[@]}"\n'), run.run);
+    assert(!run.run.includes("${{"), "an expression in the run: line");
+    for (const name of Object.keys(action.inputs)) {
+        assert(!run.run.includes(`inputs.${name}`), `${name} read directly in the run: line`);
     }
 });

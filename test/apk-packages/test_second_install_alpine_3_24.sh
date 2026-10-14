@@ -68,8 +68,8 @@ check "premise: the repositories offer less" test -n "${less_version}"
 run_install PACKAGES="less=${less_version}"
 check "a run with less=${less_version} succeeds" exited_with 0
 check "less=${less_version} is a line of apk's world" in_world "less=${less_version}"
-run_install PACKAGES=less
-check "a later run with less, without a constraint, succeeds" exited_with 0
+run_install PACKAGES=less UPGRADEPACKAGES=false LATEST=false
+check "a later run with less, without a constraint, upgradePackages=false, and latest=false succeeds" exited_with 0
 check "less is a line of apk's world" in_world less
 check "less=${less_version} is no longer a line of apk's world" not_in_world "less=${less_version}"
 check "less stays at ${less_version}" installed_in_version less "${less_version}"

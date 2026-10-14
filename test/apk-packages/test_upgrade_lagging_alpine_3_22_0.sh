@@ -43,9 +43,9 @@ check "${package} stays at ${version_before}" installed_in_version "${package}" 
 check "${package} is a line of apk's world" in_world "${package}"
 check "the repositories still offer the newer ${package} ${newer_version}" still_lags "${first_lagging}"
 
-run_install PACKAGES="${package}" UPGRADEPACKAGES=false
-check "the list ${package} installs with upgradePackages=false" exited_with 0
-check "upgradePackages=false leaves ${package} at ${version_before}" \
+run_install PACKAGES="${package}" UPGRADEPACKAGES=false LATEST=false
+check "the list ${package} installs with upgradePackages=false and latest=false" exited_with 0
+check "upgradePackages=false and latest=false leave ${package} at ${version_before}" \
   installed_in_version "${package}" "${version_before}"
 run_install PACKAGES="${package}" UPGRADEPACKAGES=true
 check "the list ${package} installs with upgradePackages=true" exited_with 0

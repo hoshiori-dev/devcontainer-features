@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs the packages listed in the option `packages` with apk from the image's repositories, to the paths the
 # packages define. Runs as root at image build time; the options arrive as PACKAGES, REFRESHPOLICY, CLEANUP,
-# NETWORKTIMEOUT, and UPGRADEPACKAGES.
+# NETWORKTIMEOUT, UPGRADEPACKAGES, LATEST, and LOCKTIMEOUT.
 # POSIX sh, because Alpine images ship no bash.
 set -eu
 
@@ -22,6 +22,8 @@ REFRESHPOLICY="${REFRESHPOLICY-default}"
 CLEANUP="${CLEANUP-all}"
 NETWORKTIMEOUT="${NETWORKTIMEOUT-}"
 UPGRADEPACKAGES="${UPGRADEPACKAGES-false}"
+LATEST="${LATEST-false}"
+LOCKTIMEOUT="${LOCKTIMEOUT-}"
 
 cache_dir=""
 work_dir=""
@@ -70,16 +72,16 @@ check_entry() {
   esac
 }
 
-# Runs apk with the subcommand $1, then --no-interactive and --cache-dir, then the remaining arguments; --timeout
-# comes before the subcommand when networkTimeout is set.
+# Runs apk with the subcommand $1, then --no-interactive and --cache-dir, then the remaining arguments. Before the
+# subcommand come --timeout when networkTimeout is set and --wait when lockTimeout is set; an empty option adds
+# nothing, so apk's own default or the image's apk configuration applies.
 run_apk() {
   run_apk_subcommand="$1"
   shift
-  if [ -n "${NETWORKTIMEOUT}" ]; then
-    apk --timeout "${NETWORKTIMEOUT}" "${run_apk_subcommand}" --no-interactive --cache-dir "${cache_dir}" "$@"
-  else
-    apk "${run_apk_subcommand}" --no-interactive --cache-dir "${cache_dir}" "$@"
-  fi
+  set -- "${run_apk_subcommand}" --no-interactive --cache-dir "${cache_dir}" "$@"
+  if [ -n "${LOCKTIMEOUT}" ]; then set -- --wait "${LOCKTIMEOUT}" "$@"; fi
+  if [ -n "${NETWORKTIMEOUT}" ]; then set -- --timeout "${NETWORKTIMEOUT}" "$@"; fi
+  apk "$@"
 }
 
 # Removes, on every exit, the directories the feature created for this run alone: the temporary package cache of
@@ -117,6 +119,23 @@ validate_options() {
     *) fail "option upgradePackages is \"${UPGRADEPACKAGES}\"; use true or false" ;;
   esac
   readonly UPGRADEPACKAGES
+  case "${LATEST}" in
+    true | false) ;;
+    *) fail "option latest is \"${LATEST}\"; use true or false" ;;
+  esac
+  readonly LATEST
+  # apk reads the value with atoi: it would take 0 and text as no wait, 3x as 3, and a negative number as a wait
+  # without bound, so this check is the only guard.
+  case "${LOCKTIMEOUT}" in
+    "") ;;
+    0* | *[!0123456789]*) fail "option lockTimeout is \"${LOCKTIMEOUT}\"; ${validate_options_hint}" ;;
+    *)
+      if [ "${#LOCKTIMEOUT}" -gt 4 ] || [ "${LOCKTIMEOUT}" -gt 3600 ]; then
+        fail "option lockTimeout is \"${LOCKTIMEOUT}\"; ${validate_options_hint}"
+      fi
+      ;;
+  esac
+  readonly LOCKTIMEOUT
 }
 
 # Fails unless apk is available, naming the image's distribution when /etc/os-release gives its PRETTY_NAME.
@@ -168,21 +187,25 @@ refresh_index() {
     # requested from a repository.
     run_apk update --no-network \
       || fail "apk update --no-network failed with status $?;" \
-        "fix the cached package index, or use refreshPolicy=default"
+        "fix the cached package index, or use refreshPolicy=default; a held apk database lock also fails here"
   else
     log "refreshing the package index from the image's repositories (refreshPolicy=${REFRESHPOLICY})"
     run_apk update \
-      || fail "apk update failed with status $?; fix what apk reports above (repositories, keys, or network)"
+      || fail "apk update failed with status $?;" \
+        "fix what apk reports above (repositories, keys, network, or a held apk database lock)"
   fi
 }
 
 # Installs the entries given as arguments; each reaches apk as one argument after the end-of-options marker.
+# --latest makes apk fail instead of keeping an older version of an entry without a tag or of its dependencies.
 install_packages() {
-  log "installing $* from the image's repositories (upgradePackages=${UPGRADEPACKAGES})"
+  log "installing $* from the image's repositories (upgradePackages=${UPGRADEPACKAGES}, latest=${LATEST})"
   set -- -- "$@"
+  if [ "${LATEST}" = "true" ]; then set -- --latest "$@"; fi
   if [ "${UPGRADEPACKAGES}" = "true" ]; then set -- --upgrade "$@"; fi
   run_apk add --cache-max-age "${CACHE_MAX_AGE_MINUTES}" "$@" \
-    || fail "apk add failed with status $?; fix what apk reports above (entries, repositories, or network)"
+    || fail "apk add failed with status $?; fix what apk reports above (entries, repositories, network, a held apk" \
+      "database lock, or with latest=true a version that a constraint holds back)"
 }
 
 # Removes what cleanup selects from the feature's own caches. The temporary cache of cleanup=all goes on exit

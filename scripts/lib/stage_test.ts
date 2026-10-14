@@ -179,3 +179,66 @@ Deno.test("stage refuses a repository with an unreadable scenario file", async (
         await Deno.remove(out.slice(0, out.lastIndexOf("/")), { recursive: true });
     }
 });
+
+Deno.test("stage with a selection stages that scenario alone and leaves everything else as it was", async () => {
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-root-" });
+    const out = join(await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-out-" }), "staged");
+    try {
+        for (const id of ["a", "b", "c"]) {
+            await writeJson(join(root, `src/${id}/devcontainer-feature.json`), { id, version: "1.0.0" });
+        }
+        await Deno.writeTextFile(join(root, "src/a/install.sh"), "#!/bin/sh\necho a\n", { mode: 0o755 });
+        const source = {
+            test_x: { build: { dockerfile: "Dockerfile" }, features: { a: {}, b: {} } },
+            test_x_more: { image: "debian:12", features: { a: {}, [`${NAMESPACE}/c:1`]: {} } },
+        };
+        await writeJson(join(root, "test/a/scenarios.json"), source);
+        await Deno.writeTextFile(join(root, "test/a/test_x.sh"), "echo x\n");
+        await Deno.writeTextFile(join(root, "test/a/test_x_more.sh"), "echo more\n");
+        await Deno.mkdir(join(root, "test/a/test_x"));
+        await Deno.writeTextFile(join(root, "test/a/test_x/Dockerfile"), "FROM debian:12\n");
+        await writeJson(join(root, "test/c/scenarios.json"), { test_c: { image: "debian:12", features: { c: {} } } });
+
+        const staged = await stage(root, out, HOST, () => ["a", "b"], { feature: "a", scenario: "test_x" });
+
+        assertEquals(staged, ["a", "b"]);
+        const read = async (path: string) => JSON.parse(await Deno.readTextFile(join(out, path)));
+        // The exact key only — test_x_more contains test_x — with its whole configuration, references rewritten.
+        assertEquals(await read("test/a/scenarios.json"), {
+            test_x: { build: { dockerfile: "Dockerfile" }, features: { [`${LOCAL}/a:1`]: {}, [`${LOCAL}/b:1`]: {} } },
+        });
+        // Scripts, the build context, and the installer copies are still beside it: the folder is copied whole.
+        assertEquals(await exists(join(out, "test/a/test_x.sh")), true);
+        assertEquals(await exists(join(out, "test/a/test_x_more.sh")), true);
+        assertEquals(await Deno.readTextFile(join(out, "test/a/test_x/Dockerfile")), "FROM debian:12\n");
+        assertEquals(await tree(join(out, "test/a/_feature")), await tree(join(root, "src/a")));
+        // Another feature's staged scenarios and the source checkout are untouched by the selection.
+        assertEquals(Object.keys(await read("test/c/scenarios.json")), ["test_c"]);
+        assertEquals(JSON.parse(await Deno.readTextFile(join(root, "test/a/scenarios.json"))), source);
+    } finally {
+        await Deno.remove(root, { recursive: true });
+        await Deno.remove(out.slice(0, out.lastIndexOf("/")), { recursive: true });
+    }
+});
+
+Deno.test("stage refuses an unknown selection before it creates the staging directory", async () => {
+    const root = await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-root-" });
+    const out = join(await Deno.makeTempDir({ dir: "/tmp", prefix: "stage-test-out-" }), "staged");
+    try {
+        await writeJson(join(root, "src/a/devcontainer-feature.json"), { id: "a", version: "1.0.0" });
+        await writeJson(join(root, "test/a/scenarios.json"), { test_x: { image: "debian:12", features: { a: {} } } });
+        const cases: [string, string, string][] = [
+            ["a", "test_", 'no scenario named "test_"'],
+            ["a", "test_x_more", 'no scenario named "test_x_more"'],
+            ["a", "", "the scenario name is empty"],
+            ["gone", "test_x", 'feature "gone"'],
+        ];
+        for (const [feature, scenario, message] of cases) {
+            await assertRejects(() => stage(root, out, HOST, () => [feature], { feature, scenario }), Error, message);
+            assertEquals(await exists(out), false, `${feature}/${scenario} staged nothing`);
+        }
+    } finally {
+        await Deno.remove(root, { recursive: true });
+        await Deno.remove(out.slice(0, out.lastIndexOf("/")), { recursive: true });
+    }
+});
