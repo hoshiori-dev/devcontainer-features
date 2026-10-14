@@ -89,7 +89,11 @@ Docker runs inside the dev container, so every CI test job can be reproduced:
   image's `remoteUser` when it names one; `--image <ref>` for one image, `--preserve` keeps containers, `--keep` keeps
   the staging directory. When no image lists this architecture it fails instead of passing with nothing run; pass
   `--image` to test one anyway.
-- `just test-scenarios <id>`, `just test-global`.
+- `just test-scenarios <id>` — every scenario of the feature on this machine's architecture;
+  `just test-scenarios <id> --scenario <name>` — the one scenario whose key is exactly `<name>`, the command a CI
+  scenario job runs. An unknown feature fails, and an unknown or empty name fails naming the valid ones, before the
+  registry or the staging directory exists; a name that is only part of another (`test_version_explicit` beside
+  `test_version_explicit_alpine`) selects just its own scenario. `just test-global`.
 - `just affected` — the plan CI will run for the current branch against `origin/main`.
 
 ## How CI selects tests
@@ -106,8 +110,11 @@ set (`scripts/affected.ts`, `scripts/lib/repo.ts`):
    scenarios.
 4. A change to the test infrastructure (the paths in `INFRA_PATHS` in `scripts/lib/repo.ts`) adds the canary features,
    without their dependents, and runs the global scenarios, so both test paths go through the changed pipeline.
-5. Each affected feature gets one job per compatibility image and architecture, plus one scenario job per selected
-   scenario architecture when it has scenarios. More than 256 jobs in one matrix fails `plan`: split the PR.
+5. Each affected feature gets one job per compatibility image and architecture, plus one job per scenario and selected
+   scenario architecture, named `scenarios (<feature>, <scenario>, <arch>)`, so the job list names a failed scenario.
+   Each such job stages only its scenario (`scripts/lib/stage.ts`) and runs it on the architecture's native runner. The
+   expanded count — every scenario times its architectures — is what the 256-job matrix limit measures; more fails
+   `plan`: split the PR.
 
 ## Local dependency resolution
 
@@ -118,7 +125,8 @@ scenario and global scenario keys — names that registry instead of GHCR (`scri
 features there, runs the tests, and removes both — also when interrupted, though a test container the CLI had started
 may remain (`docker ps -a`). A bare scenario key (`node`) becomes `<registry>/<repo>/node:<major>`. Only what the test
 needs is staged and published: the feature under test (or the global scenarios' features), the features its scenarios
-install, and their `dependsOn` / `installsAfter` closure — a broken unrelated feature cannot fail the job.
+install — for a single scenario, the ones that scenario installs — and their `dependsOn` / `installsAfter` closure; a
+broken unrelated feature cannot fail the job.
 
 References stay OCI refs, so the CLI treats them as it does for users: a dependency a scenario also installs is
 installed once, `installsAfter` orders against it, and `:<major>` resolves only when it is the dependency's current
