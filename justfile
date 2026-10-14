@@ -47,7 +47,7 @@ affected base="origin/main":
 test feature *args:
     ./scripts/test_feature.ts --feature "$1" "${@:2}"
 
-# Run a feature's scenario tests
+# Run a feature's scenario tests, or one of them with --scenario <name> as a CI scenario job does (--preserve, --keep)
 test-scenarios feature *args:
     ./scripts/test_feature.ts --feature "$1" --mode scenarios "${@:2}"
 

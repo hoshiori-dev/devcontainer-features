@@ -1,8 +1,8 @@
 {
   "id": "dnf-packages",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "name": "DNF packages",
-  "description": "Installs listed system packages from the repositories the image already enables.",
+  "description": "Installs listed system packages from the repositories the image already configures.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/dnf-packages",
   "options": {
     "packages": {
@@ -42,6 +42,31 @@
       "type": "string",
       "default": "",
       "description": "Native network timeout in seconds (1\u20133600), or empty to inherit image settings; applies only to this invocation."
+    },
+    "best": {
+      "type": "string",
+      "default": "inherit",
+      "enum": [
+        "inherit",
+        "true",
+        "false"
+      ],
+      "description": "Require the highest available version of each listed package, allow a lower one, or inherit image settings; applies only to this invocation."
+    },
+    "enableRepositories": {
+      "type": "string",
+      "default": "",
+      "description": "Comma-separated identifiers of repositories the image configures but leaves disabled, to enable, or empty to enable none; applies only to this invocation."
+    },
+    "disableRepositories": {
+      "type": "string",
+      "default": "",
+      "description": "Comma-separated identifiers of repositories the image enables, to leave out, or empty to leave none out; applies only to this invocation."
+    },
+    "parallelDownloads": {
+      "type": "string",
+      "default": "",
+      "description": "Upper bound of simultaneous downloads (1\u201320), or empty to inherit image settings; applies only to this invocation."
     }
   }
 }

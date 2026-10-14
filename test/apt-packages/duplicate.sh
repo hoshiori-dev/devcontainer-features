@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Install-twice test: apt-packages installed twice in one image, first with non-default options, then with the
 # defaults. The devcontainer CLI derives the first install's values from devcontainer-feature.json: the second proposal
-# of `packages` ("bc,file"), the opposite of each boolean default, and the enum value after each default
-# (refreshPolicy=always, cleanup=packages). The second install's default list is empty, so it changes nothing.
+# of `packages` ("bc,file"), the opposite of each boolean default (installRecommends=true, installSuggests=true), and
+# the enum value after each default (refreshPolicy=always, cleanup=packages, conffilePolicy=replace); an option without
+# proposals or enum values keeps its default. The second install's default list is empty, so it changes nothing.
 set -euo pipefail
 
 # shellcheck source=/dev/null

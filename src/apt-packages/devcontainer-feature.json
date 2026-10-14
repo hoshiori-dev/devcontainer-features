@@ -1,6 +1,6 @@
 {
   "id": "apt-packages",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "name": "APT packages",
   "description": "Installs a list of system packages with apt-get from the repositories the Debian or Ubuntu image already configures.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apt-packages",
@@ -17,7 +17,12 @@
     "installRecommends": {
       "type": "boolean",
       "default": false,
-      "description": "Include recommended dependencies; suggested dependencies remain excluded."
+      "description": "Include recommended dependencies; installSuggests selects suggested ones."
+    },
+    "installSuggests": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include suggested packages, independently of installRecommends. APT follows the suggestions of every package it installs, so the installation can grow by orders of magnitude."
     },
     "refreshPolicy": {
       "type": "string",
@@ -39,10 +44,34 @@
       ],
       "description": "Remove all managed caches, package files only, or skip feature cleanup. Native retention remains independent."
     },
+    "conffilePolicy": {
+      "type": "string",
+      "default": "keep",
+      "enum": [
+        "keep",
+        "replace"
+      ],
+      "description": "What dpkg does, without asking, where a conffile's path holds other content than the package expects: keep the image's file, or replace it with the packaged one."
+    },
     "networkTimeout": {
       "type": "string",
       "default": "",
       "description": "Native network timeout in seconds (1\u20133600), or empty to inherit image settings; applies only to this invocation."
+    },
+    "downloadRetries": {
+      "type": "string",
+      "default": "",
+      "description": "How often APT retries a failed download after its first attempt (0\u201310), or empty to inherit image settings; applies only to this invocation."
+    },
+    "lockTimeout": {
+      "type": "string",
+      "default": "",
+      "description": "Seconds the installation waits for dpkg's locks (1\u20133600), or empty to inherit image settings; applies only to this invocation."
+    },
+    "targetRelease": {
+      "type": "string",
+      "default": "",
+      "description": "Suite name, codename, or version of a release among the image's sources that APT prefers when installing, or empty to inherit image settings. Adds no source; applies only to this invocation."
     }
   }
 }

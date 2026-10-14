@@ -227,5 +227,97 @@
     "features": {
       "apt-packages": {}
     }
+  },
+  "test_source_controls_debian": {
+    "image": "debian:12",
+    "features": {
+      "apt-packages": {
+        "packages": "sqlite3",
+        "targetRelease": "bookworm",
+        "installSuggests": true,
+        "conffilePolicy": "replace",
+        "downloadRetries": "2",
+        "lockTimeout": "5"
+      }
+    }
+  },
+  "test_source_controls_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "features": {
+      "apt-packages": {
+        "packages": "sqlite3",
+        "targetRelease": "noble",
+        "installSuggests": true,
+        "conffilePolicy": "replace",
+        "downloadRetries": "2",
+        "lockTimeout": "5"
+      }
+    }
+  },
+  "test_target_release_debian": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_target_release_ubuntu": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_suggests_and_conffiles_debian": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_suggests_and_conffiles_ubuntu": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_download_and_lock_controls_debian": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
+  },
+  "test_download_and_lock_controls_ubuntu": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "apt-packages": {}
+    }
   }
 }
