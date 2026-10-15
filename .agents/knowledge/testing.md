@@ -114,8 +114,10 @@ times. The rule:
 - Run one test command at a time per daemon; the dev container's docker-in-docker daemon is shared by every worktree in
   it.
 - Or run a concurrent set in which every run passes `--preserve`, and after the last run of the set has finished, run
-  `just test-clean` once: it removes every test container on the daemon and refuses while any test run is still in
-  progress. When one agent orchestrates several workers, that agent runs it; a worker never does.
+  `just test-clean` once: it removes every test container on the daemon and refuses while a test run
+  (`scripts/test_feature.ts` or the CLI's `features test`) is still in progress; it cannot see a run that has not
+  started yet, so the set must have finished. When one agent orchestrates several workers, that agent runs it; a worker
+  never does.
 - One run without `--preserve` breaks the whole set: random scenarios lost with 137 are the symptom.
 - Kept containers keep running until removed and hold memory, and an out-of-memory kill also exits with 137: bound the
   size of a set, or clean up at a point where no run is active.

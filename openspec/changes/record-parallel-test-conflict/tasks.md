@@ -3,9 +3,10 @@
 ## 1. Cleanup recipe
 
 - [x] 1.1 Add `test-clean` to the `justfile` next to the other test recipes: refuse with a non-zero exit and a reason
-      while a `devcontainer features test` process runs (a `pgrep -f` pattern that cannot match the recipe's own shell),
-      otherwise `docker rm -f` every container from `docker ps -aq --filter label=devcontainer.is_test_run=true` and
-      report how many were removed; verify `just --list` shows it and `just lint` passes.
+      while a `scripts/test_feature.ts` or `devcontainer features test` process runs (a `pgrep -f` pattern anchored to
+      the command's start, checked after listing the containers), otherwise `docker rm -f` every container from
+      `docker ps -aq --filter label=devcontainer.is_test_run=true` and report how many were removed; verify
+      `just --list` shows it and `just lint` passes.
 - [x] 1.2 Verify the recipe's behavior: with no test container it succeeds and reports none removed; during a running
       `just test-scenarios <id>` it refuses and removes nothing; after a `--preserve` run it removes that run's
       containers, `docker ps -a --filter label=devcontainer.is_test_run=true` lists none, and an unlabeled container

@@ -85,6 +85,8 @@ use:
 | `just docs`                        | Regenerates feature READMEs and the feature list in the root README                   |
 | `just affected`                    | Which features and images CI will test for your branch                                |
 
+Run one container test command at a time: concurrent test runs in the dev container remove each other's containers.
+
 Generated files are never edited by hand: a feature's `README.md` comes from its metadata and `NOTES.md`, and the
 feature list in the root README comes from `just docs`. When the root README changes, its Chinese translation
 `README.zh.md` is brought up to date in the same pull request; your coding agent does the translation.

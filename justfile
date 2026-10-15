@@ -59,12 +59,14 @@ test-global *args:
 test-clean:
     #!/usr/bin/env bash
     set -euo pipefail
-    # The brackets keep the pattern from matching this shell, whose command line holds the pattern's text.
-    if pgrep -f '[d]evcontainer.* features test' >/dev/null; then
-        echo "error: a devcontainer features test run is still running; let it finish (or stop it), then run this again" >&2
+    # List first, then check: a run that starts after the listing owns no listed container, and one that started
+    # before it is still a process. Anchored to the command's start, so a shell whose arguments merely mention the
+    # runner (`bash -c "... test_feature.ts ..."`) does not count as a run.
+    ids=$(docker ps -aq --filter label=devcontainer.is_test_run=true)
+    if pgrep -f '^([^ ]*/)?(deno run .*scripts/test_feature\.ts|node [^ ]*devcontainer\.js features test)( |$)' >/dev/null; then
+        echo "error: a feature test run is still in progress; let it finish (or stop it), then run this again" >&2
         exit 1
     fi
-    ids=$(docker ps -aq --filter label=devcontainer.is_test_run=true)
     if [ -z "$ids" ]; then
         echo "No test containers to remove."
         exit 0
