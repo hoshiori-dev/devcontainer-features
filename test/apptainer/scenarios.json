@@ -1,0 +1,35 @@
+{
+  "test_epel_preconfigured": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "apptainer": {}
+    }
+  },
+  "test_sif_without_fuse": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "apptainer": {}
+    }
+  },
+  "fail_epel_unavailable": {
+    "image": "almalinux:9",
+    "features": {
+      "apptainer": {}
+    }
+  },
+  "fail_epel_key_mismatch": {
+    "image": "almalinux:9",
+    "features": {
+      "apptainer": {}
+    }
+  },
+  "fail_unsupported_platform": {
+    "image": "debian:12",
+    "features": {
+      "apptainer": {}
+    }
+  }
+}
