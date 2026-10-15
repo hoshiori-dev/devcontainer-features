@@ -54,7 +54,7 @@ one of its scenarios runs once per architecture through the shared scenario matr
 - Diagnose failures with `.agents/skills/github-project-workflow/scripts/run_log_digest.ts --run-id <id>` or
   `gh run view <id> --job <job-id> --log-failed`; never read a full log.
 - Reproduce a test job locally with the command in the map; `--preserve` keeps the test containers, `--keep` keeps the
-  staging directory. Testing mechanics: `.agents/knowledge/testing.md`.
+  staging directory. Testing mechanics, and the limit on concurrent local runs: `.agents/knowledge/testing.md`.
 - The PR checks run the base commit's copy of their script and the template it reads (`.github/actions/base-checks`), so
   a change to a checker or the template applies from the next pull request after it merges. Only a base that lacks them
   (the bootstrap) uses the branch's copy, with a notice.

@@ -115,9 +115,12 @@ survive deletion, and public content is indexed within minutes. Every remote or 
 ## Finish
 
 1. Run `just check`, and for a feature change `just test <id>` and `just test-scenarios <id>` (docker is available in
-   the dev container). All CI checks green — `.agents/knowledge/github/checks.md` maps jobs to commands; diagnose a red
-   run with `.agents/skills/github-project-workflow/scripts/run_log_digest.ts --run-id <id>`. Never fetch full logs,
-   never weaken a check.
+   the dev container; runs in parallel only as `.agents/knowledge/testing.md`, Concurrent runs, allows). Then the CI
+   path, in this order: the publish gate's review, the push, then watch the Actions run and read its result as the full
+   quality test (`testing.md`, Running tests locally). All CI checks green — `.agents/knowledge/github/checks.md` maps
+   jobs to commands; diagnose a red run with
+   `.agents/skills/github-project-workflow/scripts/run_log_digest.ts --run-id <id>`. Never fetch full logs, never weaken
+   a check.
 2. Complete the PR checklist and update the final description. Set the `Phase:` line to `implementation`; replace the
    reserved line of Changes with permalinks to the commits (the exact lines for a local change, the whole file or
    directory for a broad one) and the reserved line of Validation with each Acceptance item and scenario and its result,
