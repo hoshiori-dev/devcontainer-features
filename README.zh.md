@@ -52,6 +52,7 @@
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [apk-packages](src/apk-packages/README.md)                         | 用 apk 从 Alpine Linux 镜像已配置的软件源安装一组系统软件包。                                                                                                         |
 | [apt-packages](src/apt-packages/README.md)                         | 用 apt-get 从 Debian 或 Ubuntu 镜像已配置的软件源安装一组系统软件包。                                                                                                 |
+| [betterleaks](src/betterleaks/README.md)                           | 从经过校验和验证的 GitHub 发布包安装 Betterleaks 密钥扫描器，不写入任何扫描配置。                                                                                     |
 | [colab-cli](src/colab-cli/README.md)                               | 用 uv 和隔离的 Python 3.12 为远程用户安装 Google Colab CLI。                                                                                                          |
 | [deno](src/deno/README.md)                                         | 安装 Deno CLI 并按官方发布的校验和验证；用 deno install --global 安装的工具放在共用的 PATH 位置。                                                                     |
 | [dnf-packages](src/dnf-packages/README.md)                         | 从镜像已配置的软件源安装列出的系统软件包。                                                                                                                            |

@@ -1,0 +1,15 @@
+{
+  "id": "betterleaks",
+  "version": "1.0.0",
+  "name": "Betterleaks",
+  "description": "Installs the Betterleaks secrets scanner from its checksum-verified GitHub release archive and writes no scan configuration.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/betterleaks",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "1.0.1"],
+      "default": "latest",
+      "description": "Betterleaks version to install: 'latest' (the newest stable release), or a release such as 1.9.0 or a pre-release such as 2.0.0-rc.2 (a leading 'v' is accepted; 1.0.1 or later)."
+    }
+  }
+}
