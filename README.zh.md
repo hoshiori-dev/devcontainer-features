@@ -63,6 +63,7 @@
 | [nvidia-container-toolkit](src/nvidia-container-toolkit/README.md) | 从 NVIDIA 签名的软件源安装 NVIDIA Container Toolkit，并把 nvidia 运行时注册到 dev container 内的 Docker 守护进程。                                                          |
 | [openspec](src/openspec/README.md)                                 | 从 npm registry 安装 OpenSpec CLI（openspec），验证每个包的完整性哈希和 registry 签名；所需的 Node.js 运行时作为依赖一并带入。                                              |
 | [pacman-packages](src/pacman-packages/README.md)                   | 用 pacman 从 Arch Linux 镜像已配置的软件源安装一组系统软件包，安装时会做一次完整的系统升级。                                                                                |
+| [slurm](src/slurm/README.md)                                       | 安装发行版的 Slurm 和 MUNGE，每次容器启动时在 dev container 内运行一个真实的单节点 Slurm 集群，或只作为外部集群的客户端；配置目录保存在命名卷中。                           |
 | [uv](src/uv/README.md)                                             | 安装 Astral 的 uv 和 uvx，可选安装 Python 命令行工具；uv 的 Python 解释器和缓存保存在重建后仍然保留的卷上。                                                                 |
 | [zypper-packages](src/zypper-packages/README.md)                   | 从镜像已启用的软件源安装列出的系统软件包。                                                                                                                                  |
 
