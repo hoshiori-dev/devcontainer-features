@@ -1,0 +1,8 @@
+{
+  "id": "apptainer",
+  "version": "1.0.0",
+  "name": "Apptainer",
+  "description": "Installs Apptainer in its unprivileged, non-setuid form from the distribution, EPEL, the project's PPA, or the GitHub release, with the container security options an unprivileged user needs to run it.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/apptainer",
+  "securityOpt": ["seccomp=unconfined", "apparmor=unconfined"]
+}
