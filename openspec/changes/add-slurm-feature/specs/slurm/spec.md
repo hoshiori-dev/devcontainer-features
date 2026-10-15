@@ -386,20 +386,106 @@ same container.
 
 The feature SHALL declare exactly one mount (Requirement: Configuration directory in a named volume) and one
 `postStartCommand`, and SHALL NOT request `privileged`, `capAdd`, `securityOpt`, `entrypoint`, `init`, or
-`containerEnv`, and SHALL declare no `dependsOn` or `installsAfter`.
+`containerEnv`. It SHALL declare no `dependsOn`, and `installsAfter` SHALL name exactly
+`ghcr.io/hoshiori-dev/devcontainer-features/apptainer`, so Apptainer, when the user installs it, is present when this
+feature's install runs.
 
 #### Scenario: Metadata of a built container
 
 - **WHEN** a container is built with only this feature
 - **THEN** it is not privileged, has no added capability, and has one named volume mounted at `/etc/slurm`
 
+### Requirement: Option apptainer
+
+The feature SHALL accept the option `apptainer` as declared here; Requirement: Backend decision states what each value
+does.
+
+| Field   | Value                 |
+| ------- | --------------------- |
+| Type    | `string`              |
+| Default | `"auto"`              |
+| Enum    | `["auto","on","off"]` |
+
+#### Scenario: Omitted apptainer
+
+- **WHEN** the feature is installed without `apptainer` in an image where the `apptainer` feature was installed first
+  and the Slurm is 23.02 or newer
+- **THEN** the backend is configured, as with `on`
+
+#### Scenario: Omitted apptainer without Apptainer
+
+- **WHEN** the feature is installed without `apptainer` in an image without Apptainer
+- **THEN** the build succeeds, the build log says the backend is not configured and why, and no `oci.conf` is written
+
+#### Scenario: Backend required
+
+- **WHEN** the feature is installed with `apptainer` set to `on` in an image without Apptainer, or whose Slurm predates
+  23.02
+- **THEN** the build fails naming what is missing
+
+#### Scenario: Backend disabled
+
+- **WHEN** the feature is installed with `apptainer` set to `off` in an image where Apptainer is present
+- **THEN** no `oci.conf` is written and `srun --container` reports that no container runtime is configured
+
+#### Scenario: Invalid apptainer
+
+- **WHEN** the feature is installed with `apptainer` set to a value that is not `auto`, `on`, or `off`
+- **THEN** the install fails with a message naming the accepted values, and nothing is installed
+
+### Requirement: Backend decision
+
+The install SHALL decide the Apptainer container backend from `apptainer` at build time: `auto` configures it when
+`apptainer` is on `PATH` and the image's Slurm is 23.02 or newer, and otherwise logs why not; `on` fails the build
+naming what is missing when either is absent; `off` never configures it and removes a template an earlier install left.
+The decision SHALL be recorded in the image as the presence or absence of the backend template.
+
+#### Scenario: Backend decided
+
+- **WHEN** the feature is installed with `apptainer` set to `on` in an image where Apptainer and a Slurm of 23.02 or
+  newer are present
+- **THEN** the build succeeds and the backend template exists in the image
+
+### Requirement: Apptainer container backend
+
+When the backend is configured, the install SHALL keep a template `oci.conf` outside `/etc/slurm` that runs each
+container step with `apptainer exec` on the bundle path, and the start hook SHALL copy it to `/etc/slurm/oci.conf` when
+that file is absent and SHALL never overwrite an existing one. A sandbox directory named by `--container` SHALL then run
+the step inside the container as the submitting user, without privileges.
+
+#### Scenario: Job step in a sandbox
+
+- **WHEN** an unprivileged user builds a sandbox with `apptainer build --sandbox` from a small OCI image and runs
+  `srun --container <sandbox> cat /etc/os-release` in local mode
+- **THEN** the output names the sandbox image's distribution, not the dev container's
+
+#### Scenario: Batch job in a sandbox
+
+- **WHEN** the user submits `sbatch --wait --container <sandbox>` with a script that prints `/etc/os-release`
+- **THEN** the job completes and its output names the sandbox image's distribution
+
+#### Scenario: Existing oci.conf kept
+
+- **WHEN** the volume already holds an `oci.conf` and the container starts with the backend configured
+- **THEN** the file is byte-identical after the start
+
+#### Scenario: Slurm too old
+
+- **WHEN** the backend is requested with `auto` on an image whose Slurm predates 23.02
+- **THEN** the build succeeds without an `oci.conf`, and the build log names the installed and the required version
+
 ### Requirement: Installing twice
 
-Installing the feature a second time on the same image SHALL succeed and leave the same result as one install: the
-packages installed once, the seed rewritten with the same content, and the start-time script replaced. The feature has
-no options, so a second install cannot differ in options.
+Installing the feature a second time on the same image SHALL succeed and leave the same result as one install with the
+second run's `apptainer` value: the packages installed once, the seed rewritten with the same content, the start-time
+script replaced, and the backend template written or removed according to that value.
 
 #### Scenario: Second install
 
 - **WHEN** the feature is installed twice on the same image
 - **THEN** the build succeeds, and after a start one `munged`, one `slurmctld`, and one `slurmd` run
+
+#### Scenario: Different apptainer value the second time
+
+- **WHEN** the feature is installed with `apptainer` set to `off` and then to `on` in an image with Apptainer
+- **THEN** the backend template exists after the second install, and the reverse order leaves none
