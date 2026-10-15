@@ -9,7 +9,8 @@ source dev-container-features-test-lib
 source "$(dirname "$0")/helpers.sh"
 
 # The version the feature's source offers when the test runs (helpers.sh, source_candidate).
-candidate="$(source_candidate)"
+# A failed query leaves it empty, so the labeled check reports it instead of set -e ending the script.
+candidate="$(source_candidate || true)"
 
 check "apptainer reports the version the source ships after two installs (${candidate:-none})" \
   version_reports "${candidate}"

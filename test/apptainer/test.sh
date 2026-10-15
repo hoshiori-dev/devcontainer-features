@@ -12,7 +12,8 @@ work_dir="$(mktemp -d)"
 
 # The version the feature's source offers when the test runs: each source installs its current version, so no literal
 # can name it (helpers.sh, source_candidate).
-candidate="$(source_candidate)"
+# A failed query leaves it empty, so the labeled check reports it instead of set -e ending the script.
+candidate="$(source_candidate || true)"
 
 check "apptainer runs for the remote user" apptainer --version
 check "apptainer reports the version the source ships (${candidate:-none})" version_reports "${candidate}"

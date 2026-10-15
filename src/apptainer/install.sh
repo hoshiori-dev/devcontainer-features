@@ -109,8 +109,10 @@ detect_platform() {
   os_id_like="$(. /etc/os-release && printf '%s\n' "${ID_LIKE:-}")"
   # shellcheck source=/dev/null
   os_version_id="$(. /etc/os-release && printf '%s\n' "${VERSION_ID:-}")"
+  # An Ubuntu derivative reached through ID_LIKE names its own codename; the PPA publishes for Ubuntu's, which such
+  # images carry as UBUNTU_CODENAME.
   # shellcheck source=/dev/null
-  os_codename="$(. /etc/os-release && printf '%s\n' "${VERSION_CODENAME:-}")"
+  os_codename="$(. /etc/os-release && printf '%s\n' "${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}")"
 
   # ID decides first, so Ubuntu, whose ID_LIKE names debian, takes the Ubuntu path; Fedora is recognized by ID alone,
   # because a distribution that is merely Fedora-like (ID_LIKE fedora) has no Fedora repositories. Then the first
@@ -421,6 +423,8 @@ main() {
   log "installing on ${os_id} ${os_version_id} (${arch}) through the ${family} path"
   trap cleanup EXIT
   work_dir="$(mktemp --directory /tmp/apptainer-install.XXXXXXXXXX)"
+  # apt's sandboxed _apt user must read the downloaded .deb; mktemp creates the directory 0700.
+  chmod 0755 "${work_dir}"
   install_prerequisites
   case "${family}" in
     ubuntu)
