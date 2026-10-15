@@ -31,30 +31,78 @@ package, the install SHALL fail with the package manager's error.
 
 - **WHEN** the feature is installed on an image listed in `test/slurm/compatibility.json`
 - **THEN** the build succeeds, `sbatch`, `squeue`, `sinfo`, `srun`, `scontrol`, `slurmctld`, `slurmd`, and `munged` are
-  present, and the start-time script the feature declares exists and is executable
+  present, the `slurm` and `munge` system users exist, and the start-time script the feature declares exists and is
+  executable
 
 #### Scenario: Unsupported distribution
 
 - **WHEN** the feature is installed on an image whose distribution is not supported
 - **THEN** the build fails with a message naming the detected distribution and installs nothing
 
-### Requirement: Packages from the image's repositories only
+### Requirement: Packages from the distribution
 
-The feature SHALL install Slurm (`slurm-wlm` with `slurmctld`, `slurmd`, and `slurm-client`) and MUNGE only from the
-package repositories already configured in the image, at the version the distribution ships, with the package manager's
-signature verification in effect. It SHALL NOT add a repository or signing key and SHALL NOT download anything else at
-build time.
+The feature SHALL install the Slurm client commands, `slurmctld`, `slurmd`, and MUNGE from the distribution's packages
+at the version it ships, with the package manager's signature verification in effect: from the repositories configured
+in the image on Debian, Ubuntu, and Fedora, and from EPEL on a RHEL derivative (Requirement: EPEL on RHEL derivatives).
+It SHALL NOT download anything else at build time.
 
 #### Scenario: Distribution version installed
 
-- **WHEN** the feature has been installed
-- **THEN** `sinfo --version` reports the version of the distribution's `slurm-client` package, and the image's
-  repository and signing key configuration is unchanged
+- **WHEN** the feature has been installed on a Debian, Ubuntu, or Fedora image
+- **THEN** `sinfo --version` reports the version of the distribution's Slurm client package, and the image's repository
+  and signing key configuration is unchanged
 
 #### Scenario: Package verification fails
 
 - **WHEN** the package manager rejects a package or repository signature during the install
 - **THEN** the build fails and the feature does not retry with verification disabled
+
+### Requirement: EPEL on RHEL derivatives
+
+On a RHEL derivative, the feature SHALL install Slurm from EPEL. When no EPEL repository is configured, it SHALL install
+the distribution's `epel-release` package from the repositories configured in the image and SHALL verify the key that
+package delivers as Requirement: EPEL signing key states before any EPEL package is installed; when that package is
+unavailable, the install SHALL fail naming EPEL before changing the image.
+
+#### Scenario: EPEL enabled on a RHEL derivative
+
+- **WHEN** the feature is installed on a RHEL-derivative image of the compatibility list without EPEL configured
+- **THEN** EPEL is configured from the distribution's `epel-release` package, `sinfo --version` reports the version EPEL
+  ships for that release, and the `epel` repository has package signature checking on
+
+#### Scenario: EPEL already configured
+
+- **WHEN** the feature is installed on a RHEL-derivative image where EPEL is already configured
+- **THEN** the install adds no repository and installs Slurm from the configured EPEL
+
+#### Scenario: EPEL unavailable
+
+- **WHEN** the feature is installed on a RHEL-derivative image where neither EPEL nor an `epel-release` package is
+  available
+- **THEN** the build fails with a message naming EPEL, and the image is unchanged
+
+### Requirement: EPEL signing key
+
+When the feature enables EPEL, it SHALL trust it only when the key file the `epel-release` package installs for that
+release holds exactly one primary key whose full fingerprint equals the pinned one: EPEL 9,
+`FF8AD1344597106ECE813B918A3872BF3228467C`. A release without a pinned fingerprint SHALL fail the install naming the
+release. The feature SHALL NOT import a key from any other source.
+
+#### Scenario: Key matches
+
+- **WHEN** the `epel-release` package installs the EPEL 9 key with the pinned fingerprint
+- **THEN** the install continues and EPEL packages are verified by the package manager with that key
+
+#### Scenario: Key mismatch
+
+- **WHEN** the key file holds a key with another fingerprint, or more than one primary key
+- **THEN** the build fails naming the fingerprint found, and no EPEL package is installed
+
+#### Scenario: Unpinned release
+
+- **WHEN** the feature is installed on a RHEL derivative without EPEL configured whose EPEL release has no pinned
+  fingerprint
+- **THEN** the build fails naming the release, and no EPEL package is installed
 
 ### Requirement: Seeded single-node configuration
 
@@ -124,11 +172,13 @@ stops, rebuilds, and feature upgrades, and the feature SHALL never replace it wi
 
 The feature SHALL keep the controller state directory, the compute spool directory, the daemons' logs, and the MUNGE key
 outside `/etc/slurm`, in the container's writable layer, and SHALL NOT declare a volume for them. The MUNGE key SHALL be
-generated at the first start that needs it, never at image build.
+generated at the first start that needs it, never at image build; a key the `munge` package generated at install SHALL
+be removed by the install.
 
 #### Scenario: Image carries no key
 
-- **WHEN** the image built with the feature is inspected before any container start
+- **WHEN** the image built with the feature is inspected before any container start, on any image of the compatibility
+  list, including one whose `munge` package generates a key at install
 - **THEN** no MUNGE key file exists in it
 
 #### Scenario: Key generated at first start

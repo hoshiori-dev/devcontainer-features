@@ -6,11 +6,22 @@ See proposal.md for motivation and acceptance; the behavior is in `specs/slurm/s
 before the issue: the two variable names, the volume, the copy-not-link rule, and the persistence scope are decisions,
 not proposals. Facts checked on 2026-10-15, needed only for this change:
 
-- **Packages.** Debian and Ubuntu ship `slurm-wlm`, which depends on `slurmctld`, `slurmd`, and `slurm-client` at one
-  version; `slurmd` depends on `munge`. Versions: Debian 12 `22.05.8`, Debian 13 `24.11.5`, Ubuntu 22.04 `21.08.5`,
+- **Debian family.** Debian and Ubuntu ship `slurm-wlm`, which depends on `slurmctld`, `slurmd`, and `slurm-client` at
+  one version; `slurmd` depends on `munge`. Versions: Debian 12 `22.05.8`, Debian 13 `24.11.5`, Ubuntu 22.04 `21.08.5`,
   Ubuntu 24.04 `23.11.4`, each on amd64 and arm64. The packages create the `slurm` and `munge` system users, ship
-  systemd units only, and read `/etc/slurm/slurm.conf`. Fedora packages Slurm too, but the first version targets the
-  Debian family only, so one package layout is proven before a second is added.
+  systemd units only, leave `/etc/slurm` without a `slurm.conf`, and use `/var/lib/slurm` and `/var/log/slurm`. The
+  `munge` package generates `/etc/munge/munge.key` in its post-install step (seen on `debian:12`), so the install must
+  remove it.
+- **RHEL family.** Fedora ships `slurm` (the client commands and `/etc/slurm/slurm.conf`, an example with
+  `SlurmUser=root`), `slurm-slurmctld`, `slurm-slurmd`, and `munge` in its own repositories (Fedora 44: `24.05.2`,
+  `munge 0.5.18`); the packages create the `munge` user but no `slurm` user, and `/run/munge` does not exist until
+  `munged` runs. AlmaLinux and Rocky Linux carry no Slurm in BaseOS or AppStream; EPEL 9 carries `22.05.11` with the
+  same subpackages (seen on `almalinux:9` and `rockylinux/rockylinux:9`), and `epel-release` is in the distribution's
+  `extras` repository, signed by the distribution's key, delivering `/etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9` (fingerprint
+  `FF8AD1344597106ECE813B918A3872BF3228467C`) and an `epel.repo` with `gpgcheck=1`. EPEL 10 offered no `slurm` for
+  AlmaLinux 10.2 on 2026-10-15, and EPEL 8 ships `20.11`, so neither is a target. The MUNGE key tool is `mungekey` on
+  Fedora and Debian but `create-munge-key` on EL 9. RHEL itself (UBI images) has no `epel-release` in its repositories
+  and lacks `munge`, so it is not a target.
 - **Slurm.** `AuthType=auth/munge` is the default and needs `munged` on every host that authenticates, with one shared
   `munge.key`; `auth/slurm` exists from 23.11 and is absent on Ubuntu 22.04. `ProctrackType=proctrack/linuxproc` and
   `TaskPlugin=task/none` run without cgroup access. `RealMemory` defaults to 1 MiB; a node whose configured CPUs exceed
@@ -33,8 +44,21 @@ not proposals. Facts checked on 2026-10-15, needed only for this change:
 
 - The seed is complete for one node whatever the host: the install writes it with the marker as line one,
   `SlurmctldHost`, `NodeName`, and `PartitionName` lines, `StateSaveLocation` and `SlurmdSpoolDir` under
-  `/var/lib/slurm`, logs under `/var/log/slurm`, `SelectType=select/cons_tres` with `SelectTypeParameters=CR_Core`,
-  `ReturnToService=2`, and `SlurmUser=slurm` — checked by `test.sh` asserting those lines on every compatibility image.
+  `/var/lib/slurm-feature` (directories the install creates with the right owners, so the layout is the same on both
+  families), logs under `/var/log/slurm`, `SelectType=select/cons_tres` with `SelectTypeParameters=CR_Core`,
+  `ReturnToService=2`, and `SlurmUser=slurm`, whose system user the install creates when the packages do not — checked
+  by `test.sh` asserting those lines, the directories, and the users on every compatibility image.
+- EPEL is enabled only through the distribution: on a RHEL derivative where `dnf repolist` shows no `epel`, the install
+  runs `dnf install epel-release` from the configured repositories, then reads the key file the package installed with
+  `gpg --show-keys --with-colons` and continues only when it holds exactly one `pub` record whose `fpr` equals the
+  pinned fingerprint for that release; no `--nogpgcheck`, no remote `gpgkey=`, no `rpm --import` of a downloaded file —
+  checked by `test.sh` on the RHEL-derivative images (EPEL present, `gpgcheck=1`, the installed version from EPEL), by a
+  `build` scenario on `almalinux:9` whose Dockerfile enables EPEL first, by a `build` scenario on `almalinux:9` whose
+  Dockerfile disables the `extras` repository so `epel-release` is unavailable, and by a manual run with a substituted
+  key file recorded in the PR.
+- The install removes `/etc/munge/munge.key` after the packages are installed and leaves `/etc/munge` owned by `munge` —
+  checked by a scenario asserting the file is absent in the built image before the hook runs, using a `build` scenario
+  whose Dockerfile installs the feature without a start.
 - Identity lines are aligned, never guessed: at each start, while line one is the marker, the hook rewrites exactly the
   `SlurmctldHost` and `NodeName` lines from the hostname and `slurmd -C`, with an in-place edit that keeps every other
   byte — checked by a scenario that edits other lines, re-runs the hook, and diffs the file; the hostname change itself
@@ -43,11 +67,11 @@ not proposals. Facts checked on 2026-10-15, needed only for this change:
   takes its inputs only from the two variables and the volume, and decides the mode before it touches a daemon — checked
   by the re-run scenarios.
 - Daemon management is explicit and bounded: `munged`, `slurmctld`, and `slurmd` are started directly (no systemd), as
-  the users the packages intend (`munged` as `munge`, `slurmctld` as `slurm`, `slurmd` as root), each with a pid file
-  under `/run` the hook owns; a running daemon is recognized by its pid file and a live process of the expected command,
-  a stale pid file is removed, and a restart is a stop of the hook's own processes followed by a start — checked by the
-  "Repeated start", "Configuration changed", and "Client mode after local daemons" scenarios counting processes and
-  comparing pids.
+  the users the packages intend (`munged` as `munge`, `slurmctld` as `slurm`, `slurmd` as root), with `/run/munge`
+  created for `munged` when missing, each with a pid file under `/run` the hook owns; a running daemon is recognized by
+  its pid file and a live process of the expected command, a stale pid file is removed, and a restart is a stop of the
+  hook's own processes followed by a start — checked by the "Repeated start", "Configuration changed", and "Client mode
+  after local daemons" scenarios counting processes and comparing pids.
 - Readiness is waited for, with a bound: after starting the local daemons the hook waits until `scontrol ping` answers
   and the node is not down, and fails naming the daemons' log files when the bound passes — checked by the default
   scenario timing the first `sinfo`.
@@ -72,7 +96,8 @@ not proposals. Facts checked on 2026-10-15, needed only for this change:
 - Providing or distributing a MUNGE key for a remote cluster; the developer mounts it at `/etc/munge/munge.key`.
 - Stopping the daemons at container stop, or recovering jobs after a restart.
 - A diagnostics command; the daemon logs under `/var/log/slurm` and `scontrol show config` are the diagnostics.
-- Fedora, openSUSE, Alpine, and Slurm built from source.
+- RHEL itself (UBI images), AlmaLinux 8 and 10, CentOS Stream, openSUSE, Alpine, and Slurm built from source; EPEL
+  releases other than 9 until a fingerprint is pinned for them.
 
 ## Options
 
@@ -91,6 +116,20 @@ of the image, and `${devcontainerId}` cannot vary by option.
   minutes and a toolchain, and the distribution's package is signed and verified by the package manager. The cost is a
   different Slurm version per image, which the proposal accepts and `NOTES.md` states. Alternative: a GHCR image of
   Slurm — rejected, the collection installs into the user's image.
+- **EPEL through `epel-release`, with the key pinned.** On AlmaLinux and Rocky Linux the only packaged Slurm is EPEL's,
+  and the distribution's own `extras` repository delivers `epel-release`, so EPEL is enabled with nothing fetched
+  outside the image's repositories; the key the package drops is still checked against the pinned fingerprint before the
+  first EPEL package, as `feature-authoring.md` asks of every added repository. Alternative: download
+  `epel-release-latest-9.noarch.rpm` from `dl.fedoraproject.org` — rejected for this version; it would make RHEL UBI
+  images installable in principle, but their repositories lack `munge` and other dependencies, so it buys nothing
+  without a subscription. Alternative: require the user to enable EPEL — rejected, the feature would fail on the stock
+  images of its compatibility list. The maintainer directed the RHEL-family support on 2026-10-15 in the conversation of
+  the pull request.
+- **Feature-owned state directories.** The two families default to different directories (`/var/lib/slurm` versus
+  `/var/spool/slurm`), and Fedora's example sets `SlurmUser=root`; the seed names `/var/lib/slurm-feature/slurmctld` and
+  `/var/lib/slurm-feature/slurmd`, created by the install with the owners the daemons need, so the hook, the tests, and
+  `NOTES.md` describe one layout. Alternative: each distribution's default — rejected, two layouts in one script and one
+  set of notes.
 - **Marker-governed identity lines, not a hostname-independent seed.** Docker assigns a recreated container a new
   hostname, `slurmctld` refuses to run where its hostname matches no `SlurmctldHost`, and `slurmd` needs its hostname
   among the node lines, so a seed written at build time cannot stay valid without a start-time step. Rewriting only
@@ -114,10 +153,12 @@ of the image, and `${devcontainerId}` cannot vary by option.
 - **Restart, not `scontrol reconfigure`, after a local configuration change.** A restart covers every kind of change
   (`AuthType`, ports, node lines) with one path; running jobs are lost, which the persistence scope already declines to
   promise. `scontrol reconfigure` stays unused so no path can reach a remote controller by mistake.
-- **MUNGE key at the first local start.** A key in the image would be shared by every container built from it; one
-  generated at first start, `0400` and owned by `munge`, is private to the container and not persisted, as decided. In
-  `client` mode the hook starts `munged` only when a key exists, so a user-mounted cluster key works and the absence of
-  one is reported rather than papered over with a random key.
+- **MUNGE key at the first local start, from `/dev/urandom`.** A key in the image would be shared by every container
+  built from it; one generated at first start, 1024 bytes from `/dev/urandom`, `0400` and owned by `munge`, is private
+  to the container and not persisted, as decided. Writing it directly, as MUNGE's documentation allows, avoids the
+  `mungekey` / `create-munge-key` split between distributions. In `client` mode the hook starts `munged` only when a key
+  exists, so a user-mounted cluster key works and the absence of one is reported rather than papered over with a random
+  key.
 - **One volume, mounted at `/etc/slurm`.** The packages read that path, so no `SLURM_CONF` override is needed and
   daemons and commands agree on the file. The whole directory is in the volume so companion files the user adds persist
   too. Alternative: a volume at another path and `SLURM_CONF` set through `containerEnv` — rejected, it adds metadata
@@ -150,7 +191,14 @@ of the image, and `${devcontainerId}` cannot vary by option.
 - [`slurmd -C` under a CPU quota reports every host CPU] → accepted; the local mode promises no isolation, and the
   seed's `CR_Core` only shapes scheduling.
 - [Ubuntu 22.04 ships Slurm 21.08, two major versions behind] → kept in the candidate list for the proof of concept;
-  dropped from `compatibility.json` before implementation if the hook needs a feature it lacks.
+  dropped from `compatibility.json` before implementation if the hook needs a feature it lacks. The candidate list is
+  `mcr.microsoft.com/devcontainers/base:ubuntu24.04`, `debian:12`, `debian:13`, `ubuntu:22.04`, `fedora:44`,
+  `almalinux:9`, and `rockylinux/rockylinux:9`, amd64 and arm64.
+- [EPEL 10 gains `slurm`, or the EPEL 9 key is rotated] → a later change pins the new fingerprint and adds the image; a
+  rotated key fails the install loudly rather than trusting an unpinned key.
+- [A RHEL derivative image already carries EPEL with a different key file] → the pinned check runs whenever the feature
+  enables EPEL; an EPEL the image already configured is the image author's trust decision, like any other configured
+  repository, and the feature does not re-check it.
 - [Daemons keep running after the hook fails later in the same start] → the hook orders the source import and the mode
   decision before any daemon step, so a failed import or an invalid mode leaves the daemons as they were, which the spec
   states.
