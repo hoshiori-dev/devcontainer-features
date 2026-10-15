@@ -32,10 +32,14 @@ own. Recipes are kept few, with no fixed limit on their number.
 - The cleanup recipe removes exactly the containers the CLI's own sweep would remove, no more: its filter is the label
   `devcontainer.is_test_run=true` alone. Checked by running it while a container without that label runs, which
   survives.
-- The recipe refuses while any `devcontainer features test` process runs in the dev container, so it can never cut a
-  running test short. Checked by running it during a test run (refused, nothing removed) and with no run (proceeds).
-- The process check does not match the recipe's own shell, whose command line contains the pattern text. Checked by
-  running the recipe with no test running: it must proceed rather than refuse itself.
+- The recipe refuses while a test run is in progress in the dev container: a `scripts/test_feature.ts` process, which
+  spans the gaps between its CLI invocations (staging, publishing, the next image), or a CLI `features test` process
+  started directly. It lists the containers before it checks, so a run that starts after the check owns none of the
+  listed containers and is never cut short. Checked by running it during a run's staging phase and during its CLI phase
+  (refused, nothing removed) and with no run (proceeds).
+- The process check matches only a process whose command starts with the runner or the CLI, not one whose arguments
+  merely mention them, such as an invoking agent's wrapper shell or a `grep` for the text. Checked by running the recipe
+  while such a shell is alive: it must proceed.
 - The recipe succeeds when there is nothing to remove, so it can be run unconditionally at the end of a set.
 - Each rule lives in one place: the conflict and the cleanup rule in `testing.md`, reading a CI run in `checks.md`, the
   order of the CI path in the skill's Finish step; the others point to them.
@@ -63,19 +67,22 @@ parallel runs).
 
 ### A `just` recipe, written inline
 
-The recipe is a few lines of shell in the `justfile` (name: `test-clean`, next to the other test recipes): a process
-check, then `docker ps -aq --filter label=devcontainer.is_test_run=true` and `docker rm -f` over the result, then a line
-saying how many containers it removed. It earns a recipe because the sweep is easy to get wrong by hand: a looser filter
-removes unrelated containers, and running it too early recreates the original failure.
+The recipe is a few lines of shell in the `justfile` (name: `test-clean`, next to the other test recipes):
+`docker ps -aq --filter label=devcontainer.is_test_run=true`, then a process check, then `docker rm -f` over the listed
+IDs, then a line saying how many containers it removed. It earns a recipe because the sweep is easy to get wrong by
+hand: a looser filter removes unrelated containers, and running it too early recreates the original failure.
 
 Rejected: a Deno script under `scripts/`, which would add a file, permissions, and tests for two Docker calls; leaving
 the command in `testing.md` for agents to type, which loses the process check.
 
 ### Refuse while a test runs, with no override
 
-The recipe checks for a running `devcontainer features test` process with `pgrep -f` and exits non-zero naming the
-reason. There is no force option: a run that hangs is stopped first, which the recipe's message says. An override would
-be the one way to cut other runs short, the failure this change removes.
+The recipe checks with `pgrep -f` for a process whose command line starts with `deno run` of `scripts/test_feature.ts`
+or with `node` running the CLI's `devcontainer.js features test`, and exits non-zero naming the reason. Anchoring the
+pattern to the command's start keeps a shell whose arguments only mention it from blocking the cleanup; checking after
+the listing closes the window in which a run could start between the check and the removal. There is no force option: a
+run that hangs is stopped first, which the recipe's message says. An override would be the one way to cut other runs
+short, the failure this change removes.
 
 ### Where the CI path is written
 
