@@ -29,7 +29,9 @@ check "git --version exits 0" git --version
 check "betterleaks version reports the release the latest-release link points to" \
   betterleaks_reports_version "${latest}"
 
-# A repository with one empty commit holds no secret; betterleaks git exits 0 and reports no finding on it.
+# A repository with one empty commit holds no secret. The exit status is the assertion: betterleaks exits 1 when a
+# scan finds something (upstream's documented default, `--exit-code` changes it) and 0 when it finds nothing; its log
+# wording is not a contract.
 scan_of_clean_repository_finds_nothing() {
   scan_repository="$(mktemp -d)"
   git init --quiet "${scan_repository}" || return 1
@@ -39,7 +41,6 @@ scan_of_clean_repository_finds_nothing() {
     printf '%s\n' "${scan_output}"
     return 1
   }
-  printf '%s\n' "${scan_output}" | grep -i 'no leaks found' >/dev/null
 }
 check "betterleaks git exits 0 and reports no finding on a repository without secrets" \
   scan_of_clean_repository_finds_nothing

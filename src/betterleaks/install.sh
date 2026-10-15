@@ -32,7 +32,8 @@ fail() {
   exit 1
 }
 
-# Removes the staged binary and the work directory on every exit, success or failure.
+# Removes the staged binary and the work directory on every exit, success or failure. Short options: BusyBox rm has
+# no long ones.
 cleanup() {
   if [ -n "${staged}" ]; then rm -f "${staged}"; fi
   if [ -n "${work}" ]; then rm -rf "${work}"; fi
@@ -109,7 +110,7 @@ validate_options() {
 # package manager; sets ${arch} to upstream's archive name for the machine and ${pm}. Runs before VERSION becomes
 # readonly: /etc/os-release assigns it too.
 detect_platform() {
-  detect_platform_machine="$(uname -m)"
+  detect_platform_machine="$(uname --machine)"
   case "${detect_platform_machine}" in
     x86_64) arch=x64 ;;
     aarch64) arch=arm64 ;;
@@ -235,11 +236,15 @@ resolve_latest() {
 }
 
 # Ends the install with status 0 when ${TARGET} already reports ${version}. A betterleaks that exits non-zero or
-# prints anything else is replaced. The run is isolated from the image: HOME points into the work directory, so a
-# release that writes under HOME leaves nothing behind.
+# prints anything else is replaced. Anything at ${TARGET} that is not a regular file, such as a directory, is left to
+# the developer: a rename over a directory would put the binary inside it and the install would still report
+# success. The run is isolated from the image: HOME points into the work directory, so a release that writes under
+# HOME leaves nothing behind.
 skip_when_installed() {
-  [ -f "${TARGET}" ] || return 0
-  mkdir -m 700 "${work}/home"
+  [ -e "${TARGET}" ] || return 0
+  [ -f "${TARGET}" ] \
+    || fail "${TARGET} exists but is not a regular file; remove it or install betterleaks elsewhere"
+  mkdir --mode 700 "${work}/home"
   if ! skip_when_installed_output="$(HOME="${work}/home" "${TARGET}" version 2>/dev/null)"; then
     return 0
   fi
@@ -250,9 +255,10 @@ skip_when_installed() {
 }
 
 # Downloads the release's checksums.txt and then its archive into ${work}, logging each final URL without its query
-# string (GitHub's asset host signs the URL with a short-lived token) so a host change shows in the build log. Fails unless checksums.txt holds exactly one entry for the archive and the archive's
-# SHA-256 digest equals that entry. The Sigstore bundle upstream publishes for checksums.txt is not verified
-# (openspec/specs/betterleaks/spec.md, "Verified download from the GitHub release").
+# string (GitHub's asset host signs the URL with a short-lived token) so a host change shows in the build log. Fails
+# unless checksums.txt holds exactly one entry for the archive and the archive's SHA-256 digest equals that entry. The
+# Sigstore bundle upstream publishes for checksums.txt is not verified (openspec/specs/betterleaks/spec.md, "Verified
+# download from the GitHub release").
 download_and_verify() {
   archive="betterleaks_${version}_linux_${arch}.tar.gz"
   download_and_verify_url="${RELEASES}/download/v${version}"
@@ -265,6 +271,11 @@ download_and_verify() {
     "(final URL: ${download_and_verify_final%%\?*})"
   awk -v name="${archive}" 'NF == 2 && $2 == name' "${work}/checksums.txt" >"${work}/archive.sha256"
   download_and_verify_entries="$(awk 'END { print NR }' "${work}/archive.sha256")"
+  # No entry means the release publishes no archive for this architecture; several mean a checksum list that cannot
+  # be trusted to name the archive.
+  [ "${download_and_verify_entries}" != "0" ] \
+    || fail "release v${version} lists no archive for linux ${arch} in its checksums.txt;" \
+      "set version to a release that has one"
   [ "${download_and_verify_entries}" = "1" ] \
     || fail "verification failed: checksums.txt of release v${version} holds ${download_and_verify_entries} entries" \
       "for ${archive}, expected exactly one;" \
@@ -276,6 +287,7 @@ download_and_verify() {
       "check that release v${version} has an archive for linux ${arch}"
   log "downloaded ${download_and_verify_url}/${archive} to ${work}/${archive}" \
     "(final URL: ${download_and_verify_final%%\?*})"
+  # Short option: BusyBox sha256sum has no long ones.
   (cd "${work}" && sha256sum -c archive.sha256) \
     || fail "verification failed: ${archive} does not match its entry in checksums.txt;" \
       "retry the build, and set version to another release if it persists"
@@ -284,7 +296,7 @@ download_and_verify() {
 # Extracts betterleaks from the archive into ${work}/extract.
 extract_binary() {
   mkdir "${work}/extract"
-  tar -xzf "${work}/${archive}" -C "${work}/extract" betterleaks \
+  tar --extract --gzip --file "${work}/${archive}" --directory "${work}/extract" betterleaks \
     || fail "cannot extract betterleaks from ${archive}; set version to another release"
   # Only a regular file is installed: cp would follow a symbolic link out of the work directory.
   if [ ! -f "${work}/extract/betterleaks" ] || [ -L "${work}/extract/betterleaks" ]; then
@@ -294,11 +306,11 @@ extract_binary() {
 
 # Stages the binary next to ${TARGET} and renames it over the target, so the target is replaced in one step.
 install_binary() {
-  mkdir -p "${TARGET%/*}"
+  mkdir --parents "${TARGET%/*}"
   staged="$(mktemp "${STAGING_TEMPLATE}")"
   cp "${work}/extract/betterleaks" "${staged}"
   chmod 0755 "${staged}"
-  mv -f "${staged}" "${TARGET}"
+  mv --force "${staged}" "${TARGET}"
   staged=""
   log "installed betterleaks ${version} from ${archive} to ${TARGET}"
 }
@@ -316,7 +328,7 @@ main() {
   trap 'exit 143' TERM
 
   install_prerequisites
-  work="$(mktemp -d "${TMPDIR:-/tmp}/betterleaks-feature.XXXXXX")"
+  work="$(mktemp --directory "${TMPDIR:-/tmp}/betterleaks-feature.XXXXXX")"
   if [ "${VERSION}" = "latest" ]; then resolve_latest; fi
   skip_when_installed
   download_and_verify
