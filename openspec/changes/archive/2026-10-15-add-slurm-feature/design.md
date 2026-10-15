@@ -124,7 +124,7 @@ because they must change without a rebuild of the image, and `${devcontainerId}`
 
 | Name        | Type     | Default  | Enum                  | Meaning                                                                                                   |
 | ----------- | -------- | -------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
-| `apptainer` | `string` | `"auto"` | `["auto","on","off"]` | Configure Apptainer as the container backend: when found at build time, always (fail otherwise), or never |
+| `apptainer` | `string` | `"auto"` | `["auto","off","on"]` | Configure Apptainer as the container backend: when found at build time, always (fail otherwise), or never |
 
 - **`apptainer` default `"auto"`.** The backend costs nothing when Apptainer is absent and is what a user who installs
   both features wants; `auto` makes the pair work without a second setting, while `on` is for users who must not

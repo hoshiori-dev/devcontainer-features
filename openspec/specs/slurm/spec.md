@@ -1,4 +1,4 @@
-# Spec Delta
+# slurm Specification
 
 ## Purpose
 
@@ -18,7 +18,7 @@ Upstream sources:
 - MUNGE: https://github.com/dun/munge
 - Dev Container Features reference: https://containers.dev/implementors/features/
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Supported images
 
@@ -404,7 +404,7 @@ does.
 | ------- | --------------------- |
 | Type    | `string`              |
 | Default | `"auto"`              |
-| Enum    | `["auto","on","off"]` |
+| Enum    | `["auto","off","on"]` |
 
 #### Scenario: Omitted apptainer
 
