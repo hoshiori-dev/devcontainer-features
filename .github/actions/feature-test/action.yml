@@ -28,6 +28,15 @@ runs:
       with:
         devcontainer-cli: "true"
         just: "false"
+    # Ubuntu 24.04 runners restrict unprivileged user namespaces to AppArmor-confined programs; a container that runs
+    # unconfined (the apptainer feature's securityOpt) cannot create one until the restriction is lifted, as Apptainer's
+    # admin guide says for unprivileged installs. The sysctl is absent on other runner images, hence the fallback.
+    - name: Allow unprivileged user namespaces on the runner
+      shell: bash
+      run: |
+        if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+          sudo sysctl --write kernel.apparmor_restrict_unprivileged_userns=0
+        fi
     - name: Run devcontainer features test
       shell: bash
       env:
