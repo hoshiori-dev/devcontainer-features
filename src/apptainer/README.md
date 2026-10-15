@@ -58,8 +58,10 @@ containers whose other software you trust with that.
   { "runArgs": ["--device=/dev/fuse"] }
   ```
 
-  or run SIF images with `--unsquash`, which extracts them to a temporary sandbox first. Sandbox directories
-  (`apptainer build --sandbox mydir docker://...`) need no device.
+  or run SIF images with `--unsquash`, which extracts them to a temporary sandbox first. That extraction mounts a procfs
+  inside a user namespace, which some Docker hosts refuse (GitHub-hosted runners do: "can't mount proc filesystem to
+  /proc: operation not permitted"); sandbox directories (`apptainer build --sandbox mydir docker://...`) work everywhere
+  user namespaces do and need nothing else.
 
 ## With the slurm feature
 
