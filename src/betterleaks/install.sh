@@ -274,8 +274,8 @@ download_and_verify() {
   # No entry means the release publishes no archive for this architecture; several mean a checksum list that cannot
   # be trusted to name the archive.
   [ "${download_and_verify_entries}" != "0" ] \
-    || fail "release v${version} lists no archive for linux ${arch} in its checksums.txt;" \
-      "set version to a release that has one"
+    || fail "verification failed: checksums.txt of release v${version} holds no entry for ${archive}," \
+      "so the release has no archive for linux ${arch}; set version to a release that has one"
   [ "${download_and_verify_entries}" = "1" ] \
     || fail "verification failed: checksums.txt of release v${version} holds ${download_and_verify_entries} entries" \
       "for ${archive}, expected exactly one;" \
