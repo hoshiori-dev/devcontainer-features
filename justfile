@@ -55,6 +55,26 @@ test-scenarios feature *args:
 test-global *args:
     ./scripts/test_feature.ts --mode global "$@"
 
+# Remove every test container on this Docker daemon, after the last run of a concurrent --preserve set has finished
+test-clean:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # List first, then check: a run that starts after the listing owns no listed container, and one that started
+    # before it is still a process. Anchored to the command's start, so a shell whose arguments merely mention the
+    # runner (`bash -c "... test_feature.ts ..."`) does not count as a run.
+    ids=$(docker ps -aq --filter label=devcontainer.is_test_run=true)
+    if pgrep -f '^([^ ]*/)?(deno run .*scripts/test_feature\.ts|node [^ ]*devcontainer\.js features test)( |$)' >/dev/null; then
+        echo "error: a feature test run is still in progress; let it finish (or stop it), then run this again" >&2
+        exit 1
+    fi
+    if [ -z "$ids" ]; then
+        echo "No test containers to remove."
+        exit 0
+    fi
+    # shellcheck disable=SC2086 # one container ID per word
+    docker rm -f $ids >/dev/null
+    echo "Removed $(wc -w <<<"$ids") test container(s)."
+
 # Regenerate every feature's README.md and the feature list in the root README.md
 docs:
     ./scripts/docs.ts
