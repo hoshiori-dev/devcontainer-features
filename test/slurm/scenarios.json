@@ -1,0 +1,30 @@
+{
+  "test_source_and_modes": {
+    "image": "debian:13",
+    "features": {
+      "slurm": {}
+    }
+  },
+  "test_apptainer_backend": {
+    "image": "debian:13",
+    "features": {
+      "ghcr.io/hoshiori-dev/devcontainer-features/apptainer:1": {},
+      "slurm": {}
+    }
+  },
+  "test_apptainer_off": {
+    "image": "debian:13",
+    "features": {
+      "ghcr.io/hoshiori-dev/devcontainer-features/apptainer:1": {},
+      "slurm": {
+        "apptainer": "off"
+      }
+    }
+  },
+  "fail_backend_required": {
+    "image": "debian:13",
+    "features": {
+      "slurm": {}
+    }
+  }
+}

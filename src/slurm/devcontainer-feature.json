@@ -1,0 +1,24 @@
+{
+  "id": "slurm",
+  "version": "1.0.0",
+  "name": "Slurm",
+  "description": "Installs the distribution's Slurm and MUNGE and runs, at every container start, a real single-node Slurm cluster inside the dev container or only the client side against an external cluster, with the configuration directory persisted in a named volume.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/slurm",
+  "options": {
+    "apptainer": {
+      "type": "string",
+      "enum": ["auto", "off", "on"],
+      "default": "auto",
+      "description": "Configure Apptainer as the container backend of the local Slurm (srun --container, sbatch --container): auto when Apptainer and Slurm 23.02 or newer are in the image at build time, on to require them, off never."
+    }
+  },
+  "mounts": [
+    {
+      "source": "slurm-config-${devcontainerId}",
+      "target": "/etc/slurm",
+      "type": "volume"
+    }
+  ],
+  "postStartCommand": "/usr/local/share/slurm/start.sh",
+  "installsAfter": ["ghcr.io/hoshiori-dev/devcontainer-features/apptainer"]
+}
