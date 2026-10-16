@@ -1,0 +1,15 @@
+{
+  "id": "gitleaks",
+  "version": "1.0.0",
+  "name": "Gitleaks",
+  "description": "Installs the Gitleaks secrets scanner from its checksum-verified GitHub release archive, for parity with pipelines that still run it; new setups should prefer the betterleaks feature.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/gitleaks",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "8.2.0"],
+      "default": "latest",
+      "description": "Gitleaks version to install: 'latest', or a release such as 8.30.1 (a leading 'v' is accepted; 8.2.0 or later)."
+    }
+  }
+}

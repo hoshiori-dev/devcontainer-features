@@ -1,0 +1,14 @@
+{
+  "$schema": "../compatibility.schema.json",
+  "scenarioArchitectures": ["amd64", "arm64"],
+  "images": [
+    {
+      "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+      "arch": ["amd64", "arm64"],
+      "remoteUser": "vscode"
+    },
+    { "image": "debian:12", "arch": ["amd64", "arm64"] },
+    { "image": "alpine:3.24", "arch": ["amd64", "arm64"] },
+    { "image": "fedora:44", "arch": ["amd64", "arm64"] }
+  ]
+}
