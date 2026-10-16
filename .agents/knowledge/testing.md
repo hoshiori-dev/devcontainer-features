@@ -144,8 +144,9 @@ set (`scripts/affected.ts`, `scripts/lib/repo.ts`):
    `plan`: split the PR.
 6. A job whose container runs Apptainer needs the runner's restriction on unprivileged user namespaces lifted, which the
    `feature-test` action does only when the job passes `allow-unprivileged-userns: true`: `ci.yml` passes it for the
-   `apptainer` feature's jobs and for the slurm scenarios that install it, by name. A new scenario that installs
-   `apptainer` joins that expression and the assertion in `scripts/checks_test.ts`.
+   `apptainer` feature's jobs and, by name, for every scenario of another feature that installs `apptainer`. The
+   workflow test in `scripts/checks_test.ts` derives that list from the repository, so a new such scenario fails
+   `just scripts-check` until `ci.yml` names it.
 
 ## Local dependency resolution
 

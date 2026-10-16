@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.19";
 import { parse } from "jsr:@std/semver@1.0.8";
 import { parse as parseYaml } from "npm:yaml@2.9.1";
+import { fromFileUrl } from "jsr:@std/path@1.1.6";
 import { DEPENDABOT, titleProblems } from "./check_title.ts";
 import { bodyProblems } from "./check_pr_body.ts";
 import { FAILED, isChange, main as archiveVerdict, UNARCHIVED } from "./check_spec_archived.ts";
@@ -27,10 +28,12 @@ import {
     buildPlan,
     type Compat,
     type FeatureInfo,
+    loadRepo,
     NAMESPACE,
     REPO,
     type RepoModel,
     type ScenarioJob,
+    scenarioKeyId,
     selectAffected,
 } from "./lib/repo.ts";
 import { optionDifferences, parseOptionRequirements } from "./lib/options.ts";
@@ -753,14 +756,27 @@ Deno.test("ci.yml runs one scenario per job and hands the name to the action as 
     });
     const test = job.steps.at(-1);
     assertEquals(test.uses, "./.github/actions/feature-test");
+    // Only a container that runs Apptainer needs the runner's user namespace restriction lifted: apptainer's own
+    // jobs and every scenario of another feature that installs it, named one by one so the expression stays legible.
+    // The expected expression is derived from the repository, so a new scenario that installs apptainer fails here
+    // until ci.yml names it.
+    const lifted = [...(await loadRepo(fromFileUrl(new URL("..", import.meta.url)))).features.values()]
+        .filter((feature) => feature.id !== "apptainer")
+        .map((feature) => ({
+            id: feature.id,
+            names: feature.scenarios.filter((s) => s.featureKeys.map(scenarioKeyId).includes("apptainer"))
+                .map((s) => s.name),
+        }))
+        .filter((feature) => feature.names.length > 0)
+        .map((feature) =>
+            ` || (matrix.feature == '${feature.id}' && (` +
+            feature.names.map((name) => `matrix.scenario == '${name}'`).join(" || ") + "))"
+        ).join("");
     assertEquals(test.with, {
         mode: "scenarios",
         feature: "${{ matrix.feature }}",
         scenario: "${{ matrix.scenario }}",
-        // Only a container that runs Apptainer needs the runner's user namespace restriction lifted: apptainer's own
-        // jobs and the slurm scenarios that install it. A new scenario that installs apptainer joins this by name.
-        "allow-unprivileged-userns": "${{ matrix.feature == 'apptainer' || (matrix.feature == 'slurm' && " +
-            "(matrix.scenario == 'test_apptainer_backend' || matrix.scenario == 'test_apptainer_off')) }}",
+        "allow-unprivileged-userns": `\${{ matrix.feature == 'apptainer'${lifted} }}`,
     });
     assertEquals(job.if, "needs.plan.outputs.scenarios != '[]'");
     assertEquals(job["timeout-minutes"], 60);
