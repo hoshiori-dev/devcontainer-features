@@ -115,6 +115,7 @@ jobs:
           feature: ${{ matrix.feature }}
           image: ${{ matrix.image }}
           remote-user: ${{ matrix.remoteUser }}
+          allow-unprivileged-userns: ${{ matrix.feature == 'apptainer' }}
 
   test-scenarios:
     name: scenarios (${{ matrix.feature }}, ${{ matrix.scenario }}, ${{ matrix.arch }})
@@ -135,6 +136,7 @@ jobs:
           mode: scenarios
           feature: ${{ matrix.feature }}
           scenario: ${{ matrix.scenario }}
+          allow-unprivileged-userns: ${{ matrix.feature == 'apptainer' }}
 
   test-global:
     needs: plan
