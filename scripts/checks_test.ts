@@ -757,9 +757,10 @@ Deno.test("ci.yml runs one scenario per job and hands the name to the action as 
         mode: "scenarios",
         feature: "${{ matrix.feature }}",
         scenario: "${{ matrix.scenario }}",
-        // Only a container that runs Apptainer needs the runner's user namespace restriction lifted. A scenario of
-        // another feature that installs apptainer joins this expression by name.
-        "allow-unprivileged-userns": "${{ matrix.feature == 'apptainer' }}",
+        // Only a container that runs Apptainer needs the runner's user namespace restriction lifted: apptainer's own
+        // jobs and the slurm scenarios that install it. A new scenario that installs apptainer joins this by name.
+        "allow-unprivileged-userns": "${{ matrix.feature == 'apptainer' || (matrix.feature == 'slurm' && " +
+            "(matrix.scenario == 'test_apptainer_backend' || matrix.scenario == 'test_apptainer_off')) }}",
     });
     assertEquals(job.if, "needs.plan.outputs.scenarios != '[]'");
     assertEquals(job["timeout-minutes"], 60);
