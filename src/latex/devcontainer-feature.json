@@ -1,0 +1,49 @@
+{
+  "id": "latex",
+  "version": "1.0.1",
+  "name": "LaTeX (via TinyTeX)",
+  "description": "User-managed LaTeX environment with academic packages, Chinese and Japanese support, formatting, linting, and highlighting.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/latex",
+  "options": {
+    "profile": {
+      "type": "string",
+      "enum": [
+        "basic",
+        "standard",
+        "full"
+      ],
+      "default": "standard",
+      "description": "Package tier: TinyTeX-1, TinyTeX plus academic essentials, or TinyTeX-2 (full TeX Live)."
+    },
+    "languages": {
+      "type": "string",
+      "default": "zh,ja",
+      "description": "Additional languages, comma-separated: zh, ja, both, or none."
+    },
+    "packages": {
+      "type": "string",
+      "default": "",
+      "description": "Additional TeX Live package names separated by spaces or commas."
+    },
+    "ctanMirror": {
+      "type": "string",
+      "default": "",
+      "description": "HTTPS TeX Live repository URL without credentials; empty uses automatic CTAN routing."
+    }
+  },
+  "containerEnv": {
+    "PATH": "/usr/local/share/latex/bin:${PATH}",
+    "TEXLIVE_DOWNLOADER": "",
+    "TL_DOWNLOAD_PROGRAM": "/usr/bin/curl",
+    "TL_DOWNLOAD_ARGS": "--proto =https --proto-redir =https --fail --location --silent --show-error --output",
+    "TEXLIVE_DOWNLOAD_PROGRAM": "/usr/bin/curl",
+    "TEXLIVE_DOWNLOAD_ARGS": "--proto =https --proto-redir =https --fail --location --silent --show-error --output"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "James-Yu.latex-workshop"
+      ]
+    }
+  }
+}
