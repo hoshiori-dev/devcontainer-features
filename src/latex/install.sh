@@ -276,7 +276,7 @@ configure_environment() {
   mkdir --parents "${ENV_DIR}"
   touch "${ENV_MARKER}"
   [[ ! -e "${ENV_DIR}/bin" || -L "${ENV_DIR}/bin" ]] || fail "unexpected PATH bridge; move it before retrying"
-  ln --symbolic --force --no-target-directory "${USER_BIN}" "${ENV_DIR}/bin"
+  ln --symbolic --force --no-target-directory "${tex_bin}" "${ENV_DIR}/bin"
   cat > "${PROFILE_PATH}" <<'SH'
 # Managed by the latex Dev Container Feature.
 export TEXLIVE_DOWNLOADER=

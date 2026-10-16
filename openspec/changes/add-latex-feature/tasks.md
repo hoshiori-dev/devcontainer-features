@@ -40,3 +40,5 @@
       support; retain the language-switching scenario as regression coverage.
 - [x] 4.4 Retry failed default-route package installations through CTAN's router, bound tlmgr connection time, and retry
       GitHub transfers on every error; verify the retry path and the single attempt for a custom repository.
+- [x] 4.5 Restrict the shared PATH bridge to TinyTeX binaries, bump the feature to 1.0.1, and verify that unrelated
+      executables in the target user's .local/bin are not exposed through it.
