@@ -757,6 +757,9 @@ Deno.test("ci.yml runs one scenario per job and hands the name to the action as 
         mode: "scenarios",
         feature: "${{ matrix.feature }}",
         scenario: "${{ matrix.scenario }}",
+        // Only a container that runs Apptainer needs the runner's user namespace restriction lifted. A scenario of
+        // another feature that installs apptainer joins this expression by name.
+        "allow-unprivileged-userns": "${{ matrix.feature == 'apptainer' }}",
     });
     assertEquals(job.if, "needs.plan.outputs.scenarios != '[]'");
     assertEquals(job["timeout-minutes"], 60);
@@ -766,12 +769,19 @@ Deno.test("ci.yml runs one scenario per job and hands the name to the action as 
     a.compat = { images: [{ image: "debian:12" }] };
     a.scenarios = [{ name: "test_s", image: "debian:12", usesBuild: false, featureKeys: ["a"] }];
     const [entry]: ScenarioJob[] = buildPlan(selectAffected(["src/a/install.sh"], planned), planned).scenarios;
-    const read = Object.keys(test.with).filter((key) => key !== "mode").concat("arch", "runner").sort();
+    // The inputs passed straight from a matrix field, not the ones computed from several.
+    const read = Object.entries(test.with).filter(([key, value]) => value === `\${{ matrix.${key} }}`)
+        .map(([key]) => key).concat("arch", "runner").sort();
     assertEquals(Object.keys(entry).sort(), read);
     for (const key of read) assert(JSON.stringify(job).includes(`matrix.${key}`) || key === "runner", key);
     assert(workflow.jobs["ci-gate"].needs.includes("test-scenarios"));
-    // Default and global jobs pass no scenario.
+    // Default and global jobs pass no scenario; the default jobs lift the restriction for apptainer alone, the global
+    // scenarios never.
     assertEquals(workflow.jobs.test.steps.at(-1).with.scenario, undefined);
+    assertEquals(
+        workflow.jobs.test.steps.at(-1).with["allow-unprivileged-userns"],
+        "${{ matrix.feature == 'apptainer' }}",
+    );
     assertEquals(workflow.jobs["test-global"].steps.at(-1).with, { mode: "global" });
 
     const action = parseYaml(
@@ -781,6 +791,11 @@ Deno.test("ci.yml runs one scenario per job and hands the name to the action as 
         description: "Exact scenario name for mode scenarios; empty runs every scenario of the feature.",
         default: "",
     });
+    // The restriction is lifted only on request, and only where the sysctl exists.
+    assertEquals(action.inputs["allow-unprivileged-userns"].default, "false");
+    const sysctl = action.runs.steps.find((step: { name?: string }) => step.name?.includes("user namespaces"));
+    assertEquals(sysctl.if, "${{ inputs.allow-unprivileged-userns == 'true' }}");
+    assert(sysctl.run.includes("if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]"), sysctl.run);
     const run = action.runs.steps.at(-1);
     assertEquals(run.env.SCENARIO, "${{ inputs.scenario }}");
     // Through the environment and a quoted array element: a name is never pasted into the shell source.

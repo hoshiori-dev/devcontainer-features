@@ -1,8 +1,8 @@
 # Runs scripts/test_feature.ts — the same command `just test` runs locally — for one feature and
 # image, one scenario of a feature, or the global scenarios. The script publishes a staged copy of
 # the repository to a throwaway local registry, so in-repo dependencies resolve to this checkout,
-# not to GHCR. Every input reaches the script as a quoted argument through an environment variable,
-# never as text in the shell source.
+# not to GHCR. Every input the script reads reaches it as a quoted argument through an environment
+# variable, never as text in the shell source; allow-unprivileged-userns only gates a host step.
 name: Test a feature
 description: Run the devcontainer feature tests for one CI matrix entry.
 inputs:
