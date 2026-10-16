@@ -136,7 +136,11 @@ jobs:
           mode: scenarios
           feature: ${{ matrix.feature }}
           scenario: ${{ matrix.scenario }}
-          allow-unprivileged-userns: ${{ matrix.feature == 'apptainer' }}
+          # The two slurm scenarios that install the apptainer feature run Apptainer in the container as well.
+          allow-unprivileged-userns: >-
+            ${{ matrix.feature == 'apptainer'
+            || (matrix.feature == 'slurm'
+            && (matrix.scenario == 'test_apptainer_backend' || matrix.scenario == 'test_apptainer_off')) }}
 
   test-global:
     needs: plan
