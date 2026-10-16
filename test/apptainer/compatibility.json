@@ -1,0 +1,12 @@
+{
+  "$schema": "../compatibility.schema.json",
+  "images": [
+    { "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04", "arch": ["amd64", "arm64"], "remoteUser": "vscode" },
+    { "image": "debian:12" },
+    { "image": "debian:13" },
+    { "image": "ubuntu:22.04", "arch": ["amd64", "arm64"] },
+    { "image": "fedora:44", "arch": ["amd64", "arm64"] },
+    { "image": "almalinux:9", "arch": ["amd64", "arm64"] },
+    { "image": "rockylinux/rockylinux:9", "arch": ["amd64", "arm64"] }
+  ]
+}

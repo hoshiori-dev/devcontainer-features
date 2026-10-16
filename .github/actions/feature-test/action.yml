@@ -1,8 +1,8 @@
 # Runs scripts/test_feature.ts — the same command `just test` runs locally — for one feature and
 # image, one scenario of a feature, or the global scenarios. The script publishes a staged copy of
 # the repository to a throwaway local registry, so in-repo dependencies resolve to this checkout,
-# not to GHCR. Every input reaches the script as a quoted argument through an environment variable,
-# never as text in the shell source.
+# not to GHCR. Every input the script reads reaches it as a quoted argument through an environment
+# variable, never as text in the shell source; allow-unprivileged-userns only gates a host step.
 name: Test a feature
 description: Run the devcontainer feature tests for one CI matrix entry.
 inputs:
@@ -21,6 +21,11 @@ inputs:
   scenario:
     description: Exact scenario name for mode scenarios; empty runs every scenario of the feature.
     default: ""
+  allow-unprivileged-userns:
+    description: >-
+      "true" lifts the runner's restriction on unprivileged user namespaces before the test; only jobs whose
+      container runs Apptainer need it.
+    default: "false"
 runs:
   using: composite
   steps:
@@ -28,6 +33,17 @@ runs:
       with:
         devcontainer-cli: "true"
         just: "false"
+    # Ubuntu 24.04 runners restrict unprivileged user namespaces to AppArmor-confined programs; a container that runs
+    # unconfined (the apptainer feature's securityOpt) cannot create one until the restriction is lifted, as Apptainer's
+    # admin guide says for unprivileged installs. Only the jobs that opt in change the host; the sysctl is absent on
+    # other runner images, hence the fallback.
+    - name: Allow unprivileged user namespaces on the runner
+      if: ${{ inputs.allow-unprivileged-userns == 'true' }}
+      shell: bash
+      run: |
+        if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+          sudo sysctl --write kernel.apparmor_restrict_unprivileged_userns=0
+        fi
     - name: Run devcontainer features test
       shell: bash
       env:

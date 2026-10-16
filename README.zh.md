@@ -48,24 +48,25 @@
 
 <!-- features:start -->
 
-| Feature                                                            | 说明                                                                                                                                                                  |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [apk-packages](src/apk-packages/README.md)                         | 用 apk 从 Alpine Linux 镜像已配置的软件源安装一组系统软件包。                                                                                                         |
-| [apt-packages](src/apt-packages/README.md)                         | 用 apt-get 从 Debian 或 Ubuntu 镜像已配置的软件源安装一组系统软件包。                                                                                                 |
-| [betterleaks](src/betterleaks/README.md)                           | 从经过校验和验证的 GitHub 发布包安装 Betterleaks 密钥扫描器，不写入任何扫描配置。                                                                                     |
-| [colab-cli](src/colab-cli/README.md)                               | 用 uv 和隔离的 Python 3.12 为远程用户安装 Google Colab CLI。                                                                                                          |
-| [deno](src/deno/README.md)                                         | 安装 Deno CLI 并按官方发布的校验和验证；用 deno install --global 安装的工具放在共用的 PATH 位置。                                                                     |
-| [dnf-packages](src/dnf-packages/README.md)                         | 从镜像已配置的软件源安装列出的系统软件包。                                                                                                                            |
-| [firewall](src/firewall/README.md)                                 | 把容器的出站和转发流量限制在由预设、域名和 CIDR 组成的允许列表内（或拦截拒绝列表中的目标），每次启动时通过 nftables 和 dnsmasq 应用这些规则。它是护栏，不是安全边界。 |
-| [gitleaks](src/gitleaks/README.md)                                 | 从经过校验和验证的 GitHub 发布包安装 Gitleaks 密钥扫描器，用于与仍在运行它的流水线保持一致；新项目应优先使用 betterleaks feature。                                    |
-| [glab](src/glab/README.md)                                         | 从经过校验和验证的 GitLab 发布包安装 GitLab CLI（glab），不配置任何认证。                                                                                             |
-| [hf-cli](src/hf-cli/README.md)                                     | 用官方独立安装器为远程用户安装 Hugging Face CLI，可选安装上游的 hf-cli agent skill。                                                                                  |
-| [hf-mount](src/hf-mount/README.md)                                 | 从上游发布的二进制文件安装 hf-mount 守护进程及其 NFS 和 FUSE 后端，用来把 Hugging Face Buckets 和仓库挂载为本地文件系统。                                             |
-| [nvidia-container-toolkit](src/nvidia-container-toolkit/README.md) | 从 NVIDIA 签名的软件源安装 NVIDIA Container Toolkit，并把 nvidia 运行时注册到 dev container 内的 Docker 守护进程。                                                    |
-| [openspec](src/openspec/README.md)                                 | 从 npm registry 安装 OpenSpec CLI（openspec），验证每个包的完整性哈希和 registry 签名；所需的 Node.js 运行时作为依赖一并带入。                                        |
-| [pacman-packages](src/pacman-packages/README.md)                   | 用 pacman 从 Arch Linux 镜像已配置的软件源安装一组系统软件包，安装时会做一次完整的系统升级。                                                                          |
-| [uv](src/uv/README.md)                                             | 安装 Astral 的 uv 和 uvx，可选安装 Python 命令行工具；uv 的 Python 解释器和缓存保存在重建后仍然保留的卷上。                                                           |
-| [zypper-packages](src/zypper-packages/README.md)                   | 从镜像已启用的软件源安装列出的系统软件包。                                                                                                                            |
+| Feature                                                            | 说明                                                                                                                                                                        |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [apk-packages](src/apk-packages/README.md)                         | 用 apk 从 Alpine Linux 镜像已配置的软件源安装一组系统软件包。                                                                                                               |
+| [apptainer](src/apptainer/README.md)                               | 以非特权、非 setuid 的形式安装 Apptainer：Fedora 用自带软件源，RHEL 衍生版用 EPEL，Ubuntu 用项目的 PPA，Debian 用 GitHub 发布包；并声明非特权用户运行它所需的容器安全选项。 |
+| [apt-packages](src/apt-packages/README.md)                         | 用 apt-get 从 Debian 或 Ubuntu 镜像已配置的软件源安装一组系统软件包。                                                                                                       |
+| [betterleaks](src/betterleaks/README.md)                           | 从经过校验和验证的 GitHub 发布包安装 Betterleaks 密钥扫描器，不写入任何扫描配置。                                                                                           |
+| [colab-cli](src/colab-cli/README.md)                               | 用 uv 和隔离的 Python 3.12 为远程用户安装 Google Colab CLI。                                                                                                                |
+| [deno](src/deno/README.md)                                         | 安装 Deno CLI 并按官方发布的校验和验证；用 deno install --global 安装的工具放在共用的 PATH 位置。                                                                           |
+| [dnf-packages](src/dnf-packages/README.md)                         | 从镜像已配置的软件源安装列出的系统软件包。                                                                                                                                  |
+| [firewall](src/firewall/README.md)                                 | 把容器的出站和转发流量限制在由预设、域名和 CIDR 组成的允许列表内（或拦截拒绝列表中的目标），每次启动时通过 nftables 和 dnsmasq 应用这些规则。它是护栏，不是安全边界。       |
+| [gitleaks](src/gitleaks/README.md)                                 | 从经过校验和验证的 GitHub 发布包安装 Gitleaks 密钥扫描器，用于与仍在运行它的流水线保持一致；新项目应优先使用 betterleaks feature。                                          |
+| [glab](src/glab/README.md)                                         | 从经过校验和验证的 GitLab 发布包安装 GitLab CLI（glab），不配置任何认证。                                                                                                   |
+| [hf-cli](src/hf-cli/README.md)                                     | 用官方独立安装器为远程用户安装 Hugging Face CLI，可选安装上游的 hf-cli agent skill。                                                                                        |
+| [hf-mount](src/hf-mount/README.md)                                 | 从上游发布的二进制文件安装 hf-mount 守护进程及其 NFS 和 FUSE 后端，用来把 Hugging Face Buckets 和仓库挂载为本地文件系统。                                                   |
+| [nvidia-container-toolkit](src/nvidia-container-toolkit/README.md) | 从 NVIDIA 签名的软件源安装 NVIDIA Container Toolkit，并把 nvidia 运行时注册到 dev container 内的 Docker 守护进程。                                                          |
+| [openspec](src/openspec/README.md)                                 | 从 npm registry 安装 OpenSpec CLI（openspec），验证每个包的完整性哈希和 registry 签名；所需的 Node.js 运行时作为依赖一并带入。                                              |
+| [pacman-packages](src/pacman-packages/README.md)                   | 用 pacman 从 Arch Linux 镜像已配置的软件源安装一组系统软件包，安装时会做一次完整的系统升级。                                                                                |
+| [uv](src/uv/README.md)                                             | 安装 Astral 的 uv 和 uvx，可选安装 Python 命令行工具；uv 的 Python 解释器和缓存保存在重建后仍然保留的卷上。                                                                 |
+| [zypper-packages](src/zypper-packages/README.md)                   | 从镜像已启用的软件源安装列出的系统软件包。                                                                                                                                  |
 
 <!-- features:end -->
 

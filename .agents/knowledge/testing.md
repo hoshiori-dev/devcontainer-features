@@ -142,6 +142,11 @@ set (`scripts/affected.ts`, `scripts/lib/repo.ts`):
    Each such job stages only its scenario (`scripts/lib/stage.ts`) and runs it on the architecture's native runner. The
    expanded count — every scenario times its architectures — is what the 256-job matrix limit measures; more fails
    `plan`: split the PR.
+6. A job whose container runs Apptainer needs the runner's restriction on unprivileged user namespaces lifted, which the
+   `feature-test` action does only when the job passes `allow-unprivileged-userns: true`: `ci.yml` passes it for the
+   `apptainer` feature's jobs and, by name, for every scenario of another feature that installs `apptainer`. The
+   workflow test in `scripts/checks_test.ts` derives that list from the repository, so a new such scenario fails
+   `just scripts-check` until `ci.yml` names it.
 
 ## Local dependency resolution
 
