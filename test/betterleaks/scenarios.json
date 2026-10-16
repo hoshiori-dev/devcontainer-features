@@ -1,0 +1,35 @@
+{
+  "test_version_explicit": {
+    "image": "debian:12",
+    "features": {
+      "betterleaks": {
+        "version": "1.8.1"
+      }
+    }
+  },
+  "test_version_leading_v": {
+    "image": "alpine:3.24",
+    "features": {
+      "betterleaks": {
+        "version": "v1.8.1"
+      }
+    }
+  },
+  "test_version_prerelease": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "betterleaks": {
+        "version": "2.0.0-rc.2"
+      }
+    }
+  },
+  "test_version_explicit_fedora": {
+    "image": "fedora:44",
+    "features": {
+      "betterleaks": {
+        "version": "1.8.1"
+      }
+    }
+  }
+}
