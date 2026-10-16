@@ -113,12 +113,14 @@ The feature SHALL accept the option `ctanMirror` as declared here.
 - **WHEN** `ctanMirror` is omitted or empty
 - **THEN** tlmgr uses `https://mirror.ctan.org/systems/texlive/tlnet`
 - **AND** HTTPS transport and upstream package verification remain enabled
+- **AND** a failed package installation is attempted up to three times in total, each through CTAN's routing
 
 #### Scenario: Custom repository
 
 - **WHEN** `ctanMirror` is an HTTPS TeX Live repository URL without embedded credentials
 - **THEN** tlmgr uses that repository for requested package additions and subsequent user operations
 - **AND** bundle downloads continue to use the TinyTeX release source
+- **AND** a failed package installation is not repeated against that fixed repository
 
 #### Scenario: Invalid repository
 

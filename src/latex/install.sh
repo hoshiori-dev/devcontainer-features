@@ -10,7 +10,9 @@ readonly ENV_DIR="/usr/local/share/latex"
 readonly APT_LISTS_DIR="/var/lib/apt/lists"
 readonly ENV_MARKER="${ENV_DIR}/.devcontainer-latex"
 readonly PROFILE_PATH="/etc/profile.d/latex.sh"
-readonly DOWNLOAD_ARGS="--proto =https --proto-redir =https --fail --location --silent --show-error --output"
+readonly DOWNLOAD_ARGS="--proto =https --proto-redir =https --fail --location --silent --show-error \
+--connect-timeout 20 --output"
+readonly ROUTED_ATTEMPTS=3
 readonly INSTALL_MARKER=".devcontainer-latex"
 readonly REMOTE_USER="${_REMOTE_USER-}"
 readonly REMOTE_HOME="${_REMOTE_USER_HOME-}"
@@ -53,7 +55,8 @@ cleanup() {
 }
 
 fetch() {
-  curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 "$@"
+  curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
+    --retry 3 --retry-all-errors --retry-delay 5 "$@"
 }
 
 # Runs a command without shell interpolation as the target user, with its actual home and TeX PATH.
@@ -195,6 +198,17 @@ install_dependencies() {
   python3 -c 'import sys; assert sys.version_info >= (3, 8)' || fail "Python 3.8 or newer is required"
 }
 
+# CTAN's router picks a mirror per tlmgr run, so a retry can avoid a broken one; a custom repository is tried once.
+install_missing() {
+  local attempts=1
+  local attempt
+  if [[ -z "${CTANMIRROR}" ]]; then attempts=${ROUTED_ATTEMPTS}; fi
+  for (( attempt = 1; attempt < attempts; attempt++ )); do
+    if as_user tlmgr install "$@"; then return 0; fi
+    log "package installation attempt ${attempt} of ${attempts} failed; retrying through CTAN's router"
+  done
+  as_user tlmgr install "$@"
+}
 
 install_packages() {
   local repository="${CTANMIRROR:-${CTAN_REPOSITORY}}"
@@ -227,7 +241,7 @@ install_packages() {
   done
   if (( ${#missing[@]} )); then
     log "installing missing TeX packages: ${missing[*]}"
-    as_user tlmgr install "${missing[@]}" \
+    install_missing "${missing[@]}" \
       || fail "package installation failed; check names and availability, or rebuild from a current base / configure a matching TeX Live year"
   fi
   if ${ja}; then

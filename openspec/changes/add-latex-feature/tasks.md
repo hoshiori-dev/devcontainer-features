@@ -38,3 +38,5 @@
 
 - [x] 4.3 Include xecjk in Japanese-only installations and verify Japanese XeLaTeX compilation independently of Chinese
       support; retain the language-switching scenario as regression coverage.
+- [x] 4.4 Retry failed default-route package installations through CTAN's router, bound tlmgr connection time, and retry
+      GitHub transfers on every error; verify the retry path and the single attempt for a custom repository.

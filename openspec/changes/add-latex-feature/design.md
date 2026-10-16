@@ -87,6 +87,15 @@ repository is an explicit trust choice; it must be a TeX Live repository URL wit
 router and its chosen official mirror use HTTPS throughout. The first release does not silently fall back to HTTP, an
 unrelated mirror, an older bundle, or an unsigned verification mode.
 
+CTAN's router assigns a mirror per tlmgr run, and CI showed some official mirrors failing every request: one serves an
+incomplete certificate chain, others accept no connections. On the default route, the installer therefore runs a failed
+`tlmgr install` up to three times in total, so each attempt can reach a different official mirror. A custom repository
+is a fixed mirror and gets one attempt. Transfers that tlmgr starts give up after a 20-second connection timeout instead
+of the more than two minutes observed in CI. Bundle and release-metadata requests to GitHub use curl's own retries for
+every error, including connection resets, with a short delay; certificate verification and the digest check stay in
+force. The maintainer rejected pinning one mirror in CI, which would hide the default-route failure users hit, and
+reducing the installer's GitHub API requests.
+
 ### Package selection
 
 Fresh basic, standard, and full installations use TinyTeX-1, TinyTeX, and TinyTeX-2 respectively. Common tools are
