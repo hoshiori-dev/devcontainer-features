@@ -166,8 +166,9 @@ Selecting Chinese SHALL provide `xecjk`, `ctex`, `zhnumber`, `unicode-data`, and
 
 ### Requirement: Japanese compilation
 
-Selecting Japanese SHALL provide modern and traditional Japanese compilation, with Harano Aji and IPAex fonts and Noto
-CJK system fonts. Traditional compilation SHALL have working font maps for dvipdfmx.
+Selecting Japanese SHALL install xecjk for zxjatype even when Chinese support is not selected, and SHALL provide modern
+and traditional Japanese compilation, with Harano Aji and IPAex fonts and Noto CJK system fonts. Traditional compilation
+SHALL have working font maps for dvipdfmx.
 
 #### Scenario: Japanese documents
 

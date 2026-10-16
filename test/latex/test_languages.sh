@@ -10,6 +10,6 @@ cp documents/* .
 check_common
 check "Chinese selection accepts whitespace and duplicates" run_installer PROFILE=basic LANGUAGES=' zh , zh '
 check_chinese
-check "Japanese selection adds Japanese support" run_installer PROFILE=basic LANGUAGES=ja
+check "Japanese-only selection provides independent Japanese support" run_installer PROFILE=basic LANGUAGES=ja
 check_japanese
 reportResults

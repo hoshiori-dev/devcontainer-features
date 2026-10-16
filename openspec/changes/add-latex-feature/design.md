@@ -94,10 +94,11 @@ explicitly ensured for every profile rather than relying on a mutable bundle inv
 latex-bin, xetex, luahbtex, luaotfload, fontspec, latexmk, latexindent, and chktex. System Python and Pygments provide
 the command-line highlighting interface; standard and full additionally use the TeX-distributed minted integration.
 
-The standard academic set is defined once in the delta spec. Chinese uses its stated package set. Japanese adds
-luatexja, zxjatype, ptex, uptex, platex, uplatex, japanese-otf, pxjahyper, bxjscls, pbibtex-base, ptex-fontmaps,
-haranoaji, and ipaex where an OS IPAex installation is unavailable. Dependencies supply the matching engine binaries.
-Traditional font maps select Harano Aji so DVI-to-PDF compilation does not require proprietary fonts.
+The standard academic set is defined once in the delta spec. Chinese uses its stated package set. Japanese explicitly
+includes xecjk for zxjatype, including when Chinese is not selected. Japanese adds luatexja, zxjatype, xecjk, ptex,
+uptex, platex, uplatex, japanese-otf, pxjahyper, bxjscls, pbibtex-base, ptex-fontmaps, haranoaji, and ipaex where an OS
+IPAex installation is unavailable. Dependencies supply the matching engine binaries. Traditional font maps select Harano
+Aji so DVI-to-PDF compilation does not require proprietary fonts.
 
 Package selections are aggregated and deduplicated. One local installed-package inventory filters existing packages for
 every profile; tlmgr receives the missing selection in a batch and manages dependencies. Installing no missing packages

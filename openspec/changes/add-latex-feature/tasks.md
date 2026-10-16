@@ -35,3 +35,6 @@
 - [x] 4.1 Replace every target TinyTeX tree from the current archive, verify rollback, and refresh old command links.
 - [x] 4.2 Verify last-installation-wins behavior for identical, smaller, full, and unmanaged installations; document it
       in NOTES.md.
+
+- [x] 4.3 Include xecjk in Japanese-only installations and verify Japanese XeLaTeX compilation independently of Chinese
+      support; retain the language-switching scenario as regression coverage.

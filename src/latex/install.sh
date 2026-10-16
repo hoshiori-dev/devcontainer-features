@@ -212,7 +212,7 @@ install_packages() {
   fi
   if ${zh}; then selected+=(xecjk ctex zhnumber unicode-data fandol); fi
   if ${ja}; then
-    selected+=(luatexja zxjatype ptex uptex platex uplatex japanese-otf pxjahyper bxjscls
+    selected+=(luatexja zxjatype xecjk ptex uptex platex uplatex japanese-otf pxjahyper bxjscls
       pbibtex-base ptex-fontmaps haranoaji jsclasses)
     if [[ "${os_id}" == almalinux ]]; then selected+=(ipaex); fi
   fi
