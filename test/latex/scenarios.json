@@ -125,5 +125,15 @@
         "languages": "none"
       }
     }
+  },
+  "test_existing_tree": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none"
+      }
+    }
   }
 }

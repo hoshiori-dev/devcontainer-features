@@ -198,43 +198,49 @@ or home SHALL cause an actionable failure.
 
 ### Requirement: Repeat installation
 
-Installing again SHALL reuse the feature-managed tree and add missing profile, language, and extra packages without
-removing existing packages or user files. Later mirror settings SHALL apply. Reducing a profile or language selection
-SHALL NOT uninstall packages. Changing the remote user SHALL create a separate installation in the new user's home.
+Every invocation SHALL install the archive selected by the current profile and replace any existing TinyTeX tree at the
+target user's installation path, regardless of its owner, provenance, marker, or usability. The last successful
+installation SHALL determine the active profile, requested additions, and repository. Previous packages, files, formats,
+and caches in the replaced tree SHALL NOT be preserved. Other users' trees, system TeX installations, and editor
+settings SHALL remain untouched.
 
 #### Scenario: Repeated identical installation
 
-- **WHEN** the feature runs twice with identical options and the target user has installed an additional package
-- **THEN** both runs succeed, the additional package and a user-created file in the tree remain present
-- **AND** no duplicate PATH configuration is created and no replacement bundle is downloaded
+- **WHEN** the feature runs again with identical options after the user adds packages and files inside its TeX tree
+- **THEN** a new selected archive is installed and previous custom files are removed
+- **AND** packages absent from the new bundle and current selections are not retained
+- **AND** TinyTeX command links are refreshed without duplicate PATH declarations
 
 #### Scenario: Changed options
 
-- **WHEN** a basic installation is followed by standard or full, or by added languages and extra packages
-- **THEN** missing requested packages are added without replacing the tree
-- **AND** selecting full ensures the full scheme is present
-- **AND** a later smaller selection preserves the accumulated installation
+- **WHEN** a basic installation is followed by full
+- **THEN** TinyTeX-2 is downloaded directly and the full scheme is available
+- **AND** selecting a later smaller profile replaces the tree with that profile's archive and current additions
 
-### Requirement: Existing incompatible installation
+### Requirement: Replacement failure
 
-The feature SHALL fail without deleting or taking ownership of an existing unmanaged, broken, or incompatible tree at
-its installation path. A TeX Live repository from a different release year SHALL produce an actionable failure rather
-than an implicit reinstall or downgrade.
+The feature SHALL verify the new archive before moving the previous target tree aside, retain a backup until setup
+succeeds, and restore the previous tree when extraction, package installation, or configuration fails. A TeX Live
+repository from a different year SHALL fail with guidance to configure a matching repository.
 
-#### Scenario: Conflicting installation
+#### Scenario: Existing unmanaged or broken installation
 
-- **WHEN** an existing tree at the target path is not a usable installation managed by this feature
-- **THEN** installation fails and preserves its files and ownership
+- **WHEN** the target path already contains an unmanaged, broken, or differently owned TinyTeX installation
+- **THEN** a successful installation replaces it with the current selected archive owned by the target user
+
+#### Scenario: Failed replacement
+
+- **WHEN** download or verification fails, or setup of the new installation fails
+- **THEN** the previous TinyTeX tree and its contents remain available or are restored
 
 #### Scenario: Cross-year repository
 
-- **WHEN** requested package additions encounter a repository for a different TeX Live release year
-- **THEN** installation fails with guidance to rebuild from a current base or configure a matching repository
-- **AND** existing user packages remain present
+- **WHEN** requested additions encounter a repository for a different TeX Live release year
+- **THEN** installation fails with matching-repository guidance and restores the previous tree
 
 ### Requirement: Bundle origin
 
-Fresh installations SHALL use the selected architecture's daily TinyTeX bundle from
+Every installation SHALL use the selected architecture's daily TinyTeX bundle from
 `https://github.com/rstudio/tinytex-releases/releases/download/daily/`, resolving asset metadata from
 `https://api.github.com/repos/rstudio/tinytex-releases/releases/tags/daily`. Downloads SHALL use HTTPS on every hop and
 SHALL NOT fall back to a source installation.

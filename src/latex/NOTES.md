@@ -38,10 +38,25 @@ The profiles start from TinyTeX-1 (`basic`), TinyTeX with academic templates, mi
 LuaLaTeX, latexmk, latexindent, chktex, and Pygments. Language additions apply to all profiles. `languages=none`
 requests no CJK additions; a bundle can already include some of those packages.
 
-Installing the feature again reuses its own tree and adds missing packages. Choosing a smaller profile or fewer
-languages does not uninstall anything. An unrelated or broken installation at `~/.TinyTeX` is preserved and rejected;
-move it before installing this feature. A repository from a different TeX Live year requires a clean rebuild or a
-matching repository, rather than an implicit destructive upgrade.
+### Installation order: the last installation wins
+
+Every invocation installs the TinyTeX bundle selected by its current parameters and replaces any existing TinyTeX tree
+at the configured remote user's `~/.TinyTeX`, regardless of who installed it. The last feature installation determines
+the active profile, language additions, extra packages, and repository. A later `full` installation downloads TinyTeX-2
+directly instead of expanding an earlier basic installation through thousands of individual package downloads.
+
+Replacement discards the previous tree, including manually installed packages, custom files, formats, and caches.
+Choosing a smaller profile or fewer languages does not preserve earlier additions, although the new upstream bundle may
+already contain some of those packages. Declare everything needed in the final installation's `packages` option.
+
+The installer downloads and verifies the new archive before moving the old tree aside. It keeps that backup until the
+new environment is configured successfully and restores it if replacement fails. TinyTeX command links in `~/.local/bin`
+are refreshed; obsolete TinyTeX links are removed. Other users' home directories, system-managed TeX distributions, and
+editor settings are outside the replacement scope. System dependencies and fonts installed by earlier invocations may
+remain in the image.
+
+All profiles use CTAN for required or requested packages absent from their bundles. If the selected repository targets a
+different TeX Live year, installation fails and the previous TinyTeX installation is restored.
 
 `ctanMirror` accepts an HTTPS TeX Live repository URL, for example a mirror's `/systems/texlive/tlnet` directory,
 without credentials. Use a specific mirror rather than an additional redirector, so its index and packages come from the

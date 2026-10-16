@@ -11,7 +11,8 @@ Upstream research on 2026-10-16 established that:
 - TinyTeX supplies prebuilt glibc archives for both x86_64 and arm64. TinyTeX-2 is a daily-only full-scheme archive of
   about 1.8 GB compressed; the standard TinyTeX archive is about 152–158 MB.
 - The upstream shell installer removes an existing installation before unpacking its replacement and does not verify
-  archive digests. Calling it on every invocation conflicts with the required preservation behavior.
+  archive digests. This feature implements replacement itself so it can verify the new archive and restore the previous
+  tree on failure.
 - Current minted bundles latexminted and its Python libraries, including Pygments. Python 3.8+ is required; current TeX
   Live supports restricted shell escape for latexminted. A separate pygmentize remains useful for older templates.
 - The TeX Live package database names the Unicode data package `unicode-data`. Japanese bibliography commands are
@@ -33,8 +34,8 @@ is unnecessary for this feature.
   download tests.
 - Keep TeX operations and writable caches under the configured user's ownership; verify actual package installation and
   compilation as that user.
-- Reuse an existing feature-managed installation; verify user files, added packages, and changed selections survive
-  repeated installation.
+- Replace an existing TinyTeX installation on every invocation; verify that the last selections win and failed
+  replacements restore the previous tree.
 - Make the bounded profiles' three-minute ceiling measurable; retain cold-build timings with functional results.
 - Complete caching at build time; verify first-use compilation and cache ownership without runtime hooks.
 
@@ -43,8 +44,8 @@ is unnecessary for this feature.
 - A persistent volume or lifecycle bootstrap: metadata inspection confirms neither is added.
 - Bit-for-bit reconstruction across dates: daily bundles and live CTAN repositories are deliberately rolling. Notes
   explain the limitation and users can preserve a built image by digest.
-- Automatic cross-year TeX Live migration or adoption of another installation: conflict tests confirm clear failure and
-  preservation rather than replacement.
+- Automatic migration of old packages or custom files into the replacement: each installation starts from its selected
+  upstream archive. Cross-year repository errors restore the previous tree.
 - Automatic editor settings or an unrestricted shell-escape default: metadata and documented recipes are checked.
 
 ## Decisions
@@ -70,8 +71,8 @@ a rolling daily channel and full is unavailable on the normal monthly channel.
 ### Bundle installation and verification
 
 Download and unpack the architecture-specific upstream daily archive directly, preserving TinyTeX's normal home layout.
-The metadata and archive origins are specified in the delta spec. Resolve the release once per fresh installation, match
-the selected asset, and verify the downloaded bytes against any published verification data and the platform digest when
+The metadata and archive origins are specified in the delta spec. Resolve the release once per invocation, match the
+selected asset, and verify the downloaded bytes against any published verification data and the platform digest when
 available. A daily asset replaced between metadata lookup and download causes a mismatch and fails; it never bypasses
 verification. Temporary downloads are isolated and removed on failure or success.
 
@@ -94,32 +95,33 @@ latex-bin, xetex, luahbtex, luaotfload, fontspec, latexmk, latexindent, and chkt
 the command-line highlighting interface; standard and full additionally use the TeX-distributed minted integration.
 
 The standard academic set is defined once in the delta spec. Chinese uses its stated package set. Japanese adds
-luatexja, zxjatype, ptex, uptex, platex, uplatex, japanese-otf, japanese-otf-uptex, pxjahyper, bxjscls, pbibtex-base,
-ptex-fontmaps, haranoaji, and ipaex where an OS IPAex installation is unavailable. Dependencies supply the matching
-engine binaries. Traditional font maps select Harano Aji so DVI-to-PDF compilation does not require proprietary fonts.
+luatexja, zxjatype, ptex, uptex, platex, uplatex, japanese-otf, pxjahyper, bxjscls, pbibtex-base, ptex-fontmaps,
+haranoaji, and ipaex where an OS IPAex installation is unavailable. Dependencies supply the matching engine binaries.
+Traditional font maps select Harano Aji so DVI-to-PDF compilation does not require proprietary fonts.
 
 Package selections are aggregated and deduplicated. One local installed-package inventory filters existing packages for
 every profile; tlmgr receives the missing selection in a batch and manages dependencies. Installing no missing packages
 avoids a needless package-install transaction. Link refresh and generated formats remain part of successful
 installation. Package-manager failures propagate; an already installed package does not conceal another missing one.
 
-### User paths and accumulated installation
+### User paths and replacement installation
 
-System dependencies are installed as root. TeX package management, format generation, and Lua cache work run as the
-configured remote user with its actual home. A root remote user follows the same layout without a privilege switch. An
-installation marker inside the TeX tree distinguishes this feature's installation from an unrelated tree; it is written
-only after a usable base is established. Existing unmanaged or unusable paths fail with recovery guidance.
+System dependencies are installed as root. TeX package management, formats, and Lua caches run as the configured remote
+user with its actual home. Every invocation downloads the currently selected archive, including TinyTeX-2 when full
+follows basic or standard. Existing trees are replaced regardless of provenance, ownership, or markers.
 
-Executable links live in the user's `.local/bin`. Feature environment metadata exposes the absolute target-user
-directory to VS Code and tasks; a small managed shell PATH configuration covers terminal sessions without changing
-editor settings. Existing unrelated files and command links are not overwritten. Repeated installation replaces the
-managed PATH declaration rather than appending entries.
+Verify the archive first, move the previous target path to a temporary sibling backup, and extract the new tree at the
+normal TinyTeX path so setup uses its final location. Keep the backup until package installation, environment setup, and
+cache generation succeed. On failure, remove the incomplete new tree and restore the backup. On success, delete the
+backup. Earlier custom files and package additions are intentionally discarded.
 
-An existing installation accumulates requested packages. Upgrading the profile to full installs scheme-full through
-tlmgr rather than replacing the tree with a full archive. A smaller later selection does not shrink the environment. New
-users get their own installation; old users' trees are untouched. A cross-year mismatch fails rather than performing an
-implicit reinstall. Volume persistence and recursive ownership repair are rejected because they blur the boundary
-between image configuration and runtime state.
+Refresh TinyTeX links in the user's `.local/bin`, removing obsolete links into TinyTeX trees while rejecting unrelated
+command conflicts. Replace the managed PATH declaration without appending duplicate entries. Other users' trees,
+system-managed TeX distributions, and editor settings are not replacement targets. Existing OS dependencies and fonts
+may remain; package managers are not used to undo earlier language selections.
+
+Volume persistence and recursive ownership repair remain unnecessary: the current configuration determines a fresh,
+user-owned TeX tree in the image layer. A different remote user receives its own installation.
 
 ### System dependencies and fonts
 
@@ -135,8 +137,8 @@ repository. Fandol and Harano Aji remain explicit TeX font dependencies. Smoke d
 variations in distribution-provided Noto formats do not alter their font selection.
 
 Fontconfig caches are generated after fonts are installed. Lua font indexing runs as the target user and covers its TeX
-and system font sources. Cache failures fail the build. Avoid forced full rescans on a repeated installation whose font
-inputs did not change. No volume, TEXMF relocation, or container-start initialization is introduced.
+and system font sources. Cache failures fail the build. Every replacement prepares the new tree's font index. No volume,
+TEXMF relocation, or container-start initialization is introduced.
 
 ### Compatibility and verification scope
 
@@ -156,9 +158,9 @@ and validation. Alpine and other musl images fail before dependency installation
 
 Functional coverage includes the common engines, Chinese and Japanese compilation, traditional Japanese font embedding,
 bibliography resolution, minted, formatting, and linting. Scenarios exercise all profiles, language subsets, extra
-packages, repository selection, target-user ownership, preservation, and failures. Full-profile smoke coverage runs on
-both architectures on the reference Ubuntu image; the default matrix covers every supported pair. Download failure tests
-use controlled fixtures and never weaken live download verification.
+packages, repository selection, target-user ownership, replacement, rollback, and failures. Full-profile smoke coverage
+runs on both architectures on the reference Ubuntu image; the default matrix covers every supported pair. Download
+failure tests use controlled fixtures and never weaken live download verification.
 
 ### Three-minute reference measurement
 

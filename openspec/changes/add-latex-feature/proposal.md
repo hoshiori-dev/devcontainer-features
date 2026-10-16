@@ -45,7 +45,8 @@ None.
 
 **Stays true**
 
-- User packages and files survive the delta spec's repeat-installation scenarios.
+- Files outside the replaced TinyTeX tree and its command links survive repeat installation; failed replacements restore
+  the previous tree.
 - The editor-guidance scenario confirms that existing project and user settings are preserved.
 - Supported downloads retain certificate and integrity verification, as covered by the download scenarios.
 - Existing features pass `just check`; generated documentation and its Chinese translation remain synchronized.

@@ -7,9 +7,9 @@ source ./installer.sh
 # shellcheck source=test/latex/checks.sh
 source ./checks.sh
 printf 'preserved\n' > "${HOME}/.TinyTeX/before-full-upgrade"
-check "basic upgrades to full without replacing the tree" run_installer PROFILE=full LANGUAGES=zh,ja
+check "basic is replaced using the full archive" run_installer PROFILE=full LANGUAGES=zh,ja
 check "full scheme is installed" tlmgr info --only-installed scheme-full
-check "profile upgrade preserves user files" grep -qx preserved "${HOME}/.TinyTeX/before-full-upgrade"
+check "profile replacement discards old user files" test ! -e "${HOME}/.TinyTeX/before-full-upgrade"
 cp documents/* .
 check_common
 check_ownership

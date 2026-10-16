@@ -31,13 +31,24 @@ tex_bin=""
 zh=false
 ja=false
 fresh=false
-changed=false
+backup_dir=""
+replacement_started=false
+replacement_complete=false
 extra_packages=()
 
 log() { printf 'latex: %s\n' "$*"; }
 fail() { printf 'latex: error: %s\n' "$*" >&2; exit 1; }
 
 cleanup() {
+  if ${replacement_started} && ! ${replacement_complete}; then
+    rm --recursive --force "${TEX_DIR}"
+    if [[ -n "${backup_dir}" ]]; then mv -- "${backup_dir}" "${TEX_DIR}"; fi
+    replacement_started=false
+    backup_dir=""
+  elif ${replacement_complete} && [[ -n "${backup_dir}" ]]; then
+    rm --recursive --force "${backup_dir}"
+    backup_dir=""
+  fi
   if [[ -n "${work_dir}" ]]; then rm --recursive --force "${work_dir}"; fi
 }
 
@@ -48,12 +59,12 @@ fetch() {
 # Runs a command without shell interpolation as the target user, with its actual home and TeX PATH.
 as_user() {
   if [[ "${REMOTE_USER}" == root ]]; then
-    env HOME="${REMOTE_HOME}" PATH="${tex_bin}:${USER_BIN}:${PATH}" TEXLIVE_DOWNLOADER= \
+    env HOME="${REMOTE_HOME}" PATH="${tex_bin:+${tex_bin}:}${USER_BIN}:${PATH}" TEXLIVE_DOWNLOADER= \
       TL_DOWNLOAD_PROGRAM=/usr/bin/curl TL_DOWNLOAD_ARGS="${DOWNLOAD_ARGS}" \
       TEXLIVE_DOWNLOAD_PROGRAM=/usr/bin/curl TEXLIVE_DOWNLOAD_ARGS="${DOWNLOAD_ARGS}" "$@"
   else
     runuser --user "${REMOTE_USER}" -- env HOME="${REMOTE_HOME}" \
-      PATH="${tex_bin}:${USER_BIN}:${PATH}" TEXLIVE_DOWNLOADER= \
+      PATH="${tex_bin:+${tex_bin}:}${USER_BIN}:${PATH}" TEXLIVE_DOWNLOADER= \
       TL_DOWNLOAD_PROGRAM=/usr/bin/curl TL_DOWNLOAD_ARGS="${DOWNLOAD_ARGS}" \
       TEXLIVE_DOWNLOAD_PROGRAM=/usr/bin/curl TEXLIVE_DOWNLOAD_ARGS="${DOWNLOAD_ARGS}" "$@"
   fi
@@ -106,18 +117,13 @@ detect_platform() {
   [[ -n "${REMOTE_USER}" && "${REMOTE_HOME}" == /* && "${REMOTE_HOME}" != / ]] \
     || fail "missing target user/home; use the Dev Container Feature installer"
   id "${REMOTE_USER}" >/dev/null 2>&1 || fail "target user does not exist; create it before this feature"
-  [[ -d "${REMOTE_HOME}" && ! -L "${TEX_DIR}" ]] || fail "invalid home or symlinked TinyTeX path"
+  [[ -d "${REMOTE_HOME}" ]] || fail "invalid target home"
   if [[ -e "${ENV_DIR}" && ! -f "${ENV_MARKER}" ]]; then
     fail "unmanaged PATH bridge directory; move ${ENV_DIR} before retrying"
   fi
   if [[ -e "${PROFILE_PATH}" ]]; then
     grep -qx '# Managed by the latex Dev Container Feature.' "${PROFILE_PATH}" \
       || fail "unmanaged shell configuration at ${PROFILE_PATH}; move it before retrying"
-  fi
-  if [[ -e "${TEX_DIR}" ]]; then
-    [[ -f "${TEX_DIR}/${INSTALL_MARKER}" ]] || fail "unmanaged TinyTeX tree; move it before installing this feature"
-    [[ "$(stat --format=%u "${TEX_DIR}")" == "$(id --user "${REMOTE_USER}")" ]] \
-      || fail "TinyTeX has the wrong owner; restore its ownership before retrying"
   fi
 }
 
@@ -136,9 +142,6 @@ dependencies_installed() {
 }
 
 install_dependencies() {
-  local fonts_before=""
-  local fonts_after
-  if command -v fc-list >/dev/null; then fonts_before="$(fc-list | sort | sha256sum)"; fi
   local dependencies=()
   local fonts=()
   log "installing signed system dependencies for ${os_id}"
@@ -189,8 +192,6 @@ install_dependencies() {
       fi
       ;;
   esac
-  fonts_after="$(fc-list | sort | sha256sum)"
-  if [[ "${fonts_before}" != "${fonts_after}" ]]; then changed=true; fi
   python3 -c 'import sys; assert sys.version_info >= (3, 8)' || fail "Python 3.8 or newer is required"
 }
 
@@ -203,7 +204,7 @@ install_packages() {
   local missing=()
   local seen=' '
   if [[ "${PROFILE}" == standard ]]; then
-    selected+=(biblatex biber natbib ieeetran acmart listings minted tcolorbox cleveref siunitx booktabs multirow
+    selected+=(biblatex biber natbib ieeetran acmart listings minted tcolorbox cleveref siunitx booktabs multirow fvextra
       tabularray caption enumitem ifoddpage relsize ncctools cmap algorithm2e algorithms algpseudocodex
       pgf pgfplots standalone)
   elif [[ "${PROFILE}" == full ]]; then
@@ -225,9 +226,8 @@ install_packages() {
     if ! [[ $'\n'"${inventory}"$'\n' == *$'\n'"${package}"$'\n'* ]]; then missing+=("${package}"); fi
   done
   if (( ${#missing[@]} )); then
-    changed=true
     log "installing missing TeX packages: ${missing[*]}"
-    as_user tlmgr --prefetch 4:200 install "${missing[@]}" \
+    as_user tlmgr install "${missing[@]}" \
       || fail "package installation failed; check names and availability, or rebuild from a current base / configure a matching TeX Live year"
   fi
   if ${ja}; then
@@ -244,8 +244,17 @@ configure_environment() {
   for executable in "${tex_bin}"/*; do
     target="${USER_BIN}/${executable##*/}"
     if [[ -e "${target}" || -L "${target}" ]]; then
-      [[ -L "${target}" && "$(readlink "${target}")" == "${executable}" ]] \
+      [[ -L "${target}" && "$(readlink "${target}")" == *[Tt]iny[Tt]e[Xx]*/bin/* ]] \
         || fail "command conflict at ${target}; move the unrelated file before retrying"
+    fi
+  done
+  log "warming system and target-user Lua font caches"
+  fc-cache || fail "fontconfig cache generation failed"
+  as_user luaotfload-tool --update || fail "Lua font cache generation failed"
+  as_user touch "${FONT_CACHE_MARKER}"
+  for target in "${USER_BIN}"/*; do
+    if [[ -L "${target}" && "$(readlink "${target}")" == *[Tt]iny[Tt]e[Xx]*/bin/* ]]; then
+      rm -- "${target}"
     fi
   done
   as_user tlmgr option sys_bin "${USER_BIN}"
@@ -265,12 +274,7 @@ case ":${PATH}:" in
   *) export PATH="/usr/local/share/latex/bin:${PATH}" ;;
 esac
 SH
-  if ${changed} || [[ ! -f "${FONT_CACHE_MARKER}" ]]; then
-    log "warming system and target-user Lua font caches"
-    fc-cache || fail "fontconfig cache generation failed"
-    as_user luaotfload-tool --update || fail "Lua font cache generation failed"
-    as_user touch "${FONT_CACHE_MARKER}"
-  fi
+
 }
 
 clean_dependencies() {
@@ -294,6 +298,7 @@ main() {
   install_packages
   configure_environment
   clean_dependencies
+  replacement_complete=true
   cleanup
   printf '%s %s %s %s\n' "${PROFILE}" "${fresh}" "${arch}" "$((SECONDS - started))" \
     | as_user tee --append "${TIMING_RECORD}"
