@@ -50,7 +50,7 @@ containers whose other software you trust with that.
 
 ## With the slurm feature
 
-When this collection's `slurm` feature (in development) is installed in the same container, it finds Apptainer and
+When this collection's [`slurm`](../slurm/README.md) feature is installed in the same container, it finds Apptainer and
 configures it as the container backend of its local Slurm: `srun --container <sandbox dir>` and
 `sbatch --container <sandbox dir>` run the job step inside the sandbox. See that feature's notes for the option that
 controls it.
