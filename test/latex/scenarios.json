@@ -1,0 +1,129 @@
+{
+  "test_basic": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic"
+      }
+    }
+  },
+  "test_full": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "full"
+      }
+    }
+  },
+  "test_languages": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none"
+      }
+    }
+  },
+  "test_packages_repository": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none",
+        "packages": "lipsum,csquotes lipsum",
+        "ctanMirror": "https://ctan.tikz.jp/systems/texlive/tlnet"
+      }
+    }
+  },
+  "fail_options": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none"
+      }
+    }
+  },
+  "fail_existing_tree": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none"
+      }
+    }
+  },
+  "fail_integrity": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none"
+      }
+    }
+  },
+  "fail_platform": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none"
+      }
+    }
+  },
+  "test_standard_repeat_1": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "standard"
+      }
+    }
+  },
+  "test_standard_repeat_2": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "standard"
+      }
+    }
+  },
+  "test_basic_repeat": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic"
+      }
+    }
+  },
+  "test_remote_user": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none"
+      }
+    }
+  },
+  "test_full_upgrade": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "latex": {
+        "profile": "basic",
+        "languages": "none"
+      }
+    }
+  }
+}
