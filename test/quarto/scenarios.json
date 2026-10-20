@@ -1,0 +1,35 @@
+{
+  "fail_contract": {
+    "image": "debian:12",
+    "features": {
+      "quarto": {}
+    }
+  },
+  "test_version_explicit": {
+    "image": "debian:12",
+    "features": {
+      "quarto": {
+        "version": "v1.9.38"
+      }
+    }
+  },
+  "test_python": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "quarto": {},
+      "ghcr.io/hoshiori-dev/devcontainer-features/uv:1": {}
+    }
+  },
+  "test_latex": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "quarto": {},
+      "ghcr.io/hoshiori-dev/devcontainer-features/latex:1": {
+        "profile": "standard",
+        "languages": "none"
+      }
+    }
+  }
+}
