@@ -186,6 +186,7 @@ install_release() {
   printf '%s\n' "${version}" >"${work}/new/${MARKER}"
   chown --recursive root:root "${work}/new"
   chmod --recursive go-w "${work}/new"
+  chmod 0755 "${work}/new"
   chmod 0644 "${work}/new/${MARKER}"
   if [[ "${managed}" == true ]]; then
     backup="${work}/previous"

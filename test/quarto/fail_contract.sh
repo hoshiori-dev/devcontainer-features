@@ -23,7 +23,11 @@ printf 'normal\n' >"${FIXTURE_DIR}/mode"
 printf '1.2.3\n' >"${FIXTURE_DIR}/latest"
 make_release 1.2.3
 make_release 1.2.4
+previous_umask="$(umask)"
+umask 077
 check "verified fixture release installs" run_installer 1.2.3
+umask "${previous_umask}"
+check "restrictive umask permits nonroot CLI use" runuser --user nobody -- /usr/local/bin/quarto --version
 requests_before="$(wc -l <"${FIXTURE_DIR}/requests")"
 for value in '' 1.2 1.2.3-preview garbage; do
   if run_installer "${value}"; then exit 1; fi
