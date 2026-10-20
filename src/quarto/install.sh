@@ -95,7 +95,7 @@ check_conflicts() {
   fi
   while IFS= read -r path; do
     path="${path:-.}"
-    [[ -e "${path}/quarto" || -L "${path}/quarto" ]] || continue
+    [[ -x "${path}/quarto" && ! -d "${path}/quarto" ]] || continue
     resolved="$(readlink --canonicalize-missing "${path}/quarto")"
     [[ "${managed}" == true && "${resolved}" == "${TARGET}/bin/quarto" ]] \
       || fail "${path}/quarto conflicts with this feature; remove the existing installation first"

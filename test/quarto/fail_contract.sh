@@ -54,6 +54,12 @@ printf 'keep\n' >/opt/quarto/sentinel
 check "healthy identical installation succeeds" run_installer 1.2.3
 check "same-version skip retains tree" test -f /opt/quarto/sentinel
 check "same-version skip is logged" grep -q 'skipping archive' "${FIXTURE_DIR}/output"
+PATH="/opt:${PATH}" check "managed directory on PATH permits repeated installation" run_installer 1.2.3
+check "directory on PATH retains the managed tree" test -f /opt/quarto/sentinel
+printf 'not a command\n' >"${FIXTURE_DIR}/bin/quarto"
+chmod 0644 "${FIXTURE_DIR}/bin/quarto"
+check "nonexecutable file on PATH is ignored" run_installer 1.2.3
+rm "${FIXTURE_DIR}/bin/quarto"
 printf '1.2.4\n' >"${FIXTURE_DIR}/latest"
 check "latest is resolved again" run_installer latest
 check "latest activates current stable fixture" test "$(quarto --version)" = 1.2.4
