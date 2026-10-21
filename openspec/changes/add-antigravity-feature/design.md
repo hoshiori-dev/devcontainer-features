@@ -40,11 +40,23 @@ install contract is established.
 
 ### Runtime state
 
-Map owned CLI directories and active plugin-secret storage into /var/lib/antigravity. The reference run observed
-.gemini/antigravity-cli and .config/antigravity/plugin-secrets.json. Shared .gemini/config entries need ownership-aware
-mapping that preserves unrelated Gemini data. Establish the actual account-token and refresh-write paths during the
-authentication feasibility test; do not assume a legacy filename. No host keychain or added keyring service is required
-by this design.
+Map verified owned CLI directories and active plugin-secret storage into /var/lib/antigravity while preserving their
+default discovery paths. The reference run observed .gemini/antigravity-cli and .config/antigravity/plugin-secrets.json;
+these observations do not establish complete authenticated state coverage. Link only directories confirmed to belong
+exclusively to Antigravity. Never link the whole shared .gemini or .config tree. Shared .gemini/config entries require
+an upstream-supported mapping that preserves unrelated Gemini data.
+
+Establish the actual account-token and refresh-write paths during the authentication feasibility test; do not assume a
+legacy filename. Verify real saves, atomic replacements, plugin-secret updates, and Google-account credential refreshes
+leave each mapping effective. A file link that an atomic write replaces is insufficient. If a required shared store
+cannot be mapped safely, stop delivery rather than redirect a shared parent or omit the store. No host keychain or added
+keyring service is required by this design. Complete real-account restoration remains a delivery blocker.
+
+Resolve home paths for the actual runtime user after mounting. Create only missing links and reuse links to intended
+mounted targets. Existing files, directories, dangling links, or links to other targets are actionable conflicts; do not
+replace, import, or delete them. Create home links as the remote user, with privileged ownership repair confined to the
+mount and never following external links or changing ownership of the home. Recreate links for each fresh container,
+including when the remote-user home changes.
 
 Metadata declares source `antigravity-${devcontainerId}`, target `/var/lib/antigravity`, type `volume`, an
 `onCreateCommand` initializer, and ordering after common-utils where user setup matters. It declares no entrypoint,
@@ -76,8 +88,9 @@ the host IDE profile.
 
 The initial compatibility list targets Debian 12 and Ubuntu 24.04 on amd64 and arm64. Only verified combinations are
 advertised; Alpine and other libc families are outside this first design. Automated checks cover version selection,
-executable availability, integrity failures, install-twice behavior, private state, repair, and conflicts. Isolation
-uses two project identities; persistence needs two fresh containers mounting the same volume.
+executable availability, integrity failures, install-twice behavior, private state, repair, link conflicts,
+default/custom path discovery, real writes and atomic replacement, and recreated home links. Isolation uses two project
+identities; persistence needs two fresh containers mounting the same volume.
 
 The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
 result alongside just check, just test antigravity, and just test-scenarios antigravity; this introduces no CI mechanism

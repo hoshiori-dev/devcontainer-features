@@ -68,19 +68,46 @@ changes and another Docker host SHALL not imply automatic state migration.
 
 ### Requirement: State directory contract
 
-The feature SHALL configure `owned Antigravity directories linked below /var/lib/antigravity`. Explicit upstream state
-overrides outside this root SHALL be documented as outside the persistence guarantee. Existing conflicting files or
-directories SHALL not be silently replaced or imported.
+The feature SHALL link only verified Antigravity-owned directories into `/var/lib/antigravity`, retaining upstream
+default discovery paths. It SHALL NOT link the entire shared `.gemini` or `.config` tree. Shared files SHALL use only an
+upstream-supported mapping verified to preserve other tools' data and remain effective after actual writes and
+credential refreshes. A file link replaced by an atomic write SHALL not satisfy persistence. If required state cannot be
+mapped safely, the feature SHALL remain unready for delivery rather than broaden ownership or omit that state.
+
+Mappings SHALL be initialized after mounting for the actual remote user's home. Setup SHALL reuse links to the intended
+mounted targets and recreate absent links in fresh containers. A conflicting file, directory, dangling link, or link to
+another target SHALL cause an actionable failure without replacement, import, or deletion. Explicit application state
+overrides outside the mapped directories SHALL be documented as outside the persistence guarantee.
 
 #### Scenario: Default state paths
 
 - **WHEN** the CLI runs with the feature's default environment
-- **THEN** its private durable state is under the mounted root
+- **THEN** all required private durable state uses the verified mapping into the mounted root
 
 #### Scenario: Conflicting existing state
 
-- **WHEN** a required state mapping conflicts with unrelated existing content
+- **WHEN** a required mapping encounters an existing file, directory, dangling link, or link to another target
 - **THEN** setup reports the conflict and preserves both the existing content and the volume
+
+#### Scenario: Existing correct mapping
+
+- **WHEN** setup is repeated with links already targeting the intended mounted directories
+- **THEN** it reuses those links and preserves private state
+
+#### Scenario: Recreated user home
+
+- **WHEN** a fresh container mounts the existing volume under a different remote-user home
+- **THEN** setup recreates the required links for that user and the saved state remains available
+
+#### Scenario: Real state writes
+
+- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
+- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+
+#### Scenario: Unsafe shared store
+
+- **WHEN** required account or plugin state cannot be retained without replacing a shared parent or losing writes
+- **THEN** the feature remains unready for delivery and preserves unrelated Gemini and application data
 
 ### Requirement: Ownership and privacy
 
