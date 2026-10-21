@@ -90,19 +90,45 @@ changes and another Docker host SHALL not imply automatic state migration.
 
 ### Requirement: State directory contract
 
-The feature SHALL configure `app-specific XDG directories linked below /var/lib/opencode`. Explicit upstream state
-overrides outside this root SHALL be documented as outside the persistence guarantee. Existing conflicting files or
-directories SHALL not be silently replaced or imported.
+The feature SHALL link only OpenCode-owned data, configuration, state, and cache directories under the remote user's
+effective XDG roots to corresponding subdirectories of `/var/lib/opencode`. It SHALL respect existing XDG root settings
+without setting or replacing global `XDG_*` values or linking whole shared XDG roots. Complete databases and companion
+files SHALL remain together in their linked application directories.
+
+Mappings SHALL be initialized after mounting for the actual remote user's home. Setup SHALL reuse links to the intended
+mounted targets and recreate absent links in fresh containers. A conflicting file, directory, dangling link, or link to
+another target SHALL cause an actionable failure without replacement, import, or deletion. Explicit application state
+overrides outside the mapped directories SHALL be documented as outside the persistence guarantee.
 
 #### Scenario: Default state paths
 
 - **WHEN** the CLI runs with the feature's default environment
-- **THEN** its private durable state is under the mounted root
+- **THEN** all required private durable state uses the verified mapping into the mounted root
 
 #### Scenario: Conflicting existing state
 
-- **WHEN** a required state mapping conflicts with unrelated existing content
+- **WHEN** a required mapping encounters an existing file, directory, dangling link, or link to another target
 - **THEN** setup reports the conflict and preserves both the existing content and the volume
+
+#### Scenario: Existing correct mapping
+
+- **WHEN** setup is repeated with links already targeting the intended mounted directories
+- **THEN** it reuses those links and preserves private state
+
+#### Scenario: Recreated user home
+
+- **WHEN** a fresh container mounts the existing volume under a different remote-user home
+- **THEN** setup recreates the required links for that user and the saved state remains available
+
+#### Scenario: Real state writes
+
+- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
+- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+
+#### Scenario: Custom XDG roots
+
+- **WHEN** the remote user supplies valid custom XDG roots containing other applications' state
+- **THEN** setup maps only OpenCode-owned subdirectories and preserves the root settings and unrelated data
 
 ### Requirement: Ownership and privacy
 

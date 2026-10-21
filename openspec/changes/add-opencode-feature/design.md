@@ -45,9 +45,17 @@ conflicting channel/version combinations; there is no arbitrary URL or source-re
 ### Runtime state
 
 Use separate data/config/state/cache subdirectories under /var/lib/opencode, linked at the remote user's
-OpenCode-specific XDG paths after mounting. Respect configured XDG roots without changing XDG_* globally. Preserve full
-credential/session SQL databases and WAL/SHM files. A v1 auth.json-only cache is insufficient; no v1 migration is
-included.
+OpenCode-specific XDG paths after mounting. Resolve each path from the effective configured XDG roots and the supported
+v2 release; respect those roots without setting XDG_* globally. Never link the entire shared XDG root. Preserve full
+credential/session SQL databases and WAL/SHM files in their owned directories. A v1 auth.json-only cache is
+insufficient; no v1 migration is included. Test real database writes and reopen operations through the links, plus
+coexistence with unrelated application directories under both default and custom XDG roots.
+
+Resolve home paths for the actual runtime user after mounting. Create only missing links and reuse links to intended
+mounted targets. Existing files, directories, dangling links, or links to other targets are actionable conflicts; do not
+replace, import, or delete them. Create home links as the remote user, with privileged ownership repair confined to the
+mount and never following external links or changing ownership of the home. Recreate links for each fresh container,
+including when the remote-user home changes.
 
 Metadata declares source `opencode-${devcontainerId}`, target `/var/lib/opencode`, type `volume`, an `onCreateCommand`
 initializer, and ordering after common-utils where user setup matters. It declares no entrypoint, privileged mode, added
@@ -79,8 +87,9 @@ the host IDE profile.
 
 The initial compatibility list targets Debian 12 and Ubuntu 24.04 on amd64 and arm64. Only verified combinations are
 advertised; Alpine and other libc families are outside this first design. Automated checks cover version selection,
-executable availability, integrity failures, install-twice behavior, private state, repair, and conflicts. Isolation
-uses two project identities; persistence needs two fresh containers mounting the same volume.
+executable availability, integrity failures, install-twice behavior, private state, repair, link conflicts,
+default/custom path discovery, real writes and atomic replacement, and recreated home links. Isolation uses two project
+identities; persistence needs two fresh containers mounting the same volume.
 
 The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
 result alongside just check, just test opencode, and just test-scenarios opencode; this introduces no CI mechanism or
