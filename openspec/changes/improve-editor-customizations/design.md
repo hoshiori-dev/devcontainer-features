@@ -2,9 +2,11 @@
 
 ## Context
 
-See proposal.md for the outcome and affected releases. Only Deno gains a metadata customization; Quarto and LaTeX
-already declare their companion extensions, and their specs explicitly preserve editor settings. Other changes are usage
-documentation. Existing container tests exercise installation, not editor-specific application of customizations.
+See proposal.md for the outcome and affected releases. Deno, uv, glab, and colab-cli gain companion extension
+declarations. Quarto and LaTeX already declare their companion extensions, and their specs explicitly preserve editor
+settings. The remaining changes are usage documentation. Default integrations carry the collection's source verification
+so consumers do not need to research and assemble the basic editor environment themselves. Existing container tests
+exercise installation, not editor-specific application of customizations.
 
 Sources were checked on 2026-10-21. Source text and plugin manifests, rather than third-party setup guides, establish
 identifiers and defaults. The R extension is a community project directly recommended by Quarto; it is not described as
@@ -12,8 +14,8 @@ an R-vendor extension.
 
 ## Goals / Non-Goals
 
-- Keep project choices explicit: inspect metadata to confirm that only Deno gains an extension declaration and no
-  feature gains default editor settings, a backend, or an editor-install option.
+- Keep project choices explicit: inspect metadata to confirm that Deno, uv, glab, and colab-cli gain the documented
+  extension declarations and no feature gains default editor settings, a backend, or an editor-install option.
 - Keep plugin recommendations attributable: check each identifier and setting against the official references below.
 - Keep runtime behavior outside this change: inspect the diff for install scripts, lifecycle hooks, dependencies,
   environment changes, mounts, and supported-platform changes.
@@ -25,8 +27,9 @@ an R-vendor extension.
 
 ### Static extension declaration with a documented VS Code opt-out
 
-Deno metadata requests `denoland.vscode-deno`. Its notes show a consuming project's `customizations.vscode.extensions`
-entry `-denoland.vscode-deno`. Quarto and LaTeX notes document the equivalent exclusions for their existing extensions.
+Each of Deno, uv, glab, and colab-cli declares its companion extensions directly in metadata. Their notes describe what
+is provided automatically and show consuming-project exclusions in `customizations.vscode.extensions`, such as
+`-denoland.vscode-deno`. Quarto and LaTeX notes document the equivalent exclusions for their existing extensions.
 Exclusion removes an inherited automatic-install request; it does not uninstall an extension already present. An empty
 array is not documented as an override: customization arrays merge as a union.
 
@@ -39,37 +42,46 @@ metadata contract.
 - [VS Code inherited extension exclusion](https://code.visualstudio.com/docs/devcontainers/containers)
 - [VS Code customization schema](https://github.com/microsoft/vscode/blob/main/extensions/configuration-editing/schemas/devContainer.vscode.schema.json)
 
-### Deno activation and JetBrains configuration belong to the project
+### Supply official JetBrains plugins without selecting an IDE backend
 
 The Deno notes show `deno.enable` for a Deno workspace and `deno.enablePaths` for a mixed workspace. They explain that
 Deno language-service activation replaces the corresponding built-in TypeScript/JavaScript service. No container-wide
 activation, formatter default, or format-on-save setting is imposed.
 
-The optional JetBrains example uses `customizations.jetbrains.plugins: ["deno"]`; the official plugin's XML ID is
-`deno`, not its Marketplace page number. The project selects a JavaScript-capable IDE. Backend selection is explained as
-an optional project-level choice using JetBrains' documented backend names, not a feature default. No minus-prefix
-exclusion is claimed for JetBrains because the checked official documentation does not establish one.
+Deno metadata uses `customizations.jetbrains.plugins: ["deno"]`, and glab uses `["com.gitlab.plugin"]`. These are
+official plugin XML IDs, not Marketplace page numbers. GitLab documents installing its plugin on the remote backend
+only; the notes explain that existing client-side installations may need user adjustment. For Deno, the project selects
+a JavaScript-capable IDE. Backend selection is explained as an optional project-level choice using JetBrains' documented
+backend names, not a feature default. No minus-prefix exclusion is claimed for JetBrains because the checked official
+documentation does not establish one.
 
 - [Deno VS Code integration](https://docs.deno.com/runtime/reference/vscode/)
 - [JetBrains Deno guide](https://www.jetbrains.com/help/webstorm/deno.html)
 - [JetBrains Deno plugin manifest](https://github.com/JetBrains/intellij-plugins/blob/master/Deno/resources/META-INF/plugin.xml)
 - [JetBrains Dev Container customizations](https://www.jetbrains.com/help/idea/customizing-devcontainer-json-file.html)
 
-### Optional integrations remain project examples
+### Ready-to-use companion integrations and project-specific choices
 
 | Feature          | Documentation additions                                                                                                                                                                                                                                |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | quarto           | Optional `ms-python.python` and `ms-toolsai.jupyter`, `REditorSupport.r`, or `julialang.language-julia`; language runtimes and packages remain separate prerequisites. Preview and port configuration are project examples.                            |
 | latex            | Optional `latex-workshop.linting.chktex.enabled: true`, `[latex].editor.defaultFormatter: "James-Yu.latex-workshop"`, and the already documented `latex-workshop.formatting.latex: "latexindent"`; engine selection remains document/project-specific. |
-| uv               | Optional `ms-python.python` and `ms-python.vscode-python-envs`, plus `ms-toolsai.jupyter` for notebooks; `.venv` discovery, `uv add --dev ipykernel`, and explicit kernel selection. PyCharm uses its native uv integration.                           |
-| glab             | Optional `GitLab.gitlab-workflow` and JetBrains `com.gitlab.plugin`, with links to official setup instructions; editor authentication is distinct from CLI installation. The JetBrains plugin belongs on the remote backend only, as GitLab documents. |
-| colab-cli        | Optional `google.colab`, its Jupyter dependency, Google sign-in and Colab kernel selection; upstream `colab ssh --proxy-mode` guidance is version-dependent and refers to a separate remote runtime rather than the dev container.                     |
+| uv               | Supply `ms-python.python` and `ms-python.vscode-python-envs` by default. Explain `.venv` discovery and native PyCharm integration; `ms-toolsai.jupyter`, `uv add --dev ipykernel`, and kernel selection remain notebook-specific additions.            |
+| glab             | Supply `GitLab.gitlab-workflow` and JetBrains `com.gitlab.plugin` by default. Link official sign-in instructions and explain backend-only installation; account, instance URL, and backend selection remain with the user.                             |
+| colab-cli        | Supply `google.colab` by default; its manifest brings `ms-toolsai.jupyter`. Explain user-controlled Google sign-in and kernel selection, and version-dependent `colab ssh --proxy-mode` guidance for a separate remote runtime.                        |
 | hf-cli, hf-mount | Codespaces `HF_TOKEN` Secret guidance alongside local `remoteEnv` forwarding; omit an empty `${localEnv:HF_TOKEN}` override in Codespaces so it does not mask the supplied secret.                                                                     |
 
-uv does not automatically install Python extensions: colab-cli depends on uv and hf-cli may use it, so a default would
-also affect CLI-only users. GitLab and Colab integrations likewise remain opt-in because their account workflows are not
-required for installing the CLIs. No third-party OpenSpec, scanner, or TeXiFy plugin is added without the requested
-source evidence.
+The baseline is to ship a verified, directly related companion integration rather than make users find and add it. An
+independent editor login is not a reason to omit an official plugin. Account login and project decisions remain user
+actions because the Feature cannot infer them. No third-party OpenSpec, scanner, or TeXiFy plugin is added without the
+requested source evidence. No official JetBrains Colab plugin was established, and PyCharm already supplies uv
+integration natively, so neither gets an invented counterpart.
+
+The uv defaults also reach CLI-only users through colab-cli's dependency. This is an accepted usability trade-off:
+provide Microsoft Python support consistently and document exclusion of both directly declared IDs. With Colab,
+excluding `google.colab` does not promise removal of Jupyter or other independently requested extensions. Explicit
+Jupyter metadata in uv is rejected because plain uv usage does not imply notebooks; Colab's own extension dependency
+already supplies Jupyter for its notebook workflow.
 
 Do not write defaults that upstream already supplies: Quarto's `quarto.render.previewType` defaults to `internal`, LaTeX
 Workshop's PDF viewer defaults to `tab`, and Python Environments' `python-envs.alwaysUseUv` defaults to `true`. No fixed
@@ -85,6 +97,7 @@ uv interpreter path is imposed on a project that may not yet have an environment
 - [GitLab JetBrains integration](https://docs.gitlab.com/editor_extensions/jetbrains_ide/)
 - [GitLab JetBrains plugin identity](https://plugins.jetbrains.com/api/plugins/22325)
 - [Google Colab extension](https://github.com/googlecolab/colab-vscode)
+- [Colab publisher, ID, and Jupyter dependency](https://github.com/googlecolab/colab-vscode/blob/main/package.json)
 - [Colab CLI remote connection options](https://github.com/googlecolab/google-colab-cli)
 - [Codespaces development environment secrets](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-your-account-specific-secrets-for-github-codespaces)
 
@@ -123,14 +136,15 @@ The approval-package-only draft has no changed Feature artifacts and need not tr
   the PR does not claim runtime IDE verification or compatibility beyond the upstream plugin's own declarations.
 - Documentation-only source edits still publish PATCH releases and trigger the existing regression matrix. Keep the
   bumps listed in proposal.md and preserve CI selection rather than creating a documentation exception.
-- The Colab extension and CLI have separate session workflows. Document each as optional without promising shared
-  sessions, shared login, or universal browser-based support for SSH remote development.
+- The Colab extension and CLI have separate session workflows. Document authentication and usage without promising
+  shared sessions, shared login, or universal browser-based support for SSH remote development.
 - Codespaces secrets are available at runtime, not Feature build time. Keep examples free of credential values and avoid
   echoing secrets or putting them in build arguments, image metadata, or command-line arguments.
 
 ## Migration Plan
 
-Existing Feature major references continue to work. The only new automatic request is Deno's companion VS Code
-extension, which consumers can exclude. Existing editor settings and installed tools remain unchanged; documentation
-examples take effect only when a consumer adopts them. Published corrections use subsequent feature versions rather than
-moving or deleting release tags.
+Existing Feature major references continue to work. Deno, uv, glab, and colab-cli add the companion extension requests
+listed above. Consumers can exclude the new VS Code requests using the documented minus-prefixed IDs. Official JetBrains
+plugins are supplied for Deno and glab; backend compatibility follows their upstream declarations. Existing editor
+settings and installed tools remain unchanged; documentation examples take effect only when a consumer adopts them.
+Published corrections use subsequent feature versions rather than moving or deleting release tags.

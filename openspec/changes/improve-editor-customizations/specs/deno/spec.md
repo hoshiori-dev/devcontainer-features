@@ -2,9 +2,9 @@
 
 ### Requirement: Companion editor extension
 
-The feature SHALL request the official `denoland.vscode-deno` extension through VS Code customizations without declaring
-editor settings or a JetBrains IDE backend. It SHALL leave the installed CLI and its installation behavior independent
-of editor choice.
+The feature SHALL request `denoland.vscode-deno` through VS Code customizations and the official JetBrains `deno` plugin
+through JetBrains customizations. It SHALL declare no editor settings or IDE backend and SHALL leave CLI installation
+behavior independent of editor choice.
 
 #### Scenario: Companion extension declaration
 
@@ -12,17 +12,22 @@ of editor choice.
 - **THEN** the extension list requests `denoland.vscode-deno`
 - **AND** the feature declares no editor settings or IDE backend
 
+#### Scenario: JetBrains companion declaration
+
+- **WHEN** a supporting JetBrains client reads the feature customizations
+- **THEN** its plugin list requests `deno` without selecting an IDE backend
+
 ### Requirement: Project-controlled editor activation
 
 `NOTES.md` SHALL explain project-controlled Deno activation, including partial activation in mixed Node/Deno workspaces,
-and optional use of the official JetBrains Deno plugin. It SHALL distinguish project examples from configuration
+and use of the supplied official JetBrains Deno plugin. It SHALL distinguish project examples from configuration
 supplied by the feature.
 
 #### Scenario: Project-controlled activation
 
 - **WHEN** a developer reads the editor guidance
 - **THEN** it offers `deno.enable` for a Deno project and `deno.enablePaths` for selected mixed-project directories
-- **AND** JetBrains plugin selection is an optional project customization
+- **AND** it identifies the supplied JetBrains plugin and leaves compatible IDE backend selection to the project
 - **AND** it does not claim that installing the feature enables Deno language services throughout the workspace
 
 ### Requirement: Documented extension exclusion
