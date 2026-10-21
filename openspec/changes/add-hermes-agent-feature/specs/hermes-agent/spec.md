@@ -147,19 +147,46 @@ identity changes and another Docker host SHALL not imply automatic state migrati
 
 ### Requirement: State directory contract
 
-The feature SHALL configure `HERMES_HOME=/var/lib/hermes-agent`. Explicit upstream state overrides outside this root
-SHALL be documented as outside the persistence guarantee. Existing conflicting files or directories SHALL not be
-silently replaced or imported.
+The feature SHALL link the supported release's verified default Hermes home to `/var/lib/hermes-agent`, without setting
+`HERMES_HOME`. The complete profile, including credentials, configuration, skills, memories, databases and companions,
+and sessions, SHALL remain volume-backed. Source checkout, application dependencies, and runtimes SHALL remain outside
+this home and the state volume. A release whose default home cannot be linked without losing required state SHALL fail
+clearly.
+
+Mappings SHALL be initialized after mounting for the actual remote user's home. Setup SHALL reuse links to the intended
+mounted targets and recreate absent links in fresh containers. A conflicting file, directory, dangling link, or link to
+another target SHALL cause an actionable failure without replacement, import, or deletion. Caller-provided `HERMES_HOME`
+SHALL cause an actionable conflict without overwriting the setting or existing state.
 
 #### Scenario: Default state paths
 
 - **WHEN** the CLI runs with the feature's default environment
-- **THEN** its private durable state is under the mounted root
+- **THEN** all required private durable state uses the verified mapping into the mounted root
 
 #### Scenario: Conflicting existing state
 
-- **WHEN** a required state mapping conflicts with unrelated existing content
+- **WHEN** a required mapping encounters an existing file, directory, dangling link, or link to another target
 - **THEN** setup reports the conflict and preserves both the existing content and the volume
+
+#### Scenario: Existing correct mapping
+
+- **WHEN** setup is repeated with links already targeting the intended mounted directories
+- **THEN** it reuses those links and preserves private state
+
+#### Scenario: Recreated user home
+
+- **WHEN** a fresh container mounts the existing volume under a different remote-user home
+- **THEN** setup recreates the required links for that user and the saved state remains available
+
+#### Scenario: Real state writes
+
+- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
+- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+
+#### Scenario: Caller-provided state home
+
+- **WHEN** the consumer explicitly configures `HERMES_HOME`
+- **THEN** setup reports the conflict without changing that setting or existing state
 
 ### Requirement: Ownership and privacy
 

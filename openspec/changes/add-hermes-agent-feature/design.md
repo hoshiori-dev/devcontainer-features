@@ -47,10 +47,22 @@ conflicting channel/version combinations; there is no arbitrary URL or source-re
 
 ### Runtime state
 
-Set HERMES_HOME=/var/lib/hermes-agent. Retain the whole profile: .env, auth.json, config.yaml, state.db and companions,
-memories, skills, sessions, and other durable files. An explicit source-install path prevents the default
-HERMES_HOME/hermes-agent checkout and runtime from being hidden by an empty mount. No desktop product, messaging daemon,
-browser stack, or nested Docker tool backend is enabled.
+Leave HERMES_HOME unset by the feature. Locate the supported release's default home in an isolated remote-user home and
+link that whole directory to /var/lib/hermes-agent. Retain the whole profile: .env, auth.json, config.yaml, state.db and
+companions, memories, skills, sessions, and other durable files. Verify actual saves, configuration replacement,
+credential refresh, and enabled ACP discovery through the link. A release that cannot preserve complete required state
+through this mapping is unsupported; do not silently switch to a global environment override.
+
+Use an explicit application installation path outside the default home and state volume for the source checkout,
+dependencies, and runtimes. Verify an empty volume cannot hide the executable or trigger a second source installation
+under the default home. No desktop product, messaging daemon, browser stack, or nested Docker tool backend is enabled.
+
+Resolve home paths for the actual runtime user after mounting. Create only missing links and reuse links to intended
+mounted targets. Existing files, directories, dangling links, or links to other targets are actionable conflicts; do not
+replace, import, or delete them. Create home links as the remote user, with privileged ownership repair confined to the
+mount and never following external links or changing ownership of the home. Recreate links for each fresh container,
+including when the remote-user home changes. Caller-provided HERMES_HOME is a conflict requiring consumer resolution;
+never rewrite or unset it. Distinguish caller settings from any feature-owned fallback setting.
 
 Metadata declares source `hermes-agent-${devcontainerId}`, target `/var/lib/hermes-agent`, type `volume`, an
 `onCreateCommand` initializer, and ordering after common-utils where user setup matters. It declares no entrypoint,
@@ -82,8 +94,9 @@ the host IDE profile.
 
 The initial compatibility list targets Debian 12 and Ubuntu 24.04 on amd64 and arm64. Only verified combinations are
 advertised; Alpine and other libc families are outside this first design. Automated checks cover version selection,
-executable availability, integrity failures, install-twice behavior, private state, repair, and conflicts. Isolation
-uses two project identities; persistence needs two fresh containers mounting the same volume.
+executable availability, integrity failures, install-twice behavior, private state, repair, link conflicts,
+default/custom path discovery, real writes and atomic replacement, and recreated home links. Isolation uses two project
+identities; persistence needs two fresh containers mounting the same volume.
 
 The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
 result alongside just check, just test hermes-agent, and just test-scenarios hermes-agent; this introduces no CI

@@ -9,6 +9,9 @@ confirmed editor/persistence boundaries.
 
 ## What Changes
 
+- Preserve upstream state discovery paths where verified directory links can retain complete state; define conflict
+  handling and write/recreation checks before enabling persistence.
+
 - Introduce the independent `hermes-agent` feature at `1.0.0`, with its CLI and project-scoped private state.
 - Provide first-party editor integrations where their container-side state can persist, with an integrated-terminal
   fallback where it cannot. CLI and IDE state may be independent.
