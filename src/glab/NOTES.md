@@ -93,3 +93,29 @@ amd64 and arm64 images of the Debian, Ubuntu, Fedora, and Alpine families, teste
 [test/glab/compatibility.json](../../test/glab/compatibility.json). Other distributions of these families are accepted
 when they have the family's package manager (`apt-get`, `dnf`, or `apk`), but only the listed images are tested; images
 without it, such as Amazon Linux 2, fail with a clear message.
+
+## Editor integration
+
+The feature requests the official `GitLab.gitlab-workflow` VS Code extension and GitLab's `com.gitlab.plugin` JetBrains
+plugin. VS Code provides merge request, issue, and pipeline integration; the JetBrains plugin provides GitLab Duo
+features, whose availability depends on your GitLab instance and subscription. Editor sign-in is configured separately
+from installing glab; the feature supplies no account, instance URL, or token.
+
+Follow [GitLab's VS Code setup](https://docs.gitlab.com/editor_extensions/visual_studio_code/) or
+[JetBrains setup](https://docs.gitlab.com/editor_extensions/jetbrains_ide/). GitLab requires its JetBrains plugin on the
+remote backend only; a copy also installed on the local client can prevent Duo features from working. Choose a
+compatible IDE backend in the consuming project's
+[JetBrains customization](https://www.jetbrains.com/help/idea/customizing-devcontainer-json-file.html).
+
+To exclude the VS Code extension from automatic installation, add this to your project's `devcontainer.json`:
+
+```json
+{
+  "customizations": {
+    "vscode": { "extensions": ["-GitLab.gitlab-workflow"] }
+  }
+}
+```
+
+The [VS Code exclusion](https://code.visualstudio.com/docs/devcontainers/containers) does not uninstall an extension
+already present. It does not define an exclusion syntax for JetBrains plugins.

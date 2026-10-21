@@ -135,6 +135,64 @@ Japanese documents, select the LaTeX Feature's language support and an appropria
 [LaTeX Feature notes](../latex/NOTES.md) and
 [Quarto PDF engines](https://quarto.org/docs/output-formats/pdf-engine.html).
 
+## Editor integration and remote preview
+
+The feature requests the official `quarto.quarto` VS Code extension. Open a Quarto document and run **Quarto: Preview**
+from the command palette, or click the editor's Preview button. The extension uses internal preview by default, so there
+is no need to set `quarto.render.previewType` to `internal` again. For executable code cells, add only the language
+integrations your project uses to `customizations.vscode.extensions` in its `devcontainer.json`:
+
+| Language | Extensions                               | Additional prerequisites                                                                               |
+| -------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Python   | `ms-python.python`, `ms-toolsai.jupyter` | A project Python environment with Jupyter; uv supplies the Python extension when used alongside Quarto |
+| R        | `REditorSupport.r`                       | R, knitr, and the R extension's language-server requirements                                           |
+| Julia    | `julialang.language-julia`               | Julia and the computation packages required by your document                                           |
+
+These are the integrations linked by [Quarto's official VS Code guide](https://quarto.org/docs/tools/vscode/index.html).
+The R extension is community-maintained and officially recommended by Quarto. The Quarto feature does not install the
+language runtimes or these language-specific extensions automatically.
+
+For CLI preview in a remote container, run:
+
+```bash
+quarto preview --port 4200 --no-browser
+```
+
+For a uv-managed Python document, use `uv run quarto preview --port 4200 --no-browser`. In the consuming project's
+`devcontainer.json`, configure the preview port:
+
+```json
+{
+  "forwardPorts": [4200],
+  "portsAttributes": {
+    "4200": { "label": "Quarto preview", "onAutoForward": "openBrowserOnce" }
+  }
+}
+```
+
+Quarto's `--port` is a suggestion: if 4200 is occupied it chooses another port. Check the actual URL in its output and
+forward that port in the editor's Ports view. The default loopback bind works with editor tunneling; ordinary preview
+does not require binding to every interface. Keep Codespaces ports private. See
+[Quarto preview options](https://quarto.org/docs/cli/preview.html) and
+[GitHub's port-forwarding guidance](https://docs.github.com/en/codespaces/developing-in-a-codespace/forwarding-ports-in-your-codespace).
+
+Port fields belong in the project's `devcontainer.json`, not this feature's metadata. Likewise,
+[Codespaces-specific customizations](https://containers.dev/supporting#github-codespaces) such as `openFiles` are read
+from project configuration, not image metadata.
+
+To exclude the Quarto extension from automatic installation:
+
+```json
+{
+  "customizations": {
+    "vscode": { "extensions": ["-quarto.quarto"] }
+  }
+}
+```
+
+This [VS Code exclusion](https://code.visualstudio.com/docs/devcontainers/containers) does not uninstall an existing
+extension.
+
 
 ---
 

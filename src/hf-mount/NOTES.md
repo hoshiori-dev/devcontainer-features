@@ -122,3 +122,16 @@ Debian, Ubuntu, and Fedora images with glibc 2.34 or later, on x86_64 and aarch6
 [test/hf-mount/compatibility.json](../../test/hf-mount/compatibility.json). On a musl-based image such as Alpine, with
 an older glibc, on another architecture, or on another distribution, the install fails with a message naming the reason,
 before it changes anything.
+
+## Credentials in GitHub Codespaces
+
+For a private repository or Bucket, create a Codespaces development environment secret named `HF_TOKEN` and grant it
+access to the repository. Create or restart the codespace, then run `hf-mount` from a terminal that receives that
+variable. Public mounts need no secret. The feature does not mount anything or grant mount permissions; the container
+settings described above remain necessary.
+
+Do not copy the local `remoteEnv.HF_TOKEN` forwarding example into a Codespaces configuration: `${localEnv:HF_TOKEN}`
+does not refer to your laptop there, and an empty override can mask the secret Codespaces supplies. Never place the
+value in the repository, build arguments, or a `--hf-token` command-line argument. See
+[GitHub's Codespaces Secrets guide](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-your-account-specific-secrets-for-github-codespaces)
+and the [upstream authentication options](https://github.com/huggingface/hf-mount).

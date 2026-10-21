@@ -136,6 +136,36 @@ execute arbitrary shell commands. The system `pygmentize` command also supports 
 `standard` and `full` include minted and bibliography tools. With `basic`, request additional packages such as `minted`,
 `biblatex`, and `biber` through `packages` when needed.
 
+## Optional editor settings
+
+The installed `chktex` can provide diagnostics while you edit. Add the following to the project's
+`.vscode/settings.json`, together with the formatting and recipe configuration above:
+
+```json
+{
+  "latex-workshop.linting.chktex.enabled": true,
+  "[latex]": { "editor.defaultFormatter": "James-Yu.latex-workshop" }
+}
+```
+
+These settings select the installed formatter only for LaTeX files. Choose the compilation recipe for your document; the
+feature does not select an engine or enable format-on-save. LaTeX Workshop already uses its built-in PDF tab viewer by
+default, so ordinary VS Code PDF preview needs no extra port-forwarding configuration. Setting names and defaults are
+defined in [LaTeX Workshop's configuration](https://github.com/James-Yu/LaTeX-Workshop/blob/master/package.json).
+
+To exclude LaTeX Workshop from automatic installation, add this to your project's `devcontainer.json`:
+
+```json
+{
+  "customizations": {
+    "vscode": { "extensions": ["-James-Yu.latex-workshop"] }
+  }
+}
+```
+
+The [VS Code exclusion mechanism](https://code.visualstudio.com/docs/devcontainers/containers) does not uninstall an
+extension already present. The TeX toolchain remains available from the terminal.
+
 ## Installation time and supported platforms
 
 The three-minute build benchmark covers `basic` and `standard` with default languages and no extra packages on native
