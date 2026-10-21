@@ -45,10 +45,18 @@ conflicting channel/version combinations; there is no arbitrary URL or source-re
 
 ### Runtime state
 
-Set CODEX_HOME=/var/lib/codex. Initialize a minimal runtime config.toml selecting file credentials, preserving
-compatible existing settings. A managed policy prohibiting file storage is an actionable conflict. Retain auth.json,
-history, complete session stores and companion files; sharing this directory with an IDE is convenient rather than
-required.
+Leave CODEX_HOME unset by the feature. After mounting, resolve the actual remote user's home and create
+`~/.codex -> /var/lib/codex`. This preserves the default path expected by Codex and tools that install skills there.
+Initialize a minimal runtime config.toml selecting file credentials, preserving compatible existing settings. A managed
+policy prohibiting file storage is an actionable conflict. Retain the entire directory, including auth.json, history,
+complete session stores and companion files, and skills; sharing this directory with an IDE is convenient rather than
+required. The separate `~/.agents/skills` discovery location is unchanged and is not persisted by this volume.
+
+An absent link is created; an existing link to the intended mount is reused. A regular file, directory, dangling link,
+or link to another target is an actionable conflict: do not replace, import, or delete it. An explicitly configured
+CODEX_HOME is also a conflict requiring consumer resolution; do not rewrite or unset it. Recreate the home link in each
+fresh container, including when its remote-user home changes. Link creation runs as the remote user; privileged repair
+is restricted to the mounted state root and never changes the user's home ownership.
 
 Metadata declares source `codex-${devcontainerId}`, target `/var/lib/codex`, type `volume`, an `onCreateCommand`
 initializer, and ordering after common-utils where user setup matters. It declares no entrypoint, privileged mode, added
@@ -80,8 +88,9 @@ the host IDE profile.
 
 The initial compatibility list targets Debian 12 and Ubuntu 24.04 on amd64 and arm64. Only verified combinations are
 advertised; Alpine and other libc families are outside this first design. Automated checks cover version selection,
-executable availability, integrity failures, install-twice behavior, private state, repair, and conflicts. Isolation
-uses two project identities; persistence needs two fresh containers mounting the same volume.
+executable availability, integrity failures, install-twice behavior, private state, repair, home-link recreation,
+unchanged skill paths, explicit CODEX_HOME conflicts, and existing-path conflicts. Isolation uses two project
+identities; persistence needs two fresh containers mounting the same volume.
 
 The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
 result alongside just check, just test codex, and just test-scenarios codex; this introduces no CI mechanism or changes

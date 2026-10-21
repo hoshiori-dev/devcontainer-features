@@ -90,19 +90,41 @@ changes and another Docker host SHALL not imply automatic state migration.
 
 ### Requirement: State directory contract
 
-The feature SHALL configure `CODEX_HOME=/var/lib/codex`. Explicit upstream state overrides outside this root SHALL be
-documented as outside the persistence guarantee. Existing conflicting files or directories SHALL not be silently
-replaced or imported.
+The feature SHALL leave `CODEX_HOME` unset by the feature and, after mounting, link the actual remote user's `~/.codex`
+to `/var/lib/codex`. It SHALL preserve the entire volume-backed Codex home, including skills stored there, and leave
+`~/.agents/skills` unchanged and outside this volume's persistence guarantee. Existing conflicting paths and an
+explicitly configured `CODEX_HOME` SHALL cause an actionable setup failure without replacement, import, deletion, or
+environment modification.
 
 #### Scenario: Default state paths
 
 - **WHEN** the CLI runs with the feature's default environment
-- **THEN** its private durable state is under the mounted root
+- **THEN** its default `~/.codex` path resolves to the mounted root without a feature-defined `CODEX_HOME`
 
 #### Scenario: Conflicting existing state
 
-- **WHEN** a required state mapping conflicts with unrelated existing content
+- **WHEN** the home path is a regular file, directory, dangling link, or link to another target
 - **THEN** setup reports the conflict and preserves both the existing content and the volume
+
+#### Scenario: Existing correct link
+
+- **WHEN** setup finds `~/.codex` already linked to the intended mount
+- **THEN** it reuses the link and preserves the mounted contents
+
+#### Scenario: Recreated home link
+
+- **WHEN** a fresh container mounts the existing volume under a different remote-user home
+- **THEN** setup creates the link in that home and retains the saved state and Codex-home skills
+
+#### Scenario: Explicit Codex home
+
+- **WHEN** the consumer explicitly configures `CODEX_HOME`
+- **THEN** setup reports the conflict and leaves that setting and all existing state untouched
+
+#### Scenario: Separate user skills
+
+- **WHEN** the remote user has `~/.agents/skills`
+- **THEN** setup leaves that directory and its contents untouched
 
 ### Requirement: Ownership and privacy
 
