@@ -1,0 +1,25 @@
+{
+  "id": "quarto",
+  "version": "1.0.0",
+  "name": "Quarto",
+  "description": "Installs the Quarto CLI from verified official releases, with the Quarto VS Code extension.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/quarto",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Quarto stable release: latest or an exact MAJOR.MINOR.PATCH version, with an optional leading v.",
+      "proposals": [
+        "latest",
+        "1.9.38"
+      ]
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "quarto.quarto"
+      ]
+    }
+  }
+}
