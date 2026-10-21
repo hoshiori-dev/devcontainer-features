@@ -17,6 +17,12 @@ Installs the Deno CLI, verified against its published checksums, with a shared P
 |-----|-----|-----|-----|
 | version | Deno version to install: latest, or an exact release version MAJOR.MINOR.PATCH (2.7.14, or 2.8.0 and later). | string | latest |
 
+## Customizations
+
+### VS Code Extensions
+
+- `denoland.vscode-deno`
+
 ## Versions
 
 `version` takes `latest` or an exact release version such as `2.9.7`; partial versions (`2.9`) and a `v` prefix are
@@ -65,6 +71,43 @@ Debian, Fedora, and openSUSE families with Bash preinstalled and glibc 2.27 or n
 does not install Bash. Only current distribution releases are expected to work; end-of-life repositories may fail. Deno
 publishes no musl build, so Alpine is unsupported. Tested images:
 [test/deno/compatibility.json](../../test/deno/compatibility.json).
+
+## Editor integration
+
+The feature requests the official `denoland.vscode-deno` VS Code extension and JetBrains' `deno` plugin. Compatible
+editors apply their own customization section; the feature does not choose an IDE backend or change editor settings.
+
+In VS Code, run **Deno: Initialize Workspace Configuration**, or add this to the project's `.vscode/settings.json`:
+
+```json
+{ "deno.enable": true }
+```
+
+Enabling Deno replaces the built-in TypeScript/JavaScript language service for JavaScript and TypeScript files in the
+workspace. In a mixed Node/Deno workspace, enable only the Deno directories instead:
+
+```json
+{ "deno.enablePaths": ["./worker"] }
+```
+
+See [Deno's official VS Code guide](https://docs.deno.com/runtime/reference/vscode/) for activation and formatting. For
+JetBrains, use a JavaScript-capable IDE and select the installed `/usr/local/bin/deno` if it is not detected.
+[JetBrains' Deno guide](https://www.jetbrains.com/help/webstorm/deno.html) explains project activation and formatting;
+[Dev Container customizations](https://www.jetbrains.com/help/idea/customizing-devcontainer-json-file.html) explains
+project-level IDE backend selection.
+
+To exclude the VS Code extension from automatic installation, add this to your project's `devcontainer.json`:
+
+```json
+{
+  "customizations": {
+    "vscode": { "extensions": ["-denoland.vscode-deno"] }
+  }
+}
+```
+
+The [VS Code exclusion mechanism](https://code.visualstudio.com/docs/devcontainers/containers) removes the installation
+request; it does not uninstall an extension already present. The minus-prefix syntax is specific to VS Code.
 
 
 ---

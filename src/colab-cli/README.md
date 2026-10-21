@@ -17,6 +17,12 @@ Installs the Google Colab CLI with uv and isolated Python 3.12 for the remote us
 |-----|-----|-----|-----|
 | version | The google-colab-cli release: latest stable at build time, or an exact MAJOR.MINOR.PATCH. | string | latest |
 
+## Customizations
+
+### VS Code Extensions
+
+- `google.colab`
+
 ## Usage
 
 Select this feature to install `colab` and its required
@@ -42,6 +48,37 @@ are covered by the
 The
 [feature specification](https://github.com/hoshiori-dev/devcontainer-features/blob/main/openspec/specs/colab-cli/spec.md)
 defines version selection, installation sources, and repeated-install behavior.
+
+## Editor integration
+
+The feature requests Google's official `google.colab` VS Code extension. Its
+[extension manifest](https://github.com/googlecolab/colab-vscode/blob/main/package.json) also requests Microsoft's
+`ms-toolsai.jupyter` dependency; uv, installed by this feature, supplies the Microsoft Python editor extensions.
+
+Open a notebook, sign in to Google when prompted, and choose **Select Kernel > Colab > Auto Connect**. Follow the
+[official extension guide](https://github.com/googlecolab/colab-vscode) for setup and supported workflows. The feature
+does not sign in, select a runtime, or create sessions. The extension and CLI have their own authentication and session
+workflows; do not assume they share a login or the same active session.
+
+For a separate IDE connection to a Colab runtime, upstream documents `colab ssh --proxy-mode` as an OpenSSH
+`ProxyCommand` bridge. Check `colab ssh --help` for the CLI version you selected before configuring it: older versions
+may not provide that command. This connects to the Colab runtime, not the dev container, and requires a client that
+supports SSH remote development. Browser-editor compatibility depends on the client's SSH remote-development support.
+See the [upstream CLI guide](https://github.com/googlecolab/google-colab-cli).
+
+To exclude the Colab extension from automatic installation, add this to your project's `devcontainer.json`:
+
+```json
+{
+  "customizations": {
+    "vscode": { "extensions": ["-google.colab"] }
+  }
+}
+```
+
+[Exclusion](https://code.visualstudio.com/docs/devcontainers/containers) does not uninstall existing extensions or
+remove Jupyter and Python extensions requested independently. To exclude uv's Python integrations as well, follow the
+[uv editor guidance](../uv/NOTES.md#editor-integration).
 
 
 ---

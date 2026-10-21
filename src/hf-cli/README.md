@@ -167,6 +167,19 @@ Supports Debian- and Ubuntu-based images on amd64 and arm64. See
 [test/hf-cli/compatibility.json](../../test/hf-cli/compatibility.json) for the tested images and
 [the hf-cli specification](../../openspec/specs/hf-cli/spec.md) for the behavior contract.
 
+## Credentials in GitHub Codespaces
+
+Create a Codespaces development environment secret named `HF_TOKEN`, grant it access to the repository, and create or
+restart the codespace so the secret is available in its terminal environment. `hf` reads that variable at runtime; no
+login command or token value belongs in the Feature configuration or build arguments.
+
+The local forwarding example above is for a tool running on your own machine. In Codespaces, omit that
+`remoteEnv.HF_TOKEN` override: `${localEnv:HF_TOKEN}` does not read your laptop's environment in a cloud-hosted
+codespace, and an empty override can mask the supplied secret. Keep the secret value in Codespaces Secrets rather than
+in `devcontainer.json`. See
+[GitHub's secret guidance](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-your-account-specific-secrets-for-github-codespaces)
+and [Hugging Face token variables](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables).
+
 
 ---
 

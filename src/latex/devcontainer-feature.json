@@ -1,6 +1,6 @@
 {
   "id": "latex",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "name": "LaTeX (via TinyTeX)",
   "description": "User-managed LaTeX environment with academic packages, Chinese and Japanese support, formatting, linting, and highlighting.",
   "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/latex",

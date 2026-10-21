@@ -176,3 +176,41 @@ update). With `toolsToInstall`, uv also reaches `releases.astral.sh` (managed CP
 - Dev Container `updateRemoteUserUID`: https://containers.dev/implementors/json_reference/
 - Dev Container Feature lifecycle hooks: https://containers.dev/implementors/features/
 - Docker volumes: https://docs.docker.com/engine/storage/volumes/
+
+## Editor integration
+
+The feature requests Microsoft's `ms-python.python` and `ms-python.vscode-python-envs` VS Code extensions, including
+when another feature installs uv as a dependency. The extensions discover project environments such as `.venv`; create
+or synchronize the project's environment before selecting it in the editor. No interpreter path or formatter is forced.
+By default, the Python Environments extension uses uv when it is available (`python-envs.alwaysUseUv` is `true`), so no
+additional setting is needed. See
+[Microsoft's environment guide](https://code.visualstudio.com/docs/python/environments).
+
+For notebooks, add `ms-toolsai.jupyter` to your project's `customizations.vscode.extensions`, then install a kernel in
+the project environment:
+
+```bash
+uv add --dev ipykernel
+```
+
+In the notebook's kernel picker, choose **Python Environments** and the project's `.venv/bin/python`. The feature does
+not install Jupyter into every Python project.
+[Astral's Jupyter guide](https://docs.astral.sh/uv/guides/integration/jupyter/) explains the kernel setup. PyCharm has
+[native uv support](https://www.jetbrains.com/help/pycharm/uv.html); select the project's uv environment, using
+`/usr/local/bin/uv` if automatic detection needs help. No extra uv plugin or IDE backend is selected by the feature.
+
+If you use uv only for command-line tools, exclude both supplied VS Code extension requests in `devcontainer.json`:
+
+```json
+{
+  "customizations": {
+    "vscode": {
+      "extensions": ["-ms-python.python", "-ms-python.vscode-python-envs"]
+    }
+  }
+}
+```
+
+[Exclusions](https://code.visualstudio.com/docs/devcontainers/containers) do not uninstall existing extensions or remove
+other requests for them, such as another extension's dependencies. An empty extensions array does not remove inherited
+requests.
