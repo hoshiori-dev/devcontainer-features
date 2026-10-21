@@ -44,9 +44,19 @@ conflicting channel/version combinations; there is no arbitrary URL or source-re
 
 ### Runtime state
 
-Set PI_CODING_AGENT_DIR=/var/lib/pi/agent. Retain auth.json, settings, installed user Pi packages, and default sessions.
-Keep the base CLI outside this home. Explicit session-directory overrides outside the volume remain outside the
-guarantee. Do not migrate deprecated owner/package identities or install community bridges.
+Leave PI_CODING_AGENT_DIR unset by the feature. Locate the supported release's default agent directory in an isolated
+remote-user home, then link that whole directory to /var/lib/pi/agent. Verify auth.json, settings, skills, installed
+user Pi packages, and default sessions use the linked directory through real save and replacement operations. Keep the
+base CLI outside this home. A release that cannot preserve complete required state through this mapping is unsupported;
+do not silently switch to a global environment override. Explicit session-directory overrides outside the volume remain
+outside the guarantee. Do not migrate deprecated owner/package identities or install community bridges.
+
+Resolve home paths for the actual runtime user after mounting. Create only missing links and reuse links to intended
+mounted targets. Existing files, directories, dangling links, or links to other targets are actionable conflicts; do not
+replace, import, or delete them. Create home links as the remote user, with privileged ownership repair confined to the
+mount and never following external links or changing ownership of the home. Recreate links for each fresh container,
+including when the remote-user home changes. Caller-provided PI_CODING_AGENT_DIR is a conflict requiring consumer
+resolution; never rewrite or unset it. Distinguish caller settings from any feature-owned fallback setting.
 
 Metadata declares source `pi-${devcontainerId}`, target `/var/lib/pi`, type `volume`, an `onCreateCommand` initializer,
 and ordering after common-utils where user setup matters. It declares no entrypoint, privileged mode, added
@@ -78,8 +88,9 @@ the host IDE profile.
 
 The initial compatibility list targets Debian 12 and Ubuntu 24.04 on amd64 and arm64. Only verified combinations are
 advertised; Alpine and other libc families are outside this first design. Automated checks cover version selection,
-executable availability, integrity failures, install-twice behavior, private state, repair, and conflicts. Isolation
-uses two project identities; persistence needs two fresh containers mounting the same volume.
+executable availability, integrity failures, install-twice behavior, private state, repair, link conflicts,
+default/custom path discovery, real writes and atomic replacement, and recreated home links. Isolation uses two project
+identities; persistence needs two fresh containers mounting the same volume.
 
 The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
 result alongside just check, just test pi, and just test-scenarios pi; this introduces no CI mechanism or changes to
