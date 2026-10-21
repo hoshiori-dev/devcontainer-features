@@ -1,0 +1,38 @@
+## ADDED Requirements
+
+### Requirement: Companion editor extension
+
+The feature SHALL request the official `denoland.vscode-deno` extension through VS Code customizations without declaring
+editor settings or a JetBrains IDE backend. It SHALL leave the installed CLI and its installation behavior independent
+of editor choice.
+
+#### Scenario: Companion extension declaration
+
+- **WHEN** a supporting editor reads the feature's VS Code customizations
+- **THEN** the extension list requests `denoland.vscode-deno`
+- **AND** the feature declares no editor settings or IDE backend
+
+### Requirement: Project-controlled editor activation
+
+`NOTES.md` SHALL explain project-controlled Deno activation, including partial activation in mixed Node/Deno workspaces,
+and optional use of the official JetBrains Deno plugin. It SHALL distinguish project examples from configuration
+supplied by the feature.
+
+#### Scenario: Project-controlled activation
+
+- **WHEN** a developer reads the editor guidance
+- **THEN** it offers `deno.enable` for a Deno project and `deno.enablePaths` for selected mixed-project directories
+- **AND** JetBrains plugin selection is an optional project customization
+- **AND** it does not claim that installing the feature enables Deno language services throughout the workspace
+
+### Requirement: Documented extension exclusion
+
+`NOTES.md` SHALL document the VS Code mechanism for excluding the feature's default extension using
+`-denoland.vscode-deno` in the consuming project's customization. The guidance SHALL describe exclusion from automatic
+installation rather than claiming to uninstall an already installed extension.
+
+#### Scenario: Documented extension exclusion
+
+- **WHEN** a developer wants the CLI without its VS Code companion extension
+- **THEN** the notes provide a project configuration example using `-denoland.vscode-deno`
+- **AND** they explain that exclusion does not uninstall an existing extension
