@@ -44,10 +44,24 @@ conflicting channel/version combinations; there is no arbitrary URL or source-re
 
 ### Runtime state
 
-Set an absolute CLAUDE_CONFIG_DIR=/var/lib/claude-code. Supported releases must keep credentials, transcripts, memory,
-settings, and global app state volume-backed, including their actual .claude.json store. Verify that path resolution in
-an isolated home before implementing mappings: a single-file symlink that an atomic rewrite can replace is insufficient.
-A release whose complete state cannot be mapped safely is unsupported rather than silently losing app state.
+Prefer leaving CLAUDE_CONFIG_DIR unset and linking the release's verified default configuration directory into
+/var/lib/claude-code. First inspect the supported release and exercise writes in an isolated remote-user home: locate
+credentials, transcripts, memory, settings, and the actual .claude.json store. Test configuration replacement and
+credential refresh, not only initial reads. If .claude.json lives outside the linked directory or a file link is
+replaced by an atomic rewrite, that link cannot establish persistence.
+
+If the default-directory route cannot cover complete state, retain the official absolute
+CLAUDE_CONFIG_DIR=/var/lib/claude-code route only after proving complete state coverage and compatibility with each
+enabled first-party integration. Record the selected route, evidence, and supported-release boundary in NOTES and PR
+validation; a release with no verified complete route is unsupported. Do not claim that changing this variable affects
+only credentials: verify configuration and skill discovery too.
+
+Resolve home paths for the actual runtime user after mounting. Create only missing links and reuse links to intended
+mounted targets. Existing files, directories, dangling links, or links to other targets are actionable conflicts; do not
+replace, import, or delete them. Create home links as the remote user, with privileged ownership repair confined to the
+mount and never following external links or changing ownership of the home. Recreate links for each fresh container,
+including when the remote-user home changes. Caller-provided CLAUDE_CONFIG_DIR is a conflict requiring consumer
+resolution; never rewrite or unset it. Distinguish caller settings from any feature-owned fallback setting.
 
 Metadata declares source `claude-code-${devcontainerId}`, target `/var/lib/claude-code`, type `volume`, an
 `onCreateCommand` initializer, and ordering after common-utils where user setup matters. It declares no entrypoint,
@@ -80,8 +94,9 @@ the host IDE profile.
 
 The initial compatibility list targets Debian 12 and Ubuntu 24.04 on amd64 and arm64. Only verified combinations are
 advertised; Alpine and other libc families are outside this first design. Automated checks cover version selection,
-executable availability, integrity failures, install-twice behavior, private state, repair, and conflicts. Isolation
-uses two project identities; persistence needs two fresh containers mounting the same volume.
+executable availability, integrity failures, install-twice behavior, private state, repair, link conflicts,
+default/custom path discovery, real writes and atomic replacement, and recreated home links. Isolation uses two project
+identities; persistence needs two fresh containers mounting the same volume.
 
 The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
 result alongside just check, just test claude-code, and just test-scenarios claude-code; this introduces no CI mechanism

@@ -96,19 +96,53 @@ changes and another Docker host SHALL not imply automatic state migration.
 
 ### Requirement: State directory contract
 
-The feature SHALL configure `CLAUDE_CONFIG_DIR=/var/lib/claude-code`. Explicit upstream state overrides outside this
-root SHALL be documented as outside the persistence guarantee. Existing conflicting files or directories SHALL not be
-silently replaced or imported.
+The feature SHALL prefer linking the supported release's default Claude configuration directory into
+`/var/lib/claude-code`, without setting `CLAUDE_CONFIG_DIR`. Before selecting this route it SHALL verify all required
+state paths and write behavior, including `.claude.json`. If default-directory links cannot retain complete state, the
+feature SHALL use the official `CLAUDE_CONFIG_DIR` route only when verified to retain that complete state and support
+the enabled integrations. A single-file link replaced by an atomic write SHALL not satisfy persistence. A release with
+no verified complete mapping SHALL fail clearly rather than report persistent state as available.
+
+Mappings SHALL be initialized after mounting for the actual remote user's home. Setup SHALL reuse links to the intended
+mounted targets and recreate absent links in fresh containers. A conflicting file, directory, dangling link, or link to
+another target SHALL cause an actionable failure without replacement, import, or deletion. Caller-provided
+`CLAUDE_CONFIG_DIR` SHALL cause an actionable conflict without overwriting the setting or existing state.
 
 #### Scenario: Default state paths
 
 - **WHEN** the CLI runs with the feature's default environment
-- **THEN** its private durable state is under the mounted root
+- **THEN** all required private durable state uses the verified mapping into the mounted root
 
 #### Scenario: Conflicting existing state
 
-- **WHEN** a required state mapping conflicts with unrelated existing content
+- **WHEN** a required mapping encounters an existing file, directory, dangling link, or link to another target
 - **THEN** setup reports the conflict and preserves both the existing content and the volume
+
+#### Scenario: Existing correct mapping
+
+- **WHEN** setup is repeated with links already targeting the intended mounted directories
+- **THEN** it reuses those links and preserves private state
+
+#### Scenario: Recreated user home
+
+- **WHEN** a fresh container mounts the existing volume under a different remote-user home
+- **THEN** setup recreates the required links for that user and the saved state remains available
+
+#### Scenario: Real state writes
+
+- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
+- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+
+#### Scenario: Caller-provided state home
+
+- **WHEN** the consumer explicitly configures `CLAUDE_CONFIG_DIR`
+- **THEN** setup reports the conflict without changing that setting or existing state
+
+#### Scenario: Incomplete default-directory mapping
+
+- **WHEN** the default-directory route cannot retain the actual `.claude.json` and other required state
+- **THEN** only a verified complete official configuration-directory route is supported; otherwise the release fails
+  clearly without a persistence guarantee
 
 ### Requirement: Ownership and privacy
 
