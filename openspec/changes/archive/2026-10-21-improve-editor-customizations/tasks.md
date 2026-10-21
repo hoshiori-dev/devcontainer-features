@@ -22,7 +22,15 @@
 
 - [x] 3.1 Inspect the diff to confirm install.sh, test.sh, duplicate.sh, scenarios, compatibility lists, firewall, and
       .devcontainer remain unchanged; no new tests or local container/IDE execution, as agreed.
-- [ ] 3.2 Regenerate READMEs with just docs, run just check with CI's pinned OpenSpec, and inspect just affected for the
+- [x] 3.2 Regenerate READMEs with just docs, run just check with CI's pinned OpenSpec, and inspect just affected for the
       approved scope.
-- [ ] 3.3 Review documentation and publication payload, commit and push, and inspect existing affected GitHub Actions
+- [x] 3.3 Review documentation and publication payload, commit and push, and inspect existing affected GitHub Actions
       regressions; record each Acceptance item and scenario result in the PR Validation section.
+
+## Validation handoff
+
+Local documentation generation, static checks, JSON example validation, and publication/documentation reviews passed.
+The implementation run is https://github.com/hoshiori-dev/devcontainer-features/actions/runs/39529424049. At handoff,
+LaTeX jobs failed on Debian 12 arm64, Arch Linux amd64, and the basic-profile arm64 scenario; other jobs were still
+running. On 2026-10-21 the maintainer took ownership of LaTeX retries and any follow-up diagnosis, and explicitly
+commanded archival after implementation. No passing container or IDE result is inferred from the static checks.
