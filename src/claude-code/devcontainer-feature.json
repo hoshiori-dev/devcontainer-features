@@ -1,0 +1,29 @@
+{
+  "id": "claude-code",
+  "version": "1.0.0",
+  "name": "Claude Code",
+  "description": "Installs Claude Code and preserves application state in a private project volume.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/claude-code",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "The stable Claude Code release: latest, or an exact MAJOR.MINOR.PATCH version.",
+      "proposals": [
+        "latest",
+        "2.1.89"
+      ]
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ],
+  "mounts": [
+    {
+      "source": "claude-code-${devcontainerId}",
+      "target": "/var/lib/claude-code",
+      "type": "volume"
+    }
+  ],
+  "onCreateCommand": "/usr/local/share/claude-code-feature/initialize"
+}

@@ -54,6 +54,7 @@
 | [apptainer](src/apptainer/README.md)                               | 以非特权、非 setuid 的形式安装 Apptainer：Fedora 用自带软件源，RHEL 衍生版用 EPEL，Ubuntu 用项目的 PPA，Debian 用 GitHub 发布包；并声明非特权用户运行它所需的容器安全选项。 |
 | [apt-packages](src/apt-packages/README.md)                         | 用 apt-get 从 Debian 或 Ubuntu 镜像已配置的软件源安装一组系统软件包。                                                                                                       |
 | [betterleaks](src/betterleaks/README.md)                           | 从经过校验和验证的 GitHub 发布包安装 Betterleaks 密钥扫描器，不写入任何扫描配置。                                                                                           |
+| [claude-code](src/claude-code/README.md)                           | 安装 Claude Code CLI，并将应用状态保存在项目专属卷中。                                                                                                                      |
 | [codex](src/codex/README.md)                                       | 安装 Codex CLI，并通过私有项目卷保留其主目录中的凭证、配置、技能和会话。                                                                                                    |
 | [colab-cli](src/colab-cli/README.md)                               | 用 uv 和隔离的 Python 3.12 为远程用户安装 Google Colab CLI。                                                                                                                |
 | [deno](src/deno/README.md)                                         | 安装 Deno CLI 并按官方发布的校验和验证；用 deno install --global 安装的工具放在共用的 PATH 位置。                                                                           |
