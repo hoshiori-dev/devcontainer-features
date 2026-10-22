@@ -69,20 +69,24 @@ changes and another Docker host SHALL not imply automatic state migration.
 ### Requirement: State directory contract
 
 The feature SHALL link only verified Antigravity-owned directories into `/var/lib/antigravity`, retaining upstream
-default discovery paths. It SHALL NOT link the entire shared `.gemini` or `.config` tree. Shared files SHALL use only an
-upstream-supported mapping verified to preserve other tools' data and remain effective after actual writes and
-credential refreshes. A file link replaced by an atomic write SHALL not satisfy persistence. If required state cannot be
-mapped safely, the feature SHALL remain unready for delivery rather than broaden ownership or omit that state.
-
-Mappings SHALL use the actual remote user's effective paths. Setup SHALL reuse links to the intended mounted targets and
-create absent links when initializing a fresh container. A conflicting file, directory, dangling link, or link to
-another target SHALL cause an actionable failure without replacement, import, or deletion. Explicit application state
-overrides outside the mapped directories SHALL be documented as outside the persistence guarantee.
+default discovery paths. It SHALL NOT link the entire shared `.gemini` or `.config` tree.
 
 #### Scenario: Default state paths
 
 - **WHEN** the CLI runs with the feature's default environment
 - **THEN** all required private durable state uses the verified mapping into the mounted root
+
+#### Scenario: Real state writes
+
+- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
+- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+
+### Requirement: State mapping conflicts
+
+Setup SHALL use the actual remote user's effective paths, reuse links to the intended mounts, and create missing links
+in fresh containers. Conflicting files, directories, dangling links, or links to another target SHALL cause an
+actionable failure, preserving existing content without replacement, import, or deletion. Explicit application state
+overrides outside mapped directories SHALL be documented as outside the persistence guarantee.
 
 #### Scenario: Conflicting existing state
 
@@ -99,10 +103,11 @@ overrides outside the mapped directories SHALL be documented as outside the pers
 - **WHEN** a fresh container mounts the existing volume under a different remote-user home
 - **THEN** setup recreates the required links for that user and the saved state remains available
 
-#### Scenario: Real state writes
+### Requirement: Safe shared state mappings
 
-- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
-- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+Shared files SHALL use only upstream-supported mappings verified to preserve other tools' data after writes and
+credential refreshes. A file link replaced by atomic writes SHALL NOT count as persistence. If required state cannot be
+mapped safely, the feature SHALL remain unready for delivery without broadening ownership or omitting that state.
 
 #### Scenario: Unsafe shared store
 
@@ -111,16 +116,9 @@ overrides outside the mapped directories SHALL be documented as outside the pers
 
 ### Requirement: Initialization lifecycle
 
-The feature MAY prepare known state-directory links during image construction. It SHALL perform one readiness check per
-container creation through `onCreateCommand`, after mounts are available. That check SHALL verify the expected state
-mount, effective user paths, link targets, state-root ownership and private permissions, known credential-store
-permissions, and read/write/search access as the actual remote user before reporting readiness. Missing links MAY be
-created then; conflicting content SHALL be preserved with an actionable failure.
-
-Normal creation checks SHALL be bounded to these paths; full-tree scans and recursive ownership or permission changes
-SHALL occur only when a detected mismatch requires repair within the state mount. The feature SHALL add no automatic
-state check to start or attach hooks. Path, user, or mount changes after creation SHALL require container recreation or
-an explicit rerun of initialization, as documented.
+The feature MAY prepare known state-directory links during image construction. It SHALL run one readiness check per
+container creation via `onCreateCommand`, after mounts are available. Missing runtime links MAY be created then;
+conflicting content SHALL be preserved with an actionable failure.
 
 #### Scenario: Build-prepared link
 
@@ -132,10 +130,21 @@ an explicit rerun of initialization, as documented.
 - **WHEN** the effective runtime home or application state path differs from the prepared path, or a home mount hides it
 - **THEN** initialization uses the effective path, creates a missing link there, and preserves any conflicting content
 
+### Requirement: State readiness checks
+
+Before reporting readiness, the creation check SHALL verify the expected state mount, effective user paths, link
+targets, state-root ownership and private permissions, known credential-store permissions, and read/write/search access
+as the actual remote user.
+
 #### Scenario: Missing state mount
 
 - **WHEN** the expected state volume is absent
 - **THEN** initialization fails clearly instead of treating writable image storage as persistent state
+
+### Requirement: Bounded state repair
+
+Normal creation checks SHALL be bounded to the readiness paths. Full-tree scans and recursive ownership or permission
+changes SHALL occur only when a detected mismatch requires repair within the state mount.
 
 #### Scenario: Healthy reused volume
 
@@ -147,6 +156,11 @@ an explicit rerun of initialization, as documented.
 - **WHEN** the readiness check detects incompatible ownership, private permissions, or user access
 - **THEN** initialization repairs only what is needed within the state mount or fails clearly if safe repair is
   unavailable
+
+### Requirement: No recurring initialization
+
+The feature SHALL add no automatic state check to start or attach hooks. Path, user, or mount changes after creation
+SHALL require container recreation or an explicit rerun of initialization, as documented.
 
 #### Scenario: Ordinary restart or attachment
 
