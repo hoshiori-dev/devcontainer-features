@@ -1,0 +1,64 @@
+{
+  "test_state": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "claude-code": {
+        "version": "2.1.89"
+      }
+    }
+  },
+  "test_node_explicit": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "ghcr.io/devcontainers/features/node:2": {
+        "version": "22",
+        "npmVersion": "10.9.4",
+        "pnpmVersion": "9.15.9",
+        "nodeGypDependencies": false
+      },
+      "claude-code": {}
+    }
+  },
+  "test_node_partial": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "ghcr.io/devcontainers/features/node:2": {
+        "version": "22"
+      },
+      "claude-code": {}
+    }
+  },
+  "test_node_defaults": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "ghcr.io/devcontainers/features/node:2": {},
+      "claude-code": {}
+    }
+  },
+  "fail_installation": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "claude-code": {}
+    }
+  },
+  "test_state_latest": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "claude-code": {}
+    }
+  },
+  "test_untested": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "claude-code": {}
+    }
+  }
+}
