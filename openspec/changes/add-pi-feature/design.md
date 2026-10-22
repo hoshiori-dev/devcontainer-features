@@ -51,27 +51,45 @@ base CLI outside this home. A release that cannot preserve complete required sta
 do not silently switch to a global environment override. Explicit session-directory overrides outside the volume remain
 outside the guarantee. Do not migrate deprecated owner/package identities or install community bridges.
 
-Resolve home paths for the actual runtime user after mounting. Create only missing links and reuse links to intended
-mounted targets. Existing files, directories, dangling links, or links to other targets are actionable conflicts; do not
-replace, import, or delete them. Create home links as the remote user, with privileged ownership repair confined to the
-mount and never following external links or changing ownership of the home. Recreate links for each fresh container,
-including when the remote-user home changes. Caller-provided PI_CODING_AGENT_DIR is a conflict requiring consumer
+Prepare only known link paths during construction; resolve runtime-only paths at container creation. Reuse links to
+intended mounted targets. Existing files, directories, dangling links, or links to other targets are actionable
+conflicts; preserve their contents. Runtime link creation runs as the remote user; privileged repair stays inside the
+state mount and never changes home ownership. Caller-provided PI_CODING_AGENT_DIR is a conflict requiring consumer
 resolution; never rewrite or unset it. Distinguish caller settings from any feature-owned fallback setting.
 
 Metadata declares source `pi-${devcontainerId}`, target `/var/lib/pi`, type `volume`, an `onCreateCommand` initializer,
 and ordering after common-utils where user setup matters. It declares no entrypoint, privileged mode, added
-capabilities, weakened security profile, or host-home mount. Initialize mappings and nonsecret defaults after mounting,
-with private directories at 0700 and credentials at 0600. A restrictive runtime umask protects newly created private
-files.
+capabilities, weakened security profile, or host-home mount. Initialize missing nonsecret defaults after mounting, with
+private directories at 0700 and credentials at 0600. A restrictive runtime umask protects newly created private files.
 
-Docker copy-up preserves prepared directory ownership for a fresh volume. A reused volume with a new remote UID needs
-repair using the runtime user's identity and noninteractive sudo where necessary. Repair stays inside the exact mount
-and does not follow external symlinks. If it is unavailable, return an actionable failure rather than success, deletion,
-or broader access. A single profile is not promised to support simultaneous independent owners/writers.
+Prepare mount-point directories with private permissions during the build. Docker may copy their contents and ownership
+into a new empty volume; this does not repair an existing volume or establish runtime access. A reused volume with a new
+remote UID needs repair using the runtime user's identity and noninteractive sudo where necessary. Repair stays inside
+the exact mount and does not follow external symlinks. If it is unavailable, return an actionable failure rather than
+success, deletion, or broader access. A single profile is not promised to support simultaneous independent
+owners/writers.
 
 The devcontainerId names one configuration on one Docker host. Moving a checkout or changing configuration may select
 another volume; NOTES explains inspection and explicit migration. No volume pruning or automatic import of conflicting
 home content occurs.
+
+### Initialization timing
+
+In install.sh, use `_REMOTE_USER_HOME` for known home-relative links, not root's `~`. Build-time creation is allowed
+before the target volume exists; preserve existing paths and keep account data out of image layers. Runtime-only XDG or
+application overrides are resolved by the creation initializer. Mounting an entire home can hide image-prepared links,
+so the initializer verifies the effective paths even when build preparation succeeded.
+
+Use only onCreateCommand for automatic readiness work. Check the actual mount (not just directory existence), effective
+paths and link targets, state-root ownership/mode, known credential-store permissions, and user read/write/search
+access. Use metadata and narrowly scoped access probes without reading credentials or enumerating all conversations.
+When healthy, perform no full-tree scan or recursive chown/chmod. A detected mismatch may require repair confined to the
+mount under the existing ownership/privacy contract; unavailable repair fails clearly. Initialize only absent defaults.
+
+No postStartCommand or postAttachCommand is added for this purpose. The initializer remains idempotent for explicit
+reruns. NOTES tells consumers to recreate the container or rerun initialization after changing users, homes, XDG roots,
+or mounts. Check healthy-volume and ordinary-restart behavior alongside missing-mount, hidden-link, and changed-UID
+cases.
 
 ### Editor routes
 
