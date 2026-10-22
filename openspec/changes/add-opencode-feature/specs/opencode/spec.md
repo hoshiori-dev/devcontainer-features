@@ -95,8 +95,8 @@ effective XDG roots to corresponding subdirectories of `/var/lib/opencode`. It S
 without setting or replacing global `XDG_*` values or linking whole shared XDG roots. Complete databases and companion
 files SHALL remain together in their linked application directories.
 
-Mappings SHALL be initialized after mounting for the actual remote user's home. Setup SHALL reuse links to the intended
-mounted targets and recreate absent links in fresh containers. A conflicting file, directory, dangling link, or link to
+Mappings SHALL use the actual remote user's effective paths. Setup SHALL reuse links to the intended mounted targets and
+create absent links when initializing a fresh container. A conflicting file, directory, dangling link, or link to
 another target SHALL cause an actionable failure without replacement, import, or deletion. Explicit application state
 overrides outside the mapped directories SHALL be documented as outside the persistence guarantee.
 
@@ -129,6 +129,50 @@ overrides outside the mapped directories SHALL be documented as outside the pers
 
 - **WHEN** the remote user supplies valid custom XDG roots containing other applications' state
 - **THEN** setup maps only OpenCode-owned subdirectories and preserves the root settings and unrelated data
+
+### Requirement: Initialization lifecycle
+
+The feature MAY prepare known state-directory links during image construction. It SHALL perform one readiness check per
+container creation through `onCreateCommand`, after mounts are available. That check SHALL verify the expected state
+mount, effective user paths, link targets, state-root ownership and private permissions, known credential-store
+permissions, and read/write/search access as the actual remote user before reporting readiness. Missing links MAY be
+created then; conflicting content SHALL be preserved with an actionable failure.
+
+Normal creation checks SHALL be bounded to these paths; full-tree scans and recursive ownership or permission changes
+SHALL occur only when a detected mismatch requires repair within the state mount. The feature SHALL add no automatic
+state check to start or attach hooks. Path, user, or mount changes after creation SHALL require container recreation or
+an explicit rerun of initialization, as documented.
+
+#### Scenario: Build-prepared link
+
+- **WHEN** a known state path is linked during construction before its volume is mounted
+- **THEN** initialization accepts the link once the expected volume is mounted and user access is verified
+
+#### Scenario: Runtime path differs
+
+- **WHEN** the effective runtime home or application state path differs from the prepared path, or a home mount hides it
+- **THEN** initialization uses the effective path, creates a missing link there, and preserves any conflicting content
+
+#### Scenario: Missing state mount
+
+- **WHEN** the expected state volume is absent
+- **THEN** initialization fails clearly instead of treating writable image storage as persistent state
+
+#### Scenario: Healthy reused volume
+
+- **WHEN** the mounted state has valid mappings, ownership, permissions, and user access
+- **THEN** initialization completes without scanning the full tree or recursively changing ownership or permissions
+
+#### Scenario: Detected repair need
+
+- **WHEN** the readiness check detects incompatible ownership, private permissions, or user access
+- **THEN** initialization repairs only what is needed within the state mount or fails clearly if safe repair is
+  unavailable
+
+#### Scenario: Ordinary restart or attachment
+
+- **WHEN** the initialized container is restarted or an editor attaches again without configuration changes
+- **THEN** no feature-provided state scan, recursive repair, or readiness hook runs automatically
 
 ### Requirement: Ownership and privacy
 
