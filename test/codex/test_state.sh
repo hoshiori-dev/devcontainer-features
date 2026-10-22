@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercises the real initializer and native configuration API on the project's mounted state, using no account.
+# Exercises the real initializer and preserved configuration on the project's mounted state, using no account.
 set -euo pipefail
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
@@ -8,8 +8,8 @@ readonly STATE_DIR="/var/lib/codex"
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 "${INITIALIZE}"
-# Current releases may already default to file credentials without creating a user configuration file.
-if [[ ! -e "${STATE_DIR}/config.toml" ]]; then install --mode 0600 /dev/null "${STATE_DIR}/config.toml"; fi
+check "initialization leaves absent Codex settings absent" test ! -e "${STATE_DIR}/config.toml"
+install --mode 0600 /dev/null "${STATE_DIR}/config.toml"
 cp "${STATE_DIR}/config.toml" "${work}/config.toml"
 
 healthy_without_scan() {
@@ -35,40 +35,45 @@ preserves_unrelated_settings() {
 }
 check "compatible TOML settings are preserved" preserves_unrelated_settings
 
-selects_file_from_auto() {
-  printf '# keep this comment\ncli_auth_credentials_store = "auto"\nmodel_reasoning_effort = "low"\n' \
+preserves_backend() {
+  local backend="$1"
+  printf '# keep this comment\ncli_auth_credentials_store = "%s"\nmodel_reasoning_effort = "low"\n' "${backend}" \
     >"${STATE_DIR}/config.toml"
+  cp "${STATE_DIR}/config.toml" "${work}/backend.toml"
   "${INITIALIZE}" || return 1
-  grep -q 'cli_auth_credentials_store = "file"' "${STATE_DIR}/config.toml" \
-    && grep -q '# keep this comment' "${STATE_DIR}/config.toml" \
-    && grep -q 'model_reasoning_effort = "low"' "${STATE_DIR}/config.toml"
+  cmp "${STATE_DIR}/config.toml" "${work}/backend.toml"
 }
-check "native configuration replaces auto storage and preserves TOML comments and settings" selects_file_from_auto
+for backend in file auto keyring ephemeral; do
+  check "initialization preserves ${backend} storage and all TOML content" preserves_backend "${backend}"
+done
 cp "${work}/config.toml" "${STATE_DIR}/config.toml"
+
+without_cli() {
+  mkdir "${work}/no-cli"
+  printf '#!/bin/sh\nexit 91\n' >"${work}/no-cli/codex"
+  chmod +x "${work}/no-cli/codex"
+  PATH="${work}/no-cli:${PATH}" "${INITIALIZE}"
+}
+check "initialization does not require a Codex configuration service" without_cli
 
 rejects_initialization() {
   local output
   if output="$("${INITIALIZE}" 2>&1)"; then return 1; fi
   [[ "${output}" == *"codex: error:"* ]]
 }
-rejects_keyring() {
-  printf 'cli_auth_credentials_store = "keyring"\n' >"${STATE_DIR}/config.toml"
-  cp "${STATE_DIR}/config.toml" "${work}/keyring.toml"
-  rejects_initialization && cmp "${STATE_DIR}/config.toml" "${work}/keyring.toml"
-}
-check "keyring-only configuration fails without being rewritten" rejects_keyring
-cp "${work}/config.toml" "${STATE_DIR}/config.toml"
-
-rejects_managed_policy() {
+preserves_managed_policy() {
   sudo mkdir -p /etc/codex
   [[ ! -e /etc/codex/requirements.toml ]] || return 1
-  printf 'cli_auth_credentials_store = "keyring"\n' | sudo tee /etc/codex/requirements.toml >/dev/null || return 1
+  printf 'cli_auth_credentials_store = "keyring"\n' >"${work}/requirements.toml"
+  sudo cp "${work}/requirements.toml" /etc/codex/requirements.toml || return 1
   local result=0
-  rejects_initialization || result=1
+  "${INITIALIZE}" || result=1
+  cmp "${work}/requirements.toml" /etc/codex/requirements.toml || result=1
+  cmp "${work}/config.toml" "${STATE_DIR}/config.toml" || result=1
   sudo rm /etc/codex/requirements.toml
   return "${result}"
 }
-check "managed policy cannot be overridden by file defaults" rejects_managed_policy
+check "managed keyring policy is preserved without rejecting initialization" preserves_managed_policy
 check "explicit CODEX_HOME is rejected" env CODEX_HOME=/tmp/other-codex bash -c \
   'if /usr/local/share/codex-feature/initialize; then exit 1; fi'
 

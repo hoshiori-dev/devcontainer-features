@@ -13,6 +13,7 @@ check "creation-time initialization succeeds with no credentials" "${INITIALIZE}
 check "default home links to the project volume without CODEX_HOME" default_home
 check "state root belongs privately to the remote user" private_root
 check "installation and initialization do not log in" no_account
+check "initialization does not create Codex settings" test ! -e /var/lib/codex/config.toml
 check "native application remains outside the volume" test -x /usr/local/share/codex/bin/codex
 check "native package retains its code-mode companion" test -x /usr/local/share/codex/bin/codex-code-mode-host
 check "native package retains its search companion" test -x /usr/local/share/codex/codex-path/rg

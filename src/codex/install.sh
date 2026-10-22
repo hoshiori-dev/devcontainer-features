@@ -128,10 +128,6 @@ install_release() {
   fi
   [[ "$(env -u CODEX_HOME HOME="${work_dir}/home" "${work_dir}/application/bin/codex" --version)" == "codex-cli ${resolved}" ]] \
     || fail "native package cannot execute or reports an unexpected version"
-  # Probe the native protocol with an empty home before replacing the working installation.
-  env -u CODEX_HOME HOME="${work_dir}/home" PATH="${work_dir}/application/bin:${PATH}" \
-    bash "$(dirname "$0")/configure.sh" \
-    || fail "release cannot configure file authentication; choose a supported stable release"
   log "installing verified native Codex ${resolved} to ${APPLICATION_DIR}"
   rm --recursive --force "${APPLICATION_DIR}"
   mv "${work_dir}/application" "${APPLICATION_DIR}"
@@ -145,8 +141,6 @@ install_runtime() {
   log "preparing ${remote_home}/.codex and creation-time helpers for ${STATE_DIR}"
   install --directory --mode 0755 "${HELPER_DIR}"
   install --mode 0755 "$(dirname "$0")/initialize.sh" "${HELPER_DIR}/initialize"
-  install --mode 0755 "$(dirname "$0")/configure.sh" "${HELPER_DIR}/configure"
-  rm --force "${HELPER_DIR}/configure.mjs"
   cat >"${CLI_PATH}" <<'WRAPPER'
 #!/usr/bin/env bash
 umask 077

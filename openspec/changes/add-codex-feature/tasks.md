@@ -47,3 +47,12 @@ Sections 1–4 record the original implementation at `a6c5ac2`. Section 5 tracks
       and default Node configuration, preserved Codex state, and CLI/initializer execution.
 - [x] 5.5 Regenerate documentation, run local checks and affected CI, and replace the superseded PR validation record;
       retain the maintainer's real-account verification waiver.
+
+## 6. Respect credential backend choices
+
+- [x] 6.1 Remove the configuration helper, build-time protocol probe, and initialization call; retain private state
+      mapping and access checks without invoking Codex or writing its settings.
+- [x] 6.2 Verify absent configuration remains absent and explicit file/auto/keyring/ephemeral settings and managed
+      policy survive initialization unchanged; retain file-login and session persistence coverage.
+- [x] 6.3 Update generated documentation, run local checks, and prepare the renewed-approval and PR validation records
+      for `6484be4`; affected CI follows the finish workflow without changing the authenticated-check waiver.

@@ -6,7 +6,6 @@ umask 077
 
 readonly STATE_DIR="/var/lib/codex"
 readonly SELF_PATH="/usr/local/share/codex-feature/initialize"
-readonly CONFIGURE_PATH="/usr/local/share/codex-feature/configure"
 
 log() { printf 'codex: %s\n' "$*"; }
 fail() { printf 'codex: error: %s\n' "$*" >&2; exit 1; }
@@ -85,7 +84,6 @@ initialize_state() {
     log "linking the runtime home to ${STATE_DIR}"
     ln --symbolic "${STATE_DIR}" "${home_path}/.codex"
   fi
-  "${CONFIGURE_PATH}"
   [[ ! -e "${STATE_DIR}/config.toml" ]] || chmod 0600 "${STATE_DIR}/config.toml"
   log "private project state is ready"
 }

@@ -3,8 +3,6 @@
 Run `codex` in the VS Code or JetBrains **container terminal**. The feature installs the complete official native
 package, verified against the release SHA-256 manifest, without installing Node or npm. `version` accepts `latest` or an
 exact stable release; installing again selects the newly requested release without importing or deleting account state.
-A release must support the native configuration API used to select file credential storage. Unsupported releases fail
-before replacing the installed CLI.
 
 Systems and hardware without a matching official native package for the selected release are unsupported. A target with
 an available native package outside the tested compatibility list receives a warning before installation is attempted.
@@ -23,8 +21,9 @@ including configuration, file credentials, sessions, companion databases, and sk
 
 Keep `CODEX_HOME` unset. Existing `.codex` files, directories, or links to other locations cause a clear conflict; the
 feature does not overwrite or automatically migrate them. Back them up and migrate them explicitly before enabling this
-feature. Existing keyring-only credential settings and managed policies that conflict with file credential storage must
-be resolved first. Compatible settings are preserved through Codex's own TOML configuration API.
+feature. Credential storage follows Codex defaults, user configuration, and managed policy; the feature does not create
+or rewrite Codex settings. File credentials inside Codex home persist on the volume. If you select a keyring backend,
+you manage its service, unlocking, and persistence separately; this feature does not set up a keyring.
 
 The creation hook `/usr/local/share/codex-feature/initialize` checks the mount, home link, ownership, private
 permissions, and user access once. Healthy volumes require no recursive scan. A changed UID may need noninteractive sudo
