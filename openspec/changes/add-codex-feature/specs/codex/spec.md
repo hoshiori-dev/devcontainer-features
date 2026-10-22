@@ -128,16 +128,9 @@ environment modification.
 
 ### Requirement: Initialization lifecycle
 
-The feature MAY prepare known state-directory links during image construction. It SHALL perform one readiness check per
-container creation through `onCreateCommand`, after mounts are available. That check SHALL verify the expected state
-mount, effective user paths, link targets, state-root ownership and private permissions, known credential-store
-permissions, and read/write/search access as the actual remote user before reporting readiness. Missing links MAY be
-created then; conflicting content SHALL be preserved with an actionable failure.
-
-Normal creation checks SHALL be bounded to these paths; full-tree scans and recursive ownership or permission changes
-SHALL occur only when a detected mismatch requires repair within the state mount. The feature SHALL add no automatic
-state check to start or attach hooks. Path, user, or mount changes after creation SHALL require container recreation or
-an explicit rerun of initialization, as documented.
+The feature MAY prepare known state-directory links during image construction. It SHALL run one readiness check per
+container creation via `onCreateCommand`, after mounts are available. Missing runtime links MAY be created then;
+conflicting content SHALL be preserved with an actionable failure.
 
 #### Scenario: Build-prepared link
 
@@ -149,10 +142,21 @@ an explicit rerun of initialization, as documented.
 - **WHEN** the effective runtime home or application state path differs from the prepared path, or a home mount hides it
 - **THEN** initialization uses the effective path, creates a missing link there, and preserves any conflicting content
 
+### Requirement: State readiness checks
+
+Before reporting readiness, the creation check SHALL verify the expected state mount, effective user paths, link
+targets, state-root ownership and private permissions, known credential-store permissions, and read/write/search access
+as the actual remote user.
+
 #### Scenario: Missing state mount
 
 - **WHEN** the expected state volume is absent
 - **THEN** initialization fails clearly instead of treating writable image storage as persistent state
+
+### Requirement: Bounded state repair
+
+Normal creation checks SHALL be bounded to the readiness paths. Full-tree scans and recursive ownership or permission
+changes SHALL occur only when a detected mismatch requires repair within the state mount.
 
 #### Scenario: Healthy reused volume
 
@@ -164,6 +168,11 @@ an explicit rerun of initialization, as documented.
 - **WHEN** the readiness check detects incompatible ownership, private permissions, or user access
 - **THEN** initialization repairs only what is needed within the state mount or fails clearly if safe repair is
   unavailable
+
+### Requirement: No recurring initialization
+
+The feature SHALL add no automatic state check to start or attach hooks. Path, user, or mount changes after creation
+SHALL require container recreation or an explicit rerun of initialization, as documented.
 
 #### Scenario: Ordinary restart or attachment
 
