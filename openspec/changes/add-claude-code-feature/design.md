@@ -47,8 +47,8 @@ conflicting channel/version combinations; there is no arbitrary URL or source-re
 Prefer leaving CLAUDE_CONFIG_DIR unset and linking the release's verified default configuration directory into
 /var/lib/claude-code. First inspect the supported release and exercise writes in an isolated remote-user home: locate
 credentials, transcripts, memory, settings, and the actual .claude.json store. Test configuration replacement and
-credential refresh, not only initial reads. If .claude.json lives outside the linked directory or a file link is
-replaced by an atomic rewrite, that link cannot establish persistence.
+synthetic credential-file replacement, not only initial reads. If .claude.json lives outside the linked directory or a
+file link is replaced by an atomic rewrite, that link cannot establish persistence.
 
 If the default-directory route cannot cover complete state, retain the official absolute
 CLAUDE_CONFIG_DIR=/var/lib/claude-code route only after proving complete state coverage and compatibility with each
@@ -64,9 +64,8 @@ resolution; never rewrite or unset it. Distinguish caller settings from any feat
 
 Metadata declares source `claude-code-${devcontainerId}`, target `/var/lib/claude-code`, type `volume`, an
 `onCreateCommand` initializer, and ordering after common-utils where user setup matters. It declares no entrypoint,
-privileged mode, added capabilities, weakened security profile, or host-home mount. Initialize missing nonsecret
-defaults after mounting, with private directories at 0700 and credentials at 0600. A restrictive runtime umask protects
-newly created private files.
+privileged mode, added capabilities, weakened security profile, or host-home mount. Keep private directories at 0700 and
+credentials at 0600. A restrictive runtime umask protects newly created private files.
 
 Prepare mount-point directories with private permissions during the build. Docker may copy their contents and ownership
 into a new empty volume; this does not repair an existing volume or establish runtime access. A reused volume with a new
@@ -90,7 +89,8 @@ Use only onCreateCommand for automatic readiness work. Check the actual mount (n
 paths and link targets, state-root ownership/mode, known credential-store permissions, and user read/write/search
 access. Use metadata and narrowly scoped access probes without reading credentials or enumerating all conversations.
 When healthy, perform no full-tree scan or recursive chown/chmod. A detected mismatch may require repair confined to the
-mount under the existing ownership/privacy contract; unavailable repair fails clearly. Initialize only absent defaults.
+mount under the existing ownership/privacy contract; unavailable repair fails clearly. Do not create or rewrite agent
+settings or select a credential backend.
 
 No postStartCommand or postAttachCommand is added for this purpose. The initializer remains idempotent for explicit
 reruns. NOTES tells consumers to recreate the container or rerun initialization after changing users, homes, XDG roots,
@@ -111,22 +111,37 @@ the host IDE profile.
 
 ### Validation boundary
 
-The initial compatibility list targets Debian 12 and Ubuntu 24.04 on amd64 and arm64. Only verified combinations are
-advertised; Alpine and other libc families are outside this first design. Automated checks cover version selection,
-executable availability, integrity failures, install-twice behavior, private state, repair, link conflicts,
-default/custom path discovery, real writes and atomic replacement, and recreated home links. Isolation uses two project
-identities; persistence needs two fresh containers mounting the same volume.
+The initial compatibility list records tested Debian 12 and Ubuntu 24.04 combinations on amd64 and arm64. It is not a
+support whitelist: warn and attempt other targets covered by the selected official installation route, and report
+missing coverage or actual prerequisite/execution failures clearly.
 
-The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
-result alongside just check, just test claude-code, and just test-scenarios claude-code; this introduces no CI mechanism
-or changes to required checks. Fixtures/local mock providers verify state formats without live credentials. Real
-authentication and each enabled IDE route require their own result, with no raw credentials or transcripts published.
+Use unattended synthetic files to test credential-file contents, private permissions, mounts, separate project
+identities, atomic replacement, and recreation with the same volume. Never perform real authentication, token refresh,
+browser authorization, or tests requiring API keys or human input. Do not test other authentication forms or interpret
+file preservation as proof of account restoration. Preserve the existing non-authentication CLI and state tests.
+
+A two-container check is an unattended host-side script using isolated test volumes and synthetic fixtures; no manual
+login or operator step is part of acceptance. Keep the existing scenario runner and required CI checks unchanged; use
+the repository's current test capabilities rather than depending on the proposed expected-build-failure metadata.
+
+### Credential and initialization boundary
+
+Preserve upstream credential backend defaults, user configuration, and managed policy. Map application-owned state
+folders and retain credential files there; never force a file backend, provision a keyring, or rewrite authentication
+settings. Initialization checks only state paths, mounts, ownership, private permissions, and access, without starting
+an agent configuration service. NOTES documents retained paths and consumer-managed keyring, external files, and
+environment credentials. No authentication workflow or credential-service design is included.
+
+Validate staged executables in an isolated temporary home before replacing a working installation. Keep complete
+required runtime payloads outside the state mount. Check that installation and later runtime Feature configuration do
+not alter user tool versions or defaults; compare explicit, partial, and empty configurations with runtime-only
+controls. Audit first-party installation entry points, artifact/registry locations, and verification sources separately
+from base-image repositories and upstream-selected dependency distributors.
 
 ## Risks / Trade-offs
 
-- Private state can contain credentials and source text; protect the whole root and never print its contents in
-  verification output.
-- Upstream schemas can change; preserve whole owned directories and still verify resume for supported releases.
-- Cross-host synchronization and simultaneous independent writers are outside the design.
-- Package/parser checks do not prove authenticated resume. An unverified IDE route takes the terminal fallback;
-  unverified CLI credential restoration remains a delivery blocker.
+- Private files can contain credentials and source text; protect the state root and never print its contents.
+- Upstream state layouts can change; verify directory mappings and file replacement without real account access.
+- External credential stores, cross-host synchronization, and simultaneous independent writers are consumer-managed.
+- File-retention checks do not establish authenticated restoration. An IDE route without verified container-side file
+  mapping uses the terminal fallback.

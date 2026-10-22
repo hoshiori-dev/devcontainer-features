@@ -59,19 +59,25 @@ then compare the binary SHA-256 with the verified manifest.
 
 ### Requirement: Supported targets
 
-The feature SHALL support only the image and architecture combinations declared in
-`test/claude-code/compatibility.json`. It SHALL reject an unsupported distribution, architecture, or requested release
-before installing the CLI.
+`test/claude-code/compatibility.json` SHALL record tested image and architecture combinations. A target covered by the
+selected official installation route but absent from that list SHALL receive a warning followed by an installation
+attempt. Missing distribution/runtime coverage SHALL fail clearly; actual prerequisite and execution failures SHALL
+report their cause without claiming success.
 
-#### Scenario: Supported installation
+#### Scenario: Tested installation
 
 - **WHEN** a declared target and supported release are selected
-- **THEN** `claude --version` runs successfully as the remote user
+- **THEN** the CLI runs successfully as the remote user
 
-#### Scenario: Unsupported target
+#### Scenario: Covered but untested target
 
-- **WHEN** the target is not supported
-- **THEN** installation fails with a clear target-specific error
+- **WHEN** the installation route covers a target absent from the compatibility list
+- **THEN** installation warns and attempts installation rather than rejecting it solely for missing test coverage
+
+#### Scenario: Uncovered or unusable target
+
+- **WHEN** no supported artifact/runtime covers the target, or a required prerequisite or executable fails
+- **THEN** installation fails clearly with the actual cause
 
 ### Requirement: Project-scoped state
 
@@ -87,7 +93,7 @@ changes and another Docker host SHALL not imply automatic state migration.
 #### Scenario: Recreated container
 
 - **WHEN** a fresh container for the same project mounts the previous volume
-- **THEN** saved credentials and conversations remain available to the CLI
+- **THEN** saved file-backed credentials and conversations remain in their mapped directories
 
 #### Scenario: Independent project
 
@@ -107,8 +113,9 @@ paths and actual writes, including `.claude.json`.
 
 #### Scenario: Real state writes
 
-- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
-- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or atomically replaces a credential
+  fixture
+- **THEN** required files remain volume-backed and readable by a fresh process and a recreated container without login
 
 ### Requirement: State mapping conflicts
 
@@ -220,7 +227,7 @@ report an actionable failure and SHALL not make state world-readable.
 
 ### Requirement: No build-time account data
 
-Installation SHALL neither log in nor copy host credentials. Runtime credentials, OAuth codes, and conversations SHALL
+Installation SHALL neither log in nor copy host credentials. Real credentials, OAuth codes, and conversations SHALL
 remain out of image layers, the checkout, and test/review output. The CLI SHALL retain upstream approval and sandbox
 defaults.
 
@@ -229,10 +236,10 @@ defaults.
 - **WHEN** an image is built without account credentials
 - **THEN** installation completes without requesting credentials or storing account state in image layers
 
-#### Scenario: Runtime sign-in
+#### Scenario: Runtime credential files
 
-- **WHEN** the developer completes authentication after container creation
-- **THEN** private credentials are stored in the project volume without being printed by feature helpers
+- **WHEN** synthetic credential files are written to mapped application state after container creation
+- **THEN** those files remain private and volume-backed without being printed by feature helpers
 
 ### Requirement: Editor entry points
 
@@ -243,7 +250,7 @@ agent servers qualify. Separate CLI/IDE login and conversation stores SHALL be a
 #### Scenario: Official remote integration
 
 - **WHEN** an official IDE route runs its backend inside the container with mapped private state
-- **THEN** that route can retain its own login and conversations across recreation
+- **THEN** that route can retain its own file-backed state across recreation
 
 #### Scenario: Terminal fallback
 
@@ -292,3 +299,54 @@ SHALL fail clearly.
 
 - **WHEN** a release below 2.1.89 is requested
 - **THEN** installation fails before changing the installed CLI or runtime state
+
+### Requirement: Credential backend choice
+
+The feature SHALL preserve upstream credential backend defaults, user configuration, and managed policy without
+selecting or requiring a backend. Credential files in mapped application directories SHALL persist with private
+permissions. Keyring services, external credential paths, and environment-supplied secrets SHALL remain consumer
+responsibilities; the feature SHALL not configure them.
+
+#### Scenario: File-backed credentials
+
+- **WHEN** synthetic credential files are saved in mapped application directories and the container is recreated
+- **THEN** their contents and private permissions remain intact on the same volume
+
+#### Scenario: User-selected backend
+
+- **WHEN** user configuration or managed policy selects a credential backend
+- **THEN** state initialization preserves that selection without rewriting or rejecting it solely for backend choice
+
+### Requirement: Unattended credential-file validation
+
+Credential validation SHALL test only file persistence, mounts, permissions, isolation, and recreation using synthetic
+fixtures. No test SHALL require interactive login, a real API key, browser authorization, token refresh, or human
+assistance. Other authentication forms SHALL not be tested. File-retention results SHALL not be reported as proof of
+account authentication or restoration.
+
+#### Scenario: Credential-free execution
+
+- **WHEN** local automation or CI validates credential persistence without account access
+- **THEN** fixture checks complete unattended and never request secrets or an authorization URL
+
+### Requirement: Authentication documentation
+
+NOTES.md SHALL explain supported upstream authentication choices, credential-file paths retained by the volume, and how
+consumers can persist external stores themselves. It SHALL distinguish retained files from working authentication and
+explain that keyring setup, unlocking, and persistence are outside this feature.
+
+#### Scenario: Consumer-managed credentials
+
+- **WHEN** a developer chooses an authentication method
+- **THEN** NOTES identifies its file-persistence boundary and any consumer-managed storage
+
+### Requirement: Independent user runtimes
+
+Installation SHALL preserve user runtime versions, paths, package-manager settings, and defaults. Agent-owned runtimes
+SHALL remain outside the state volume and SHALL not override user toolchains. Required runtime dependencies SHALL not
+inject conflicting options into a separately configured runtime Feature.
+
+#### Scenario: Runtime composition
+
+- **WHEN** a user installs a runtime Feature with explicit, partial, or empty options alongside or after this agent
+- **THEN** its settings match the runtime Feature installed alone, and the agent and initializer remain usable
