@@ -104,3 +104,6 @@ without Node, then installs the actual Node Feature with explicit options and re
 each Node configuration with a matching Node-only container and verifies that Codex's private test state, CLI, and
 initializer remain intact. The check uses isolated workspaces and removes only its own containers and volumes; it uses
 no real account credentials.
+
+Pass the name of an image built from this checkout's Codex as the script's first argument to reuse that installation
+instead of rebuilding it. The check still verifies that Codex works without Node before testing later Node installs.

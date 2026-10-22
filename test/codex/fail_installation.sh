@@ -25,6 +25,12 @@ for version in "" v0.163.0 0.163.0-beta.1 '$(touch /tmp/codex-option-executed)' 
 done
 check "version input is never evaluated as shell code" test ! -e /tmp/codex-option-executed
 mkdir "${work}/cpu" "${work}/system" "${work}/downloads"
+mkdir -p "${work}/runtime/bin" "${work}/runtime/codex-path"
+printf '#!/bin/sh\nexit 37\n' >"${work}/runtime/bin/codex"
+printf '#!/bin/sh\nexit 0\n' >"${work}/runtime/bin/codex-code-mode-host"
+cp "${work}/runtime/bin/codex-code-mode-host" "${work}/runtime/codex-path/rg"
+chmod +x "${work}/runtime/bin/"* "${work}/runtime/codex-path/rg"
+tar -czf "${work}/runtime.tar.gz" -C "${work}/runtime" .
 cat >"${work}/cpu/uname" <<'STUB'
 #!/bin/sh
 case "$1" in --kernel-name) printf 'Linux\n' ;; *) printf 'mips\n' ;; esac
@@ -54,9 +60,19 @@ case "${url}" in
     ;;
   */codex-package_SHA256SUMS)
     if [[ "${CODEX_TEST_DOWNLOAD_CASE}" == no_manifest ]]; then exit 22; fi
-    printf '%064d  %s\n' 0 "${asset}" >"${output}"
+    if [[ "${CODEX_TEST_DOWNLOAD_CASE}" == runtime_failure ]]; then
+      printf '%s  %s\n' "$(sha256sum "${CODEX_TEST_ARCHIVE}" | cut -d ' ' -f 1)" "${asset}" >"${output}"
+    else
+      printf '%064d  %s\n' 0 "${asset}" >"${output}"
+    fi
     ;;
-  *.tar.gz) printf 'corrupt native archive\n' >"${output}" ;;
+  *.tar.gz)
+    if [[ "${CODEX_TEST_DOWNLOAD_CASE}" == runtime_failure ]]; then
+      cp "${CODEX_TEST_ARCHIVE}" "${output}"
+    else
+      printf 'corrupt native archive\n' >"${output}"
+    fi
+    ;;
   *) exit 23 ;;
 esac
 STUB
@@ -64,8 +80,8 @@ chmod +x "${work}/cpu/uname" "${work}/system/uname" "${work}/downloads/curl"
 
 rejects_environment() {
   local directory="$1" expected="$2" mode="${3-integrity}" output
-  if output="$(sudo env PATH="${directory}:${PATH}" CODEX_TEST_DOWNLOAD_CASE="${mode}" VERSION=0.162.0 \
-    _REMOTE_USER="${REMOTE_USER}" _REMOTE_USER_HOME="${REMOTE_HOME}" bash "${INSTALLER}" 2>&1)"; then return 1; fi
+  if output="$(sudo env PATH="${directory}:${PATH}" CODEX_TEST_DOWNLOAD_CASE="${mode}" \
+    CODEX_TEST_ARCHIVE="${work}/runtime.tar.gz" VERSION=0.162.0 _REMOTE_USER="${REMOTE_USER}" _REMOTE_USER_HOME="${REMOTE_HOME}" bash "${INSTALLER}" 2>&1)"; then return 1; fi
   [[ "${output}" == *"codex: error: ${expected}"* ]]
 }
 check "uncovered system is rejected before installation" rejects_environment "${work}/system" "unsupported system"
@@ -76,5 +92,7 @@ check "missing checksum manifest fails installation" rejects_environment \
   "${work}/downloads" "cannot download required release checksum manifest" no_manifest
 check "native checksum rejection fails installation" rejects_environment \
   "${work}/downloads" "native package checksum verification failed"
+check "a verified native payload that cannot execute fails before replacement" rejects_environment \
+  "${work}/downloads" "native package cannot execute or reports an unexpected version" runtime_failure
 check "the installed CLI still runs after rejected replacements" codex --version
 reportResults

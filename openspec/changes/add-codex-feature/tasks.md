@@ -1,7 +1,7 @@
 # Tasks
 
 Sections 1–4 record the original implementation at `a6c5ac2`. Section 5 tracks the native-package revision approved at
-`55ec1ad`; implementation and regression verification are in progress.
+`55ec1ad`; its implementation and regression checks are complete.
 
 ## 1. CLI installation
 
@@ -36,14 +36,14 @@ Sections 1–4 record the original implementation at `a6c5ac2`. Section 5 tracks
 
 ## 5. Requested compatibility and Node isolation revision
 
-- [ ] 5.1 After renewed package approval, implement the native-package support boundary: reject uncovered systems and
+- [x] 5.1 After renewed package approval, implement the native-package support boundary: reject uncovered systems and
       hardware, warn and attempt covered untested targets, and verify real prerequisite/execution failures.
-- [ ] 5.2 Replace npm and the shared Node dependency with checksum-verified complete native packages; rewrite helpers to
+- [x] 5.2 Replace npm and the shared Node dependency with checksum-verified complete native packages; rewrite helpers to
       run without Node, and verify companions, standalone execution, integrity failures, staged replacement,
       idempotency, and unchanged global Node state.
-- [ ] 5.3 Add composition scenarios for explicit Node/tool versions, a partial Node options object, and an empty Node
+- [x] 5.3 Add composition scenarios for explicit Node/tool versions, a partial Node options object, and an empty Node
       options object; assert upstream defaults and run both Codex and its initializer.
-- [ ] 5.4 Run a two-stage image check with Codex installed before the actual Node Feature; verify subsequent explicit
+- [x] 5.4 Run a two-stage image check with Codex installed before the actual Node Feature; verify subsequent explicit
       and default Node configuration, preserved Codex state, and CLI/initializer execution.
-- [ ] 5.5 Regenerate documentation, run local checks and affected CI, and replace the superseded PR validation record;
+- [x] 5.5 Regenerate documentation, run local checks and affected CI, and replace the superseded PR validation record;
       retain the maintainer's real-account verification waiver.

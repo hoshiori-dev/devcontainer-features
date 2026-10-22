@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Host-side check: install the actual Node Feature after Codex and compare its options with Node-only containers.
 # Run from any directory; requires Docker, devcontainer CLI, and jq. Uses isolated scratch workspaces and fake state.
+# Optional $1 is a prebuilt image with this checkout's Codex already installed without Node.
 set -euo pipefail
 
 repository="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -48,8 +49,11 @@ node_snapshot() {
 
 mkdir -p "${work}/codex/.devcontainer"
 cp -R "${repository}/src/codex" "${work}/codex/.devcontainer/codex"
-printf '%s\n' '{"image":"mcr.microsoft.com/devcontainers/base:ubuntu24.04","remoteUser":"vscode","features":{"./codex":{}}}' \
-  >"${work}/codex/.devcontainer/devcontainer.json"
+initial_image="${1-mcr.microsoft.com/devcontainers/base:ubuntu24.04}"
+initial_features='{"./codex":{}}'
+if [[ "$#" -gt 0 ]]; then initial_features='{}'; fi
+jq -n --arg image "${initial_image}" --argjson features "${initial_features}" \
+  '{image:$image,remoteUser:"vscode",features:$features}' >"${work}/codex/.devcontainer/devcontainer.json"
 up "${work}/codex"
 codex_container="$(jq -r .containerId "${work}/up.json")"
 codex_image="${image_prefix}-base"
@@ -68,10 +72,12 @@ devcontainer exec --workspace-folder "${work}/codex" bash -c '
 docker rm --force "${codex_container}" >/dev/null
 
 oracle_image="mcr.microsoft.com/devcontainers/base:ubuntu24.04"
-for mode in explicit defaults; do
+for mode in explicit partial defaults; do
   options='{}'
   if [[ "${mode}" == explicit ]]; then
     options='{"version":"22","npmVersion":"10.9.4","pnpmVersion":"9.15.9","nodeGypDependencies":false}'
+  elif [[ "${mode}" == partial ]]; then
+    options='{"version":"22"}'
   fi
   mkdir -p "${work}/oracle-${mode}/.devcontainer"
   jq -n --arg image "${oracle_image}" --argjson options "${options}" \
@@ -97,8 +103,8 @@ for mode in explicit defaults; do
     codex login status >/dev/null 2>&1
     test "$(cat ~/.codex/composition-fixture)" = "private composition fixture"
   '
-  session_mode=create
-  if [[ "${mode}" == defaults ]]; then session_mode=restore; fi
+  session_mode=restore
+  if [[ "${mode}" == explicit ]]; then session_mode=create; fi
   docker cp "${repository}/test/codex/session_fixture.mjs" \
     "$(jq -r .containerId "${work}/up.json"):/tmp/codex-session-fixture.mjs"
   devcontainer exec --workspace-folder "${work}/codex" node /tmp/codex-session-fixture.mjs "${session_mode}"
