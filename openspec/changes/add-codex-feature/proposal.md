@@ -8,6 +8,9 @@ records the upstream research and confirmed editor/persistence boundaries.
 
 ## What Changes
 
+- Allow known state paths to be prepared during the build, with one creation-time readiness check and no recurring
+  startup scans.
+
 - Introduce the independent `codex` feature at `1.0.0`, with its CLI and project-scoped private state.
 - Preserve Codex's default home path by linking the remote user's `~/.codex` to the project volume instead of setting
   `CODEX_HOME`.
