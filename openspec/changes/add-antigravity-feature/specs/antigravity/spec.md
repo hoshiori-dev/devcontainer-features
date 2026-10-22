@@ -31,19 +31,25 @@ redirects SHALL retain HTTPS.
 
 ### Requirement: Supported targets
 
-The feature SHALL support only the image and architecture combinations declared in
-`test/antigravity/compatibility.json`. It SHALL reject an unsupported distribution, architecture, or requested release
-before installing the CLI.
+`test/antigravity/compatibility.json` SHALL record tested image and architecture combinations. A target covered by the
+selected official installation route but absent from that list SHALL receive a warning followed by an installation
+attempt. Missing distribution/runtime coverage SHALL fail clearly; actual prerequisite and execution failures SHALL
+report their cause without claiming success.
 
-#### Scenario: Supported installation
+#### Scenario: Tested installation
 
 - **WHEN** a declared target and supported release are selected
-- **THEN** `agy --version` runs successfully as the remote user
+- **THEN** the CLI runs successfully as the remote user
 
-#### Scenario: Unsupported target
+#### Scenario: Covered but untested target
 
-- **WHEN** the target is not supported
-- **THEN** installation fails with a clear target-specific error
+- **WHEN** the installation route covers a target absent from the compatibility list
+- **THEN** installation warns and attempts installation rather than rejecting it solely for missing test coverage
+
+#### Scenario: Uncovered or unusable target
+
+- **WHEN** no supported artifact/runtime covers the target, or a required prerequisite or executable fails
+- **THEN** installation fails clearly with the actual cause
 
 ### Requirement: Project-scoped state
 
@@ -59,7 +65,7 @@ changes and another Docker host SHALL not imply automatic state migration.
 #### Scenario: Recreated container
 
 - **WHEN** a fresh container for the same project mounts the previous volume
-- **THEN** saved credentials and conversations remain available to the CLI
+- **THEN** saved file-backed credentials and conversations remain in their mapped directories
 
 #### Scenario: Independent project
 
@@ -78,8 +84,9 @@ default discovery paths. It SHALL NOT link the entire shared `.gemini` or `.conf
 
 #### Scenario: Real state writes
 
-- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
-- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or atomically replaces a credential
+  fixture
+- **THEN** required files remain volume-backed and readable by a fresh process and a recreated container without login
 
 ### Requirement: State mapping conflicts
 
@@ -105,14 +112,15 @@ overrides outside mapped directories SHALL be documented as outside the persiste
 
 ### Requirement: Safe shared state mappings
 
-Shared files SHALL use only upstream-supported mappings verified to preserve other tools' data after writes and
-credential refreshes. A file link replaced by atomic writes SHALL NOT count as persistence. If required state cannot be
-mapped safely, the feature SHALL remain unready for delivery without broadening ownership or omitting that state.
+Shared files SHALL use only upstream-supported mappings that preserve unrelated tools' data under synthetic writes and
+atomic replacement. A file link replaced by atomic writes SHALL NOT count as persistence. Stores that cannot be mapped
+safely SHALL remain consumer-managed and documented in NOTES; the feature SHALL not redirect shared parent directories
+or broaden ownership to include them.
 
 #### Scenario: Unsafe shared store
 
-- **WHEN** required account or plugin state cannot be retained without replacing a shared parent or losing writes
-- **THEN** the feature remains unready for delivery and preserves unrelated Gemini and application data
+- **WHEN** an external or shared credential store cannot be mapped without affecting unrelated application data
+- **THEN** the feature preserves that data and documents consumer-managed persistence outside its mapped directories
 
 ### Requirement: Initialization lifecycle
 
@@ -185,7 +193,7 @@ report an actionable failure and SHALL not make state world-readable.
 
 ### Requirement: No build-time account data
 
-Installation SHALL neither log in nor copy host credentials. Runtime credentials, OAuth codes, and conversations SHALL
+Installation SHALL neither log in nor copy host credentials. Real credentials, OAuth codes, and conversations SHALL
 remain out of image layers, the checkout, and test/review output. The CLI SHALL retain upstream approval and sandbox
 defaults.
 
@@ -194,10 +202,10 @@ defaults.
 - **WHEN** an image is built without account credentials
 - **THEN** installation completes without requesting credentials or storing account state in image layers
 
-#### Scenario: Runtime sign-in
+#### Scenario: Runtime credential files
 
-- **WHEN** the developer completes authentication after container creation
-- **THEN** private credentials are stored in the project volume without being printed by feature helpers
+- **WHEN** synthetic credential files are written to mapped application state after container creation
+- **THEN** those files remain private and volume-backed without being printed by feature helpers
 
 ### Requirement: Editor entry points
 
@@ -208,7 +216,7 @@ qualify. Separate CLI/IDE login and conversation stores SHALL be allowed.
 #### Scenario: Official remote integration
 
 - **WHEN** an official IDE route runs its backend inside the container with mapped private state
-- **THEN** that route can retain its own login and conversations across recreation
+- **THEN** that route can retain its own file-backed state across recreation
 
 #### Scenario: Terminal fallback
 
@@ -237,27 +245,16 @@ upstream's current version changes the newly verified version SHALL replace the 
 - **WHEN** the feature is installed again and the manifest resolves to a newer supported version
 - **THEN** the newly verified CLI replaces the executable while credentials and conversations remain intact
 
-### Requirement: Google account restoration
+### Requirement: Authentication choice and update policy
 
-The CLI SHALL retain Google-account login and durable conversations using upstream file storage across new CLI processes
-and container recreation. API-key or ADC authentication SHALL not substitute for this behavior. Upstream self-updates
-SHALL be disabled by default for the installed build.
+Google-account, API-key, and ADC authentication SHALL be allowed without imposing a login method. Credential files in
+mapped application directories SHALL be retained; external ADC paths, environment variables, and keyrings SHALL remain
+consumer-managed. Upstream self-updates SHALL be disabled by default for the installed build.
 
-#### Scenario: Account restoration
+#### Scenario: Authentication selection
 
-- **WHEN** a developer has signed in with Google OAuth, exits, and starts a fresh container using the same volume
-- **THEN** the CLI restores the account, can refresh credentials, and can resume a retained conversation without
-  repeating OAuth
-
-#### Scenario: File backend selection
-
-- **WHEN** the headless container has no D-Bus session
-- **THEN** the upstream CLI selects file storage; this observation alone does not establish account restoration
-
-#### Scenario: No alternate-auth substitution
-
-- **WHEN** Google account restoration fails for the selected release
-- **THEN** the feature remains unready for delivery rather than substituting an API key or ADC mode
+- **WHEN** the consumer selects Google-account, API-key, or ADC authentication
+- **THEN** the feature leaves that selection unchanged and documents which credential files its mappings retain
 
 ### Requirement: Additional Antigravity private stores
 
@@ -274,3 +271,54 @@ keychain or an extra keyring service.
 
 - **WHEN** another tool uses the user's .gemini tree
 - **THEN** Antigravity setup leaves unrelated data unchanged
+
+### Requirement: Credential backend choice
+
+The feature SHALL preserve upstream credential backend defaults, user configuration, and managed policy without
+selecting or requiring a backend. Credential files in mapped application directories SHALL persist with private
+permissions. Keyring services, external credential paths, and environment-supplied secrets SHALL remain consumer
+responsibilities; the feature SHALL not configure them.
+
+#### Scenario: File-backed credentials
+
+- **WHEN** synthetic credential files are saved in mapped application directories and the container is recreated
+- **THEN** their contents and private permissions remain intact on the same volume
+
+#### Scenario: User-selected backend
+
+- **WHEN** user configuration or managed policy selects a credential backend
+- **THEN** state initialization preserves that selection without rewriting or rejecting it solely for backend choice
+
+### Requirement: Unattended credential-file validation
+
+Credential validation SHALL test only file persistence, mounts, permissions, isolation, and recreation using synthetic
+fixtures. No test SHALL require interactive login, a real API key, browser authorization, token refresh, or human
+assistance. Other authentication forms SHALL not be tested. File-retention results SHALL not be reported as proof of
+account authentication or restoration.
+
+#### Scenario: Credential-free execution
+
+- **WHEN** local automation or CI validates credential persistence without account access
+- **THEN** fixture checks complete unattended and never request secrets or an authorization URL
+
+### Requirement: Authentication documentation
+
+NOTES.md SHALL explain supported upstream authentication choices, credential-file paths retained by the volume, and how
+consumers can persist external stores themselves. It SHALL distinguish retained files from working authentication and
+explain that keyring setup, unlocking, and persistence are outside this feature.
+
+#### Scenario: Consumer-managed credentials
+
+- **WHEN** a developer chooses an authentication method
+- **THEN** NOTES identifies its file-persistence boundary and any consumer-managed storage
+
+### Requirement: Independent user runtimes
+
+Installation SHALL preserve user runtime versions, paths, package-manager settings, and defaults. Agent-owned runtimes
+SHALL remain outside the state volume and SHALL not override user toolchains. Required runtime dependencies SHALL not
+inject conflicting options into a separately configured runtime Feature.
+
+#### Scenario: Runtime composition
+
+- **WHEN** a user installs a runtime Feature with explicit, partial, or empty options alongside or after this agent
+- **THEN** its settings match the runtime Feature installed alone, and the agent and initializer remain usable
