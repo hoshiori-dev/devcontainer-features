@@ -6,7 +6,7 @@ umask 077
 
 readonly STATE_DIR="/var/lib/codex"
 readonly SELF_PATH="/usr/local/share/codex-feature/initialize"
-readonly CONFIGURE_PATH="/usr/local/share/codex-feature/configure.mjs"
+readonly CONFIGURE_PATH="/usr/local/share/codex-feature/configure"
 
 log() { printf 'codex: %s\n' "$*"; }
 fail() { printf 'codex: error: %s\n' "$*" >&2; exit 1; }
@@ -44,7 +44,7 @@ initialize_state() {
   fi
   uid="$(id --user)"
   gid="$(id --group)"
-  home_path="$(node --print 'require("node:os").homedir()')"
+  home_path="${HOME:-$(getent passwd "${uid}" | cut --delimiter=: --fields=6)}"
   [[ -d "${home_path}" && "${home_path}" == /* ]] || fail "remote-user home is unavailable; fix HOME and retry"
   if [[ -L "${home_path}/.codex" ]]; then
     [[ "$(readlink --canonicalize-existing "${home_path}/.codex")" == "${STATE_DIR}" ]] \
@@ -85,7 +85,7 @@ initialize_state() {
     log "linking the runtime home to ${STATE_DIR}"
     ln --symbolic "${STATE_DIR}" "${home_path}/.codex"
   fi
-  node "${CONFIGURE_PATH}"
+  "${CONFIGURE_PATH}"
   [[ ! -e "${STATE_DIR}/config.toml" ]] || chmod 0600 "${STATE_DIR}/config.toml"
   log "private project state is ready"
 }

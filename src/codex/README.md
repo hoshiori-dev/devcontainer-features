@@ -19,10 +19,17 @@ Installs the Codex CLI and preserves its home in a private project volume, inclu
 
 ## Using Codex
 
-Run `codex` in the VS Code or JetBrains **container terminal**. The feature installs Node 24 and the official
-`@openai/codex` npm package. `version` accepts `latest` or an exact stable release; installing again selects the newly
-requested release without importing or deleting account state. A release must support the native configuration API used
-to select file credential storage. Unsupported releases fail before replacing the installed CLI.
+Run `codex` in the VS Code or JetBrains **container terminal**. The feature installs the complete official native
+package, verified against the release SHA-256 manifest, without installing Node or npm. `version` accepts `latest` or an
+exact stable release; installing again selects the newly requested release without importing or deleting account state.
+A release must support the native configuration API used to select file credential storage. Unsupported releases fail
+before replacing the installed CLI.
+
+Systems and hardware without a matching official native package for the selected release are unsupported. A target with
+an available native package outside the tested compatibility list receives a warning before installation is attempted.
+If a prerequisite check or executable fails, installation stops and reports the cause. The feature does not fall back to
+npm or build Codex from source. User-installed Node Features retain their explicit options and upstream defaults;
+installing or reconfiguring Node later does not change Codex's runtime or initializer.
 
 Sign in with `codex login` after creating the container. Authentication never runs during the image build. The CLI
 wrapper sets a private umask without changing Codex's approval or sandbox defaults.
@@ -35,8 +42,8 @@ including configuration, file credentials, sessions, companion databases, and sk
 
 Keep `CODEX_HOME` unset. Existing `.codex` files, directories, or links to other locations cause a clear conflict; the
 feature does not overwrite or automatically migrate them. Back them up and migrate them explicitly before enabling this
-feature. Existing keyring-only or managed policies that conflict with file credentials must be resolved first.
-Compatible settings are preserved through Codex's own TOML configuration API.
+feature. Existing keyring-only credential settings and managed policies that conflict with file credential storage must
+be resolved first. Compatible settings are preserved through Codex's own TOML configuration API.
 
 The creation hook `/usr/local/share/codex-feature/initialize` checks the mount, home link, ownership, private
 permissions, and user access once. Healthy volumes require no recursive scan. A changed UID may need noninteractive sudo
@@ -110,6 +117,12 @@ devcontainer exec --workspace-folder "$workspace" --config "$config" codex resum
 
 Confirm the previous conversation opens and a new request completes. The CLI forwards the interactive terminal when run
 this way. This fixture adds no CI job or host credential mount.
+
+To check Node composition locally, run `test/codex/manual/node_composition.sh` from the checkout. It installs Codex
+without Node, then installs the actual Node Feature with explicit options and reconfigures it with defaults. It compares
+each Node configuration with a matching Node-only container and verifies that Codex's private test state, CLI, and
+initializer remain intact. The check uses isolated workspaces and removes only its own containers and volumes; it uses
+no real account credentials.
 
 
 ---

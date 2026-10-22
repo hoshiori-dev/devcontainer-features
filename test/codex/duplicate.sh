@@ -5,7 +5,8 @@ set -euo pipefail
 source dev-container-features-test-lib
 [[ "${VERSION-}" == 0.162.0 && "${VERSION__DEFAULT-}" == latest ]]
 # Latest is resolved at test time because it is a moving upstream channel.
-latest="$(npm view @openai/codex@latest version --registry=https://registry.npmjs.org/)"
+latest="$(curl --fail --silent --show-error --location https://api.github.com/repos/openai/codex/releases/latest \
+  | jq --raw-output '.tag_name | ltrimstr("rust-v")')"
 reports_latest() { [[ "$(codex --version)" == "codex-cli ${latest}" ]]; }
 check "the second installation selects the current stable release" reports_latest
 check "creation-time initialization works after two installations" /usr/local/share/codex-feature/initialize

@@ -1,16 +1,66 @@
 {
   "test_version_explicit": {
     "image": "debian:12",
-    "features": { "codex": { "version": "0.162.0" } }
+    "features": {
+      "codex": {
+        "version": "0.162.0"
+      }
+    }
   },
   "test_state": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
-    "features": { "codex": {} }
+    "features": {
+      "codex": {},
+      "ghcr.io/devcontainers/features/node:2": {
+        "version": "22"
+      }
+    }
   },
   "fail_installation": {
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
     "remoteUser": "vscode",
-    "features": { "codex": {} }
+    "features": {
+      "codex": {}
+    }
+  },
+  "test_node_explicit": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "codex": {},
+      "ghcr.io/devcontainers/features/node:2": {
+        "version": "22",
+        "npmVersion": "10.9.4",
+        "pnpmVersion": "9.15.9",
+        "nodeGypDependencies": false
+      }
+    }
+  },
+  "test_node_partial": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "codex": {},
+      "ghcr.io/devcontainers/features/node:2": {
+        "version": "22"
+      }
+    }
+  },
+  "test_node_defaults": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "codex": {},
+      "ghcr.io/devcontainers/features/node:2": {}
+    }
+  },
+  "test_untested": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "codex": {}
+    }
   }
 }

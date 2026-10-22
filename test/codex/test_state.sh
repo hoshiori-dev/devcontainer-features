@@ -35,6 +35,17 @@ preserves_unrelated_settings() {
 }
 check "compatible TOML settings are preserved" preserves_unrelated_settings
 
+selects_file_from_auto() {
+  printf '# keep this comment\ncli_auth_credentials_store = "auto"\nmodel_reasoning_effort = "low"\n' \
+    >"${STATE_DIR}/config.toml"
+  "${INITIALIZE}" || return 1
+  grep -q 'cli_auth_credentials_store = "file"' "${STATE_DIR}/config.toml" \
+    && grep -q '# keep this comment' "${STATE_DIR}/config.toml" \
+    && grep -q 'model_reasoning_effort = "low"' "${STATE_DIR}/config.toml"
+}
+check "native configuration replaces auto storage and preserves TOML comments and settings" selects_file_from_auto
+cp "${work}/config.toml" "${STATE_DIR}/config.toml"
+
 rejects_initialization() {
   local output
   if output="$("${INITIALIZE}" 2>&1)"; then return 1; fi

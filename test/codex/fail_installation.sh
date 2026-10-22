@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run invalid inputs against the actual installer; stubs model an unsupported CPU and npm's integrity failure.
+# Invalid inputs and local download fixtures exercise the actual installer's native support and verification boundary.
 set -euo pipefail
 # shellcheck source=/dev/null
 source dev-container-features-test-lib
@@ -24,21 +24,57 @@ for version in "" v0.163.0 0.163.0-beta.1 '$(touch /tmp/codex-option-executed)' 
   check "invalid or unavailable release is rejected: ${version}" rejects_version "${version}"
 done
 check "version input is never evaluated as shell code" test ! -e /tmp/codex-option-executed
-mkdir "${work}/cpu" "${work}/integrity"
-printf '#!/bin/sh\nprintf "mips\\n"\n' >"${work}/cpu/uname"
-cat >"${work}/integrity/npm" <<'STUB'
+mkdir "${work}/cpu" "${work}/system" "${work}/downloads"
+cat >"${work}/cpu/uname" <<'STUB'
 #!/bin/sh
-if [ "$1" = view ]; then printf '"0.162.0"\n'; else printf 'npm error EINTEGRITY\n' >&2; exit 1; fi
+case "$1" in --kernel-name) printf 'Linux\n' ;; *) printf 'mips\n' ;; esac
 STUB
-chmod +x "${work}/cpu/uname" "${work}/integrity/npm"
+printf '#!/bin/sh\nprintf "Darwin\\n"\n' >"${work}/system/uname"
+cat >"${work}/downloads/curl" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+output=""
+url="${!#}"
+while [[ "$#" -gt 0 ]]; do
+  if [[ "$1" == --output ]]; then output="$2"; shift; fi
+  shift
+done
+case "$(uname --machine)" in
+  x86_64) target=x86_64 ;; aarch64) target=aarch64 ;;
+esac
+asset="codex-package-${target}-unknown-linux-musl.tar.gz"
+case "${url}" in
+  */tags/rust-v0.162.0)
+    if [[ "${CODEX_TEST_DOWNLOAD_CASE}" == no_asset ]]; then
+      printf '{"tag_name":"rust-v0.162.0","draft":false,"prerelease":false,"assets":[]}' >"${output}"
+    else
+      jq -n --arg asset "${asset}" \
+        '{tag_name:"rust-v0.162.0",draft:false,prerelease:false,assets:[{name:$asset}]}' >"${output}"
+    fi
+    ;;
+  */codex-package_SHA256SUMS)
+    if [[ "${CODEX_TEST_DOWNLOAD_CASE}" == no_manifest ]]; then exit 22; fi
+    printf '%064d  %s\n' 0 "${asset}" >"${output}"
+    ;;
+  *.tar.gz) printf 'corrupt native archive\n' >"${output}" ;;
+  *) exit 23 ;;
+esac
+STUB
+chmod +x "${work}/cpu/uname" "${work}/system/uname" "${work}/downloads/curl"
 
 rejects_environment() {
-  local directory="$1" expected="$2" output
-  if output="$(sudo env PATH="${directory}:${PATH}" VERSION=0.162.0 _REMOTE_USER="${REMOTE_USER}" \
-    _REMOTE_USER_HOME="${REMOTE_HOME}" bash "${INSTALLER}" 2>&1)"; then return 1; fi
+  local directory="$1" expected="$2" mode="${3-integrity}" output
+  if output="$(sudo env PATH="${directory}:${PATH}" CODEX_TEST_DOWNLOAD_CASE="${mode}" VERSION=0.162.0 \
+    _REMOTE_USER="${REMOTE_USER}" _REMOTE_USER_HOME="${REMOTE_HOME}" bash "${INSTALLER}" 2>&1)"; then return 1; fi
   [[ "${output}" == *"codex: error: ${expected}"* ]]
 }
-check "unsupported CPU is rejected before installation" rejects_environment "${work}/cpu" "unsupported architecture"
-check "npm integrity rejection fails installation" rejects_environment "${work}/integrity" "npm installation or integrity verification failed"
+check "uncovered system is rejected before installation" rejects_environment "${work}/system" "unsupported system"
+check "uncovered CPU is rejected before installation" rejects_environment "${work}/cpu" "unsupported architecture"
+check "missing release package is unsupported without a fallback" rejects_environment \
+  "${work}/downloads" "unsupported target for release" no_asset
+check "missing checksum manifest fails installation" rejects_environment \
+  "${work}/downloads" "cannot download required release checksum manifest" no_manifest
+check "native checksum rejection fails installation" rejects_environment \
+  "${work}/downloads" "native package checksum verification failed"
 check "the installed CLI still runs after rejected replacements" codex --version
 reportResults
