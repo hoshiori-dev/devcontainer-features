@@ -27,10 +27,34 @@ result cannot establish private credential availability.
 ### Installation and dependencies
 
 Use the documented @openai/codex npm package in a feature-owned application prefix. npm verifies registry integrity for
-the package and platform payloads. Declare ghcr.io/devcontainers/features/node:2 with Node 24, node-gyp extras disabled,
-and pnpmVersion=none. A registry route costs a Node runtime but avoids adding a separate Sigstore verification toolchain
-and maintaining direct GitHub asset selection. The node feature's current metadata is major 2 and its version option
-accepts 24.
+the package and platform payloads. Keep the npm route and provide a private Node 24 bootstrap runtime at
+`/usr/local/share/codex-runtime`, outside both user Node installations and the state volume. Invoke its Node/npm and
+Codex launcher through explicit paths; never register it with NVM or expose it through global PATH or shell profiles.
+Use this same private runtime for native configuration helpers, so later user Node changes cannot break initialization.
+
+Fetch official Linux runtime archives from `https://nodejs.org/dist/`, verify their corresponding official
+`SHASUMS256.txt` before extraction or execution, and retain normal TLS verification. Resolve the Node 24 release from
+the official release directory, then use its versioned archive URL to avoid a moving-alias download race. Reuse a valid
+private runtime on repeated installation. Missing platform payloads or runtime execution failures remain real upstream
+errors; they are distinct from an untested-target warning. Obtain missing download/extraction prerequisites through an
+available distribution package manager, with a clear error when this is not possible.
+
+The previous shared Node Feature dependency is rejected because different options are separate installation nodes, not
+an override merge. With CLI 0.89.0, both explicit Node 22 and an empty Node options object resolve before Codex's Node
+24 dependency. That second installation can replace the user's active runtime and default alias. An empty shared
+dependency would still conflict with explicitly configured Node instances. Requiring consumers to supply Node would
+remove standalone installation; the private runtime preserves it without changing user Node configuration.
+
+Sources for this decision:
+
+- [Feature dependency equality and option resolution](https://github.com/devcontainers/spec/blob/main/docs/specs/devcontainer-features.md#definition-feature-equality)
+- [Official Node Feature defaults](https://github.com/devcontainers/features/blob/main/src/node/devcontainer-feature.json)
+- [Node release downloads and verification](https://nodejs.org/en/download)
+
+Do not declare `dependsOn` for the shared Node Feature. Ordering after a user Node Feature may use `installsAfter`,
+without injecting options. Validate explicit tool versions, partially specified options, and an empty options object;
+check the upstream default NVM alias and tool availability, not just a coincidentally equal Node major version. A
+separate two-stage image check installs Codex first and then the actual Node Feature to verify later reconfiguration.
 
 ### Options
 
@@ -105,16 +129,23 @@ the host IDE profile.
 
 ### Validation boundary
 
-The initial compatibility list targets Debian 12 and Ubuntu 24.04 on amd64 and arm64. Only verified combinations are
-advertised; Alpine and other libc families are outside this first design. Automated checks cover version selection,
-executable availability, integrity failures, install-twice behavior, private state, repair, home-link recreation,
-unchanged skill paths, explicit CODEX_HOME conflicts, and existing-path conflicts. Isolation uses two project
-identities; persistence needs two fresh containers mounting the same volume.
+The initial compatibility list records verified Debian 12 and Ubuntu 24.04 combinations on amd64 and arm64. It is not an
+allowlist: warn and attempt normal installation on other targets. Test that unlisted target metadata reaches an actual
+installation attempt; do not assert early rejection solely because a distribution or architecture is unlisted. Missing
+assets, failed checksums, missing prerequisites, and incompatible executables still fail with the actual diagnostic. No
+success guarantee is added for Alpine or other libc families. Automated checks cover version selection, executable
+availability, integrity failures, install-twice behavior, private state, repair, home-link recreation, unchanged skill
+paths, explicit CODEX_HOME conflicts, existing-path conflicts, and the Node isolation scenarios. Keep the CI test
+architecture unchanged; use normal feature scenarios for composition and a separate two-stage image result for later
+Node installation. Isolation uses two project identities; persistence needs two fresh containers mounting the same
+volume.
 
 The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
 result alongside just check, just test codex, and just test-scenarios codex; this introduces no CI mechanism or changes
-to required checks. Fixtures/local mock providers verify state formats without live credentials. Real authentication and
-each enabled IDE route require their own result, with no raw credentials or transcripts published.
+to required checks. Fixtures/local mock providers verify state formats without live credentials. Each enabled IDE route
+requires its own result, with no raw credentials or transcripts published. The maintainer waived real-account
+restoration verification for this change on 2026-10-22; retain that explicit exception without presenting fixture
+results as proof of authenticated restoration.
 
 ## Risks / Trade-offs
 
@@ -122,5 +153,5 @@ each enabled IDE route require their own result, with no raw credentials or tran
   verification output.
 - Upstream schemas can change; preserve whole owned directories and still verify resume for supported releases.
 - Cross-host synchronization and simultaneous independent writers are outside the design.
-- Package/parser checks do not prove authenticated resume. An unverified IDE route takes the terminal fallback;
-  unverified CLI credential restoration remains a delivery blocker.
+- Package/parser checks do not prove authenticated resume. An unverified IDE route takes the terminal fallback. The
+  maintainer's real-account verification waiver leaves that result unobserved for this change.

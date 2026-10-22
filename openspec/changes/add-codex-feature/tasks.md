@@ -1,5 +1,8 @@
 # Tasks
 
+Sections 1–4 record the original implementation at `a6c5ac2`. Section 5 tracks the requested revision and awaits renewed
+package approval.
+
 ## 1. CLI installation
 
 - [x] 1.1 Scaffold the feature at 1.0.0 with Node 24, project volume metadata, and target coverage; verify metadata
@@ -30,3 +33,17 @@
       supported architectures.
 - [x] 4.2 Reconcile discussion and prepare the implementation publication and PR validation/checklist for review; retain
       the authenticated-check waiver explicitly. CI and review admission follow the repository's finish workflow.
+
+## 5. Requested compatibility and Node isolation revision
+
+- [ ] 5.1 After renewed package approval, replace the target allowlist failure with an untested-target warning and
+      normal installation attempt; verify working unlisted targets and genuine upstream/prerequisite failures.
+- [ ] 5.2 Replace the shared Node Feature dependency with the checksum-verified private bootstrap runtime; verify
+      standalone Codex, private helper execution, runtime integrity failure, idempotency, and unchanged global Node
+      state.
+- [ ] 5.3 Add composition scenarios for explicit Node/tool versions, a partial Node options object, and an empty Node
+      options object; assert upstream defaults and run both Codex and its initializer.
+- [ ] 5.4 Run a two-stage image check with Codex installed before the actual Node Feature; verify subsequent explicit
+      and default Node configuration, preserved Codex state, and CLI/initializer execution.
+- [ ] 5.5 Regenerate documentation, run local checks and affected CI, and replace the superseded PR validation record;
+      retain the maintainer's real-account verification waiver.

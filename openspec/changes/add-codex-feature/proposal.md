@@ -18,6 +18,8 @@ records the upstream research and confirmed editor/persistence boundaries.
   fallback where it cannot. CLI and IDE state may be independent.
 - Define version selection, upstream verification, repeated installation, state permissions, and recovery from container
   recreation.
+- Treat the compatibility list as verified coverage; warn and attempt installation on unlisted targets.
+- Keep Codex usable alongside independently configured Node installations without changing their options or defaults.
 
 ## Capabilities
 

@@ -39,8 +39,7 @@ The feature SHALL accept the option `version` as declared here.
 ### Requirement: Official registry installation
 
 The feature SHALL install `@openai/codex` through npm from `https://registry.npmjs.org/`, preserving npm integrity
-verification. It SHALL declare `ghcr.io/devcontainers/features/node:2` with Node 24 as a dependency. Its CLI
-installation and dependencies SHALL remain outside the runtime-state volume.
+verification. Its CLI installation and bootstrap runtime SHALL remain outside the runtime-state volume.
 
 #### Scenario: Registry package
 
@@ -52,20 +51,72 @@ installation and dependencies SHALL remain outside the runtime-state volume.
 - **WHEN** npm rejects the downloaded package integrity
 - **THEN** installation fails without reporting success
 
-### Requirement: Supported targets
+### Requirement: Tested targets
 
-The feature SHALL support only the image and architecture combinations declared in `test/codex/compatibility.json`. It
-SHALL reject an unsupported distribution, architecture, or requested release before installing the CLI.
+`test/codex/compatibility.json` SHALL declare the verified image and architecture combinations, not an installation
+allowlist. On an unlisted distribution, release, or architecture, the feature SHALL warn that the target is untested and
+continue the normal installation attempt. Absence from the list alone SHALL NOT reject installation. Actual missing
+prerequisites, unavailable upstream payloads, integrity errors, or execution failures SHALL fail with their real cause.
 
-#### Scenario: Supported installation
+#### Scenario: Tested installation
 
 - **WHEN** a declared target and supported release are selected
 - **THEN** `codex --version` runs successfully as the remote user
 
-#### Scenario: Unsupported target
+#### Scenario: Untested target
 
-- **WHEN** the target is not supported
-- **THEN** installation fails with a clear target-specific error
+- **WHEN** the target is absent from the verified combinations but its prerequisites and upstream payload work
+- **THEN** installation warns and continues, and the installed CLI runs successfully
+
+#### Scenario: Upstream incompatibility
+
+- **WHEN** an installation attempt encounters an actual missing prerequisite or incompatible upstream payload
+- **THEN** installation reports that cause rather than treating an unlisted target as automatically unsupported
+
+### Requirement: Private bootstrap runtime
+
+The feature SHALL obtain its private Node 24 runtime only from official `https://nodejs.org/dist/` release archives and
+verify the archive against the corresponding official `SHASUMS256.txt` before extraction or execution. It SHALL invoke
+that runtime through feature-owned paths without exposing it as the user's global Node installation or changing global
+PATH, NVM configuration, or package-manager defaults. Verification failure SHALL stop installation.
+
+#### Scenario: Standalone installation
+
+- **WHEN** Codex is installed without a user Node Feature or existing global Node installation
+- **THEN** its CLI and initializer run through the private runtime without configuring a global Node installation
+
+#### Scenario: Corrupt runtime archive
+
+- **WHEN** the downloaded runtime fails its official checksum verification
+- **THEN** installation fails before extracting or executing it
+
+### Requirement: Node feature isolation
+
+The feature SHALL NOT declare a hard dependency on the shared Node Feature or override that Feature's options. A user's
+explicit Node configuration SHALL retain its requested version and tools; omitted options SHALL use that Feature's own
+defaults. Later valid Node Feature installation or reconfiguration SHALL NOT break Codex or its initializer. Codex's
+private bootstrap settings SHALL NOT become defaults for the user's Node, npm, pnpm, or node-gyp tooling.
+
+#### Scenario: Explicit Node configuration
+
+- **WHEN** Codex and a Node Feature with explicit version and tool options are installed together
+- **THEN** the requested Node configuration takes effect and both Codex and its initializer work
+
+#### Scenario: Partially configured Node feature
+
+- **WHEN** the user selects a Node version but omits other Node Feature options
+- **THEN** the other options retain the upstream Node Feature defaults without inheriting Codex bootstrap settings
+
+#### Scenario: Default Node configuration
+
+- **WHEN** the user declares the Node Feature with an empty options object alongside Codex
+- **THEN** its default runtime, package managers, and node-gyp tools match the Node Feature's own defaults
+
+#### Scenario: Later Node installation
+
+- **WHEN** a valid Node Feature is installed or reconfigured after Codex is already present
+- **THEN** the new Node configuration takes effect, including its own defaults, and Codex state and execution remain
+  usable
 
 ### Requirement: Project-scoped state
 
