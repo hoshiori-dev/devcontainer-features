@@ -36,27 +36,31 @@ The feature SHALL accept the option `version` as declared here.
 - **WHEN** the value is malformed, prerelease, unavailable, or outside the supported range
 - **THEN** installation fails clearly without treating the input as shell syntax
 
-### Requirement: Official registry installation
+### Requirement: Official native installation
 
-The feature SHALL install `@openai/codex` through npm from `https://registry.npmjs.org/`, preserving npm integrity
-verification. Its CLI installation and bootstrap runtime SHALL remain outside the runtime-state volume.
+The feature SHALL obtain complete native release packages and `codex-package_SHA256SUMS` from
+`https://github.com/openai/codex/releases`, resolving stable versions through
+`https://api.github.com/repos/openai/codex/releases`. It SHALL verify the selected archive against that release's
+checksum manifest before extraction or execution, retain required companion files, and keep application files outside
+the runtime-state volume. Missing verification data SHALL fail installation.
 
-#### Scenario: Registry package
+#### Scenario: Native package
 
-- **WHEN** the resolved package is installed
-- **THEN** npm verifies registry integrity and the remote user can run the CLI
+- **WHEN** the resolved native package is installed
+- **THEN** its checksum is verified and the remote user can run the CLI with its required companion files
 
-#### Scenario: Corrupt registry payload
+#### Scenario: Corrupt native payload
 
-- **WHEN** npm rejects the downloaded package integrity
-- **THEN** installation fails without reporting success
+- **WHEN** the downloaded archive fails checksum verification or its checksum manifest is unavailable
+- **THEN** installation fails before extracting or executing the archive
 
-### Requirement: Tested targets
+### Requirement: Native target coverage
 
-`test/codex/compatibility.json` SHALL declare the verified image and architecture combinations, not an installation
-allowlist. On an unlisted distribution, release, or architecture, the feature SHALL warn that the target is untested and
-continue the normal installation attempt. Absence from the list alone SHALL NOT reject installation. Actual missing
-prerequisites, unavailable upstream payloads, integrity errors, or execution failures SHALL fail with their real cause.
+The feature SHALL support only systems and hardware covered by a matching official native package for the selected
+release. Targets without such coverage SHALL fail as unsupported without a Node, npm, or source-build fallback.
+`test/codex/compatibility.json` SHALL record verified combinations. Covered targets outside that list SHALL receive an
+untested-target warning followed by an installation attempt; actual prerequisite or execution failures SHALL report
+their cause.
 
 #### Scenario: Tested installation
 
@@ -65,37 +69,35 @@ prerequisites, unavailable upstream payloads, integrity errors, or execution fai
 
 #### Scenario: Untested target
 
-- **WHEN** the target is absent from the verified combinations but its prerequisites and upstream payload work
+- **WHEN** the target has native package coverage and working prerequisites but is absent from the verified combinations
 - **THEN** installation warns and continues, and the installed CLI runs successfully
 
-#### Scenario: Upstream incompatibility
+#### Scenario: Unsupported target
 
-- **WHEN** an installation attempt encounters an actual missing prerequisite or incompatible upstream payload
-- **THEN** installation reports that cause rather than treating an unlisted target as automatically unsupported
+- **WHEN** no official native package covers the selected release, system, and hardware
+- **THEN** installation fails clearly as unsupported without trying an alternative installation route
 
-### Requirement: Private bootstrap runtime
+#### Scenario: Native installation failure
 
-The feature SHALL obtain its private Node 24 runtime only from official `https://nodejs.org/dist/` release archives and
-verify the archive against the corresponding official `SHASUMS256.txt` before extraction or execution. It SHALL invoke
-that runtime through feature-owned paths without exposing it as the user's global Node installation or changing global
-PATH, NVM configuration, or package-manager defaults. Verification failure SHALL stop installation.
+- **WHEN** a covered target encounters a missing prerequisite or incompatible executable during installation
+- **THEN** installation reports the actual cause without reporting success
+
+### Requirement: Node-independent execution
+
+The feature SHALL install and run its CLI and initializer without requiring or provisioning Node or npm. It SHALL leave
+global Node paths, NVM configuration, and package-manager defaults unchanged.
 
 #### Scenario: Standalone installation
 
 - **WHEN** Codex is installed without a user Node Feature or existing global Node installation
-- **THEN** its CLI and initializer run through the private runtime without configuring a global Node installation
-
-#### Scenario: Corrupt runtime archive
-
-- **WHEN** the downloaded runtime fails its official checksum verification
-- **THEN** installation fails before extracting or executing it
+- **THEN** its native CLI and initializer work without installing Node or npm
 
 ### Requirement: Node feature isolation
 
 The feature SHALL NOT declare a hard dependency on the shared Node Feature or override that Feature's options. A user's
 explicit Node configuration SHALL retain its requested version and tools; omitted options SHALL use that Feature's own
 defaults. Later valid Node Feature installation or reconfiguration SHALL NOT break Codex or its initializer. Codex's
-private bootstrap settings SHALL NOT become defaults for the user's Node, npm, pnpm, or node-gyp tooling.
+installation SHALL NOT change defaults for the user's Node, npm, pnpm, or node-gyp tooling.
 
 #### Scenario: Explicit Node configuration
 
@@ -105,7 +107,7 @@ private bootstrap settings SHALL NOT become defaults for the user's Node, npm, p
 #### Scenario: Partially configured Node feature
 
 - **WHEN** the user selects a Node version but omits other Node Feature options
-- **THEN** the other options retain the upstream Node Feature defaults without inheriting Codex bootstrap settings
+- **THEN** the other options retain the upstream Node Feature defaults without changes from Codex
 
 #### Scenario: Default Node configuration
 

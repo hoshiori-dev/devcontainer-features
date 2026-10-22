@@ -26,35 +26,38 @@ result cannot establish private credential availability.
 
 ### Installation and dependencies
 
-Use the documented @openai/codex npm package in a feature-owned application prefix. npm verifies registry integrity for
-the package and platform payloads. Keep the npm route and provide a private Node 24 bootstrap runtime at
-`/usr/local/share/codex-runtime`, outside both user Node installations and the state volume. Invoke its Node/npm and
-Codex launcher through explicit paths; never register it with NVM or expose it through global PATH or shell profiles.
-Use this same private runtime for native configuration helpers, so later user Node changes cannot break initialization.
+Use complete official native packages (`codex-package-<target>.tar.gz`) in the feature-owned application prefix
+`/usr/local/share/codex`. Resolve `latest` to a stable release, then use that exact release for both the archive and
+`codex-package_SHA256SUMS`; verify the archive before extraction or execution. Fetch release metadata from the GitHub
+API and assets from OpenAI's GitHub Releases with normal HTTPS verification. Missing archives or verification data fail
+clearly. Retain the package layout and companion executables rather than extracting only the main binary. Validate a
+staged package before replacing a working installation; matching installed releases can be reused.
 
-Fetch official Linux runtime archives from `https://nodejs.org/dist/`, verify their corresponding official
-`SHASUMS256.txt` before extraction or execution, and retain normal TLS verification. Resolve the Node 24 release from
-the official release directory, then use its versioned archive URL to avoid a moving-alias download race. Reuse a valid
-private runtime on repeated installation. Missing platform payloads or runtime execution failures remain real upstream
-errors; they are distinct from an untested-target warning. Obtain missing download/extraction prerequisites through an
-available distribution package manager, with a clear error when this is not possible.
+Do not execute the upstream standalone installer unchanged: its default application location is inside Codex home, which
+this feature persists as runtime state. Keep the existing launcher and private umask while adapting it to the native
+package layout. Replace Node-based helper logic with shell and jq, retaining Codex app-server's native configuration API
+so file credentials, managed policy, and existing TOML are handled by Codex. Install missing prerequisites through an
+available distribution package manager; report unavailable prerequisites clearly. Neither installation nor
+initialization may require Node or npm.
 
-The previous shared Node Feature dependency is rejected because different options are separate installation nodes, not
-an override merge. With CLI 0.89.0, both explicit Node 22 and an empty Node options object resolve before Codex's Node
-24 dependency. That second installation can replace the user's active runtime and default alias. An empty shared
-dependency would still conflict with explicitly configured Node instances. Requiring consumers to supply Node would
-remove standalone installation; the private runtime preserves it without changing user Node configuration.
+The shared Node Feature dependency is rejected because different options are separate installation nodes, not an
+override merge. With CLI 0.89.0, both explicit Node 22 and an empty Node options object resolve before Codex's Node 24
+dependency. The explicit-version build ends with Node 24 and its default alias, overriding the requested Node 22. An
+empty shared dependency would still conflict with explicitly configured Node instances. Requiring consumers to supply
+Node removes standalone installation. A private Node runtime isolates settings but adds a separate runtime to maintain;
+the maintainer selected native packages instead.
 
 Sources for this decision:
 
+- [Official installation routes and native releases](https://github.com/openai/codex#installation)
+- [Official standalone installer package selection and layout](https://chatgpt.com/codex/install.sh)
 - [Feature dependency equality and option resolution](https://github.com/devcontainers/spec/blob/main/docs/specs/devcontainer-features.md#definition-feature-equality)
 - [Official Node Feature defaults](https://github.com/devcontainers/features/blob/main/src/node/devcontainer-feature.json)
-- [Node release downloads and verification](https://nodejs.org/en/download)
 
 Do not declare `dependsOn` for the shared Node Feature. Ordering after a user Node Feature may use `installsAfter`,
 without injecting options. Validate explicit tool versions, partially specified options, and an empty options object;
-check the upstream default NVM alias and tool availability, not just a coincidentally equal Node major version. A
-separate two-stage image check installs Codex first and then the actual Node Feature to verify later reconfiguration.
+compare default aliases and tools with the same upstream Node Feature installed alone. A separate two-stage image check
+installs Codex first and then the actual Node Feature to verify later reconfiguration.
 
 ### Options
 
@@ -129,15 +132,19 @@ the host IDE profile.
 
 ### Validation boundary
 
-The initial compatibility list records verified Debian 12 and Ubuntu 24.04 combinations on amd64 and arm64. It is not an
-allowlist: warn and attempt normal installation on other targets. Test that unlisted target metadata reaches an actual
-installation attempt; do not assert early rejection solely because a distribution or architecture is unlisted. Missing
-assets, failed checksums, missing prerequisites, and incompatible executables still fail with the actual diagnostic. No
-success guarantee is added for Alpine or other libc families. Automated checks cover version selection, executable
-availability, integrity failures, install-twice behavior, private state, repair, home-link recreation, unchanged skill
-paths, explicit CODEX_HOME conflicts, existing-path conflicts, and the Node isolation scenarios. Keep the CI test
-architecture unchanged; use normal feature scenarios for composition and a separate two-stage image result for later
-Node installation. Isolation uses two project identities; persistence needs two fresh containers mounting the same
+The initial compatibility list records verified Debian 12 and Ubuntu 24.04 combinations on amd64 and arm64. Native
+package coverage determines support: the selected release must publish a matching Linux package for the system and
+hardware. Current Linux packages cover x86_64 and aarch64 using musl targets. Missing native coverage is unsupported;
+there is no npm, private Node, or source-build fallback. A covered target outside the tested list receives a warning and
+an installation attempt. This distinction supersedes the earlier proposal to attempt every architecture. Package
+availability does not establish successful execution on every distribution; prerequisite and runtime failures report
+their actual cause.
+
+Automated checks cover version selection, complete native-package execution, checksum failures, unsupported targets,
+covered but untested targets, installation without global Node, install-twice behavior, private state, repair, home-link
+recreation, unchanged skill paths, explicit CODEX_HOME conflicts, existing-path conflicts, and Node isolation. Keep the
+CI test architecture unchanged; use normal feature scenarios for composition and a separate two-stage image result for
+later Node installation. Isolation uses two project identities; persistence needs two fresh containers mounting the same
 volume.
 
 The ordinary scenario runner cannot express a host test with multiple containers. Record a separate manual two-container
