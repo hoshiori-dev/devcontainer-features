@@ -16,6 +16,8 @@ records the upstream research and confirmed editor/persistence boundaries.
   `CODEX_HOME`.
 - Provide first-party editor integrations where their container-side state can persist, with an integrated-terminal
   fallback where it cannot. CLI and IDE state may be independent.
+- Preserve upstream credential backend defaults and user/managed selections; keyring setup and persistence remain
+  consumer responsibilities.
 - Define version selection, upstream verification, repeated installation, state permissions, and recovery from container
   recreation.
 - Support targets covered by official native distributions; reject targets without a matching distribution and warn

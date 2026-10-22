@@ -35,8 +35,8 @@ staged package before replacing a working installation; matching installed relea
 
 Do not execute the upstream standalone installer unchanged: its default application location is inside Codex home, which
 this feature persists as runtime state. Keep the existing launcher and private umask while adapting it to the native
-package layout. Replace Node-based helper logic with shell and jq, retaining Codex app-server's native configuration API
-so file credentials, managed policy, and existing TOML are handled by Codex. Install missing prerequisites through an
+package layout. Use shell and jq for installation metadata and state initialization. Do not probe the app-server
+configuration protocol or require its availability to install a release. Install missing prerequisites through an
 available distribution package manager; report unavailable prerequisites clearly. Neither installation nor
 initialization may require Node or npm.
 
@@ -73,11 +73,13 @@ conflicting channel/version combinations; there is no arbitrary URL or source-re
 ### Runtime state
 
 Leave CODEX_HOME unset by the feature. Resolve the intended remote user's home and prepare `~/.codex -> /var/lib/codex`.
-This preserves the default path expected by Codex and tools that install skills there. Initialize a minimal runtime
-config.toml selecting file credentials, preserving compatible existing settings. A managed policy prohibiting file
-storage is an actionable conflict. Retain the entire directory, including auth.json, history, complete session stores
-and companion files, and skills; sharing this directory with an IDE is convenient rather than required. The separate
-`~/.agents/skills` discovery location is unchanged and is not persisted by this volume.
+This preserves the default path expected by Codex and tools that install skills there. Leave credential backend
+defaults, user configuration, and managed policy to Codex; do not create or rewrite config.toml or reject a selected
+backend. File credentials persist through this mapping. Consumers selecting keyring manage its service, unlocking, and
+persistence separately; this feature provides no keyring setup. Retain the entire directory, including auth.json,
+history, complete session stores and companion files, and skills; sharing this directory with an IDE is convenient
+rather than required. The separate `~/.agents/skills` discovery location is unchanged and is not persisted by this
+volume.
 
 An absent link is created; an existing link to the intended mount is reused. A regular file, directory, dangling link,
 or link to another target is an actionable conflict: do not replace, import, or delete it. An explicitly configured
@@ -87,8 +89,8 @@ never changes the user's home ownership.
 
 Metadata declares source `codex-${devcontainerId}`, target `/var/lib/codex`, type `volume`, an `onCreateCommand`
 initializer, and ordering after common-utils where user setup matters. It declares no entrypoint, privileged mode, added
-capabilities, weakened security profile, or host-home mount. Initialize missing nonsecret defaults after mounting, with
-private directories at 0700 and credentials at 0600. A restrictive runtime umask protects newly created private files.
+capabilities, weakened security profile, or host-home mount. Keep private directories at 0700 and credentials at 0600. A
+restrictive runtime umask protects newly created private files.
 
 Prepare mount-point directories with private permissions during the build. Docker may copy their contents and ownership
 into a new empty volume; this does not repair an existing volume or establish runtime access. A reused volume with a new
@@ -112,7 +114,7 @@ Use only onCreateCommand for automatic readiness work. Check the actual mount (n
 paths and link targets, state-root ownership/mode, known credential-store permissions, and user read/write/search
 access. Use metadata and narrowly scoped access probes without reading credentials or enumerating all conversations.
 When healthy, perform no full-tree scan or recursive chown/chmod. A detected mismatch may require repair confined to the
-mount under the existing ownership/privacy contract; unavailable repair fails clearly. Initialize only absent defaults.
+mount under the existing ownership/privacy contract; unavailable repair fails clearly. Do not initialize Codex settings.
 
 No postStartCommand or postAttachCommand is added for this purpose. The initializer remains idempotent for explicit
 reruns. NOTES tells consumers to recreate the container or rerun initialization after changing users, homes, XDG roots,

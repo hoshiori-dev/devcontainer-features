@@ -302,18 +302,23 @@ already resolved matching version SHALL avoid unnecessary installation.
 - **WHEN** the feature is installed with another supported release selection
 - **THEN** the later selection wins without erasing credentials or conversations
 
-### Requirement: File credential backend
+### Requirement: Credential backend choice
 
-The default container configuration SHALL select Codex's file credential store in CODEX_HOME. Existing compatible
-configuration SHALL be preserved; a conflicting managed/keyring-only policy SHALL fail clearly instead of silently
-exporting credentials or weakening policy.
+The feature SHALL preserve Codex's credential backend defaults, user configuration, and managed policy without selecting
+or requiring a backend. File credentials under the default Codex home SHALL remain volume-backed. Keyring service
+startup, unlocking, and persistence SHALL remain the consumer's responsibility.
 
 #### Scenario: File authentication
 
-- **WHEN** Codex signs in under the feature's default configuration
+- **WHEN** Codex signs in using file credential storage under its default home
 - **THEN** the credential cache is volume-backed and readable by a fresh CLI process
 
-#### Scenario: Conflicting managed backend
+#### Scenario: User-selected backend
 
-- **WHEN** a managed policy prohibits the required file backend
-- **THEN** setup reports the incompatibility without replacing the managed policy
+- **WHEN** the user configures a credential backend, including auto or keyring
+- **THEN** feature initialization preserves the configuration without rejecting or rewriting the backend
+
+#### Scenario: Managed backend
+
+- **WHEN** managed policy selects a credential backend
+- **THEN** feature initialization leaves that policy unchanged without requiring file storage
