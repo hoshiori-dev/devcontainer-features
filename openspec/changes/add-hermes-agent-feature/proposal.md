@@ -9,6 +9,9 @@ confirmed editor/persistence boundaries.
 
 ## What Changes
 
+- Allow known state paths to be prepared during the build, with one creation-time readiness check and no recurring
+  startup scans.
+
 - Preserve upstream state discovery paths where verified directory links can retain complete state; define conflict
   handling and write/recreation checks before enabling persistence.
 
