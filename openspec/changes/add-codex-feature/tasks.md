@@ -1,7 +1,7 @@
 # Tasks
 
-Sections 1–4 record the original implementation at `a6c5ac2`. Section 5 tracks the requested revision and awaits renewed
-package approval.
+Sections 1–4 record the original implementation at `a6c5ac2`. Section 5 tracks the native-package revision approved at
+`55ec1ad`; implementation and regression verification are in progress.
 
 ## 1. CLI installation
 
