@@ -97,21 +97,25 @@ changes and another Docker host SHALL not imply automatic state migration.
 ### Requirement: State directory contract
 
 The feature SHALL prefer linking the supported release's default Claude configuration directory into
-`/var/lib/claude-code`, without setting `CLAUDE_CONFIG_DIR`. Before selecting this route it SHALL verify all required
-state paths and write behavior, including `.claude.json`. If default-directory links cannot retain complete state, the
-feature SHALL use the official `CLAUDE_CONFIG_DIR` route only when verified to retain that complete state and support
-the enabled integrations. A single-file link replaced by an atomic write SHALL not satisfy persistence. A release with
-no verified complete mapping SHALL fail clearly rather than report persistent state as available.
-
-Mappings SHALL use the actual remote user's effective paths. Setup SHALL reuse links to the intended mounted targets and
-create absent links when initializing a fresh container. A conflicting file, directory, dangling link, or link to
-another target SHALL cause an actionable failure without replacement, import, or deletion. Caller-provided
-`CLAUDE_CONFIG_DIR` SHALL cause an actionable conflict without overwriting the setting or existing state.
+`/var/lib/claude-code`, leaving `CLAUDE_CONFIG_DIR` unset. Before using this route it SHALL verify all required state
+paths and actual writes, including `.claude.json`.
 
 #### Scenario: Default state paths
 
 - **WHEN** the CLI runs with the feature's default environment
 - **THEN** all required private durable state uses the verified mapping into the mounted root
+
+#### Scenario: Real state writes
+
+- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
+- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
+
+### Requirement: State mapping conflicts
+
+Setup SHALL use the actual remote user's effective paths, reuse links to the intended mounts, and create missing links
+in fresh containers. Conflicting files, directories, dangling links, or links to another target SHALL cause an
+actionable failure, preserving existing content without replacement, import, or deletion. Caller-provided
+`CLAUDE_CONFIG_DIR` SHALL fail clearly without changing the setting or existing state.
 
 #### Scenario: Conflicting existing state
 
@@ -128,15 +132,16 @@ another target SHALL cause an actionable failure without replacement, import, or
 - **WHEN** a fresh container mounts the existing volume under a different remote-user home
 - **THEN** setup recreates the required links for that user and the saved state remains available
 
-#### Scenario: Real state writes
-
-- **WHEN** the supported CLI or enabled backend saves state, replaces configuration, or refreshes credentials
-- **THEN** required state remains volume-backed and readable by a fresh process and a recreated container
-
 #### Scenario: Caller-provided state home
 
 - **WHEN** the consumer explicitly configures `CLAUDE_CONFIG_DIR`
 - **THEN** setup reports the conflict without changing that setting or existing state
+
+### Requirement: Official configuration fallback
+
+If default-directory links cannot retain complete state, the feature SHALL use the official `CLAUDE_CONFIG_DIR` route
+only when verified to retain that state and support enabled integrations. A file link replaced by atomic writes SHALL
+NOT count as persistence. Without a verified complete mapping, the release SHALL fail clearly.
 
 #### Scenario: Incomplete default-directory mapping
 
@@ -146,16 +151,9 @@ another target SHALL cause an actionable failure without replacement, import, or
 
 ### Requirement: Initialization lifecycle
 
-The feature MAY prepare known state-directory links during image construction. It SHALL perform one readiness check per
-container creation through `onCreateCommand`, after mounts are available. That check SHALL verify the expected state
-mount, effective user paths, link targets, state-root ownership and private permissions, known credential-store
-permissions, and read/write/search access as the actual remote user before reporting readiness. Missing links MAY be
-created then; conflicting content SHALL be preserved with an actionable failure.
-
-Normal creation checks SHALL be bounded to these paths; full-tree scans and recursive ownership or permission changes
-SHALL occur only when a detected mismatch requires repair within the state mount. The feature SHALL add no automatic
-state check to start or attach hooks. Path, user, or mount changes after creation SHALL require container recreation or
-an explicit rerun of initialization, as documented.
+The feature MAY prepare known state-directory links during image construction. It SHALL run one readiness check per
+container creation via `onCreateCommand`, after mounts are available. Missing runtime links MAY be created then;
+conflicting content SHALL be preserved with an actionable failure.
 
 #### Scenario: Build-prepared link
 
@@ -167,10 +165,21 @@ an explicit rerun of initialization, as documented.
 - **WHEN** the effective runtime home or application state path differs from the prepared path, or a home mount hides it
 - **THEN** initialization uses the effective path, creates a missing link there, and preserves any conflicting content
 
+### Requirement: State readiness checks
+
+Before reporting readiness, the creation check SHALL verify the expected state mount, effective user paths, link
+targets, state-root ownership and private permissions, known credential-store permissions, and read/write/search access
+as the actual remote user.
+
 #### Scenario: Missing state mount
 
 - **WHEN** the expected state volume is absent
 - **THEN** initialization fails clearly instead of treating writable image storage as persistent state
+
+### Requirement: Bounded state repair
+
+Normal creation checks SHALL be bounded to the readiness paths. Full-tree scans and recursive ownership or permission
+changes SHALL occur only when a detected mismatch requires repair within the state mount.
 
 #### Scenario: Healthy reused volume
 
@@ -182,6 +191,11 @@ an explicit rerun of initialization, as documented.
 - **WHEN** the readiness check detects incompatible ownership, private permissions, or user access
 - **THEN** initialization repairs only what is needed within the state mount or fails clearly if safe repair is
   unavailable
+
+### Requirement: No recurring initialization
+
+The feature SHALL add no automatic state check to start or attach hooks. Path, user, or mount changes after creation
+SHALL require container recreation or an explicit rerun of initialization, as documented.
 
 #### Scenario: Ordinary restart or attachment
 
