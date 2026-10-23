@@ -71,8 +71,10 @@ checksum file:
   resolves, and runs `act --list` on a repository it creates with one workflow, asserting the exit status and that the
   job id appears. Checked by reading `test.sh` in review.
 - The `defaultImage` scenarios compare the configuration file byte for byte with the lines in the spec and, for
-  `medium`, run `act --dryrun` with stdin from `/dev/null` on a repository the script creates, asserting exit 0. A dry
-  run creates no container and needs no engine (Context). Checked by reading the scenario scripts in review.
+  `medium`, run `act --dryrun` with stdin from `/dev/null` in a directory the script creates, asserting that the output
+  holds neither the prompt's text nor its fatal `EOF`. The exit status is not asserted: without a Docker Engine a dry
+  run still fails when it sets up the job, after the point where act would have prompted. Checked by reading the
+  scenario scripts in review.
 - Scenarios a successful container build cannot show are checked by hand, once each, on amd64, the way the `gitleaks`
   design describes: a malformed version (each form the scenario names), a version below the minimum, a release that does
   not exist, `latest` pointing to a malformed tag, a digest mismatch, a missing or duplicated entry, an unsupported

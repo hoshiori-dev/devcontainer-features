@@ -28,8 +28,8 @@ to it on the default `PATH` of the remote user and of root.
 
 #### Scenario: Listing a repository's workflows
 
-- **WHEN** the feature has been installed and the remote user runs `act --list` in a Git repository holding a workflow
-  under `.github/workflows/`
+- **WHEN** the feature has been installed and the remote user runs `act --list` in a directory holding a workflow under
+  `.github/workflows/`
 - **THEN** the command exits 0 and its output names the workflow's job, without a Docker Engine being reachable
 
 ### Requirement: Option version
@@ -171,8 +171,10 @@ user.
 - **WHEN** the feature is installed with `defaultImage` set to `medium`
 - **THEN** the remote user's act configuration file holds the lines that requirement "act default image lines" names for
   `medium`
-- **AND** `act --dryrun` run as the remote user without a terminal, in a Git repository holding a workflow whose job
-  runs on `ubuntu-latest`, exits 0 without prompting
+- **AND** `act --dryrun` run as the remote user without a terminal, in a directory holding a workflow whose job runs on
+  `ubuntu-latest`, does not show act's default-image prompt: its output holds neither
+  `Please choose the default
+  image` nor a fatal `EOF`
 
 #### Scenario: Large images selected
 
@@ -271,8 +273,8 @@ or check one. It SHALL be ordered after `ghcr.io/devcontainers/features/docker-i
 #### Scenario: Running a job with a Docker Engine
 
 - **WHEN** the feature is installed together with `ghcr.io/devcontainers/features/docker-in-docker` and the remote user
-  runs `act` in a Git repository holding a workflow with one job that runs `echo` on `ubuntu-latest`, with `-P` naming
-  an image available to the engine
+  runs `act` in a directory holding a workflow with one job that runs `echo` on `ubuntu-latest`, with `-P` naming an
+  image available to the engine
 - **THEN** the job runs in a container of that engine and the command exits 0
 
 ### Requirement: No other configuration
@@ -285,7 +287,7 @@ an event payload, or an environment file, and SHALL NOT run a workflow or pull a
 #### Scenario: Nothing else configured after install
 
 - **WHEN** the feature has been installed with default options
-- **THEN** neither the remote user's nor root's home holds a file or directory whose name contains `act`
+- **THEN** neither the remote user's nor root's home holds `.actrc`, `.config/act`, or `.cache/act`
 - **AND** no environment variable whose name starts with `ACT_` other than `ACT_DISABLE_VERSION_CHECK` is set in the
   remote user's environment
 
