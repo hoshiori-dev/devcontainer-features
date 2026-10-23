@@ -4,9 +4,10 @@
 
 ### Requirement: Option allowedDomains
 
-The feature SHALL accept comma-separated DNS names, case-insensitively, ignoring surrounding whitespace and empty
-entries. Each SHALL be a valid DNS name; the feature SHALL fail installation and name any invalid entry, including
-wildcard label `*.example`. Valid entries SHALL allow subdomains as Allowed domains specifies.
+The feature SHALL accept the option `allowedDomains` as declared here: comma-separated DNS names, case-insensitive,
+ignoring surrounding whitespace and empty entries, each allowed as Requirement: Allowed domains states, with an entry
+that is not a valid DNS name, including an entry with a wildcard label such as `*.example` (subdomains are always
+included), failing the install with a message naming it.
 
 | Field   | Value    |
 | ------- | -------- |
@@ -20,9 +21,9 @@ wildcard label `*.example`. Valid entries SHALL allow subdomains as Allowed doma
 
 ### Requirement: Option allowedCidrs
 
-The feature SHALL accept comma-separated IPv4/IPv6 addresses or CIDRs, ignoring whitespace and empty entries. Each SHALL
-allow its range or single address on every protocol and port. The feature SHALL fail installation and name any invalid
-address, host bits outside a prefix, or range containing start-check probe `192.0.2.1`.
+The feature SHALL accept the option `allowedCidrs` as declared here: comma-separated IPv4 or IPv6 addresses or CIDRs,
+ignoring surrounding whitespace and empty entries, each allowing every address in that range, or that single address, on
+every protocol and port, with an invalid entry failing the install as Requirement: Invalid CIDR entries states.
 
 | Field   | Value    |
 | ------- | -------- |
@@ -52,9 +53,10 @@ address, host bits outside a prefix, or range containing start-check probe `192.
 
 ### Requirement: Option deniedDomains
 
-The feature SHALL accept comma-separated DNS names, case-insensitively, ignoring surrounding whitespace and empty
-entries. Each SHALL be a valid DNS name; the feature SHALL fail installation and name any invalid entry, including
-wildcard label `*.example`. Valid entries SHALL deny subdomains as Denied domains specifies.
+The feature SHALL accept the option `deniedDomains` as declared here: comma-separated DNS names, case-insensitive,
+ignoring surrounding whitespace and empty entries, each denied as Requirement: Denied domains states, with an entry that
+is not a valid DNS name, including an entry with a wildcard label such as `*.example` (subdomains are always included),
+failing the install with a message naming it.
 
 | Field   | Value    |
 | ------- | -------- |
@@ -73,9 +75,10 @@ wildcard label `*.example`. Valid entries SHALL deny subdomains as Denied domain
 
 ### Requirement: Option deniedCidrs
 
-The feature SHALL accept comma-separated IPv4/IPv6 addresses or CIDRs, ignoring whitespace and empty entries. Each SHALL
-deny its range or single address on every protocol and port. The feature SHALL fail installation and name any invalid
-address or host bits outside a prefix.
+The feature SHALL accept the option `deniedCidrs` as declared here: comma-separated IPv4 or IPv6 addresses or CIDRs,
+ignoring surrounding whitespace and empty entries, each refusing every address in that range, or that single address, on
+every protocol and port as Requirement: Rule precedence states, with an invalid entry failing the install as
+Requirement: Invalid CIDR entries states.
 
 | Field   | Value    |
 | ------- | -------- |
@@ -100,8 +103,10 @@ address or host bits outside a prefix.
 
 ### Requirement: Option filterForward
 
-When enabled, the feature SHALL apply the same outbound rules, including DNS restrictions, to forwarded traffic such as
-nested-container traffic, subject to Forwarded traffic exceptions. When disabled, it SHALL NOT filter forwarded traffic.
+The feature SHALL accept the option `filterForward` as declared here: when enabled, traffic that the container forwards,
+such as that of nested containers, is subject to the same rules as its own outbound traffic, including the DNS
+restriction, with the exception for allowed and denied names of Requirement: Names in forwarded traffic, and when
+disabled, the feature does not filter forwarded traffic.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -126,11 +131,11 @@ nested-container traffic, subject to Forwarded traffic exceptions. When disabled
 
 ### Requirement: Firewall applied at every start
 
-The root entrypoint SHALL apply firewall rules before the container command on every start and SHALL replace prior
-feature rules with those for build-time options. Repeated starts of the same image SHALL yield the same rules except for
-resolver-learned addresses, fetched GitHub ranges, and resolvers rerecorded after Docker regenerates resolv.conf. The
-dev container tool MAY run lifecycle commands while the entrypoint runs; firewall rules SHALL apply only after first
-load.
+The feature SHALL apply the firewall on every start of the container, as root, through the feature's entrypoint, before
+the container's command runs. Each start SHALL replace everything the feature applied before with the rules for the
+options the image was built with (Requirement: Same rules at every start). The dev container tool may run lifecycle
+commands while the entrypoint is still running; the firewall is in force for them only from the moment the entrypoint
+loads its first rules.
 
 #### Scenario: First start
 
@@ -144,10 +149,11 @@ load.
 
 ### Requirement: Outbound default deny
 
-Once active, the firewall SHALL refuse every outbound IPv4/IPv6 connection not allowed by Rule precedence. With
-defaultAction=deny, it SHALL allow loopback, permitted resolver DNS, allowed destinations not refused by a more-specific
-denial, and reply traffic; IPv6 neighbor discovery SHALL remain possible. A refused connection SHALL fail immediately
-with an error. The feature SHALL NOT filter inbound connections.
+Once the firewall is in force, the container SHALL refuse every outbound IPv4 and IPv6 connection that Requirement: Rule
+precedence refuses. With `defaultAction` `deny`, that is every connection except those of Requirement: Exceptions under
+default deny. IPv6 neighbour discovery SHALL stay possible, so an allowed IPv6 destination is reachable. A refused
+connection SHALL fail immediately with an error rather than time out. Inbound connections to the container SHALL NOT be
+filtered by the feature.
 
 #### Scenario: Allowed domain is reachable
 
@@ -172,10 +178,11 @@ with an error. The feature SHALL NOT filter inbound connections.
 
 ### Requirement: Allowed domains
 
-Each allowedDomains entry SHALL allow its exact name and all subdomains on every protocol and port at resolver-returned
-addresses, from lookup until next start. The feature SHALL follow changed addresses. Addresses not learned through the
-container resolver SHALL remain refused unless another option allows them. NOTES.md SHALL warn that top-level/shared
-suffixes permit nearly any destination.
+Each `allowedDomains` entry SHALL allow the name itself and every subdomain of it, on every protocol and port. A name
+SHALL become reachable at the addresses the container's resolver returns for it, from the time of that lookup until the
+next start of the container, so addresses that change between lookups are followed, unless Requirement: Rule precedence
+refuses them. An address the container did not obtain through its resolver SHALL stay refused unless another option
+allows it.
 
 #### Scenario: Subdomain of an allowed domain
 
@@ -191,10 +198,10 @@ suffixes permit nearly any destination.
 
 ### Requirement: Denied domains
 
-Each deniedDomains entry SHALL refuse its exact name and all subdomains at resolver-returned addresses from lookup until
-next start, while names SHALL still resolve. The longer allowed/denied domain SHALL win; equal names SHALL be denied.
-Directly reached addresses SHALL not be refused by deniedDomains unless another rule matches; other names resolving to a
-refused address SHALL also be refused.
+Each `deniedDomains` entry SHALL deny the name itself and every subdomain of it, on every protocol and port. The
+addresses the container's resolver returns for a denied name SHALL be refused from the time of that lookup until the
+next start of the container, and the name SHALL still resolve wherever Requirement: Name resolution under the DNS
+restriction says names resolve. Overlaps are stated in Requirement: Allowed and denied domain overlap.
 
 #### Scenario: Denied domain refused
 
@@ -220,10 +227,13 @@ refused address SHALL also be refused.
 
 ### Requirement: Rule precedence
 
-For outbound and filtered forwarded traffic, the feature SHALL apply rules in order: allow replies, loopback, IPv6
-neighbor discovery, allowed resolver DNS and Forwarded traffic exceptions; refuse other DNS; refuse `192.0.2.1`; then
-use the longest matching prefix among CIDRs, preset ranges, and resolver-learned domain addresses, allowing or refusing
-as that entry says and refusing an equal-length allow/deny tie; otherwise apply defaultAction.
+The feature SHALL decide each outbound connection, and each forwarded one it filters, in this order:
+
+1. Traffic of Requirement: Traffic allowed before any entry is allowed, whatever the denied entries say; other DNS
+   traffic is refused.
+2. Traffic to `192.0.2.1`, the address the start check probes (Requirement: Start check), is refused.
+3. Traffic that an entry contains is decided by Requirement: Longest prefix decides.
+4. Traffic that no entry contains is decided by `defaultAction`.
 
 #### Scenario: Allowed address inside a denied range
 
@@ -254,10 +264,10 @@ as that entry says and refusing an equal-length allow/deny tie; otherwise apply 
 
 ### Requirement: Presets
 
-Each preset SHALL allow its named domains as Allowed domains does, plus its listed ranges. The `github` preset SHALL
-include github.com and githubusercontent.com, plus GitHub web ranges only under defaultAction=deny; all Pages addresses
-SHALL then be reachable although github.io is not listed. NOTES.md SHALL name the hosts each preset source lists and
-leaves out, and SHALL explain GitHub Pages reachability.
+`presets` SHALL select named destination sets, each allowing its domains the way `allowedDomains` allows them, plus its
+ranges, and following its source, as Requirement: GitHub preset, Requirement: Package registry presets, Requirement:
+Anthropic preset, and Requirement: VS Code preset state. `NOTES.md` SHALL name the hosts that a preset's source lists
+and the preset leaves out, and SHALL state that the `github` preset makes every GitHub Pages site reachable.
 
 #### Scenario: GitHub preset
 
@@ -272,9 +282,10 @@ leaves out, and SHALL explain GitHub Pages reachability.
 
 ### Requirement: GitHub ranges
 
-For `presets=github` with defaultAction=deny, each start SHALL fetch and validate GitHub web/api/git IPv4 and IPv6
-ranges from https://api.github.com/meta. Before ranges load, the feature SHALL allow beyond loopback and resolver DNS
-only HTTPS to addresses returned by one api.github.com resolver lookup, and SHALL connect only to those addresses.
+When `presets` contains `github` and `defaultAction` is `deny`, each start SHALL fetch https://api.github.com/meta over
+HTTPS as Requirement: GitHub metadata fetch relies on TLS states, and SHALL allow every IPv4 and IPv6 range in the
+response's `web`, `api`, and `git` lists, validated as Requirement: GitHub range validation states. What is reachable
+until the ranges are loaded is stated in Requirement: Reachability before the GitHub ranges load.
 
 #### Scenario: Ranges loaded
 
@@ -304,10 +315,10 @@ only HTTPS to addresses returned by one api.github.com resolver lookup, and SHAL
 
 ### Requirement: DNS only to the container's resolvers
 
-Beyond loopback, DNS SHALL reach only resolvers in Docker-generated `/etc/resolv.conf`; Docker 127.0.0.11 and the
-feature resolver SHALL be allowed over loopback. Other DNS SHALL be refused regardless of rules. Names SHALL still
-resolve through Docker, including denied names; user-defined networks SHALL resolve only names Docker answers. NOTES.md
-SHALL state this limit; search/options lines SHALL stay intact.
+The container SHALL be able to send DNS queries beyond the loopback interface only to the resolvers named in
+`/etc/resolv.conf` as Docker last generated it (Requirement: Firewall applied at every start); queries to Docker's
+embedded resolver `127.0.0.11` and to the feature's local resolver travel through the loopback interface and stay
+allowed. DNS traffic to any other address SHALL be refused, whatever `defaultAction` and the allowed entries say.
 
 #### Scenario: Other DNS server refused
 
@@ -321,10 +332,10 @@ SHALL state this limit; search/options lines SHALL stay intact.
 
 ### Requirement: Forwarded traffic
 
-Regardless of filterForward, the feature SHALL allow traffic to networks only inside the container, traffic forwarded
-into them, and replies to allowed forwarded connections. The feature SHALL NOT guarantee name-based allow/deny for
-nested-container traffic when its lookups bypass the container resolver. NOTES.md SHALL explain both exceptions, their
-cause, and a user remedy.
+Whatever `filterForward` is, traffic from the container to networks that exist only inside it, such as the bridges of a
+nested Docker daemon, traffic forwarded into those networks, and reply traffic of forwarded connections that were
+allowed SHALL be allowed, whatever the denied entries say; which forwarded traffic the rules filter is stated in
+Requirement: Option filterForward, and the exception for names in Requirement: Names in forwarded traffic.
 
 #### Scenario: Nested container reaches an allowed range
 
@@ -334,10 +345,10 @@ cause, and a user remedy.
 
 ### Requirement: Failure mode
 
-A start SHALL fail if rules cannot fully apply, GitHub fetch fails, or the domain resolver cannot start (including
-address/port collision). If no rule loads (missing NET_ADMIN, non-root entrypoint, or missing nftables), outbound SHALL
-remain unrestricted. A non-root entrypoint SHALL write no record; start check SHALL detect this and NOTES.md SHALL
-require root. A resolver dying after success SHALL NOT change record/rules; lookups SHALL fail until restart.
+A start SHALL be a failure when the rules for the configured options cannot be applied in full: the rules cannot be
+loaded, the GitHub ranges fetch fails, or the resolver that learns allowed and denied domains cannot start, including
+when another process already holds its address and port. What a failed start leaves in place is stated in Requirement:
+Option failureMode; in both modes the start SHALL be recorded as failed with its reason.
 
 #### Scenario: Rules cannot be loaded
 
@@ -354,10 +365,11 @@ require root. A resolver dying after success SHALL NOT change record/rules; look
 
 ### Requirement: Start check
 
-The unprivileged postStartCommand SHALL wait a bounded time for this start’s record, treat an earlier record as missing,
-and verify `192.0.2.1` is blocked without Internet traffic. It SHALL set its own PATH, run without inherited
-environment, and call tools by absolute path. For missing/failed/not-applied starts it SHALL print the reason; closed
-SHALL exit nonzero, while warn SHALL exit zero after a stderr warning.
+The feature SHALL run, as its `postStartCommand` and without privilege, a check that waits a bounded time for the
+current start's record, treats an earlier start's record as missing, and verifies that `192.0.2.1`, which the rules
+refuse whatever the options say (Requirement: Rule precedence), is refused. On a failed, missing, or not-applied start
+it SHALL print the reason; with `failureMode` `closed` it SHALL exit non-zero, and with `warn` it SHALL exit zero after
+a warning on standard error.
 
 #### Scenario: Firewall in force
 
@@ -387,10 +399,10 @@ SHALL exit nonzero, while warn SHALL exit zero after a stderr warning.
 
 ### Requirement: Guardrail, not a security boundary
 
-The feature SHALL be documented as a guardrail, not a security boundary, and SHALL NOT claim protection against
-root/passwordless sudo, Docker access, DNS tunneling, shared allowed addresses, resolver-bypassing access to denied
-hosts, un-denied names, or names inside allowed protocols such as DNS over HTTPS. NOTES.md SHALL state these limits and
-that common users such as vscode may have passwordless sudo; with defaultAction=allow only denied entries are refused.
+The feature SHALL be documented as a guardrail and not a security boundary, and it SHALL NOT claim to stop a process
+that has root or passwordless `sudo` inside the container, that can use a Docker daemon (including through membership in
+the `docker` group), that tunnels data through DNS lookups, or any other process that Requirement: Guardrail bypasses or
+Requirement: Guardrail indirect bypasses names. `NOTES.md` SHALL state what Requirement: Guardrail notes lists.
 
 #### Scenario: Root removes the firewall
 
@@ -399,91 +411,276 @@ that common users such as vscode may have passwordless sudo; with defaultAction=
 
 ## ADDED Requirements
 
-### Requirement: Preset source hosts and omissions are documented
+### Requirement: Invalid CIDR entries
 
-The `npm` preset SHALL allow `registry.npmjs.org` (source: https://docs.npmjs.com/cli/v11/using-npm/config, `registry`
-default); `pypi` SHALL allow `pypi.org` and `files.pythonhosted.org` (source: https://docs.pypi.org/api/).
+An `allowedCidrs` or `deniedCidrs` entry that is not a valid IPv4 or IPv6 address or CIDR, or that has bits set outside
+its prefix length, and an `allowedCidrs` entry whose range contains `192.0.2.1`, the address the start check probes
+(Requirement: Start check), SHALL fail the install with a message naming it.
 
-#### Scenario: Package registry presets
+#### Scenario: Invalid CIDR entry fails the install
 
-- **WHEN** `presets` contains `npm` or `pypi`
-- **THEN** the named registry hosts are allowed according to the preset list
+- **WHEN** `allowedCidrs` or `deniedCidrs` contains an entry that is not a valid IPv4 or IPv6 address or CIDR, or has
+  host bits set
+- **THEN** the build fails with a message naming that entry
 
-### Requirement: GitHub preset domains use the documented source
+### Requirement: Same rules at every start
 
-The `github` preset SHALL allow `github.com` and `githubusercontent.com` as domains from the `domains.website` list of
-https://api.github.com/meta. Its GitHub Pages `web` ranges allow every Pages site, including custom domains by address;
-`github.io` itself is not among the preset domains.
+Every start of the same image SHALL yield the same rules apart from addresses learned through the resolver, the GitHub
+ranges fetched at that start, and resolvers re-recorded after Docker regenerated `/etc/resolv.conf`.
+
+#### Scenario: Restart yields the same rules
+
+- **WHEN** a container with the feature is stopped and started again
+- **THEN** the firewall is applied again with the same rules as after the first start
+
+### Requirement: Exceptions under default deny
+
+Once the firewall is in force, with `defaultAction` `deny`, the container SHALL refuse every outbound connection, IPv4
+and IPv6, except traffic through the loopback interface, DNS traffic to the resolvers allowed by Requirement: DNS only
+to the container's resolvers, traffic to a destination allowed by `presets`, `allowedDomains`, or `allowedCidrs` and not
+refused by a denied entry at least as specific, and reply traffic of connections the container accepted or opened
+through these exceptions.
+
+#### Scenario: Allowed destination reachable under default deny
+
+- **WHEN** `defaultAction` is `deny` and a process in the container connects to a host whose name is allowed by
+  `presets` or `allowedDomains`
+- **THEN** the connection succeeds
+
+### Requirement: Allowed domains breadth documented
+
+`NOTES.md` SHALL state that an `allowedDomains` entry allows every name under it, so a top-level domain or a shared
+suffix, such as a dynamic DNS provider's domain, allows nearly any destination.
+
+#### Scenario: Breadth of an allowed domain documented
+
+- **WHEN** a user reads `NOTES.md`
+- **THEN** it states that an `allowedDomains` entry allows every name under it, so a top-level domain or a shared suffix
+  allows nearly any destination
+
+### Requirement: Allowed and denied domain overlap
+
+A name matched by both an allowed domain (from `presets` or `allowedDomains`) and a denied one SHALL follow the longer
+of the two entries, and the denied one when both are the same name. An address that the container reaches without a
+lookup of a denied name through its resolver is not refused by `deniedDomains`, and every other name that shares a
+refused address is refused with it.
+
+#### Scenario: Longer allowed entry wins
+
+- **WHEN** `deniedDomains` contains `githubusercontent.com`, `allowedDomains` contains `raw.githubusercontent.com`, and
+  a process connects to `raw.githubusercontent.com`
+- **THEN** the connection succeeds
+
+### Requirement: Traffic allowed before any entry
+
+Reply traffic of accepted connections, traffic through the loopback interface, IPv6 neighbour discovery, DNS traffic to
+the resolvers of Requirement: DNS only to the container's resolvers, and traffic of Requirement: Forwarded traffic SHALL
+be allowed, whatever the denied entries say, as step 1 of Requirement: Rule precedence.
+
+#### Scenario: Resolvers stay reachable inside a denied range
+
+- **WHEN** `deniedCidrs` lists a range that contains the container's resolvers
+- **THEN** names still resolve
+
+### Requirement: Longest prefix decides
+
+Among the entries that contain the destination address (`allowedCidrs`, `deniedCidrs`, the ranges of the selected
+presets, and the addresses learned through allowed and denied domains, each learned address counting as a single
+address), the one with the longest prefix SHALL decide, as step 3 of Requirement: Rule precedence: an allowed entry lets
+the traffic through and a denied one refuses it. Between an allowed and a denied entry of the same prefix length, the
+traffic SHALL be refused.
+
+#### Scenario: Equal prefixes refuse
+
+- **WHEN** `allowedCidrs` and `deniedCidrs` list the same range
+- **THEN** connections to that range fail immediately with an error
+
+### Requirement: GitHub preset
+
+The `github` preset SHALL allow `github.com`, `githubusercontent.com`, and, with `defaultAction` `deny`, the IPv4 and
+IPv6 ranges of Requirement: GitHub ranges. Source: the `domains.website` list of the endpoint named in Requirement:
+GitHub ranges. Its `web` ranges hold the addresses of GitHub Pages, so every Pages site, custom domains included, is
+reachable by address although `github.io` is not among its domains.
 
 #### Scenario: GitHub Pages are reachable by address
 
-- **WHEN** `presets` includes `github`, `defaultAction=deny`, and GitHub ranges loaded successfully
-- **THEN** Pages destinations in the `web` ranges are allowed even though `github.io` is not listed as a domain
+- **WHEN** `presets` contains `github`, `defaultAction` is `deny`, and the GitHub ranges fetch succeeds
+- **THEN** an address of a GitHub Pages site inside a `web` range is reachable although `github.io` is not among the
+  preset's domains
 
-### Requirement: Anthropic preset scope is documented
+### Requirement: Package registry presets
 
-The `anthropic` preset SHALL allow `api.anthropic.com`, `claude.ai`, and `platform.claude.com` for API and sign-in only,
-from https://code.claude.com/docs/en/network-config; NOTES.md SHALL document these hosts and omitted destinations.
+The `npm` preset SHALL allow `registry.npmjs.org`. Source: the `registry` default in
+https://docs.npmjs.com/cli/v11/using-npm/config. The `pypi` preset SHALL allow `pypi.org` and `files.pythonhosted.org`.
+Source: https://docs.pypi.org/api/
+
+#### Scenario: Package registry presets
+
+- **WHEN** `presets` contains `npm` and `pypi`
+- **THEN** `registry.npmjs.org`, `pypi.org`, and `files.pythonhosted.org` are reachable
+
+### Requirement: Anthropic preset
+
+The `anthropic` preset SHALL allow `api.anthropic.com`, `claude.ai`, and `platform.claude.com`, which cover the API and
+sign-in only. Source: https://code.claude.com/docs/en/network-config
 
 #### Scenario: Anthropic preset hosts
 
 - **WHEN** `presets` contains `anthropic`
-- **THEN** its three listed hosts are allowed and its documented scope remains API and sign-in only
+- **THEN** `api.anthropic.com`, `claude.ai`, and `platform.claude.com` are reachable
 
-### Requirement: VS Code preset scope is documented
+### Requirement: VS Code preset
 
 The `vscode` preset SHALL allow `update.code.visualstudio.com`, `vscode.download.prss.microsoft.com`, `vscode-cdn.net`,
-`marketplace.visualstudio.com`, `gallery.vsassets.io`, and `gallerycdn.vsassets.io` for VS Code Server and Marketplace
-downloads only, from https://code.visualstudio.com/docs/setup/network. NOTES.md SHALL document these hosts and
-omissions.
+`marketplace.visualstudio.com`, `gallery.vsassets.io`, and `gallerycdn.vsassets.io`, which cover VS Code Server and
+Marketplace downloads only. Source: https://code.visualstudio.com/docs/setup/network
 
 #### Scenario: VS Code preset hosts
 
 - **WHEN** `presets` contains `vscode`
-- **THEN** the listed Server and Marketplace download hosts are allowed
+- **THEN** `update.code.visualstudio.com` and `marketplace.visualstudio.com` are reachable
 
 ### Requirement: GitHub metadata fetch relies on TLS
 
-For github ranges, the feature SHALL fetch https://api.github.com/meta over HTTPS with bounded time and response size,
-and verify TLS against image CA certificates; it SHALL NOT disable or weaken verification. Since GitHub publishes no
-checksum or signature, trust relies on TLS alone.
+The fetch of Requirement: GitHub ranges SHALL have a bounded time and response size. GitHub publishes no checksum or
+signature for this response, so the fetch SHALL rely on TLS alone, verified against the image's CA certificates, and
+SHALL NOT disable or weaken that verification.
 
 #### Scenario: GitHub range metadata uses verified HTTPS
 
-- **WHEN** `presets=github` and `defaultAction=deny`
-- **THEN** the feature fetches the endpoint over verified HTTPS within the configured bounds
+- **WHEN** `presets` contains `github` and `defaultAction` is `deny`
+- **THEN** the start fetches https://api.github.com/meta over HTTPS with TLS verified against the image's CA
+  certificates
 
-### Requirement: GitHub ranges are validated and applied as a whole
+### Requirement: Reachability before the GitHub ranges load
 
-Every web/api/git IPv4/IPv6 range SHALL pass allowedCidrs validation and have IPv4 prefix /8 or longer and IPv6 /16 or
-longer. The feature SHALL allow each validated range. An error status, timeout, malformed response, invalid range, or
-rate limit SHALL fail the whole fetch/start and record the reason; partial ranges SHALL NOT load.
+When the start fetches the ranges of Requirement: GitHub ranges, then until they are loaded, the only destinations
+reachable beyond loopback and the DNS resolvers SHALL be the addresses that one lookup of `api.github.com` through those
+resolvers returned at that start, on the HTTPS port, and the fetch SHALL connect only to those addresses.
 
-#### Scenario: Invalid GitHub metadata fails as a whole
+#### Scenario: Fetch reaches only the looked-up addresses
 
-- **WHEN** the metadata response has an invalid range, malformed body, error status, timeout, or reports the rate limit
-- **THEN** no range from that response is allowed and start failure records the cause
+- **WHEN** `presets` contains `github`, `defaultAction` is `deny`, and the ranges are not loaded yet
+- **THEN** beyond loopback and the DNS resolvers only the addresses that one lookup of `api.github.com` returned at that
+  start are reachable, on the HTTPS port
 
-### Requirement: Failed start records include the reason
+### Requirement: GitHub range validation
 
-For either failureMode, the feature SHALL record each failed start and its reason. If the resolver cannot start, it
-SHALL leave `/etc/resolv.conf` naming container resolvers, never the process that owns the port. A resolver that exits
-after successful start SHALL NOT change recorded status or loaded rules.
+Every entry of the `web`, `api`, and `git` lists SHALL be validated as an `allowedCidrs` entry is (Requirement: Option
+allowedCidrs) and SHALL have a prefix of at least /8 for IPv4 and at least /16 for IPv6; an entry that fails either
+check, an error status, a timeout, or a malformed response SHALL make the whole fetch a failure handled by Requirement:
+Failure mode, and a response that reports GitHub's rate limit SHALL be recorded with that reason.
 
-#### Scenario: Resolver port is already occupied
+#### Scenario: Error response fails the whole fetch
 
-- **WHEN** another process holds the resolver address and port at start
-- **THEN** the start is recorded as failed with the cause and resolv.conf still names container resolvers
+- **WHEN** `presets` contains `github` and the fetch returns an error status or a malformed response
+- **THEN** no range from that response is allowed and the start is handled as a failure
 
-### Requirement: Guardrail documentation includes indirect bypasses
+### Requirement: Name resolution under the DNS restriction
 
-NOTES.md SHALL state that allowed-domain addresses inside denied ranges may remain reachable, a process can
-intentionally fail a warn-mode start (including by exhausting GitHub's rate limit) and thereby remove rules, the
-resolver retains rule-changing capability, and a remote user's dynamic loader can forge start-check output. It SHALL
-also state that changing workspace devcontainer configuration affects later builds and that any process causing start
-failure in warn mode removes the rules.
+Every name SHALL still resolve, including names that no option allows and denied names, since only connections are
+filtered, when Docker forwards lookups from the host's network namespace or `/etc/resolv.conf` names the configured DNS
+servers. On a user-defined network with DNS servers configured for the container or the Docker daemon, only the names
+Docker itself answers resolve, and `NOTES.md` SHALL state that limitation.
 
-#### Scenario: Guardrail limitations are documented
+#### Scenario: Denied name still resolves
 
-- **WHEN** a user reads the feature notes
-- **THEN** these indirect bypasses and failure behaviors are described
+- **WHEN** Docker forwards lookups from the host's network namespace and a process looks up a name that `deniedDomains`
+  lists
+- **THEN** the lookup returns its addresses
+
+### Requirement: Resolver search and options kept
+
+The feature SHALL keep the `search` and `options` lines of `/etc/resolv.conf` intact.
+
+#### Scenario: Search and options lines unchanged
+
+- **WHEN** the firewall is in force
+- **THEN** the `search` and `options` lines of `/etc/resolv.conf` are those Docker generated
+
+### Requirement: Names in forwarded traffic
+
+A nested container is not guaranteed to reach a destination allowed only by name, nor to be refused one denied only by
+name: such a name takes effect at the addresses the container's resolver returned for it (Requirement: Allowed domains,
+Requirement: Denied domains), and a nested container's lookups do not always pass through that resolver, as under a
+nested Docker daemon with its own DNS servers. `NOTES.md` SHALL state this exception in both directions, its cause, and
+what a user can do.
+
+#### Scenario: Name exception documented
+
+- **WHEN** a user reads `NOTES.md`
+- **THEN** it states that a nested container may reach a destination denied only by name or miss one allowed only by
+  name, why, and what a user can do
+
+### Requirement: Resolver failure at start
+
+A resolver that cannot start SHALL leave `/etc/resolv.conf` naming the container's own resolvers, never the process that
+holds the port. A resolver that exits after a successful start SHALL NOT change the recorded result or the rules; name
+lookups then fail until the next start.
+
+#### Scenario: Resolver port taken in either mode
+
+- **WHEN** another process holds the resolver's address and port when a start launches the resolver
+- **THEN** the start is recorded as failed and `/etc/resolv.conf` names the container's own resolvers
+
+### Requirement: Start without loaded rules
+
+When no rule can be loaded at all (the container lacks `NET_ADMIN`, the entrypoint does not run as root, or the kernel
+lacks nftables support), outbound traffic stays unrestricted in both modes. A start under an entrypoint that does not
+run as root loads no rule and writes no record; the start check reports it from the missing record, and `NOTES.md` SHALL
+state that the entrypoint has to run as root.
+
+#### Scenario: Entrypoint not run as root
+
+- **WHEN** the entrypoint does not run as root
+- **THEN** outbound traffic is not restricted, no start record is written, and the start check reports it from the
+  missing record
+
+### Requirement: Start check isolation
+
+The start check SHALL send no traffic to any host on the Internet. It SHALL set its own `PATH`, SHALL run without the
+environment variables it inherits, and SHALL call its tools by absolute path, so a changed `PATH`, `ENV`, or `BASH_ENV`
+of the remote user does not change its result.
+
+#### Scenario: Changed environment of the remote user
+
+- **WHEN** the check runs with a `PATH` whose first directory holds programs named like the tools it uses, and with
+  `ENV` and `BASH_ENV` set
+- **THEN** its result and exit status are those of a run in a clean environment
+
+### Requirement: Guardrail bypasses
+
+The feature SHALL NOT claim to stop a process that reaches other services sharing an allowed address or range, that
+reaches a denied host through an address it did not look up through the container's resolver, through a name that is not
+denied, or through a protocol that carries names inside allowed traffic (such as DNS over HTTPS), or that reaches a
+denied range through a name of an allowed domain that resolves into it.
+
+#### Scenario: Allowed name into a denied range
+
+- **WHEN** `deniedCidrs` lists a range and a name of an allowed domain resolves to an address inside it
+- **THEN** a connection to that name succeeds
+
+### Requirement: Guardrail indirect bypasses
+
+The feature SHALL NOT claim to stop a process that makes a start fail on purpose while `failureMode` is `warn` (for
+example by exhausting GitHub's rate limit), that exploits the resolver, which keeps the capability to change the rules,
+that forges the start check's output through the dynamic loader of the remote user's environment, or that changes the
+dev container configuration in the workspace for the next build.
+
+#### Scenario: Failing start under warn removes the rules
+
+- **WHEN** `failureMode` is `warn` and a start fails
+- **THEN** the feature leaves no rule in place and the start is recorded as failed with its reason
+
+### Requirement: Guardrail notes
+
+`NOTES.md` SHALL state that the guardrail holds only for a remote user without root, passwordless `sudo`, or access to a
+Docker daemon, that the default users of common dev container images, such as `vscode` in the Dev Containers base
+images, have passwordless `sudo`, and that with `defaultAction` `allow` the feature refuses only what the denied entries
+name, and that with `failureMode` `warn` any process that can make a start fail removes the rules at that start.
+
+#### Scenario: Guardrail limits documented
+
+- **WHEN** a user reads `NOTES.md`
+- **THEN** it states that the guardrail holds only for a remote user without root, passwordless `sudo`, or access to a
+  Docker daemon

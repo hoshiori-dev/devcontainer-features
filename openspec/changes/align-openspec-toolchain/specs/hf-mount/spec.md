@@ -4,7 +4,8 @@
 
 ### Requirement: Option version
 
-The feature SHALL accept `version` and install the daemon and every selected backend from one upstream release.
+The feature SHALL accept the option `version` as declared here and install the daemon and every selected backend from
+the one upstream release it names, as "Version selection" states.
 
 | Field   | Value      |
 | ------- | ---------- |
@@ -36,7 +37,9 @@ The feature SHALL accept `version` and install the daemon and every selected bac
 
 ### Requirement: Downloads come from the upstream GitHub release and rely on TLS alone
 
-The feature SHALL download binaries only from the upstream GitHub release and rely on TLS alone.
+The feature SHALL download each binary only from the upstream GitHub release, as "Exact release asset names" and "Latest
+release URL is checked" state, and SHALL rely on TLS alone, as "Release integrity relies on TLS" and "Release requests
+carry no credentials" state.
 
 #### Scenario: Downloads succeed
 
@@ -64,10 +67,11 @@ The feature SHALL download binaries only from the upstream GitHub release and re
 
 ### Requirement: Installing twice
 
-A second installation SHALL succeed. With the same options, the second install SHALL leave the same binaries in place.
-With different options, the later `version` SHALL apply to every binary the later `backend` selects, including
-downgrades; an earlier unselected backend SHALL remain at its earlier version, and previously installed packages SHALL
-remain regardless of the later `installMountDependencies` value.
+Installing the feature a second time on the same image SHALL succeed. With the same options, the second install SHALL
+leave the same binaries in place. With different options, the later `version` SHALL apply to every binary the later
+`backend` selects, including a downgrade; a backend installed by an earlier run and not selected by the later one SHALL
+remain in place at its earlier version; packages installed by an earlier run SHALL remain, whatever the later
+`installMountDependencies` value.
 
 #### Scenario: Non-default options, then the defaults
 
@@ -98,9 +102,10 @@ remain regardless of the later `installMountDependencies` value.
 
 ### Requirement: Version selection
 
-`latest` SHALL select the release GitHub reports as latest for `huggingface/hf-mount`; `MAJOR.MINOR.PATCH` SHALL select
-the release tagged `v<MAJOR.MINOR.PATCH>`. Any other value fails before downloads, and a missing release fails with a
-message naming the requested version.
+The feature SHALL install from the release that `version` names: `latest` the release GitHub reports as the latest
+release of `huggingface/hf-mount`, and a `MAJOR.MINOR.PATCH` value the release tagged `v<MAJOR.MINOR.PATCH>`; any other
+value SHALL fail the install before anything is downloaded, and a release that does not exist SHALL fail the install
+with a message naming the requested version.
 
 #### Scenario: Malformed version fails before download
 
@@ -110,13 +115,16 @@ message naming the requested version.
 #### Scenario: Missing release names requested version
 
 - **WHEN** `version` names a release never published by `huggingface/hf-mount`
-- **THEN** installation fails naming that version and creates or replaces no binary
+- **THEN** installation fails naming that version, and no binary under `/usr/local/bin` is created or replaced by that
+  run
 
 ### Requirement: Exact release asset names
 
-For each selected binary, the feature SHALL request exactly `hf-mount-<arch>-linux`, `hf-mount-nfs-<arch>-linux`, or
-`hf-mount-fuse-<arch>-linux` from `https://github.com/huggingface/hf-mount/releases/download/v<version>/<asset>`, where
-`<arch>` is `x86_64` or `aarch64`. It SHALL never install another asset, including `hf-mount-fuse-sidecar-<arch>-linux`.
+The feature SHALL download each binary only from
+`https://github.com/huggingface/hf-mount/releases/download/v<version>/<asset>`, where `<asset>` is exactly
+`hf-mount-<arch>-linux`, `hf-mount-nfs-<arch>-linux`, or `hf-mount-fuse-<arch>-linux` and `<arch>` is `x86_64` or
+`aarch64`; the feature requests only these exact names, so no other asset, such as `hf-mount-fuse-sidecar-<arch>-linux`,
+is ever installed.
 
 #### Scenario: Missing exact asset fails
 
@@ -125,9 +133,10 @@ For each selected binary, the feature SHALL request exactly `hf-mount-<arch>-lin
 
 ### Requirement: Latest release URL is checked
 
-For `latest`, the feature SHALL take `<version>` from the redirect answered by
-`https://github.com/huggingface/hf-mount/releases/latest`. The redirect MUST lead to
-`https://github.com/huggingface/hf-mount/releases/tag/v<MAJOR.MINOR.PATCH>`, and any other answer fails installation.
+When following the latest release, the feature SHALL take `<version>` from the redirect that
+`https://github.com/huggingface/hf-mount/releases/latest` answers with: the redirect MUST lead to
+`https://github.com/huggingface/hf-mount/releases/tag/v<MAJOR.MINOR.PATCH>`, and any other answer SHALL fail the
+install.
 
 #### Scenario: Latest link has another destination
 
@@ -136,13 +145,14 @@ For `latest`, the feature SHALL take `<version>` from the redirect answered by
 
 ### Requirement: Release integrity relies on TLS
 
-Upstream publishes no checksum file and no signature for any release, so the feature verifies none; integrity and
-authenticity of every download rest on TLS alone. Every request SHALL use HTTPS, including every redirect.
+Upstream publishes no checksum file and no signature for any release, so the feature verifies none, and the integrity
+and authenticity of every download rest on TLS alone: every request SHALL use HTTPS, including every redirect.
 
 #### Scenario: Redirect leaves HTTPS
 
 - **WHEN** a request redirects to a non-HTTPS URL
-- **THEN** installation fails naming the URL and status and creates or replaces no binary
+- **THEN** installation fails naming the URL and the status, and no binary under `/usr/local/bin` is created or replaced
+  by that run
 
 ### Requirement: Release requests carry no credentials
 

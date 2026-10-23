@@ -4,7 +4,7 @@
 
 ### Requirement: Install the toolkit from NVIDIA's stable repository
 
-The feature SHALL install NVIDIA’s four toolkit packages at one selected version from the stable repository.
+The feature SHALL install NVIDIA's four toolkit packages at one selected version from the stable repository.
 
 #### Scenario: Default install on a supported image
 
@@ -112,8 +112,10 @@ The feature SHALL accept `configureDocker` to control Docker runtime registratio
 
 ### Requirement: Register the NVIDIA runtime with Docker
 
-When enabled and Docker is present, the feature SHALL register the NVIDIA runtime while preserving other daemon
-settings.
+When the `configureDocker` option is enabled and a Docker daemon (`dockerd`) is installed in the image when the feature
+runs, the feature SHALL register the `nvidia` runtime in `/etc/docker/daemon.json` as "NVIDIA Docker runtime
+registration" states, and SHALL be ordered after docker-in-docker as "NVIDIA feature ordering after docker-in-docker"
+states.
 
 #### Scenario: Docker daemon installed by docker-in-docker
 
@@ -141,7 +143,9 @@ settings.
 
 ### Requirement: Unsupported platforms fail the build
 
-The feature SHALL reject unsupported distributions and architectures before changing the image.
+The feature SHALL fail the build with a message naming the distribution or architecture, before it changes the image,
+when the distribution is outside the apt, dnf, and zypper families or the architecture is not `amd64` or `arm64`, as
+"NVIDIA supported platform gate" states; an unlisted distribution of those families is not refused.
 
 #### Scenario: Distribution without a supported package manager
 
@@ -180,18 +184,21 @@ expose installed commands on every user's default `PATH`. Supported images are l
 
 ### Requirement: NVIDIA repository signing key verification
 
-The feature SHALL download the key from `https://nvidia.github.io/libnvidia-container/gpgkey` and use it only if the
-file contains exactly one primary key with fingerprint `C95B321B61E88C1809C4F759DDCAE044F796ECB0`.
+The feature SHALL download NVIDIA's repository signing key from `https://nvidia.github.io/libnvidia-container/gpgkey`
+and SHALL use it only after verifying that the downloaded file contains exactly one primary key, whose full fingerprint
+is `C95B321B61E88C1809C4F759DDCAE044F796ECB0`.
 
 #### Scenario: Downloaded key fingerprint
 
 - **WHEN** the feature downloads NVIDIA's repository key
-- **THEN** it uses the file only when exactly one primary key has the pinned full fingerprint
+- **THEN** it uses the file only when it holds exactly one primary key and that key has the pinned full fingerprint
 
 ### Requirement: NVIDIA repository signature enforcement
 
-The repository SHALL trust no key except the verified pinned copy. Apt SHALL verify the signed repository index against
-that key alone; dnf and zypper SHALL verify both repository metadata and every package against a local copy of that key.
+The configured repository SHALL accept only content signed by the verified pinned key: on apt-based images the
+repository's signed index is checked against that key alone, and on dnf- and zypper-based images both the repository
+metadata and every package are signature-checked against a local copy of that key. Neither the feature nor the
+repository configuration it writes SHALL import or trust any key other than the verified copy of that key.
 
 #### Scenario: Repository signatures use only pinned key
 
@@ -200,9 +207,10 @@ that key alone; dnf and zypper SHALL verify both repository metadata and every p
 
 ### Requirement: NVIDIA stable version selection
 
-`latest` SHALL select the newest version offered by the stable repository at build time. An available
-`MAJOR.MINOR.PATCH` SHALL select exactly that version for all four packages with no minimum floor, including versions
-with known vulnerabilities. Other values, including package release suffixes, SHALL fail.
+For option `version`, `latest` SHALL install the newest version that NVIDIA's stable repository offers at build time, a
+version of the form `MAJOR.MINOR.PATCH` that the repository offers SHALL install exactly that version of all four
+packages with no minimum version, including releases with known vulnerabilities, and any other value, including a
+version with a package release suffix, SHALL fail the build.
 
 #### Scenario: Exact vulnerable version remains selectable
 
@@ -211,34 +219,45 @@ with known vulnerabilities. Other values, including package release suffixes, SH
 
 ### Requirement: Docker configuration option outcomes
 
-When `configureDocker` is true but no Docker daemon is present, the feature SHALL install the toolkit, print that Docker
-configuration was skipped, succeed, and leave `/etc/docker/daemon.json` absent. When false, it SHALL neither create nor
-change that file. Values other than `true` or `false`, including empty, SHALL fail.
+When `configureDocker` is enabled and no Docker daemon is installed, the feature SHALL install the toolkit, print a
+message that it skipped the Docker configuration, and succeed without creating `/etc/docker/daemon.json`. When it is
+disabled, the feature SHALL NOT create or change `/etc/docker/daemon.json`. Any value other than `true` or `false`,
+including an empty value, SHALL fail the build.
 
 #### Scenario: Docker configuration skipped or disabled
 
-- **WHEN** Docker is absent with configuration enabled, or configuration is disabled
+- **WHEN** no Docker daemon (`dockerd`) is installed with configuration enabled, or configuration is disabled
 - **THEN** the enabled case reports the skip without creating daemon settings, and the disabled case leaves settings
   unchanged
 
 ### Requirement: NVIDIA Docker runtime registration
 
-When enabled and `dockerd` exists, the feature SHALL register runtime `nvidia` at `nvidia-container-runtime` in
-`/etc/docker/daemon.json`, creating it if missing or empty. It SHALL preserve all other settings and the default
-runtime. Invalid existing JSON SHALL fail with the file unchanged. The feature SHALL be ordered after
-`ghcr.io/devcontainers/features/docker-in-docker` when both are installed.
+When `configureDocker` is enabled and `dockerd` is installed in the image when the feature runs, the feature SHALL
+register runtime `nvidia` with path `nvidia-container-runtime` in `/etc/docker/daemon.json`, creating the file if
+missing or empty, SHALL keep every other setting in it, and SHALL NOT change the default runtime. When that file exists
+but is not valid JSON, the feature SHALL fail the build and leave the file unchanged.
 
 #### Scenario: Docker settings are invalid
 
 - **WHEN** runtime registration is enabled and the existing daemon settings are invalid JSON
 - **THEN** the build fails and leaves the file unchanged
 
+### Requirement: NVIDIA feature ordering after docker-in-docker
+
+The feature SHALL be ordered after `ghcr.io/devcontainers/features/docker-in-docker` when both are installed.
+
+#### Scenario: Installed together with docker-in-docker
+
+- **WHEN** the feature and `ghcr.io/devcontainers/features/docker-in-docker` are installed in the same dev container
+- **THEN** the feature runs after docker-in-docker
+
 ### Requirement: NVIDIA supported platform gate
 
-Before changing the image, the feature SHALL fail with a named distribution or architecture if the distribution is not
-Debian/Ubuntu with apt, Fedora/RHEL with dnf, or openSUSE/SLES with zypper, or architecture is neither `amd64` nor
-`arm64`. For a family distribution absent from `test/nvidia-container-toolkit/compatibility.json`, the feature SHALL
-attempt installation without guaranteeing success.
+The feature SHALL fail the build with a message naming the distribution or architecture, before changing the image, when
+the distribution is not Debian- or Ubuntu-based with apt, Fedora- or RHEL-based with dnf, or openSUSE- or SLES-based
+with zypper, or the architecture is not `amd64` or `arm64`. A distribution of these families not in
+`test/nvidia-container-toolkit/compatibility.json` is not refused but unsupported: the feature attempts the install
+without a guarantee that it succeeds.
 
 #### Scenario: Unlisted family distribution
 

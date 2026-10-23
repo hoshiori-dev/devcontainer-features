@@ -96,19 +96,19 @@ Baseline: `52bb16e`. Counts below cover the approval-package deltas; original sc
 
 | Capability                 | Original requirements | Modified | Added | Preserved original scenarios |
 | -------------------------- | --------------------: | -------: | ----: | ---------------------------: |
-| `apk-packages`             |                    22 |       10 |    10 |                           57 |
-| `apt-packages`             |                    29 |       10 |     5 |                           64 |
-| `betterleaks`              |                     7 |        3 |     5 |                           14 |
+| `apk-packages`             |                    22 |       10 |    27 |                           57 |
+| `apt-packages`             |                    29 |       10 |    18 |                           64 |
+| `betterleaks`              |                     7 |        3 |     7 |                           14 |
 | `colab-cli`                |                    10 |        1 |     1 |                            4 |
-| `deno`                     |                    13 |        4 |    11 |                           23 |
-| `dnf-packages`             |                    26 |       13 |     3 |                           70 |
-| `firewall`                 |                    28 |       17 |     8 |                           48 |
-| `gitleaks`                 |                     7 |        4 |     5 |                           18 |
-| `glab`                     |                     9 |        3 |     4 |                           13 |
-| `hf-cli`                   |                    15 |        7 |    14 |                           25 |
+| `deno`                     |                    13 |        4 |    14 |                           23 |
+| `dnf-packages`             |                    26 |       13 |    24 |                           70 |
+| `firewall`                 |                    28 |       17 |    23 |                           48 |
+| `gitleaks`                 |                     7 |        4 |     8 |                           18 |
+| `glab`                     |                     9 |        3 |     5 |                           13 |
+| `hf-cli`                   |                    15 |        7 |    17 |                           25 |
 | `hf-mount`                 |                     9 |        3 |     5 |                           12 |
-| `nvidia-container-toolkit` |                     7 |        6 |     8 |                           20 |
-| `openspec`                 |                    11 |        5 |     9 |                           19 |
-| `pacman-packages`          |                    18 |       11 |    24 |                           48 |
-| `uv`                       |                    16 |       11 |    16 |                           42 |
-| `zypper-packages`          |                    28 |       14 |     7 |                           84 |
+| `nvidia-container-toolkit` |                     7 |        6 |     9 |                           20 |
+| `openspec`                 |                    11 |        5 |    12 |                           19 |
+| `pacman-packages`          |                    18 |       11 |    40 |                           48 |
+| `uv`                       |                    16 |       11 |    28 |                           42 |
+| `zypper-packages`          |                    28 |       14 |    27 |                           84 |

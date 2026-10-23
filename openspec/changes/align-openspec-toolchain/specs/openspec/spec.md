@@ -4,7 +4,10 @@
 
 ### Requirement: Install the requested version
 
-The feature SHALL install the exact selected OpenSpec npm package for every container user.
+The feature SHALL install the npm package `@fission-ai/openspec` at the version the `version` option names, and SHALL
+make `openspec` runnable from `PATH` by every user of the container, the remote user included. The sources, selection,
+and placement are stated in "OpenSpec registry metadata selection", "OpenSpec exact version check", "OpenSpec package
+source", and "OpenSpec install locations".
 
 #### Scenario: Registry configured in the image
 
@@ -22,7 +25,10 @@ The feature SHALL install the exact selected OpenSpec npm package for every cont
 
 ### Requirement: Verify every installed package
 
-The feature SHALL verify every installed package before exposing the `openspec` command.
+The feature SHALL verify every package it installs, `@fission-ai/openspec` and each of its dependencies, as "Verify
+OpenSpec package integrity", "OpenSpec signature check on the install cache", "OpenSpec registry signing keys", and
+"OpenSpec package signatures and provenance" state. The command `openspec` SHALL never reach a package that did not
+pass.
 
 #### Scenario: Verified install
 
@@ -43,7 +49,9 @@ The feature SHALL verify every installed package before exposing the `openspec` 
 
 ### Requirement: Run on a supported Node.js
 
-The feature SHALL install OpenSpec only with a compatible Node.js and npm.
+The feature SHALL fail the build when no Node.js is found, when no npm is found with it or that npm is older than
+10.8.2, the npm that Node.js 20.19.0 ships, or when the found Node.js is older than the requested OpenSpec version
+requires (20.19.0 for the current releases). Which Node.js `openspec` runs on is stated in "OpenSpec Node.js binding".
 
 #### Scenario: No Node.js
 
@@ -68,7 +76,9 @@ The feature SHALL install OpenSpec only with a compatible Node.js and npm.
 
 ### Requirement: Option disableUpdateCheck
 
-The feature SHALL accept `disableUpdateCheck` to control the upstream update-check variable.
+The feature SHALL accept the option `disableUpdateCheck` as declared here; any value other than `true` or `false`,
+including an empty value, SHALL fail the build. What the feature sets while it is true or false is stated in "OpenSpec
+update-check environment".
 
 | Field   | Value     |
 | ------- | --------- |
@@ -107,7 +117,9 @@ The feature SHALL accept `disableUpdateCheck` to control the upstream update-che
 
 ### Requirement: Option disableTelemetry
 
-The feature SHALL accept `disableTelemetry` to control the upstream telemetry variable.
+The feature SHALL accept the option `disableTelemetry` as declared here; any value other than `true` or `false`,
+including an empty value, SHALL fail the build. What the feature sets while it is true or false is stated in "OpenSpec
+telemetry environment".
 
 | Field   | Value     |
 | ------- | --------- |
@@ -147,56 +159,94 @@ The feature SHALL accept `disableTelemetry` to control the upstream telemetry va
 
 ### Requirement: OpenSpec registry metadata selection
 
-The feature SHALL read the selected version, publish time, and required Node.js version from
-`https://registry.npmjs.org/@fission-ai%2fopenspec`, relying on TLS alone and following no redirect. The document
-selects the package only; package verification is governed by “Verify every installed package.” A `latest` response that
-names anything other than an exact version SHALL fail.
+The feature SHALL read the version to install, its publish time, and the Node.js version it requires from the package's
+registry document at https://registry.npmjs.org/@fission-ai%2fopenspec, relying on TLS alone and following no redirect;
+that document only selects what is installed, and the packages are then verified as "Verify every installed package"
+requires.
 
 #### Scenario: Registry document is not a direct response
 
 - **WHEN** the package metadata request redirects
 - **THEN** the feature does not follow the redirect
 
-### Requirement: OpenSpec package source and placement
+### Requirement: OpenSpec exact version check
 
-The feature SHALL download `@fission-ai/openspec` and all dependencies from `https://registry.npmjs.org/`, ignoring
-registry settings from the build environment and user, global, or project npm configuration. It SHALL install under
-`/usr/local/lib/openspec`, provide `/usr/local/bin/openspec`, and keep that command and directory tree root-owned and
-writable only by root. The installed package SHALL match the exact selected package name and version.
+The build SHALL fail when the registry names anything other than an exact version as `latest`, and when the package
+installed as `@fission-ai/openspec` is not that package at exactly the selected version.
+
+#### Scenario: Registry latest is not an exact version
+
+- **WHEN** the registry names anything other than an exact version as `latest`
+- **THEN** the build fails
+
+### Requirement: OpenSpec package source
+
+The feature SHALL download `@fission-ai/openspec` and every one of its dependencies from the public npm registry at
+https://registry.npmjs.org/, regardless of any registry the build's environment or the user, global, or project npm
+configuration names.
 
 #### Scenario: Alternate npm registry configured
 
-- **WHEN** the environment or npm configuration names another registry
-- **THEN** all packages still come from the public npm registry and the selected exact package is installed
+- **WHEN** the image's environment or its user or global npm configuration names another registry, for all packages or
+  for the `@fission-ai` scope, before the feature is installed
+- **THEN** every package the feature installs is downloaded from https://registry.npmjs.org/, or the build fails with a
+  message naming the package that came from elsewhere
+
+### Requirement: OpenSpec install locations
+
+The feature SHALL install the package and its dependencies under `/usr/local/lib/openspec` and SHALL install the command
+`openspec` at `/usr/local/bin/openspec`; that file and everything under that directory SHALL be owned by root and
+writable only by root.
+
+#### Scenario: Root-owned install locations
+
+- **WHEN** the feature is installed
+- **THEN** `command -v openspec` resolves to `/usr/local/bin/openspec`, the package `@fission-ai/openspec` and its
+  dependencies are under `/usr/local/lib/openspec`, and that file and everything under that directory are owned by root
+  and writable only by root
 
 ### Requirement: Verify OpenSpec package integrity
 
-The feature SHALL verify `@fission-ai/openspec` and every dependency against its registry-published `sha512` integrity
-hash. Hashes are received over TLS alone; npm's signature check SHALL run on the install-populated cache and checks the
-package documents from which npm obtained those hashes. The feature does not enforce cache reads or compare hashes
-itself.
+The feature SHALL verify every package it installs, `@fission-ai/openspec` and each of its dependencies, against the
+`sha512` integrity hash the npm registry publishes for that version. A package whose integrity does not match SHALL fail
+the build.
 
 #### Scenario: Package integrity mismatch
 
 - **WHEN** any installed package fails its registry `sha512` check
 - **THEN** the build fails and the command cannot reach that package
 
+### Requirement: OpenSpec signature check on the install cache
+
+The integrity hashes reach the build from the registry over TLS alone; the signature check SHALL run on the npm cache
+the install filled, so that npm checks the signatures of the package documents the install took those hashes from; this
+holds only while npm reads those documents from that cache, which the feature does not enforce, and the feature makes no
+comparison of its own.
+
+#### Scenario: Package altered while installing
+
+- **WHEN** the registry document and the tarball of a package are altered while the feature installs it, the registry
+  answers unaltered afterwards, and npm reads that package's document from the cache the install filled
+- **THEN** the build fails on that package's registry signature
+
 ### Requirement: OpenSpec registry signing keys
 
-Registry signing keys and Sigstore trust root SHALL come from Sigstore's public-good TUF repository at
-`https://tuf-repo-cdn.sigstore.dev`. If it has no npm registry target, keys SHALL come from
-`https://registry.npmjs.org/-/npm/v1/keys` over TLS alone.
+The feature SHALL verify registry signatures and provenance attestations with the registry signing keys and the Sigstore
+trust root served at https://tuf-repo-cdn.sigstore.dev by Sigstore's public-good TUF repository, which npm uses. When
+that TUF repository has no target for the npm registry, the registry signing keys SHALL come from
+https://registry.npmjs.org/-/npm/v1/keys, relying on TLS alone.
 
 #### Scenario: TUF repository lacks npm target
 
 - **WHEN** Sigstore's TUF repository has no target for the npm registry
-- **THEN** the registry signing keys come from the npm keys endpoint over TLS
+- **THEN** the registry signing keys come from https://registry.npmjs.org/-/npm/v1/keys over TLS
 
 ### Requirement: OpenSpec package signatures and provenance
 
-The feature SHALL verify each package's npm registry signature and any published provenance at
-`https://registry.npmjs.org/-/npm/v1/attestations/<name>@<version>`. Missing or invalid signatures and invalid published
-attestations fail; absence of a provenance attestation alone SHALL NOT fail.
+The feature SHALL verify each package's npm registry signature, and its provenance attestations where the registry
+publishes them at `https://registry.npmjs.org/-/npm/v1/attestations/<name>@<version>`. A package whose registry
+signature is missing or invalid, or whose published provenance attestation is invalid, SHALL fail the build; a package
+published without a provenance attestation SHALL NOT fail the build for that reason.
 
 #### Scenario: Provenance is not published
 
@@ -205,46 +255,45 @@ attestations fail; absence of a provenance attestation alone SHALL NOT fail.
 
 ### Requirement: OpenSpec package execution during build
 
-The command SHALL never reach a package that failed verification. No package install script SHALL run during the build;
-the only package code run SHALL be `openspec --version` as an unprivileged user, never root.
+During the build, no install script of a package SHALL run, and the only package code that runs SHALL be
+`openspec --version`, as an unprivileged user and never as root.
 
 #### Scenario: Package code execution is restricted
 
 - **WHEN** OpenSpec is installed and checked during the build
 - **THEN** install scripts do not run and only unprivileged `openspec --version` executes
 
-### Requirement: OpenSpec Node.js and npm compatibility
+### Requirement: OpenSpec Node.js binding
 
-The feature SHALL depend on `ghcr.io/devcontainers/features/node` and bind OpenSpec to the Node.js on `PATH` at
-installation. Fail if Node.js or its npm is missing, npm is below `10.8.2`, or Node.js is below the selected release's
-requirement (currently `20.19.0`). Later changes to default/current Node.js, including `nvm use` or `nvm alias default`,
-SHALL NOT change the Node.js OpenSpec runs on.
+The feature SHALL depend on the first-party Node.js feature `ghcr.io/devcontainers/features/node` and SHALL run
+`openspec` on the Node.js found on `PATH` when the feature was installed. Switching the default or current Node.js
+afterwards (for example with `nvm use` or `nvm alias default`) SHALL NOT change the Node.js that `openspec` runs on.
 
 #### Scenario: Node.js selection later changes
 
-- **WHEN** the user switches default or current Node.js after feature installation
-- **THEN** `openspec` continues to run on the Node.js selected during installation
+- **WHEN** the user switches the default or current Node.js after the feature is installed
+- **THEN** `openspec` continues to run on the Node.js found on `PATH` when the feature was installed
 
 ### Requirement: OpenSpec update-check environment
 
-When `disableUpdateCheck` is true, run OpenSpec with `OPENSPEC_NO_UPDATE_CHECK=1` unless the caller already set that
-variable, whose value SHALL win. When false, the feature SHALL NOT set it. Values other than `true` or `false`,
-including empty, fail the build. The variable name is defined by the upstream CLI reference at
-`https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md`.
+While `disableUpdateCheck` is true, the feature SHALL run `openspec` with `OPENSPEC_NO_UPDATE_CHECK=1`, the variable
+upstream's CLI reference (https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md) defines, unless
+`OPENSPEC_NO_UPDATE_CHECK` is already set in the caller's environment, in which case the caller's value SHALL be kept;
+while it is false, the feature SHALL NOT set `OPENSPEC_NO_UPDATE_CHECK`.
 
 #### Scenario: Caller sets update-check variable
 
-- **WHEN** update checks are disabled and the caller already sets `OPENSPEC_NO_UPDATE_CHECK`
-- **THEN** OpenSpec receives the caller's value
+- **WHEN** `disableUpdateCheck` is true and the caller's environment already sets `OPENSPEC_NO_UPDATE_CHECK`
+- **THEN** the `openspec` process sees the caller's value
 
 ### Requirement: OpenSpec telemetry environment
 
-When `disableTelemetry` is true, run OpenSpec with `OPENSPEC_TELEMETRY=0` unless the caller already set that variable,
-whose value SHALL win. When false, the feature SHALL NOT set it. Values other than `true` or `false`, including empty,
-fail the build. The variable name is defined by the upstream CLI reference at
-`https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md`.
+While `disableTelemetry` is true, the feature SHALL run `openspec` with `OPENSPEC_TELEMETRY=0`, the variable upstream's
+CLI reference (https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md) defines, unless `OPENSPEC_TELEMETRY` is
+already set in the caller's environment, in which case the caller's value SHALL be kept; while it is false, the feature
+SHALL NOT set `OPENSPEC_TELEMETRY`.
 
 #### Scenario: Caller sets telemetry variable
 
-- **WHEN** telemetry is disabled and the caller already sets `OPENSPEC_TELEMETRY`
-- **THEN** OpenSpec receives the caller's value
+- **WHEN** `disableTelemetry` is true and the caller's environment already sets `OPENSPEC_TELEMETRY`
+- **THEN** the `openspec` process sees the caller's value

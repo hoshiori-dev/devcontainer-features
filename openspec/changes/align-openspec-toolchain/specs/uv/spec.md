@@ -4,7 +4,8 @@
 
 ### Requirement: Option version
 
-The feature SHALL accept `version` and install that upstream uv release for every user.
+The feature SHALL accept `version` and install that upstream uv release for every user, as "Select and install a uv
+release" states.
 
 | Field   | Value      |
 | ------- | ---------- |
@@ -34,7 +35,8 @@ The feature SHALL accept `version` and install that upstream uv release for ever
 
 ### Requirement: Verify the uv release before installing it
 
-The feature SHALL verify the selected uv release archive before installing its contents.
+The feature SHALL verify the uv release archive before anything from it is installed, and SHALL resolve `latest`, as
+"Verify uv release archive" and "Resolve the latest uv release" state.
 
 #### Scenario: Checksum matches
 
@@ -49,8 +51,9 @@ The feature SHALL verify the selected uv release archive before installing its c
 
 ### Requirement: Verify build-time tool downloads
 
-When tools are requested, the feature SHALL use uv defaults and verification for their interpreter and package
-downloads.
+When `toolsToInstall` is not empty, the feature SHALL leave uv's default sources and checks in place for the
+interpreters and packages the tools need, as "Verify uv-managed Python downloads" and "Verify uv tool package downloads"
+state.
 
 #### Scenario: Default sources
 
@@ -60,7 +63,9 @@ downloads.
 
 ### Requirement: Install download prerequisites only from the image's repositories
 
-The feature SHALL obtain missing download prerequisites only from repositories already configured in the image.
+The feature SHALL install missing download prerequisites only from the package repositories the image already
+configures, as "Install uv prerequisites from configured repositories" and "Upgrade Arch Linux packages with a missing
+uv prerequisite" state.
 
 #### Scenario: Minimal image
 
@@ -69,7 +74,8 @@ The feature SHALL obtain missing download prerequisites only from repositories a
 
 ### Requirement: Option toolsToInstall
 
-The feature SHALL accept `toolsToInstall` as a comma-separated list of uv tools to install at build time.
+The feature SHALL accept `toolsToInstall` as a comma-separated list of uv tools to install at build time, as "Parse and
+install requested uv tools" and "Reject invalid uv tool entries" state.
 
 | Field   | Value    |
 | ------- | -------- |
@@ -99,7 +105,9 @@ The feature SHALL accept `toolsToInstall` as a comma-separated list of uv tools 
 
 ### Requirement: Grant write access through the group uv
 
-For a non-root remote user, the feature SHALL provide group-based write access to its installed tools and the uv volume.
+The feature SHALL grant write access to `/usr/local/share/uv` and a newly created volume at `/var/lib/uv` as "Use the uv
+group for non-root write access", "Make the uv locations writable by the group uv", "Restrict uv installed-directory
+permissions", and "Keep the uv locations root-only for root" state.
 
 #### Scenario: Remote user in the group
 
@@ -140,7 +148,8 @@ For a non-root remote user, the feature SHALL provide group-based write access t
 
 ### Requirement: Persist interpreters and cache per dev container
 
-The feature SHALL persist uv interpreters and cache in a named volume specific to each dev container.
+The feature SHALL persist uv interpreters and cache in a named volume specific to each dev container, as "Persist uv
+data per dev container" and "Keep the modes of an existing uv volume" state.
 
 #### Scenario: New volume
 
@@ -166,8 +175,9 @@ The feature SHALL persist uv interpreters and cache in a named volume specific t
 
 ### Requirement: Repair a volume that no longer fits the remote user
 
-At container creation, the feature SHALL repair a uv volume that no longer fits the remote user when passwordless sudo
-permits it.
+When a dev container is created, the feature SHALL check and repair the volume as "Determine whether the uv volume
+fits", "Define a fitting uv volume", "Repair a non-fitting uv volume", "Leave cleared special bits after uv volume
+repair", "Continue when uv volume repair fails", and "Limit uv volume repair" state.
 
 #### Scenario: Volume filled under another UID
 
@@ -210,7 +220,8 @@ permits it.
 
 ### Requirement: Point uv at the feature's locations
 
-The feature SHALL direct uv to the feature’s tool, interpreter, and cache locations and expose its tools on PATH.
+The feature SHALL direct uv to the feature's tool, interpreter, and cache locations and expose its tools on `PATH`, as
+"Configure uv locations" and "Append uv tools to PATH" state.
 
 #### Scenario: Environment of the remote user
 
@@ -225,7 +236,8 @@ The feature SHALL direct uv to the feature’s tool, interpreter, and cache loca
 
 ### Requirement: Install twice
 
-A second install SHALL preserve or update uv and tools according to the later options.
+A second install SHALL preserve or update uv and tools according to the later options, as "Repeat the uv install" and
+"Keep the uv group on a repeated install" state.
 
 #### Scenario: Same options
 
@@ -253,8 +265,9 @@ A second install SHALL preserve or update uv and tools according to the later op
 
 ### Requirement: Fail on unsupported platforms and invalid options
 
-The feature SHALL fail before downloads for unsupported platforms, invalid combined versions, missing users, or unsafe
-group setup.
+The feature SHALL fail the build, with a message naming the problem, as "Reject unsupported uv platforms before
+downloading", "Reject a missing remote user or a primary group uv", and "Reject a shared or unmanageable uv group"
+state. The Option requirements state how invalid values of a single option fail.
 
 #### Scenario: Unsupported architecture
 
@@ -303,199 +316,336 @@ group setup.
 
 ### Requirement: Select and install a uv release
 
-`latest` SHALL resolve the newest uv release at build time; explicit versions SHALL be `MAJOR.MINOR.PATCH`. Install its
-`uv` and `uvx` at `/usr/local/bin/uv` and `/usr/local/bin/uvx`, executable by every user; any other value fails naming
-it before downloads.
+The feature SHALL accept for `version` either `latest`, meaning the newest release at build time, or one release as
+`MAJOR.MINOR.PATCH`; SHALL install the `uv` and `uvx` executables of that upstream uv release as `/usr/local/bin/uv` and
+`/usr/local/bin/uvx`, executable by every user; and SHALL fail the build on any other value, with a message naming the
+value, before downloading anything.
 
-#### Scenario: Invalid version
+#### Scenario: Version outside both forms
 
 - **WHEN** `version` is neither `latest` nor `MAJOR.MINOR.PATCH`
-- **THEN** installation fails naming the value before downloads
+- **THEN** the build fails with a message naming the value, and nothing is downloaded
 
 ### Requirement: Verify uv release archive
 
-The feature SHALL fetch
-`https://github.com/astral-sh/uv/releases/download/<version>/uv-<arch>-unknown-linux-<libc>.tar.gz` and its adjacent
-`.sha256` checksum over HTTPS. The feature SHALL verify the archive before installing any contents. For `latest`, it
-SHALL accept only a `MAJOR.MINOR.PATCH` tag from `https://github.com/astral-sh/uv/releases/latest` HTTPS redirect; it
-SHALL rely on TLS alone for this unsigned name-only redirect. The feature SHALL NOT run an upstream installer script.
+The feature SHALL download the release archive from
+`https://github.com/astral-sh/uv/releases/download/<version>/uv-<arch>-unknown-linux-<libc>.tar.gz` over HTTPS and SHALL
+verify it against the SHA-256 checksum published beside it as the same URL with `.sha256` appended, before anything from
+the archive is installed. The feature SHALL run no installer script from upstream.
 
-#### Scenario: Invalid latest release tag
+#### Scenario: Archive checked before install
 
-- **WHEN** the latest-release redirect names a value other than `MAJOR.MINOR.PATCH`
-- **THEN** installation fails without installing archive contents
+- **WHEN** the archive's SHA-256 digest differs from the checksum published beside it, or that checksum cannot be
+  downloaded
+- **THEN** the build fails, and nothing from the archive is installed
+
+### Requirement: Resolve the latest uv release
+
+For `latest`, the feature SHALL resolve the release from the redirect of
+`https://github.com/astral-sh/uv/releases/latest` and SHALL accept only a `MAJOR.MINOR.PATCH` release name from it. The
+feature SHALL trust that redirect on TLS alone, because upstream publishes no checksum or signature for it; it yields
+only the release name, and the archive of that release is verified as "Verify uv release archive" states.
+
+#### Scenario: Latest resolves to a release name
+
+- **WHEN** the feature is installed with `version` set to `latest`
+- **THEN** the release name taken from the redirect has the form `MAJOR.MINOR.PATCH`, and the archive of that release is
+  verified against its published checksum before anything from it is installed
 
 ### Requirement: Verify uv-managed Python downloads
 
-When tools are requested, uv SHALL use default managed CPython sources:
+When `toolsToInstall` is not empty, the feature SHALL configure no Python download source and SHALL disable none of uv's
+checks, so that the managed CPython builds uv downloads for the tools at build time, on the feature's behalf, come from
 `https://releases.astral.sh/github/python-build-standalone/releases/download/`, falling back to
-`https://github.com/astral-sh/python-build-standalone/releases/download/`. Each interpreter SHALL be checked against the
-SHA-256 carried by the installed uv release.
+`https://github.com/astral-sh/python-build-standalone/releases/download/`, each checked against the SHA-256 that the
+installed uv release carries for that build.
 
-#### Scenario: Managed Python uses default sources
+#### Scenario: Managed Python from the default sources
 
-- **WHEN** a requested tool needs managed CPython
-- **THEN** uv uses the stated source or fallback and verifies its digest
+- **WHEN** the feature installs a tool from `toolsToInstall` at build time that needs a uv-managed CPython build
+- **THEN** the build is downloaded only from the sources above, and the install runs with no uv setting from the feature
+  that changes a source or a hash check
 
 ### Requirement: Verify uv tool package downloads
 
-When tools are requested, uv SHALL use the default `https://pypi.org/simple/` index and
-`https://files.pythonhosted.org/` files, checking each package against the index SHA-256. The feature SHALL configure no
-alternate index or Python source, disable no uv check, and require uv >=`0.12.16` to install tools.
+When `toolsToInstall` is not empty, the feature SHALL configure no package index and SHALL disable none of uv's checks,
+so that the packages uv downloads for the tools at build time, on the feature's behalf, come from the index
+`https://pypi.org/simple/` and its files on `https://files.pythonhosted.org/`, each file checked against the SHA-256 the
+index supplies for it. The feature SHALL install tools only with a uv release that checks index-supplied hashes, which
+is 0.12.16 or later.
 
-#### Scenario: Tool packages use default index verification
+#### Scenario: Packages from the default index
 
-- **WHEN** a requested tool requires Python packages
-- **THEN** uv downloads from the stated PyPI sources and verifies each file against its index digest
+- **WHEN** the feature installs a tool from `toolsToInstall` at build time
+- **THEN** the tool's packages are downloaded only from the sources above, and the install runs with no uv setting from
+  the feature that changes a source or a hash check
 
 ### Requirement: Install uv prerequisites from configured repositories
 
-The feature SHALL install missing `curl`, CA certificates, `tar`, or `sha256sum` only from already configured image
-repositories using the family manager (`apt`, `dnf`, `pacman`, `apk`, or `zypper`). The feature SHALL add no repository
-or key and SHALL leave installed prerequisites in the image. On Arch, installing any missing prerequisite SHALL also
-upgrade the image packages. If none is missing, the feature SHALL run no package manager.
+The feature SHALL install curl, CA certificates, tar, and `sha256sum`, when the image lacks them, only from the package
+repositories the image already configures, with the package manager of the distribution's family (`apt`, `dnf`,
+`pacman`, `apk`, or `zypper`), and SHALL add no package repository or signing key. When nothing is missing, the feature
+SHALL run no package manager. What it installs this way stays in the image.
 
-#### Scenario: No missing prerequisites
+#### Scenario: Prerequisites already present
 
-- **WHEN** all four prerequisites are already present
-- **THEN** the feature runs no package manager
+- **WHEN** the feature is installed on an image that has curl, CA certificates, tar, and `sha256sum`
+- **THEN** the install runs no package manager
+
+### Requirement: Upgrade Arch Linux packages with a missing uv prerequisite
+
+On Arch Linux, whose package manager supports installing a package only together with a full system upgrade, installing
+a missing download prerequisite SHALL also upgrade the image's packages.
+
+#### Scenario: Missing prerequisite on Arch Linux
+
+- **WHEN** the feature is installed on an Arch Linux image that lacks one of the download prerequisites
+- **THEN** the prerequisite is installed together with an upgrade of the image's packages, and the image's package
+  repository configuration and signing keys are unchanged
 
 ### Requirement: Parse and install requested uv tools
 
-The feature SHALL parse `toolsToInstall` as comma-separated entries, trim surrounding whitespace, and skip empty
-entries. It SHALL install each with `uv tool install` and expose executables on every user's PATH. It SHALL reject
-entries other than package names with at most one bracketed extra and one version constraint, including options, URLs,
-paths, or internal whitespace; name the entry and fail before downloads. It SHALL fail if uv cannot install an entry.
+For `toolsToInstall`, a comma-separated list in which whitespace around an entry is ignored and empty entries are
+skipped, the feature SHALL install each listed tool with `uv tool install` at build time and put the tools' executables
+on `PATH` for every user; and SHALL fail the build when `uv tool install` cannot install a listed tool.
 
-#### Scenario: Invalid tool entry
+#### Scenario: Two listed tools
 
-- **WHEN** an entry is an option, URL, path, has internal whitespace, or otherwise violates the allowed package-name
-  form
-- **THEN** installation fails naming the entry before downloading anything
+- **WHEN** the feature is installed with `toolsToInstall` listing two tools
+- **THEN** both are installed with `uv tool install`, and their executables run for the remote user by name
 
-### Requirement: Keep build-time uv tools in the image
+### Requirement: Reject invalid uv tool entries
 
-Tool environments and uv-managed interpreters installed for `toolsToInstall` SHALL live in the image outside the
-persistent volume. The remote user SHALL be able to upgrade, reinstall, remove, and add tools at runtime without
-elevated privileges.
+The feature SHALL fail the build when an entry of `toolsToInstall` is not a package name with at most one bracketed
+extra and one version constraint (an option, URL, path, or any whitespace inside an entry), with a message naming the
+entry, before downloading anything.
 
-#### Scenario: Tool survives empty runtime volume
+#### Scenario: Entry outside the package-name form
 
-- **WHEN** a build-time tool runs with a new empty persistent volume
-- **THEN** it runs from the image and its interpreter resolves outside the volume
+- **WHEN** an entry of `toolsToInstall` starts with `-`, is a URL or a path, or contains whitespace inside it
+- **THEN** the build fails with a message naming the entry, and nothing is downloaded or installed
 
 ### Requirement: Use the uv group for non-root write access
 
-For non-root remote users, the feature SHALL create system group `uv` if absent, otherwise reuse it with its ID
-unchanged only when no other account belongs by listed or primary membership. The remote user, `/usr/local/share/uv` and
-its installed contents, and a newly created `/var/lib/uv` volume SHALL have group-based write access, including after
-the tooling changes the user's UID. A conflicting account SHALL fail under “Fail on unsupported platforms and invalid
-options.”
+When the remote user is not root, the feature SHALL make the remote user a member of a system group named `uv`, creating
+the group when the image has none. It SHALL use a group `uv` the image already has, leaving its ID unchanged, only when
+no account other than the remote user belongs to that group, as a listed member or through its primary group; otherwise
+the build fails as "Fail on unsupported platforms and invalid options" states.
 
 #### Scenario: Existing group with another account
 
-- **WHEN** a different account belongs to the existing `uv` group as a listed member or primary group
-- **THEN** installation fails naming that account and does not reuse the group
+- **WHEN** the feature is installed for a remote user other than root on an image whose group `uv` lists another user as
+  a member or is another account's primary group
+- **THEN** the build fails with a message naming the group and that account
+
+### Requirement: Make the uv locations writable by the group uv
+
+When the remote user is not root, `/usr/local/share/uv`, with everything the install puts there, and a newly created
+volume at `/var/lib/uv` SHALL belong to the group `uv` and be writable by its members, so that the remote user writes
+both without elevated privileges also when the dev container tooling has changed that user's UID to the host user's
+before the container starts.
+
+#### Scenario: Locations of a non-root remote user
+
+- **WHEN** the feature is installed for a remote user other than root
+- **THEN** `/usr/local/share/uv` and a newly created volume at `/var/lib/uv` belong to the group `uv` and are writable
+  by its members
 
 ### Requirement: Restrict uv installed-directory permissions
 
-The install SHALL leave no file or directory under `/usr/local/share/uv` or in a newly created `/var/lib/uv` volume
-writable by everyone. For non-root users, only root, group members, and the install-time owner may write installed
-content; runtime-created content keeps modes from uv and the creating user's umask. For root, create no group and leave
-both locations root-owned and root-writable only.
+The install SHALL leave no file or directory in `/usr/local/share/uv` or in a newly created volume at `/var/lib/uv`
+writable by every user, so that, besides root, only the members of `uv` and the owner the install set, which is the
+remote user under the UID it had when the image was built, can write what the install left there. What is created there
+at runtime gets the modes that uv and the creating user's umask give it; the feature does not change those modes.
 
-#### Scenario: Root remote user
+#### Scenario: No location writable by every user
 
-- **WHEN** the remote user is root
-- **THEN** no group is created and both locations are root-owned and writable only by root
+- **WHEN** the feature is installed with a tool in `toolsToInstall`, for a root or a non-root remote user
+- **THEN** nothing the install left under `/usr/local/share/uv`, and no newly created volume at `/var/lib/uv`, is
+  writable by every user
+
+### Requirement: Keep the uv locations root-only for root
+
+When the remote user is root, the feature SHALL create no group, and `/usr/local/share/uv` and a newly created volume at
+`/var/lib/uv` SHALL be owned by root and, as the install leaves them, writable by root only.
+
+#### Scenario: Remote user root
+
+- **WHEN** the feature is installed for the remote user root
+- **THEN** the install creates no group, and both locations are owned by root and writable by root only
 
 ### Requirement: Persist uv data per dev container
 
-The feature SHALL mount a named volume `uv-${devcontainerId}` at `/var/lib/uv`, unique to each dev container, and point
-uv's managed interpreter `python/` and `cache/` there. A new volume SHALL contain nothing written at build time and be
-writable as “Use the uv group for non-root write access” specifies. Existing volume owner, group, and modes SHALL be
-preserved except as “Repair a uv volume for the current user” permits.
+The feature SHALL mount a named volume `uv-${devcontainerId}`, one per dev container, at `/var/lib/uv`, and SHALL point
+uv's managed-interpreter directory (`python/`) and cache (`cache/`) into it. A newly created volume SHALL hold nothing
+written at build time and SHALL be writable by the remote user as "Grant write access through the group uv" states.
 
-#### Scenario: Separate dev containers
+#### Scenario: One volume per dev container
 
-- **WHEN** two dev containers use this feature
-- **THEN** each has its own volume and an interpreter in one is absent from the other
+- **WHEN** two different dev containers install this feature
+- **THEN** each mounts its own volume at `/var/lib/uv`, and an interpreter installed in one does not appear in the other
+
+### Requirement: Keep the modes of an existing uv volume
+
+A volume that already holds data SHALL keep its owner, group, and modes, except for the ownership changes and executable
+setuid/setgid bits cleared by "Repair a non-fitting uv volume".
+
+#### Scenario: Existing volume that fits
+
+- **WHEN** a dev container is created with a volume that already holds data and fits the remote user
+- **THEN** the volume keeps its owner, group, and modes
 
 ### Requirement: Determine whether the uv volume fits
 
-A volume fits when the remote user can create files in `/var/lib/uv` and owns every entry beneath it. Writes by any
-other UID, including root, make it not fit; root considers every volume fitting. At dev container creation and rebuild,
-the feature SHALL check as the remote user before `devcontainer.json` creation commands run.
+When a dev container is created, a rebuild included, the feature SHALL check the volume as the remote user, before the
+creation commands of the user's `devcontainer.json` run, against "Define a fitting uv volume".
 
-#### Scenario: Volume fit check precedes creation commands
+#### Scenario: Fit checked before creation commands
 
-- **WHEN** a dev container is created or rebuilt with a uv volume
-- **THEN** the feature checks fit as the remote user before user creation commands
+- **WHEN** a dev container is created, a rebuild included
+- **THEN** the feature checks the volume as the remote user before the creation commands of the user's
+  `devcontainer.json` run
+
+### Requirement: Define a fitting uv volume
+
+The feature SHALL treat the volume as fitting the remote user when that user can create files in `/var/lib/uv` and owns
+every file and directory below it, and as no longer fitting when another UID has written it: the remote user was changed
+to an account with another UID, the UID of the same account changed, or root wrote into it. For the remote user root it
+SHALL treat every volume as fitting.
+
+#### Scenario: Volume with files left by root
+
+- **WHEN** a dev container is created whose volume holds files that root wrote among the remote user's own, and the
+  remote user can run `sudo` without a password
+- **THEN** after the creation the remote user owns everything in the volume
 
 ### Requirement: Repair a non-fitting uv volume
 
-When the volume does not fit and passwordless `sudo` is available, the feature SHALL make the remote user owner and
-group `uv` where present for the volume and every entry, so cached interpreters and packages remain usable. It SHALL
-preserve contents, ordinary mode bits, and directory setgid bits. Ownership changes MAY clear executable setuid/setgid
-bits; the feature SHALL NOT restore them or otherwise change modes, and SHALL add no sudo rule.
+When the volume does not fit and the remote user can run `sudo` without a password, the feature SHALL make the remote
+user the owner, and `uv` the group where the image has that group, of the volume and of everything in it, so that uv
+works on the interpreters and the cache the volume already holds. The repair SHALL preserve file contents, ordinary
+permission bits, and directory setgid bits, and SHALL change modes only as "Leave cleared special bits after uv volume
+repair" states.
 
-#### Scenario: Ownership repair preserves content and modes
+#### Scenario: Repair with passwordless sudo
 
-- **WHEN** a non-fitting volume is repaired
-- **THEN** entries receive the remote user's ownership and group `uv` where present, contents and ordinary modes remain,
-  and executable special bits cleared by ownership changes are not restored
+- **WHEN** a dev container is created whose volume another UID wrote, and the remote user can run `sudo` without a
+  password
+- **THEN** after the creation the remote user owns everything in the volume, file contents, ordinary permission bits,
+  and directory setgid bits are preserved, and the feature does not restore setuid/setgid bits the ownership change
+  cleared
+
+### Requirement: Leave cleared special bits after uv volume repair
+
+The ownership change of the repair MAY clear setuid/setgid bits on executable files; the feature SHALL NOT restore those
+cleared bits or otherwise change modes explicitly.
+
+#### Scenario: Executable with special bits in a repaired volume
+
+- **WHEN** a volume that needs repair holds an executable file with mode `6755`, and the remote user can run `sudo`
+  without a password
+- **THEN** after the repair the feature has not set the file's setuid/setgid bits again, and the file's contents are
+  preserved
 
 ### Requirement: Continue when uv volume repair fails
 
-If passwordless sudo is unavailable, the feature SHALL leave `/var/lib/uv` unchanged and warn with its path and reason.
-If ownership change fails, it SHALL warn with the path and reason. Container creation SHALL continue in either case. The
-feature SHALL change nothing when the volume fits, when the user is root, or outside `/var/lib/uv`.
-
-#### Scenario: Repair unavailable or unnecessary
-
-- **WHEN** passwordless sudo is unavailable, the volume fits, or the remote user is root
-- **THEN** container creation continues; unavailable sudo warns and leaves the volume unchanged, while fitting and root
-  volumes are not changed
+When the volume does not fit and the remote user cannot run `sudo` without a password, the feature SHALL leave the
+volume as it is and print a warning that names `/var/lib/uv` and the reason. When the change of owner fails, the feature
+SHALL print a warning that names `/var/lib/uv` and the reason. In every case the creation of the dev container SHALL
+continue.
 
 #### Scenario: Ownership change fails after partial repair
 
 - **WHEN** ownership repair changes some entries in `/var/lib/uv` and then fails
 - **THEN** a warning names `/var/lib/uv` and the reason, and container creation continues
 
-### Requirement: Configure uv locations and PATH
+### Requirement: Limit uv volume repair
 
-For every container process, the feature SHALL set `UV_PYTHON_INSTALL_DIR=/var/lib/uv/python`,
-`UV_CACHE_DIR=/var/lib/uv/cache`, `UV_TOOL_DIR=/usr/local/share/uv/tools`, `UV_TOOL_BIN_DIR=/usr/local/share/uv/bin`,
-`UV_LINK_MODE=copy`, and SHALL append `/usr/local/share/uv/bin` after existing `/usr/local/bin` and `/usr/bin`,
-including login shells whose system profile resets PATH. Earlier commands SHALL take precedence over same-named tools.
+The feature SHALL change nothing on a volume that fits, nothing when the remote user is root, and nothing outside
+`/var/lib/uv`, and SHALL add no sudo rule.
+
+#### Scenario: Nothing to repair
+
+- **WHEN** a dev container is created with a volume that fits, or with the remote user root
+- **THEN** nothing in the volume changes
+
+### Requirement: Configure uv locations
+
+The feature SHALL set, for every process in the container, `UV_PYTHON_INSTALL_DIR` to `/var/lib/uv/python`,
+`UV_CACHE_DIR` to `/var/lib/uv/cache`, `UV_TOOL_DIR` to `/usr/local/share/uv/tools`, `UV_TOOL_BIN_DIR` to
+`/usr/local/share/uv/bin`, and `UV_LINK_MODE` to `copy`.
+
+#### Scenario: Variables in a login shell
+
+- **WHEN** the remote user opens a login shell in the container
+- **THEN** each of these variables has the stated value
+
+### Requirement: Append uv tools to PATH
+
+The feature SHALL append `/usr/local/share/uv/bin` to `PATH` for every process in the container, after any existing
+`/usr/local/bin` and `/usr/bin` entries, also in login shells whose system profile resets `PATH`. Commands already
+available earlier in `PATH` SHALL take precedence over same-named tools.
 
 #### Scenario: System command takes precedence
 
-- **WHEN** a system command and uv tool share a name
-- **THEN** the earlier PATH command resolves first
+- **WHEN** a command already available earlier in `PATH` and a tool share a name
+- **THEN** the command earlier in `PATH` runs
 
-### Requirement: Preserve uv state on repeated installation
+### Requirement: Repeat the uv install
 
-A second install SHALL succeed. With same options and an already installed requested release, the feature SHALL download
-no uv release and leave tools unchanged. With different options it SHALL replace `uv` and `uvx` with the later version,
-retain tools from both installs, and make a repeated tool satisfy the later entry. Repeating for the same non-root user
-SHALL add no group or membership and preserve access rules; another non-root user SHALL fail because the first user
-belongs to `uv`.
+Installing the feature a second time on the same image SHALL succeed. With the same options, it SHALL download no uv
+release when the requested release is already installed, and leave installed tools as they are. With different options,
+the later `version` SHALL replace the installed `uv` and `uvx`, every tool from both installs SHALL remain installed,
+and a tool listed again SHALL end up satisfying the entry of the later install.
+
+#### Scenario: Second install with the same options
+
+- **WHEN** the feature is installed twice with the same options and the requested release is already installed
+- **THEN** both installs succeed, the second downloads no uv release, and the installed tools are left as they are
+
+### Requirement: Keep the uv group on a repeated install
+
+A second install for the same remote user SHALL add no second group and no second membership, and SHALL leave
+`/usr/local/share/uv`, including what it adds there, and a newly created volume as "Grant write access through the group
+uv" states. A second install for another remote user that is not root finds the first install's remote user in the group
+and fails as that requirement states for a group to which another account belongs.
 
 #### Scenario: Different remote user on second install
 
 - **WHEN** the feature is installed a second time for a different non-root remote user
 - **THEN** it fails because the existing `uv` group has another member
 
-### Requirement: Reject unsupported uv platforms and group setup
+### Requirement: Reject unsupported uv platforms before downloading
 
-The feature SHALL fail before downloads for unsupported arch or distro families (Debian/Ubuntu, RHEL/Fedora, Arch,
-Alpine, openSUSE/SUSE), nonempty `toolsToInstall` with uv <`0.12.16`, or a missing remote user, naming the issue. For
-non-root it SHALL reject primary group `uv` because Dev Container tooling changes its GID with the user's UID,
-preventing group write access. It SHALL reject other `uv` members or missing group tools. Supported images are listed in
-`test/uv/compatibility.json`.
+The feature SHALL fail the build with a message naming the problem, before downloading anything, when the container's
+architecture is neither x86_64 nor aarch64, when the distribution belongs to none of the supported families (Debian- or
+Ubuntu-based, RHEL- or Fedora-based, Arch Linux, Alpine, and openSUSE or SUSE), or when `toolsToInstall` is not empty
+and `version` names a release older than 0.12.16. The supported images are those in `test/uv/compatibility.json`.
 
-#### Scenario: Missing group-management tool
+#### Scenario: Architecture outside x86_64 and aarch64
 
-- **WHEN** a non-root user needs a `uv` group created or membership added but the image lacks the required tool
-- **THEN** the build fails before downloads and names the group or user issue
+- **WHEN** the feature is installed on an architecture that is neither x86_64 nor aarch64
+- **THEN** the build fails with a message naming the architecture, and nothing is downloaded
+
+### Requirement: Reject a missing remote user or a primary group uv
+
+The feature SHALL also fail the build, with a message naming the problem, when the remote user it is installed for does
+not exist, and, for a remote user other than root, when the group `uv` is that user's primary group, whose ID the dev
+container tooling changes together with the user's, so that it could not keep the write access.
+
+#### Scenario: Remote user that does not exist
+
+- **WHEN** the feature is installed for a remote user that does not exist in the image
+- **THEN** the build fails with a message naming the user
+
+### Requirement: Reject a shared or unmanageable uv group
+
+For a remote user other than root, the feature SHALL also fail the build, with a message naming the problem, when an
+account other than that user belongs to a group `uv` the image already has, as a listed member or through its primary
+group, and when the group has to be created, or the user added to it, and the image has no tool for that step.
+
+#### Scenario: No tool to create the group
+
+- **WHEN** the feature is installed for a remote user other than root on an image that has neither a group `uv` nor a
+  tool to create one
+- **THEN** the build fails with a message naming the group

@@ -4,7 +4,8 @@
 
 ### Requirement: Option version
 
-The feature SHALL accept `version` and install the release it selects.
+The feature SHALL accept the option `version` as declared here and install the release it selects, as stated in "Glab
+release version selection".
 
 | Field   | Value      |
 | ------- | ---------- |
@@ -51,7 +52,8 @@ The feature SHALL accept `version` and install the release it selects.
 
 ### Requirement: Verified download from the GitLab release
 
-The feature SHALL download and verify the selected GitLab release archive before installing `glab`.
+The feature SHALL download the release archive and its checksum list as stated in "Glab release assets and checksum",
+verify the archive against that list, and trust them as stated in "Glab release metadata trust".
 
 #### Scenario: Digest matches
 
@@ -72,8 +74,8 @@ The feature SHALL download and verify the selected GitLab release archive before
 
 ### Requirement: Supported platforms
 
-The feature SHALL support images and architectures in `test/glab/compatibility.json` and reject unsupported platforms
-before changes.
+The feature SHALL support the images and architectures listed in `test/glab/compatibility.json`, and SHALL reject an
+unsupported platform before downloading or installing anything, as stated in "Glab platform gate".
 
 #### Scenario: Unsupported architecture
 
@@ -98,49 +100,63 @@ before changes.
 
 ### Requirement: Glab release version selection
 
-`latest` SHALL resolve the release from `https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest`. Explicit
-versions SHALL be decimal `MAJOR.MINOR.PATCH` at or above `1.47.0`, optionally prefixed by `v`; other forms SHALL fail
-before downloads. A latest permalink resolving to another tag form also fails before archive download.
+For `version`, `latest` SHALL mean the release that https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest
+redirects to at build time, and any other value SHALL be a release version `MAJOR.MINOR.PATCH` of decimal numbers at or
+above `1.47.0`, with or without a leading `v`; the feature SHALL reject any other value before downloading anything, and
+SHALL fail before downloading any archive when `latest` resolves to a tag of any other form.
 
 #### Scenario: Unsupported version form
 
-- **WHEN** an explicit version is malformed or below `1.47.0`, or latest resolves to a malformed tag
-- **THEN** installation fails before downloads and names the invalid value or tag
+- **WHEN** the feature is installed with `version` set to a malformed value or a version below `1.47.0`, or with
+  `latest` while the permanent link points to a tag that is not a release version at or above `1.47.0`
+- **THEN** the install fails before downloading any archive
 
 ### Requirement: Glab release assets and checksum
 
-The feature SHALL fetch
-`https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/glab_<version>_linux_<arch>.tar.gz` and
-`https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/checksums.txt`, where version omits `v` and
-architecture is `amd64` or `arm64`. It SHALL install only the archive's `glab` executable after exactly one matching
-checksum-list entry agrees with its SHA-256; an absent architecture asset fails.
+The feature SHALL download the release archive from
+`https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/glab_<version>_linux_<arch>.tar.gz` and its checksum
+list from `https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/checksums.txt`, where `<version>` has no
+leading `v` and `<arch>` is `amd64` or `arm64`, over HTTPS only, including every redirect, and SHALL fail when the
+requested release has no archive for the architecture.
 
-#### Scenario: Missing or ambiguous archive checksum
+#### Scenario: Release without an archive for the architecture
 
-- **WHEN** the requested archive is absent or its checksum list has no unique matching filename
-- **THEN** installation fails and uses no substitute asset or checksum entry
+- **WHEN** the requested release has no archive for the machine's architecture
+- **THEN** the install fails
+
+### Requirement: Glab archive checksum match
+
+The feature SHALL install the archive's `glab` only when the checksum list holds exactly one entry whose file name
+equals the archive's name and the archive's SHA-256 digest equals that entry.
+
+#### Scenario: Checksum entry matches
+
+- **WHEN** the checksum list holds exactly one entry whose file name equals the archive's name and the archive's SHA-256
+  digest equals that entry
+- **THEN** the feature installs the `glab` from that archive
 
 ### Requirement: Glab release metadata trust
 
-All requests and redirects SHALL use HTTPS. The feature SHALL resolve `latest` from the HTTPS redirect of the permanent
-link without following it and rely on TLS alone because upstream provides no checksum or signature for the redirect. It
-SHALL rely on TLS alone for the unsigned checksum list from the archive's origin; checksum verification establishes
-archive integrity against that list, not publisher authenticity.
+The feature SHALL rely on TLS alone for the checksum list itself, which upstream publishes unsigned from the same origin
+as the archive, so this verification establishes the archive's integrity against the published release, not the
+publisher's authenticity. To resolve `latest`, the feature SHALL read the redirect of the latest-release permanent link
+over HTTPS without following it and SHALL rely on TLS alone for it, since upstream publishes no checksum or signature
+for it.
 
-#### Scenario: Unsigned checksum list
+#### Scenario: Latest resolved from the redirect
 
-- **WHEN** the feature verifies a release archive
-- **THEN** it uses HTTPS throughout and treats the unsigned checksum list as TLS-delivered metadata, not proof of
-  publisher authenticity
+- **WHEN** the feature is installed with `version` set to `latest`
+- **THEN** it reads the redirect of the latest-release permanent link over HTTPS without following it
 
 ### Requirement: Glab platform gate
 
-The feature SHALL require x86_64 or aarch64 and `/etc/os-release` `ID` or `ID_LIKE` identifying Debian, Ubuntu, Fedora,
-or Alpine. It SHALL require `apt-get` on Debian/Ubuntu, `dnf` on Fedora, and `apk` on Alpine. Missing os-release,
-unsupported family or architecture, and a missing family package manager SHALL fail before download or installation and
-name the unsupported item.
+The feature SHALL fail, before downloading or installing anything, with a message naming what is unsupported when the
+machine architecture is neither x86_64 nor aarch64; when `/etc/os-release` is missing or identifies, by its `ID` or
+`ID_LIKE`, a distribution outside the Debian, Ubuntu, Fedora, and Alpine families; or when the image lacks the package
+manager of the family it matched (`apt-get` for Debian and Ubuntu, `dnf` for Fedora, `apk` for Alpine).
 
 #### Scenario: Unsupported platform prerequisite
 
-- **WHEN** the architecture, distribution metadata, or matched family's package manager is unsupported or missing
-- **THEN** installation fails before download or installation and names the unsupported item
+- **WHEN** the machine architecture is neither x86_64 nor aarch64, `/etc/os-release` is missing or names none of the
+  supported families, or the image lacks the matched family's package manager
+- **THEN** the install fails before downloading or installing anything, with a message naming what is unsupported

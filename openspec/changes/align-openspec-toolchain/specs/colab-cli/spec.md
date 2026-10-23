@@ -36,17 +36,18 @@ The feature SHALL accept `version` and install the selected release.
 
 ### Requirement: Colab CLI release selection
 
-`latest` SHALL select the newest stable `google-colab-cli` release on PyPI at build time; `MAJOR.MINOR.PATCH` SHALL
-select that exact release. The remote user's `colab version` SHALL report the selected release and `colab --help` SHALL
-succeed. Invalid values SHALL fail before downloads or installation; unavailable releases SHALL fail the build with the
-release named.
+`latest` SHALL select the newest stable `google-colab-cli` release on PyPI at build time; an exact `MAJOR.MINOR.PATCH`
+SHALL select that release. `colab version` SHALL report the selected release, and `colab --help` SHALL succeed for the
+remote user. Other values SHALL fail before this feature downloads or installs anything; an unavailable release SHALL
+fail the build with a message naming the release.
 
 #### Scenario: Selected release is usable
 
-- **WHEN** installation selects an available stable release, by `latest` or exact version
-- **THEN** `colab version` reports that release and `colab --help` succeeds
+- **WHEN** installation selects an available stable release, by `latest` or an exact version
+- **THEN** the remote user's `colab version` reports that release and `colab --help` succeeds
 
 #### Scenario: Invalid or unavailable release
 
-- **WHEN** the value is invalid or names a release unavailable on PyPI
-- **THEN** installation fails, naming the value or release, and invalid input fails before downloads or installation
+- **WHEN** the value is outside `latest` and `MAJOR.MINOR.PATCH`, or names a release unavailable on PyPI
+- **THEN** an invalid value fails with a message naming it before this feature downloads or installs anything, and an
+  unavailable release fails the build with a message naming it

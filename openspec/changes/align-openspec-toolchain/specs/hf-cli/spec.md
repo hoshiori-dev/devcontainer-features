@@ -36,7 +36,8 @@ The feature SHALL install `hf` using Hugging Face’s standalone installer and e
 
 ### Requirement: Option version
 
-The feature SHALL accept `version` and install the selected `huggingface_hub` release.
+The feature SHALL accept the option `version` as declared here and install exactly the `huggingface_hub` release it
+selects, as "Hugging Face CLI release choice" states.
 
 | Field   | Value      |
 | ------- | ---------- |
@@ -80,7 +81,10 @@ The feature SHALL fetch the installer from the selected upstream release tag bef
 
 ### Requirement: Verify package downloads
 
-The feature SHALL install package files only from the official PyPI sources with index-published hash verification.
+The Python packages installed into the virtual environment SHALL come only from the Python Package Index, through its
+simple index at https://pypi.org/simple/ and its file host https://files.pythonhosted.org/. Every downloaded package
+file, the `pip` the installer upgrades in the new environment included, SHALL be installed only when its SHA-256 digest
+matches the one the index publishes for it.
 
 #### Scenario: Digest mismatch
 
@@ -131,7 +135,8 @@ The feature SHALL provide the upstream installer with a usable Python interprete
 
 ### Requirement: Option installSkill
 
-The feature SHALL accept `installSkill` to control creation of the `hf-cli` skill.
+The feature SHALL accept the option `installSkill` as declared here, which controls the `hf-cli` skill as "Hugging Face
+skill generation" and "Hugging Face skill exclusion and reuse" state.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -178,162 +183,223 @@ A second install SHALL keep or replace the managed environment according to the 
 
 ### Requirement: Hugging Face installer identity and placement
 
-The feature SHALL run the installer as the remote user in their home, so its environment, marker, and files belong to
-them; a root or unset remote user SHALL run as root in root’s home. A missing user SHALL fail naming it. The feature
-SHALL place root-owned `/usr/local/bin/hf` as a symlink to the environment binary for pairs in
-`test/hf-cli/compatibility.json`; root and the remote user SHALL run it. It SHALL NOT install `transformers` or alter
-shell startup/profile files.
+The feature SHALL install the CLI by running Hugging Face's standalone installer (`install.sh`) as the remote user, with
+that user's home directory, so that the installer's virtual environment, its installer marker, and every file in them
+belong to the remote user; when the remote user is root or unset, it SHALL run the installer as root with root's home.
+When the remote user does not exist in the image, the build SHALL fail with a message naming the user.
 
-#### Scenario: Installer identity and CLI link
+#### Scenario: Installer runs as the remote user
 
-- **WHEN** installation completes for an existing remote user or root
-- **THEN** the environment belongs to the installer user and `/usr/local/bin/hf` is a root-owned link usable by root and
-  the remote user
+- **WHEN** the feature is installed for a remote user that exists in the image
+- **THEN** the installer runs as that user with that user's home directory, and the installer's virtual environment, its
+  installer marker, and every file in them belong to that user
+
+### Requirement: Hugging Face CLI link and shell files
+
+The feature SHALL install `/usr/local/bin/hf`, a root-owned symbolic link to the `hf` in the installer's virtual
+environment, on every image and architecture listed in `test/hf-cli/compatibility.json`, so that `hf` is on the default
+`PATH`; the CLI SHALL run for the remote user and for root. The feature SHALL NOT install `transformers`, and SHALL NOT
+create, edit, or append to any shell startup or profile file.
+
+#### Scenario: CLI on the default PATH
+
+- **WHEN** the feature is installed on an image and architecture listed in `test/hf-cli/compatibility.json`
+- **THEN** `/usr/local/bin/hf` is a root-owned symbolic link to the `hf` in the installer's virtual environment, and the
+  remote user and root can run `hf` from the default `PATH`
+- **AND** no `transformers` is installed and no shell startup or profile file is created, edited, or appended to
 
 ### Requirement: Hugging Face CLI release choice
 
-`latest` SHALL select the version resolved by “Resolve the latest version” at build time. Explicit versions SHALL be
-digit-only `MAJOR.MINOR.PATCH` at or above `1.27.0`, the first release whose installer accepts every option passed by
-this feature; this floor SHALL be checked before any download.
+For the option `version`, `latest` means the release that "Resolve the latest version" names at build time, and any
+other value SHALL be a release version of the form `MAJOR.MINOR.PATCH` (digits only) at or above `1.27.0`, the first
+release whose installer accepts every option the feature passes, which the feature SHALL check before any download.
 
-#### Scenario: Version below installer floor
+#### Scenario: Version outside the accepted forms
 
-- **WHEN** an explicit version is malformed or below `1.27.0`
-- **THEN** installation fails before any download
+- **WHEN** `version` is not `latest` and is not a digits-only `MAJOR.MINOR.PATCH` at or above `1.27.0`
+- **THEN** the build fails before anything is downloaded
 
 ### Requirement: Hugging Face installer fetch
 
-The feature SHALL download the installer as a file over HTTPS from
-`https://raw.githubusercontent.com/huggingface/huggingface_hub/refs/tags/v<version>/utils/installers/install.sh` and run
-only that file, never a piped response. Any response other than direct `200` SHALL fail naming the tag before execution.
-Upstream publishes no checksum or signature, so the feature relies on TLS to that host and the release-tag path alone.
+The feature SHALL download the installer to a file, over HTTPS, from
+`https://raw.githubusercontent.com/huggingface/huggingface_hub/refs/tags/v<version>/utils/installers/install.sh`, where
+`<version>` is the resolved version, and SHALL run it only from that file; it SHALL NOT pipe a download into a shell. A
+response other than a direct `200` SHALL fail the build with a message naming the tag, before the installer runs.
 
 #### Scenario: Installer response is not direct success
 
-- **WHEN** the tag URL does not return direct HTTP 200
-- **THEN** the feature fails naming the tag before running the installer
+- **WHEN** the installer URL for the resolved version returns a response other than a direct `200`
+- **THEN** the build fails with a message naming the tag, before the installer runs
 
 ### Requirement: Hugging Face installer digest record
 
-Before running the installer, the feature SHALL write the selected tag and downloaded file's SHA-256 digest to the build
-log. This digest is a comparison record only; the feature SHALL compare it with nothing.
+Upstream publishes no checksum or signature for the installer, so the installer's content is not verified: the feature
+relies on TLS to the installer's download host alone and on the path naming the upstream repository's release tag.
+Before running the file, the feature SHALL write the tag and the file's SHA-256 digest to the build log; the digest is a
+record that lets two builds be compared, and the feature compares it with nothing.
 
 #### Scenario: Installer digest is logged
 
-- **WHEN** the installer file is ready to run
-- **THEN** the build log records its tag and SHA-256 digest without treating the digest as verification
+- **WHEN** the installer file has been downloaded
+- **THEN** before it runs, the build log records its tag and its SHA-256 digest, and the feature compares the digest
+  with nothing
 
 ### Requirement: Hugging Face build-time requests
 
-The installer SHALL download only `huggingface_hub`, its dependencies, and `pip` from the sources in “Verify package
-downloads”; its skill step SHALL generate the skill locally without downloading it. Build-time CLI checks and skill
-generation SHALL use `HF_HUB_OFFLINE=1` to prevent auxiliary Hub requests and cache files; the feature SHALL NOT add
-this variable to the container environment.
+The installer downloads only `huggingface_hub`, its dependencies, and `pip`, from the sources "Verify package downloads"
+names; its skill step generates the skill locally and downloads nothing. Build-time CLI checks and skill generation
+SHALL run with `HF_HUB_OFFLINE=1`, preventing auxiliary Hub requests and cache files; this setting SHALL NOT be added to
+the container environment, so runtime Hub access remains available.
 
 #### Scenario: Build checks stay offline
 
 - **WHEN** installation performs CLI checks or generates the skill
-- **THEN** `HF_HUB_OFFLINE=1` prevents auxiliary Hub requests, while runtime Hub access remains available
+- **THEN** they run with `HF_HUB_OFFLINE=1`, and the container environment does not set `HF_HUB_OFFLINE`, so runtime Hub
+  access remains available
 
 ### Requirement: Hugging Face package sources and integrity
 
-Python packages SHALL come only from `https://pypi.org/simple/` and `https://files.pythonhosted.org/`, as wheels. The
-feature SHALL use uv >= `0.12.16` when present, otherwise pip. It SHALL install each downloaded file, including upgraded
-pip, only when its SHA-256 matches the index digest; the feature pins no separate checksum or signature.
+`huggingface_hub` and its dependencies SHALL be installed with an existing uv of at least `0.12.16`, or with pip when uv
+is absent, and from wheels only. The SHA-256 digests the index publishes, which "Verify package downloads" checks, are
+the feature's package verification; the feature pins no checksum or signature of its own.
 
-#### Scenario: Index hash mismatch
+#### Scenario: Package installer and wheels
 
-- **WHEN** a package file's digest differs from the index-published SHA-256
-- **THEN** the file is not installed
+- **WHEN** the feature installs `huggingface_hub` and its dependencies
+- **THEN** it installs them from wheels only, with the existing uv when that uv is at least `0.12.16`, or with pip when
+  uv is absent
 
 ### Requirement: Hugging Face package source overrides
 
-Build configuration and uv, pip, or installer environment variables SHALL NOT redirect package sources, weaken hash
-checks, or pass extra installer arguments. Proxy variables `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY`, and
-lowercase forms SHALL reach the installer unchanged.
+Package-index configuration files, and uv, pip, or installer environment variables of the build, SHALL NOT redirect the
+sources "Verify package downloads" names, weaken its checks, or pass extra arguments to the installer. The build's proxy
+variables (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY`, and their lowercase forms) SHALL reach the installer
+unchanged, so a build behind a proxy installs from the same sources with the same checks.
 
 #### Scenario: Package source override and proxy
 
-- **WHEN** alternate index settings and proxy variables are present
-- **THEN** package sources and checks remain fixed, while proxy variables reach the installer unchanged
+- **WHEN** package-index configuration files or uv, pip, or installer environment variables of the build name another
+  index, weaker checks, or extra installer arguments, and the build sets proxy variables
+- **THEN** the feature installs from the sources "Verify package downloads" names, with the same checks and no extra
+  installer arguments, and the proxy variables reach the installer unchanged
 
 ### Requirement: Hugging Face installer Python selection
 
-The installer SHALL use Python >=3.10 with `venv` and `ensurepip`. The feature SHALL run after
-`ghcr.io/devcontainers/features/python:1` when selected and SHALL NOT depend on it. The feature SHALL prefer usable
-`python3`, then `python`, in `/usr/local/python/current/bin`, then standard system PATH directories in the same order;
-it SHALL skip unusable candidates. It SHALL expose the selected interpreter to the installer as `python3` without
-changing default Python or shell configuration.
+The installer's virtual environment SHALL use an interpreter of at least Python 3.10 with `venv` and `ensurepip`. The
+feature SHALL prefer a usable `python3`, then `python`, under `/usr/local/python/current/bin`, then search standard
+system PATH directories for a usable `python3`, then `python`. An unusable earlier candidate SHALL NOT prevent selection
+of a usable later candidate.
 
 #### Scenario: Existing Python selection
 
-- **WHEN** multiple candidates exist, including an unusable earlier one and a usable later one
-- **THEN** the installer receives the first usable Python >=3.10 with `venv` and `ensurepip` as `python3`, without
-  changing the image default
+- **WHEN** an earlier candidate in that order is unusable and a later candidate is usable
+- **THEN** the installer's virtual environment uses the later candidate, an interpreter of at least Python 3.10 with
+  `venv` and `ensurepip`
+
+### Requirement: Hugging Face Python feature order and handoff
+
+The feature SHALL run after `ghcr.io/devcontainers/features/python:1` when the user selects it, but SHALL NOT install
+that feature as a dependency. The feature SHALL make the selected interpreter available to the upstream installer as
+`python3` without changing the image's default interpreter or shell configuration.
+
+#### Scenario: Interpreter handed to the installer
+
+- **WHEN** the feature has selected an interpreter
+- **THEN** the upstream installer receives it as `python3`, and the image's default interpreter and shell configuration
+  are unchanged
+- **AND** `ghcr.io/devcontainers/features/python:1` is installed only when the user selects it, and then before this
+  feature
 
 ### Requirement: Hugging Face Python prerequisites
 
-When no usable interpreter exists in the stated locations, the feature SHALL install distribution `python3` and
-`python3-venv`. If a supported interpreter needs venv support and no other usable interpreter exists, it SHALL install
-`python3-venv`; it SHALL install `ca-certificates` when absent.
+When the image has no interpreter in the locations "Hugging Face installer Python selection" names, the feature SHALL
+install the distribution's `python3` and `python3-venv`; when a supported distribution interpreter needs venv support
+and no other usable interpreter exists, it SHALL install `python3-venv`. When the image lacks the CA certificate bundle,
+it SHALL install `ca-certificates`.
 
 #### Scenario: Python packages required
 
-- **WHEN** no usable interpreter exists or the selected supported interpreter lacks venv support
-- **THEN** the feature installs the needed `python3` and/or `python3-venv` packages
+- **WHEN** a supported distribution interpreter needs venv support and no other usable interpreter exists
+- **THEN** the feature installs `python3-venv`
+
+#### Scenario: CA certificate bundle missing
+
+- **WHEN** the image lacks the CA certificate bundle
+- **THEN** the feature installs `ca-certificates`
 
 ### Requirement: Hugging Face prerequisite package sources
 
-Python prerequisites and dependencies SHALL come only from already configured apt repositories, verified by image
-archive keyrings. The feature SHALL add no apt repository or key and SHALL NOT download or compile Python itself.
+The `python3`, `python3-venv`, and `ca-certificates` packages the feature installs, and their dependencies, SHALL come
+from the apt repositories the image already configures, verified against the image's archive keyrings. The feature SHALL
+add no apt repository or key and SHALL NOT download or compile a Python interpreter itself.
 
 #### Scenario: Apt source restrictions
 
-- **WHEN** Python prerequisites are installed
-- **THEN** they come from configured repositories verified by image keyrings, with no added repository/key or separately
-  downloaded interpreter
+- **WHEN** the feature installs `python3`, `python3-venv`, or `ca-certificates`
+- **THEN** they and their dependencies come from the apt repositories the image already configures, verified against the
+  image's archive keyrings, with no apt repository or key added and no Python interpreter downloaded or compiled by the
+  feature
 
 ### Requirement: Hugging Face interpreter failure timing
 
-If no usable interpreter remains, the build SHALL fail before fetching the installer with the required Python version
-and guidance to configure the first-party Python feature.
+If no usable interpreter remains, the build SHALL fail before the installer is downloaded with the required Python
+version and guidance to configure the first-party Python feature.
 
 #### Scenario: Interpreter unavailable after package handling
 
-- **WHEN** prerequisite handling leaves no usable Python interpreter
-- **THEN** the build fails before installer download with the minimum version and first-party Python guidance
+- **WHEN** no usable interpreter remains
+- **THEN** the build fails before the installer is downloaded, with the required Python version and guidance to
+  configure the first-party Python feature
 
 ### Requirement: Hugging Face skill generation
 
-When `installSkill` is enabled, the installer SHALL generate `~/.agents/skills/hf-cli` locally and link it as `hf-cli`
-in `~/.claude/skills`. Since the installer only warns on failure, the build SHALL fail unless `SKILL.md` exists and
-names the installed version.
+When `installSkill` is enabled, the feature SHALL let the installer add the `hf-cli` skill, which the installed CLI
+generates locally without downloading it, as `~/.agents/skills/hf-cli` in the remote user's home and a link to it named
+`hf-cli` in that user's `~/.claude/skills`; because the installer only warns when this step fails, the feature SHALL
+fail the build unless `~/.agents/skills/hf-cli/SKILL.md` exists afterwards and names the installed version.
 
 #### Scenario: Skill generated
 
 - **WHEN** `installSkill` is enabled
-- **THEN** the skill and link are created locally, and the skill names the installed version or the build fails
+- **THEN** the build succeeds only if `~/.agents/skills/hf-cli/SKILL.md` exists in the remote user's home afterwards and
+  names the installed version, with a link to the skill named `hf-cli` in that user's `~/.claude/skills`
 
 ### Requirement: Hugging Face skill exclusion and reuse
 
-When `installSkill` is disabled, the feature SHALL pass `--exclude-skill` and create no skill files. If only a skill
-needs generation for an already installed version, the feature SHALL call that installed CLI directly with flags
-supported by that release, without rerunning the installer or reinstalling packages.
+When `installSkill` is disabled, the feature SHALL pass `--exclude-skill` and create no skill files. When the requested
+version is already installed and only the skill needs generating, the feature SHALL call that installed CLI directly,
+using the flags supported by that release, without rerunning the installer or reinstalling any packages.
 
-#### Scenario: Skill excluded or generated from installed CLI
+#### Scenario: Skill excluded
 
-- **WHEN** skill installation is disabled or only the skill is missing for the selected installed version
-- **THEN** the feature excludes and creates no skill, or calls the installed CLI directly without reinstalling packages
+- **WHEN** `installSkill` is disabled
+- **THEN** the feature passes `--exclude-skill` to the installer and creates no skill files
+
+#### Scenario: Skill generated from the installed CLI
+
+- **WHEN** the requested version is already installed and only the skill needs generating
+- **THEN** the feature calls that installed CLI directly, without rerunning the installer or reinstalling any packages
 
 ### Requirement: Hugging Face repeat installation
 
-A second install SHALL succeed. If the requested version is already in the installer-managed environment, keep it and
-reinstall no packages; a different version recreates the environment so only the later version remains and
-`/usr/local/bin/hf` uses it. With `installSkill` enabled, leave the skill generated by the installed version; when
-disabled, leave any earlier skill in place.
+Installing the feature a second time SHALL succeed. When the requested version is already installed in an
+installer-managed environment, the feature SHALL keep that environment and SHALL NOT reinstall its packages. With a
+different `version`, it SHALL recreate the environment so that only the later version remains and `/usr/local/bin/hf`
+runs it.
 
-#### Scenario: Version and skill options change
+#### Scenario: Version changes on the second install
 
-- **WHEN** a second install selects a different version or changes `installSkill`
-- **THEN** only the selected version remains active and skill files follow the later install's option while preserving
-  an earlier skill when disabled
+- **WHEN** the feature is installed a second time with a different `version`
+- **THEN** the install succeeds, the environment is recreated so that only the later version remains, and
+  `/usr/local/bin/hf` runs it
+
+### Requirement: Hugging Face repeat installation skill
+
+A later install with `installSkill` enabled SHALL leave a skill generated by the version then installed; a later install
+with `installSkill` disabled SHALL leave an earlier skill in place.
+
+#### Scenario: Skill option on a later install
+
+- **WHEN** the feature is installed again after an earlier install
+- **THEN** with `installSkill` enabled the skill is generated by the version then installed, and with it disabled an
+  earlier skill remains in place

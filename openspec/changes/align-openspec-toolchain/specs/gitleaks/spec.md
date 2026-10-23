@@ -132,61 +132,93 @@ A second install SHALL succeed, apply later options, and preserve the earlier ex
 
 ### Requirement: Gitleaks release version selection
 
-`latest` SHALL resolve the newest non-prerelease release through `https://github.com/gitleaks/gitleaks/releases/latest`.
-Explicit versions SHALL be decimal `MAJOR.MINOR.PATCH` at or above `8.2.0`, optionally prefixed by `v`; other forms
-SHALL fail before downloads. A latest tag outside this grammar also SHALL fail before archive download.
+The feature SHALL install the release `version` selects: `latest` means the release that
+https://github.com/gitleaks/gitleaks/releases/latest redirects to at build time, which GitHub keeps at the newest
+release not marked as a pre-release, and any other value is a release version `MAJOR.MINOR.PATCH` of decimal numbers at
+or above `8.2.0`, with or without a leading `v`.
 
-#### Scenario: Unsupported version form
+#### Scenario: Explicit version with a leading v
 
-- **WHEN** an explicit version is malformed or below `8.2.0`, or latest resolves to a malformed tag
-- **THEN** installation fails before downloads and names the invalid value or tag
+- **WHEN** the feature is installed with `version` set to `v8.28.0`
+- **THEN** `gitleaks version` reports `8.28.0`
 
-### Requirement: Gitleaks release assets and checksum
+### Requirement: Gitleaks version rejection
 
-The feature SHALL fetch
-`https://github.com/gitleaks/gitleaks/releases/download/v<version>/gitleaks_<version>_linux_<arch>.tar.gz` and
-`https://github.com/gitleaks/gitleaks/releases/download/v<version>/gitleaks_<version>_checksums.txt`, where version
-omits `v` and architecture is `x64` or `arm64`. It SHALL install only the archive's `gitleaks` executable after exactly
-one matching checksum-list entry agrees with its SHA-256; an absent architecture asset fails.
+The feature SHALL reject any `version` value other than `latest` or a release version `MAJOR.MINOR.PATCH` of decimal
+numbers at or above `8.2.0`, with or without a leading `v`, before downloading anything, and SHALL fail before
+downloading any archive when `latest` resolves to a tag of any other form.
 
-#### Scenario: Missing or ambiguous archive checksum
+#### Scenario: Explicit version below the accepted range
 
-- **WHEN** the requested archive is absent or its checksum list has no unique matching filename
-- **THEN** installation fails and uses no substitute asset or checksum entry
+- **WHEN** the feature is installed with `version` set to `8.1.2`
+- **THEN** the install fails before downloading anything, with a message naming `8.2.0` as the minimum
+
+### Requirement: Gitleaks release assets
+
+The feature SHALL download the release archive from
+`https://github.com/gitleaks/gitleaks/releases/download/v<version>/gitleaks_<version>_linux_<arch>.tar.gz` and its
+checksum list from `https://github.com/gitleaks/gitleaks/releases/download/v<version>/gitleaks_<version>_checksums.txt`,
+where `<version>` has no leading `v` and `<arch>` is `x64` or `arm64`, over HTTPS only, including every redirect, and
+SHALL fail when the requested release has no archive for the architecture.
+
+#### Scenario: Release without an archive for the architecture
+
+- **WHEN** the requested release has no archive for the machine's architecture
+- **THEN** the install fails
+
+### Requirement: Gitleaks archive checksum
+
+The feature SHALL install the archive's `gitleaks` only when the checksum list holds exactly one entry whose file name
+equals the archive's name and the archive's SHA-256 digest equals that entry.
+
+#### Scenario: Checksum entry not unique
+
+- **WHEN** the checksum list holds no entry, or more than one, whose file name equals the archive's name
+- **THEN** the install fails, and `/usr/local/bin/gitleaks` is left as it was before the install
 
 ### Requirement: Gitleaks release metadata trust
 
-All requests and redirects SHALL use HTTPS. The feature SHALL resolve `latest` from the HTTPS redirect without following
-it and rely on TLS alone because upstream provides no checksum or signature for the redirect. It SHALL rely on TLS alone
-for the unsigned checksum list from the archive's origin; checksum verification establishes archive integrity against
-that list, not publisher authenticity.
+The feature SHALL rely on TLS alone for the checksum list itself, which upstream publishes unsigned from the same origin
+as the archive, so this verification establishes the archive's integrity against the published release, not the
+publisher's authenticity. To resolve `latest`, the feature SHALL read the redirect of the latest-release link over HTTPS
+without following it and SHALL rely on TLS alone for it, since upstream publishes no checksum or signature for it.
 
-#### Scenario: Unsigned checksum list
+#### Scenario: Resolving latest
 
-- **WHEN** the feature verifies a release archive
-- **THEN** it uses HTTPS throughout and treats the unsigned checksum list as TLS-delivered metadata, not proof of
-  publisher authenticity
+- **WHEN** the feature is installed with `version` set to `latest`
+- **THEN** it reads the latest-release link's redirect over HTTPS without following it
 
 ### Requirement: Gitleaks platform gate
 
-The feature SHALL require x86_64 or aarch64 and `/etc/os-release` `ID` or `ID_LIKE` identifying Debian, Ubuntu, Fedora,
-or Alpine. It SHALL require `apt-get` on Debian/Ubuntu, `dnf` on Fedora, and `apk` on Alpine. Missing os-release,
-unsupported family or architecture, and a missing family package manager SHALL fail before download or installation and
-name the unsupported item.
+The feature SHALL fail, before downloading or installing anything, with a message naming what is unsupported when the
+machine architecture is neither x86_64 nor aarch64; when `/etc/os-release` is missing or identifies, by its `ID` or
+`ID_LIKE`, a distribution outside the Debian, Ubuntu, Fedora, and Alpine families; or when the image lacks the package
+manager of the family it matched (`apt-get` for Debian and Ubuntu, `dnf` for Fedora, `apk` for Alpine).
 
 #### Scenario: Unsupported platform prerequisite
 
-- **WHEN** the architecture, distribution metadata, or matched family's package manager is unsupported or missing
-- **THEN** installation fails before download or installation and names the unsupported item
+- **WHEN** the machine architecture is neither x86_64 nor aarch64, `/etc/os-release` is missing or identifies a
+  distribution outside the supported families, or the image lacks the matched family's package manager
+- **THEN** the install fails before downloading or installing anything, with a message naming what is unsupported
 
 ### Requirement: Gitleaks replacement safety
 
-When `/usr/local/bin/gitleaks` already reports the requested version, a second install SHALL leave it untouched and
-download no archive. Otherwise, including when its version is unreadable, the later release SHALL replace it and leave
-exactly one `gitleaks`. If the path exists but is not a regular file, installation SHALL fail before downloads and leave
-it unchanged; any failed second install SHALL preserve the first executable.
+When the installed `/usr/local/bin/gitleaks` already reports the requested version, a second install SHALL leave it
+untouched and download no archive; otherwise, including when the installed binary's version cannot be read, the version
+of the later install SHALL replace it, so that the later options win and exactly one `gitleaks` remains. A second
+install that fails SHALL leave the earlier `gitleaks` in place.
+
+#### Scenario: Matching version already installed
+
+- **WHEN** the feature is installed twice with the same `version`
+- **THEN** the second install leaves `/usr/local/bin/gitleaks` unchanged
+
+### Requirement: Gitleaks non-regular target
+
+When `/usr/local/bin/gitleaks` exists but is not a regular file, the install SHALL fail before downloading anything,
+with a message naming the path, and leave it as it is.
 
 #### Scenario: Existing target is not a regular file
 
-- **WHEN** `/usr/local/bin/gitleaks` exists but is not a regular file
-- **THEN** installation fails before downloads, names the path, and leaves it unchanged
+- **WHEN** `/usr/local/bin/gitleaks` exists but is not a regular file, and the feature is installed
+- **THEN** the install fails before downloading anything, with a message naming the path, and leaves it as it is

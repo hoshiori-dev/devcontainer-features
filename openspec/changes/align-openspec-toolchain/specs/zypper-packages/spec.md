@@ -4,11 +4,10 @@
 
 ### Requirement: Installation controls are validated before changes
 
-Before package-manager calls, cache creation, or file writes, the feature SHALL validate booleans, enums, package
-entries, repository aliases, timeouts and retries. Lock/connect/transfer values are canonical ASCII decimals 1–3600;
-retries 0–10. Alias syntax is separately specified. Invalid options fail status 1 naming the option/alias. Valid empty
-lists perform no package work or configuration change; alias existence and whether controls take effect are checked only
-for nonempty lists.
+The feature SHALL validate `installRecommends`, `exactNames`, `refreshPolicy`, `cleanup`, `repositories`, `lockTimeout`,
+`connectTimeout`, `transferTimeout`, `downloadRetries` and all package entries before invoking any package-manager
+command, creating any cache, or writing any file. Invalid options SHALL fail with status 1 and a message naming the
+option, for `repositories` also the refused alias.
 
 #### Scenario: Invalid control fails before any change
 
@@ -63,9 +62,10 @@ for nonempty lists.
 
 ### Requirement: Install the listed packages
 
-The feature SHALL install listed packages and dependencies only from image-enabled repositories, or the selected enabled
-repositories when `repositories` is nonempty. Recommendations follow installRecommends. Other installed packages do not
-upgrade except listed packages and their needs.
+The feature SHALL install, with `zypper`, every package named in the comma-separated `packages` option, taking each
+package and its dependencies only from the repositories in use: the repositories enabled in the image, or, with a
+non-empty `repositories`, the selected ones among them. Apart from that dependency selection, it SHALL NOT upgrade
+installed packages other than the listed packages and what they need.
 
 #### Scenario: Listed packages are installed
 
@@ -93,9 +93,10 @@ upgrade except listed packages and their needs.
 
 ### Requirement: Version and architecture qualifiers
 
-The feature SHALL pass `name=edition`, `name.architecture`, combined forms, and `<`, `<=`, `>`, `>=` edition ranges
-unchanged. An edition may include version, epoch and release. Architecture must be offered for the image. Pinned
-editions do not downgrade: if older than installed, the installed package stays and the entry does not fail.
+The feature SHALL pass an entry of the form `name=edition`, `name.architecture`, or `name.architecture=edition`, or one
+that puts a range operator in the place of `=` (`name<edition`, `name<=edition`, `name>edition`, `name>=edition`), to
+`zypper` unchanged, so that `zypper` selects that edition (a version, optionally with an epoch and a release), an
+edition in that range, or that architecture of the package.
 
 #### Scenario: Pinned version is installed
 
@@ -132,10 +133,10 @@ editions do not downgrade: if older than installed, the installed package stays 
 
 ### Requirement: Entries are validated before anything changes
 
-Entries SHALL start with an ASCII letter/digit; name characters are ASCII letters, digits, `.`, `_`, `+`, `-`; at most
-one `=`, `<`, `<=`, `>`, or `>=` operator is allowed. The nonempty suffix uses ASCII letters, digits, `.`, `_`, `+`,
-`~`, `^`, `:`, `-`; `.rpm` endings are refused. Invalid entries fail status 1 before zypper, refresh or install;
-accepted entries are one argument, never shell code.
+The feature SHALL accept an entry only when it starts with an ASCII letter or a digit, its name part consists only of
+ASCII letters, digits, and the characters `.`, `_`, `+`, and `-`, it holds at most one operator (`=`, `<`, `<=`, `>`, or
+`>=`), the part after that operator is not empty and consists only of ASCII letters, digits, and the characters `.`,
+`_`, `+`, `~`, `^`, `:`, and `-`, and the entry does not end in `.rpm`.
 
 #### Scenario: URL or path is refused
 
@@ -166,9 +167,11 @@ accepted entries are one argument, never shell code.
 
 ### Requirement: Entries select packages as zypper matches them
 
-The feature SHALL select same-case package-name matches, including name-architecture/edition and trailing
-version/release forms. Unless exactNames=true, if no name matches, Zypper may select a capability provider. It never
-matches globs, patterns, patches or products. Unmatched entries fail with no listed package installed.
+The feature SHALL install for each entry the package that `zypper` selects for it from the repositories in use: a
+package whose name equals the entry's name part, without its architecture and edition, in the same letter case, or
+equals it once a trailing `-version` or `-version-release` is read as an edition of that package; and, with
+`exactNames=false`, when no package has that name, a package that provides the name part as a capability, which `zypper`
+chooses when several provide it.
 
 #### Scenario: Unknown package fails
 
@@ -214,10 +217,10 @@ matches globs, patterns, patches or products. Unmatched entries fail with no lis
 
 ### Requirement: Repository metadata refresh
 
-With default or always, SHALL check every repository in use before install and fetch metadata only if missing/changed;
-any unavailable/unverifiable repository fails before install. never uses cached metadata only and fails if any in-use
-repository lacks usable metadata; package files may still download. Unused repositories are neither refreshed nor
-checked. Install does not refresh again; signature/TLS checks remain.
+With `refreshPolicy=default` or `always`, the feature SHALL check the index of every repository in use before
+installation and download metadata only when missing or changed; the repositories in use are every enabled repository,
+or, with a non-empty `repositories`, the selected ones. If any repository in use cannot be refreshed or verified, the
+feature SHALL fail before installing and SHALL NOT skip it.
 
 #### Scenario: Missing metadata is refreshed
 
@@ -254,10 +257,10 @@ checked. Install does not refresh again; signature/TLS checks remain.
 
 ### Requirement: Repository authentication stays in effect
 
-The feature SHALL preserve image libzypp signature checks and SHALL NOT ignore failures, trust keys, accept unsigned
-content, or change repositories/services/keys/configuration. Image-disabled checks remain disabled. No own config
-persists; only the temporary timeout/retry file may be written. Package-shipped files and image index-service rewrites
-are excluded.
+The feature SHALL leave libzypp's signature checking (`gpgcheck` in zypp.conf(5), libzypp 17.38.16,
+https://github.com/openSUSE/libzypp/blob/17.38.16/zypp/doc/zypp.conf.5.txt) in effect: it SHALL NOT pass any option or
+configuration that ignores signature failures, imports or trusts a new signing key, or accepts unsigned repositories or
+packages, and SHALL NOT itself add, remove, or change any repository, service, or trusted key in the image.
 
 #### Scenario: Unverifiable repository fails the refresh
 
@@ -285,10 +288,9 @@ are excluded.
 
 ### Requirement: Clean package caches
 
-After success, all SHALL remove downloaded packages and raw/parsed repository metadata from effective libzypp caches;
-packages removes package files but retains usable metadata; none performs no explicit deletion. No mode removes
-installed databases, keys, or unrelated paths. Native hooks may delete independently; none cannot guarantee retention
-and packages cannot create metadata.
+After successful installation, `cleanup=all` SHALL explicitly remove downloaded package files and repository metadata
+from the effective libzypp package, raw metadata, and parsed metadata caches. With `packages`, it SHALL explicitly
+remove downloaded package files while leaving usable metadata; with `none`, it SHALL perform no explicit cache deletion.
 
 #### Scenario: Caches are removed
 
@@ -312,10 +314,11 @@ and packages cannot create metadata.
 
 ### Requirement: Installing the feature twice
 
-A second installation SHALL retain packages from both lists and resolve as a first run; it may upgrade
-unpinned/range-listed packages and dependencies. Each run uses its own controls, with no image-config override: cache,
-recommendations, repositories, exactNames, lock wait, timeouts and retries do not persist. Prior optional packages
-remain.
+Installing the feature a second time SHALL leave installed every package that either installation listed, and SHALL
+treat the second list as a first installation would. The second installation MAY upgrade an installed package that its
+list names without an edition or with a range, or that a package of its list needs.
+
+The second invocation SHALL use its own control values, with no permanent override of image configuration.
 
 #### Scenario: Same list on the second install
 
@@ -356,10 +359,10 @@ remain.
 
 ### Requirement: Repository selection restricts the installation
 
-With empty `repositories`, the feature SHALL use all image-enabled repositories. Otherwise refresh, cache checks and the
-entire transaction (listed packages and dependencies) SHALL use only selected enabled aliases. An exact case-sensitive
-enabled alias is required; a missing, disabled, or ambiguous alias SHALL fail status 1 after zypper check and before
-refresh/change. The feature SHALL NOT enable/edit repositories, accept names/numbers/URIs, or narrow cleanup.
+An empty `repositories` SHALL leave the feature working with every repository the image enables. A non-empty
+`repositories` SHALL restrict this invocation's metadata refresh, its cached-metadata check, and the whole installation,
+the listed packages and every dependency, to the named repositories; these are then the repositories in use. Each alias
+SHALL equal, in the same letter case, the alias of a repository the image enables.
 
 #### Scenario: Empty repositories uses every enabled repository
 
@@ -432,10 +435,10 @@ refresh/change. The feature SHALL NOT enable/edit repositories, accept names/num
 
 ### Requirement: Lock wait is scoped to installation
 
-An empty lockTimeout SHALL leave image/build libzypp wait settings unchanged (without one, immediate failure). A
-nonempty value SHALL apply per zypper call, override inherited wait for that call only, and SHALL NOT persist or pass
-elsewhere. Each call waits separately, may exceed the value until lock check; failure is nonzero and a failed
-refresh/install changes no package.
+An empty `lockTimeout` SHALL leave libzypp's waiting for its system lock as the image and the build environment
+configure it: the feature sets and unsets nothing, so an inherited setting applies, and without one libzypp fails at
+once when another process holds the lock. A non-empty value SHALL be the number of seconds that each `zypper` call the
+feature makes waits for the lock before failing, overriding the inherited setting for those calls only.
 
 #### Scenario: Native lock wait is inherited
 
@@ -469,10 +472,10 @@ refresh/install changes no package.
 
 ### Requirement: Download timeouts are scoped to installation
 
-Empty connect/transfer timeout SHALL leave image settings. Nonempty connectTimeout SHALL limit each connection phase;
-transferTimeout SHALL limit inactivity between received data, not a transfer that continues receiving. Both SHALL apply
-to metadata and package downloads for all feature zypper calls only. libzypp still ends each transfer at 3600 seconds;
-options change no retries, mirrors, proxy, TLS or signatures.
+An empty `connectTimeout` or `transferTimeout` SHALL leave the matching libzypp setting as the image configures it. A
+non-empty `connectTimeout` SHALL be the number of seconds libzypp allows for the connection phase of each download
+(`download.connect_timeout` in zypp.conf(5)). Each option SHALL apply to the repository metadata and package downloads
+of every `zypper` call the feature makes, and to nothing after the feature exits.
 
 #### Scenario: Native timeouts are inherited
 
@@ -506,10 +509,11 @@ options change no retries, mirrors, proxy, TLS or signatures.
 
 ### Requirement: Download retries are bounded
 
-Empty downloadRetries inherits image `download.max_silent_tries`. N makes each metadata request try at most N+1 times; 0
-means no retry. Each HTTP method on each URL counts as a separate request. This is partial: package files are not
-covered and zypper’s fixed retries on other commands are unaffected. The feature SHALL NOT repeat refresh/install to
-compensate.
+An empty `downloadRetries` SHALL leave libzypp's number of download attempts (`download.max_silent_tries` in
+zypp.conf(5)) as the image configures it. A non-empty value N SHALL make libzypp try each repository metadata request at
+most N + 1 times before it reports the error, so that `0` means no retry. A request is one HTTP method on one URL:
+libzypp may ask for the same file with more than one method, and each counts on its own. No value SHALL request
+unbounded retries.
 
 #### Scenario: Native retries are inherited
 
@@ -535,10 +539,10 @@ compensate.
 
 ### Requirement: Timeout and retry overrides are temporary
 
-When all three options are empty, the feature SHALL write no config. Otherwise with packages it uses one new temporary
-libzypp config containing only nonempty overrides; it never edits/masks existing files and removes its file/directories
-after success or failure. If ZYPP_CONF is set (even empty) or libzypp lacks RPM capability `libzypp(econf)`, fail status
-1 naming cause before refresh/change. Never alter ZYPP_CONF. With empty options these conditions are not checked.
+When at least one of `connectTimeout`, `transferTimeout`, and `downloadRetries` is non-empty and `packages` names a
+package, the feature SHALL apply the non-empty ones through one temporary libzypp configuration file that holds only the
+overridden settings and that libzypp reads in addition to the image's configuration, so that every setting the feature
+does not override, the signature, repository, solver, and cache settings among them, stays the image's.
 
 #### Scenario: No override writes no file
 
@@ -586,86 +590,331 @@ after success or failure. If ZYPP_CONF is set (even empty) or libzypp lacks RPM 
 
 ## ADDED Requirements
 
-### Requirement: Repository aliases use literal image identifiers
+### Requirement: Boolean and enum options accept only their values
 
-Each `repositories` alias SHALL start with an ASCII letter or digit, contain only ASCII letters, digits, `.`, `_`, `:`,
-`+`, `-`, and not be digits alone. This rejects repository numbers, URIs, paths, globs and option-like values. An
-enabled repository with an alias outside this grammar cannot be selected. Repository lists SHALL validate before
-package-manager commands, cache/file changes; errors name the option and alias.
+Boolean options SHALL accept only `true` or `false`; enum options SHALL accept only their declared values.
 
-#### Scenario: Invalid repository alias is refused
+#### Scenario: Undeclared boolean or enum value is refused
 
-- **WHEN** a repository alias is numeric-only or contains a disallowed character
-- **THEN** the feature exits status 1 naming `repositories` and the alias before package work
+- **WHEN** `installRecommends` is `yes`, or `cleanup` is a value outside `all`, `packages`, and `none`
+- **THEN** the feature exits with status 1, names that option, and invokes no package-manager command
 
-### Requirement: Edition and architecture qualifiers retain native forms
+### Requirement: Timeout and retry values are bounded integers
 
-The feature SHALL pass `name=edition`, `name.architecture`, `name.architecture=edition`, `name<edition`,
-`name<=edition`, `name>edition`, and `name>=edition` unchanged. A trailing `-version` or `-version-release` SHALL be
-parsed as the package edition, including an optional epoch; architecture-qualified resolution only selects builds
-available for the image.
+A non-empty `lockTimeout`, `connectTimeout`, or `transferTimeout` SHALL be a canonical ASCII decimal integer string from
+`1` through `3600`, and a non-empty `downloadRetries` one from `0` through `10`, with no sign, whitespace, leading zero,
+or other character. This refuses every value libzypp reads as waiting or retrying without bound, and every value it
+would reinterpret; as these values are written into a libzypp configuration file, the same rule keeps an option value
+from adding a directive.
 
-#### Scenario: Qualified name selects the available edition
+#### Scenario: Out-of-range or non-canonical value is refused
 
-- **WHEN** `exactNames=true` and a valid entry uses `name.architecture=edition` or a trailing `-version-release` form
-- **THEN** zypper selects the same package form as when exactNames is false
+- **WHEN** `lockTimeout` is `0`, `connectTimeout` is `3601`, `transferTimeout` is `030`, or `downloadRetries` is `11`
+- **THEN** the feature exits with status 1, names that option, and invokes no package-manager command
 
-### Requirement: libzypp signature settings remain image-owned
+### Requirement: Repository aliases are well-formed
 
-The feature SHALL preserve libzypp `gpgcheck` settings from zypp.conf(5), libzypp 17.38.16
-(https://github.com/openSUSE/libzypp/blob/17.38.16/zypp/doc/zypp.conf.5.txt). It SHALL trust only keys already trusted
-by the image RPM database, except that it trusts no new key; repositories whose image setting disables checking remain
-unchecked. Repository index services may rewrite their own definitions during refresh, which is outside feature changes.
+Each alias in `repositories` SHALL start with an ASCII letter or digit, consist only of ASCII letters, digits, and the
+characters `.`, `_`, `:`, `+`, and `-`, and not consist of digits alone, so that a repository number, a URI, a path, a
+glob, and an option-like value are refused. An enabled repository whose alias lies outside this set, one holding a space
+for example, cannot be selected: its alias is refused as an invalid item.
 
-#### Scenario: Signature setting disabled by image remains disabled
+#### Scenario: Alias holding a space is refused
 
-- **WHEN** the image disables signature checking for a repository in use
-- **THEN** the feature does not enable checking or alter the repository configuration
+- **WHEN** `repositories` holds the alias of an enabled repository whose alias holds a space
+- **THEN** the feature exits with status 1, names `repositories` and the item, and invokes no package-manager command
 
-### Requirement: Timeout settings retain native scopes
+### Requirement: An empty package list leaves the controls unchecked
 
-`connectTimeout` SHALL set `download.connect_timeout` for each connection phase. `transferTimeout` SHALL set
-`download.transfer_timeout` as an inactivity limit; zypp.conf(5) describes maximum transfer time, but libzypp behavior
-governs. Each transfer still has libzypp’s 3600-second limit with or without the option. Neither option changes retries,
-mirror selection, proxy, TLS, or signature checking.
+With valid options and an empty package list, the feature SHALL succeed without refreshing, upgrading, cleaning, or
+changing any configuration, also without the package manager; whether an alias names an enabled repository, and whether
+a timeout or retry option can take effect, SHALL be checked only when `packages` names a package.
 
-#### Scenario: Active transfer is governed by inactivity only
+#### Scenario: Empty list skips the alias and override checks
 
-- **WHEN** a transfer continues receiving data with pauses shorter than transferTimeout for longer than that value total
-- **THEN** the transfer completes rather than timing out
+- **WHEN** packages is empty, `repositories` holds a well-formed alias no repository has, a timeout or retry option is
+  valid and non-empty, and the image has no `zypper`
+- **THEN** the feature succeeds without invoking the package manager and without writing any file
 
-### Requirement: Download retry scope stays partial
+### Requirement: Recommended packages follow installRecommends
 
-`downloadRetries` SHALL set `download.max_silent_tries` only for repository metadata requests. N means at most N+1
-attempts per HTTP-method/URL request; package files are attempted once per known mirror, and fixed zypper retries on
-other commands are unaffected. This partial control is accepted because it is libzypp’s bounded per-invocation behavior;
-the feature SHALL NOT repeat refresh or install to compensate.
+Recommended packages SHALL be excluded when `installRecommends=false` and considered by Zypper when
+`installRecommends=true`.
 
-#### Scenario: Retry count is independent per method and URL
+#### Scenario: Recommendation is excluded by default
 
-- **WHEN** one metadata file is requested through multiple HTTP methods or URLs with downloadRetries=N
-- **THEN** each method/URL request gets at most N+1 attempts
+- **WHEN** `installRecommends` is omitted and `packages` names a package that recommends another package which nothing
+  installed requires
+- **THEN** the listed package is installed and the recommended package is not
 
-### Requirement: Temporary libzypp configuration preserves image settings
+### Requirement: Pinned editions are not downgraded
 
-When a timeout or retry override is active, the new temporary file SHALL contain only nonempty settings and be read in
-addition to image config. Later image config may override it; the feature does not detect precedence because
-reimplementing libzypp merge risks silently changing signature settings. `libzypp(econf)` is the only support test and
-the feature does not verify that libzypp read the file.
+The feature SHALL NOT downgrade a package: when an entry pins with `=` an edition that the enabled repositories offer
+and that is older than the installed version of that package, the installed version stays and the entry does not fail
+the feature.
 
-#### Scenario: Later image configuration can override an option
+#### Scenario: Pin below the installed version
 
-- **WHEN** image libzypp configuration read after the temporary file sets the same key
-- **THEN** that later image value takes effect without feature detection
+- **WHEN** `packages` holds `name=edition` with an edition that the enabled repositories offer and that is older than
+  the one installed
+- **THEN** the feature succeeds and the installed version stays as it was
 
-### Requirement: Repository selection risks remain explicit
+### Requirement: Refused entries fail before any change
 
-The feature SHALL accept zypper’s documented risk: selection hides unselected repositories from resolution, and zypper
-says it later restricts only listed packages. This allows builds to depend on and refresh only named repositories. No
-option permits removals; the feature runs non-interactively and fails when zypper declines a solution requiring removal,
-but it adds no removal check and cannot promise retention for an installed package from an unselected repository.
+When any entry is refused, the feature SHALL exit with status 1 and a message naming that entry before it checks for
+`zypper`, refreshes repository metadata, or installs anything. The feature SHALL hand every accepted entry to `zypper`
+as one argument and SHALL NOT evaluate it as shell code.
 
-#### Scenario: Package from an unselected repository is not protected by a feature check
+#### Scenario: Refused entry fails before the zypper check
 
-- **WHEN** a selected-repository transaction would require removing an installed package from an unselected repository
-- **THEN** the feature passes no removal option and relies on zypper’s non-interactive solution behavior
+- **WHEN** `packages` holds an entry ending in `.rpm` on an image that has no `zypper`
+- **THEN** the feature exits with status 1 with a message naming the entry, and installs nothing
+
+### Requirement: Exact names and unmatched entries
+
+With `exactNames=true` an entry SHALL select a package by its name only: the feature SHALL NOT install a package merely
+because it provides the name part as a capability, while the edition, range, architecture, and name-version forms select
+as they do with `false`. An entry SHALL NOT be matched as a glob, a pattern, a patch, or a product. When one entry
+selects nothing, the feature SHALL fail and install none of the listed packages.
+
+#### Scenario: Exact names install no capability provider
+
+- **WHEN** `exactNames=true` and `packages` names only a capability that a package of the repositories provides and that
+  is not itself the name of a package they offer
+- **THEN** the feature exits with a non-zero status and installs no package that provides the capability
+
+### Requirement: Cached metadata and metadata use
+
+With `refreshPolicy=never`, the feature SHALL use existing metadata without contacting repositories for refresh and
+SHALL fail before installation if any repository in use has no usable cached metadata; package files MAY still be
+downloaded. A repository that is not in use SHALL neither be refreshed nor need cached metadata. Installation SHALL use
+the selected metadata without another automatic refresh. Signature and TLS checks SHALL remain in effect.
+
+#### Scenario: Cached metadata is used without refresh
+
+- **WHEN** `refreshPolicy=never` and every repository in use has usable cached metadata
+- **THEN** no metadata is fetched and installation uses the existing metadata
+
+### Requirement: Zypp configuration files stay the image's
+
+The feature SHALL edit no existing zypp configuration file and SHALL leave no configuration file of its own behind: the
+one file it MAY write is the temporary file of the requirement "Timeout and retry overrides are temporary", which holds
+no signature, key, or repository setting and is gone when the feature exits.
+
+#### Scenario: No configuration file is left behind
+
+- **WHEN** the feature has installed packages with a non-empty timeout or retry option
+- **THEN** no existing zypp configuration file has changed and no configuration file of the feature exists afterwards
+
+### Requirement: Keys and signature settings are the image's
+
+The feature SHALL NOT itself add, remove, or change any trusted key in the image. The keys and the signature settings
+are the image's: the feature trusts what the image's RPM database trusts, and a repository for which the image's
+configuration turns the check off stays unchecked. Files that the packages it installs ship, and repository definitions
+that a repository index service the image defines rewrites from its own index when `zypper` refreshes it, are not the
+feature's changes.
+
+#### Scenario: Check turned off by the image stays off
+
+- **WHEN** the image's configuration turns the signature check off for a repository in use
+- **THEN** the feature leaves that setting as it is and the repository stays unchecked
+
+### Requirement: Cache cleanup leaves other data alone
+
+No `cleanup` mode SHALL remove installed-package databases, signing keys, or unrelated paths. Package-manager
+configuration or image hooks MAY independently delete downloads; none does not guarantee that package files are
+retained, and packages does not guarantee that missing metadata is created.
+
+#### Scenario: Cleanup keeps databases and keys
+
+- **WHEN** `cleanup=all` and the feature has installed packages
+- **THEN** the installed-package database, the signing keys, and paths unrelated to the package caches remain
+
+### Requirement: Later invocations keep packages and drop earlier controls
+
+Earlier cache choices SHALL NOT override the later refresh or cleanup policy. Disabling optional dependencies on a later
+invocation SHALL NOT uninstall previously installed packages. A repository selection, exact-name matching, a lock wait,
+timeouts, and retries of one invocation SHALL NOT carry over to the next: an invocation that leaves those options at
+their defaults behaves as on an image where the feature never ran with them.
+
+#### Scenario: Recommendations disabled later keep earlier packages
+
+- **WHEN** the first installation ran with `installRecommends=true` and installed a recommended package, and the second
+  runs with `installRecommends=false`
+- **THEN** the recommended package stays installed
+
+### Requirement: Unknown or disabled alias fails before refresh
+
+When an alias in `repositories` does not equal, in the same letter case, the alias of a repository the image enables,
+because no repository has it or because the repository is defined but disabled, the feature SHALL exit with status 1 and
+a message naming that alias, after the `zypper` check and before it refreshes metadata or changes any package.
+
+#### Scenario: Alias in another letter case fails
+
+- **WHEN** `repositories` holds the alias of an enabled repository in another letter case and `packages` names a package
+- **THEN** the feature exits with status 1, names the alias, downloads no metadata, and changes no package
+
+### Requirement: Alias that is also a repository name fails
+
+The feature SHALL fail in the same way, with status 1 and a message naming that alias, after the `zypper` check and
+before it refreshes metadata or changes any package, when a selected alias is also the name of another repository the
+image defines, enabled or disabled, because zypper reads a selection as an alias or a name and could take that other
+repository for it.
+
+#### Scenario: Alias that is a disabled repository's name fails
+
+- **WHEN** `repositories` holds the alias of an enabled repository that a disabled repository the image defines has as
+  its name, and `packages` names a package
+- **THEN** the feature exits with status 1, names the alias, downloads no metadata, and changes no package
+
+### Requirement: Repository selection changes no repository
+
+The feature SHALL NOT enable, add, remove, or edit a repository to honor the `repositories` option, and SHALL NOT accept
+a repository's name, number, or URI in place of its alias. The selection SHALL NOT narrow cleanup: the requirement
+"Clean package caches" applies to the caches of every repository.
+
+#### Scenario: Repository number is not accepted as an alias
+
+- **WHEN** `repositories` holds the number of an enabled repository and `packages` names a package
+- **THEN** the feature exits with status 1, names `repositories` and the item, and no repository changes
+
+### Requirement: Repository selection risk is accepted
+
+A non-empty `repositories` SHALL restrict the installation, and the feature knowingly leaves one risk in place.
+zypper(8) discourages working with a selection of repositories, because the unselected ones are hidden from the
+resolver, which then decides without them, and it announces that the selection will later restrict only the listed
+packages. The feature accepts this because hiding the unselected repositories is what lets a build depend on, and
+refresh, only the repositories it names.
+
+#### Scenario: Unselected repositories stay hidden from the resolver
+
+- **WHEN** `repositories` names an enabled repository, and a dependency of a listed package is offered only by an
+  enabled repository outside the selection
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+### Requirement: Removal protection under a selection is zypper's
+
+With a non-empty `repositories`, the requirement "Installed packages are not removed" SHALL hold, but, because the
+selection hides the unselected repositories from the resolver, only as far as zypper's own behavior: the feature passes
+no option that permits a removal and fails when zypper, running without input, declines a solution that removes a
+package, but it adds no check of its own and cannot promise more than zypper does for an installed package that came
+from an unselected repository.
+
+#### Scenario: Conflict under a selection fails
+
+- **WHEN** `repositories` selects a repository offering a listed package that conflicts with an installed package which
+  came from an unselected repository
+- **THEN** the feature exits with a non-zero status, installs none of the listed packages, and the installed package
+  stays
+
+### Requirement: Lock wait stays per call
+
+The feature SHALL NOT pass a non-empty `lockTimeout` to any other process or persist it. The wait is counted per call
+and is not a deadline for the feature, and it MAY run past the value until libzypp's next check of the lock. When a call
+does not obtain the lock, the feature SHALL exit with a non-zero status, and a refresh or an installation that did not
+obtain it changes no package.
+
+#### Scenario: Lock not obtained fails without package change
+
+- **WHEN** another process holds libzypp's system lock for longer than the `lockTimeout`
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+### Requirement: Transfer timeout is an inactivity limit
+
+A non-empty `transferTimeout` SHALL be the number of seconds without any received data after which libzypp aborts a
+transfer (`download.transfer_timeout`): an inactivity limit, not a deadline for the feature, so the option does not
+abort a transfer that keeps receiving data. zypp.conf(5) words the setting as the maximum time of a transfer operation;
+this requirement follows what libzypp does.
+
+#### Scenario: Receiving transfer is not aborted
+
+- **WHEN** `transferTimeout` is a valid non-empty value and a download keeps receiving data, with every pause shorter
+  than that value, for longer than that value in total
+- **THEN** the download completes
+
+### Requirement: Timeouts change nothing else
+
+libzypp separately ends every single transfer after 3600 seconds, with or without `transferTimeout`, and the feature
+does not change that. Neither `connectTimeout` nor `transferTimeout` SHALL change retries, mirror selection, proxy
+settings, TLS, or signature checking.
+
+#### Scenario: Timeout leaves the proxy configuration
+
+- **WHEN** `connectTimeout` is non-empty and the image configures a proxy for libzypp
+- **THEN** the feature's `zypper` calls use that proxy configuration unchanged
+
+### Requirement: Download retries are knowingly partial
+
+`downloadRetries` is knowingly a partial control. It promises nothing for package files: when the option was specified,
+libzypp applied the setting to repository metadata requests only and tried a package file once on each mirror it knew
+for it, and the fixed retries zypper itself performs on other commands are not affected. The feature accepts this
+because it is the bounded retry libzypp offers per invocation, and it SHALL NOT repeat a refresh or an installation
+itself to make up for it.
+
+#### Scenario: Failed installation is not repeated
+
+- **WHEN** `downloadRetries` is greater than `0` and the installation fails
+- **THEN** the feature exits with a non-zero status having made the installation call once
+
+### Requirement: The override file is written only when needed and removed
+
+When `connectTimeout`, `transferTimeout`, and `downloadRetries` are all empty, the feature SHALL write no configuration.
+Otherwise the temporary file of the requirement "Timeout and retry overrides are temporary" SHALL be a new file: the
+feature SHALL NOT edit, replace, or mask an existing file, and SHALL remove the file and every directory it created for
+it when it exits, after a success and after a failure alike.
+
+#### Scenario: Override file is gone after a failed run
+
+- **WHEN** the feature fails after it wrote the override file
+- **THEN** neither the file nor any directory the feature created for it exists afterwards
+
+### Requirement: An override that cannot take effect fails
+
+A non-empty timeout or retry option that cannot take effect SHALL fail instead of being ignored: the feature SHALL exit
+with status 1 and a message naming the option and the cause, before it refreshes metadata or changes any package, when
+`ZYPP_CONF` is set in the feature's environment, also to an empty value, or when the image's libzypp does not provide
+the RPM capability `libzypp(econf)`, which zypp.conf(5) names as the mark of every libzypp that reads such additional
+configuration files.
+
+#### Scenario: Empty ZYPP_CONF fails an override
+
+- **WHEN** `ZYPP_CONF` is set to an empty value, a timeout or retry option is non-empty, and `packages` names a package
+- **THEN** the feature exits with status 1, names the option and `ZYPP_CONF`, and changes no package
+
+### Requirement: ZYPP_CONF is untouched
+
+The feature SHALL NOT set, change, or unset `ZYPP_CONF`; when that variable is set, also to an empty value, libzypp
+reads solely the file it names, or only its builtin defaults when it names none. With `connectTimeout`,
+`transferTimeout`, and `downloadRetries` all empty, neither that condition nor the absence of `libzypp(econf)` is
+examined and neither fails the feature.
+
+#### Scenario: ZYPP_CONF without an override is passed unchanged
+
+- **WHEN** `ZYPP_CONF` is set to a path and `connectTimeout`, `transferTimeout`, and `downloadRetries` are empty
+- **THEN** the feature runs `zypper` with that variable unchanged and does not fail because of it
+
+### Requirement: Later image configuration can override an option
+
+Overrides SHALL use a file libzypp reads besides the image's configuration, and the feature knowingly leaves two risks
+in place, the second in "Econf is the only support test". An image configuration file that libzypp reads after the
+feature's file and that sets the same key overrides the option, undetected: detecting it would mean re-implementing
+libzypp's merging of configuration files, where a mistake would silently change settings, the signature settings
+included.
+
+#### Scenario: Later image configuration overrides an option
+
+- **WHEN** a timeout or retry option is non-empty and a configuration file of the image that libzypp reads after the
+  feature's file sets the same key
+- **THEN** the image's value takes effect and the feature does not fail because of it
+
+### Requirement: Econf is the only support test
+
+An override SHALL fail when the image's libzypp does not provide the RPM capability `libzypp(econf)`, as the requirement
+"An override that cannot take effect fails" states, and this is the second risk the feature knowingly leaves in place:
+the capability is the feature's only test of support, and it does not verify afterwards that libzypp read its file.
+
+#### Scenario: Libzypp without econf fails an override
+
+- **WHEN** a timeout or retry option is non-empty, `packages` names a package, and the image's libzypp does not provide
+  the RPM capability `libzypp(econf)`
+- **THEN** the feature exits with status 1, names the option, and neither refreshes metadata nor changes any package

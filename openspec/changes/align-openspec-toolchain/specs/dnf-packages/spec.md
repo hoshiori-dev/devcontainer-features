@@ -4,10 +4,10 @@
 
 ### Requirement: Installation controls are validated before changes
 
-Before package-manager calls or cache creation, the feature SHALL validate booleans, enums, timeouts, retry/concurrency
-values, repository identifiers, and package entries. Network timeout is 1–3600 and parallel downloads 1–20, both
-canonical ASCII decimals. Invalid values fail status 1 naming the option; valid empty lists do no package work or
-repository-existence checks.
+The feature SHALL validate `installWeakDeps`, `refreshPolicy`, `cleanup`, `networkTimeout`, `best`,
+`enableRepositories`, `disableRepositories`, `parallelDownloads` and all package entries before invoking any
+package-manager command or creating any cache. Boolean options SHALL accept only `true` or `false`; enum options SHALL
+accept only their declared values, in the letter case declared, and never an empty value.
 
 #### Scenario: Invalid control fails before any change
 
@@ -56,10 +56,10 @@ repository-existence checks.
 
 ### Requirement: Install the listed packages
 
-The feature SHALL install listed packages and dependencies only from repositories enabled for this invocation. Weak
-Recommends and Supplements follow installWeakDeps. Other installed packages do not upgrade except listed packages and
-their needs; best controls whether a listed unversioned package may upgrade, with inherit following image DNF
-configuration.
+The feature SHALL install, with `dnf`, every package named in the comma-separated `packages` option, taking each package
+and its dependencies only from the repositories enabled for this invocation: those the image enables, as
+`enableRepositories` and `disableRepositories` adjust them. Weak Recommends and Supplements SHALL be excluded when
+`installWeakDeps=false` and considered by DNF when `installWeakDeps=true`.
 
 #### Scenario: Listed packages are installed
 
@@ -87,9 +87,10 @@ configuration.
 
 ### Requirement: Version and architecture qualifiers
 
-The feature SHALL pass version forms `name-version` or `name-version-release` (optionally prefixed by `epoch:`) and
-architecture forms `name.architecture` unchanged. Architecture must be offered for the image. A pinned version is
-installed even when that upgrades or downgrades the package and any installed package that must change with it.
+The feature SHALL pass an entry that adds a version to a package name (`name-version` or `name-version-release`, the
+version optionally preceded by `epoch:`) or an architecture (`name.architecture`, also after a version) to `dnf`
+unchanged, so that `dnf` selects that version or that architecture of the package. An architecture qualifier selects
+only an architecture that the enabled repositories offer for the image.
 
 #### Scenario: Pinned version is installed
 
@@ -113,9 +114,11 @@ installed even when that upgrades or downgrades the package and any installed pa
 
 ### Requirement: Entries are validated before anything changes
 
-Entries SHALL start with an ASCII letter or digit, use only ASCII letters, digits, `.`, `_`, `+`, `-`, `:`, `~`, `^`,
-and not end in `.rpm` in any case. Invalid entries fail status 1 naming the entry before checking dnf, loading metadata,
-or installing. Accepted entries are single arguments, never shell code.
+The feature SHALL accept an entry only when it starts with an ASCII letter or a digit, consists only of ASCII letters,
+digits, and `.`, `_`, `+`, `-`, `:`, `~`, and `^`, and does not end in `.rpm` in any letter case. When any entry is
+refused, the feature SHALL exit with status 1 and a message naming that entry before it checks for `dnf`, loads
+repository metadata, or installs anything. The feature SHALL hand every accepted entry to `dnf` as one argument and
+SHALL NOT evaluate it as shell code.
 
 #### Scenario: URL or path is refused
 
@@ -147,9 +150,11 @@ or installing. Accepted entries are single arguments, never shell code.
 
 ### Requirement: Entries select packages as dnf matches them
 
-For each entry the feature SHALL install DNF’s same-case match by package name and qualifiers, then capability provider,
-then (where native DNF supports it) program in `/usr/bin` or `/usr/sbin`. An entry selecting nothing fails the
-transaction before any listed package is installed.
+The feature SHALL install for each entry the package that `dnf` selects for it from the enabled repositories: a package
+whose name, or name with the entry's qualifiers, equals the entry in the same letter case; failing that, one that
+provides the entry as a capability; and, on an image whose `dnf` also matches program names, one that ships the entry as
+a program in `/usr/bin` or `/usr/sbin`. When one entry selects nothing, the feature SHALL fail and install none of the
+listed packages.
 
 #### Scenario: Unknown package fails
 
@@ -177,10 +182,10 @@ transaction before any listed package is installed.
 
 ### Requirement: Repository metadata refresh
 
-default SHALL let DNF use image settings, including skippable repositories. always SHALL refresh every enabled
-repository and fail before installation on any refresh or verification error, even skippable ones. never SHALL use
-cache-only mode, fetch neither metadata nor packages, and fail before installation if usable metadata or a required
-package file is absent/invalid. Cached metadata may be expired; no mode relaxes signature or TLS checks.
+With `refreshPolicy=default`, DNF SHALL decide missing or expired metadata using the image configuration and MAY skip a
+repository the image marks skippable. With `always`, the feature SHALL force a metadata check of every enabled
+repository and SHALL fail before installation when any enabled repository cannot be refreshed or verified, including one
+the image marks skippable. No policy SHALL change signature or TLS checks.
 
 #### Scenario: Missing metadata is downloaded
 
@@ -230,10 +235,11 @@ package file is absent/invalid. Cached metadata may be expired; no mode relaxes 
 
 ### Requirement: Package signature checking stays in effect
 
-The feature SHALL preserve image-configured signature (`gpgcheck`: https://dnf.readthedocs.io/en/latest/conf_ref.html;
-`pkg_gpgcheck`: https://dnf5.readthedocs.io/en/latest/dnf5.conf.5.html) and TLS checks, without weakening them or
-altering image repositories, keys, or DNF configuration. Image-disabled signature checking stays disabled.
-Package-shipped files and image index-service rewrites are outside feature changes.
+The feature SHALL leave the signature checks that the image's `dnf` configuration sets in effect
+(https://dnf.readthedocs.io/en/latest/conf_ref.html, `gpgcheck`; https://dnf5.readthedocs.io/en/latest/dnf5.conf.5.html,
+`pkg_gpgcheck`): it SHALL NOT pass any option or configuration that disables or relaxes a signature or TLS check. A
+repository whose image configuration turns the package signature check off stays unchecked: the feature neither turns
+the check on nor refuses the repository.
 
 #### Scenario: Unverifiable package fails
 
@@ -265,10 +271,10 @@ Package-shipped files and image index-service rewrites are outside feature chang
 
 ### Requirement: Clean package caches
 
-After success, all SHALL explicitly remove downloaded packages and repository metadata from effective DNF cache;
-packages removes downloaded packages but leaves usable metadata; none performs no explicit deletion. No mode removes
-installed databases, keys, or unrelated paths. Native config/hooks may delete files independently; none cannot guarantee
-retention and packages cannot create missing metadata.
+After successful installation, `cleanup=all` SHALL explicitly remove downloaded package files and repository metadata
+from the effective DNF cache. With `packages`, it SHALL explicitly remove downloaded package files while leaving usable
+metadata; with `none`, it SHALL perform no explicit cache deletion. No mode SHALL remove installed-package databases,
+signing keys, or unrelated paths.
 
 #### Scenario: Caches are removed
 
@@ -292,10 +298,10 @@ retention and packages cannot create missing metadata.
 
 ### Requirement: Installing the feature twice
 
-A second install SHALL retain packages from both successful lists and resolve its list as a first install would. It may
-upgrade unversioned listed packages/dependencies and SHALL install pinned versions, including downgrades. Each
-invocation uses its own controls: refresh/cleanup, weak-dependency, repository, best-version and parallel-download
-settings do not persist; prior optional packages and packages from temporarily enabled repositories remain installed.
+Installing the feature a second time SHALL leave installed every package that either installation listed, and SHALL
+treat the second list as a first installation would. The second installation MAY upgrade an installed package that its
+list names without a version, or that a package of its list needs, and SHALL install a version its list pins, also below
+the installed one.
 
 #### Scenario: Same list on the second install
 
@@ -336,9 +342,11 @@ settings do not persist; prior optional packages and packages from temporarily e
 
 ### Requirement: Best-version policy is scoped to installation
 
-best=inherit SHALL pass no setting; true/false override image policy for install only. true selects each listed
-package’s highest enabled version or fails; false may fall back and leaves an installed unversioned package unless
-transaction needs a higher version. This does not affect pins, allow erasure, skip unresolved entries, or persist.
+With `best=inherit`, the feature SHALL pass no best-version setting, so the image's `dnf` configuration decides, as
+before this option existed. With `true` or `false`, the feature SHALL set DNF's `best` setting to that value for its
+install call only, whatever the image configures, in the same way on every supported `dnf` generation. The policy SHALL
+NOT change how a pinned version is installed, permit erasing an installed package, skip an unresolvable entry, or
+persist a setting in the image.
 
 #### Scenario: Native best policy is inherited
 
@@ -369,11 +377,9 @@ transaction needs a higher version. This does not affect pins, allow erasure, sk
 
 ### Requirement: Repository selection is scoped to installation
 
-Enabled repositories SHALL be image-enabled minus disabled plus explicitly enabled. Empty options pass no selection.
-Selection applies to refresh, cache checks, install, timeout, concurrency and signature rules; omitted repositories are
-not loaded. IDs match configured IDs exactly; unknown IDs fail status 1 before metadata/package changes, checked locally
-only for nonempty lists. Selection changes no image files, is not exclusive/pattern/location based, and cleanup covers
-all cache.
+The repositories enabled for an invocation SHALL be the repositories the image enables, without those named in
+`disableRepositories`, together with those named in `enableRepositories`. With both options empty the feature SHALL pass
+no repository selection, so the image's set applies, as before these options existed.
 
 #### Scenario: Image repository set is inherited
 
@@ -455,9 +461,10 @@ all cache.
 
 ### Requirement: Parallel downloads are bounded
 
-Empty parallelDownloads SHALL preserve native concurrency. A nonempty value bounds simultaneous downloads globally and
-per enabled repository, overriding per-repository settings; mirror limits may lower actual concurrency. It changes no
-timeout, retry, speed, mirror, checks, or persistent image setting.
+An empty `parallelDownloads` SHALL leave the native download concurrency unchanged. A non-empty value SHALL be the upper
+bound of simultaneous downloads on the feature's install call, set for `dnf` as a whole and for every enabled
+repository, so that a repository's own setting cannot replace it. It SHALL NOT change the timeout, retry, speed, or
+mirror-selection settings, disable a check, or persist a setting in the image.
 
 #### Scenario: Native parallel downloads are inherited
 
@@ -484,9 +491,10 @@ timeout, retry, speed, mirror, checks, or persistent image setting.
 
 ### Requirement: Undeclared settings are inherited
 
-The feature SHALL set no proxy, repository variable, DNF-config-selection environment, retry, or lock setting. DNF has
-no bounded retry or lock wait on supported generations, so image configuration and build environment continue to govern
-these behaviors unchanged.
+The feature SHALL pass `dnf` no proxy, repository-variable, retry, or lock setting. It SHALL NOT set a proxy, SHALL NOT
+set, change, or unset a repository variable or any environment variable that selects `dnf` configuration, and SHALL NOT
+pass a retry count, a lock setting, or a switch that skips a lock: `dnf` offers no bounded retry and no bounded lock
+wait on the supported generations, so the feature declares no option for either and `dnf`'s own behavior applies.
 
 #### Scenario: Proxy and repository variables are inherited
 
@@ -500,41 +508,302 @@ these behaviors unchanged.
 
 ## ADDED Requirements
 
+### Requirement: Numeric installation controls are canonical
+
+A non-empty `networkTimeout` SHALL be a canonical ASCII decimal integer string from `1` through `3600`, with no sign,
+whitespace, leading zero, or other character. A non-empty `parallelDownloads` SHALL be such a string from `1` through
+`20`; the feature refuses every other value itself, because `dnf` accepts some of them at option parsing and fails
+later, when it sets up repository access.
+
+#### Scenario: Out-of-range numeric control is refused
+
+- **WHEN** `networkTimeout` is `3601` or `parallelDownloads` is `21`, also when packages is empty
+- **THEN** the feature exits with status 1, names the option, and invokes no package-manager command
+
 ### Requirement: Repository list syntax is constrained
 
-Each enableRepositories and disableRepositories identifier SHALL start with an ASCII letter or digit and contain only
-ASCII letters, digits, `_`, `.`, `:`, or `-`, independent of locale. The comma-separated lists ignore surrounding
-whitespace, empty items, and duplicates. An identifier in both lists is refused. Accepted IDs are passed in one
-argument, never shell code.
+`enableRepositories` and `disableRepositories` SHALL each be a comma-separated list of repository identifiers in which
+whitespace around an identifier and empty items are ignored and a repeated identifier counts once. An identifier SHALL
+start with an ASCII letter or a digit and consist only of ASCII letters, digits, and the characters `_`, `.`, `:`, and
+`-`, whatever the locale, so that a pattern, an option-like value, and an identifier holding `/`, `=`, or whitespace are
+refused.
 
 #### Scenario: Invalid repository identifier is rejected
 
-- **WHEN** an identifier contains a pattern character, starts with `-`, contains `/`, `=`, inner whitespace or a
-  non-ASCII letter, or appears in both lists
-- **THEN** validation fails with status 1 naming the option and identifier before any change
+- **WHEN** a repository list holds an identifier containing a pattern character, a `/`, a `=`, or inner whitespace, or
+  starting with `-`
+- **THEN** the feature exits with status 1, names the option and the identifier, and changes nothing
 
-### Requirement: Omitted repositories have explicit resolution risks
+### Requirement: Refused controls are reported before changes
 
-When an omitted repository carries a listed package or dependency, DNF SHALL fail as unresolvable; when it carries image
-updates, DNF selects older versions available elsewhere. The feature accepts this because repository choice is explicit
-in configuration. Explicitly enabling an image-configured testing repository is likewise an explicit devcontainer.json
-choice visible to reviewers, including that repository's own signature and key settings.
+An identifier present in both `enableRepositories` and `disableRepositories` SHALL be refused. The feature SHALL hand
+every accepted identifier to `dnf` as part of one argument and SHALL NOT evaluate it as shell code. Invalid options
+SHALL fail with status 1 and a message naming the option, and for a refused identifier also that identifier.
 
-#### Scenario: Omitted repository contains an update
+#### Scenario: Identifier in both lists is reported
 
-- **WHEN** an omitted repository carries a newer version of a listed package than remaining enabled repositories
-- **THEN** DNF selects only among the remaining enabled repositories
+- **WHEN** the same identifier appears in `enableRepositories` and `disableRepositories`
+- **THEN** the feature exits with status 1, names the identifier, and changes nothing
+
+### Requirement: Empty package list skips installation controls
+
+With valid options and an empty package list, the feature SHALL succeed without refreshing, upgrading, cleaning, or
+changing any configuration, also without the package manager, and without checking whether a listed repository exists.
+Whether a listed repository is configured is not part of the validation that "Installation controls are validated before
+changes" states; the requirement "Repository selection is scoped to installation" governs it.
+
+#### Scenario: Unconfigured repository identifier with an empty list
+
+- **WHEN** packages is empty and a repository list names an identifier the image does not configure
+- **THEN** the feature succeeds without invoking the package manager or touching any cache
+
+### Requirement: Upgrades are limited to the listed packages
+
+Apart from the weak-dependency selection that `installWeakDeps` makes, the feature SHALL NOT upgrade installed packages
+other than the listed packages and what they need. A listed package that the image already has MAY be upgraded when the
+list names it without a version, as the `best` option decides and, with `best=inherit`, the image's `dnf` configuration.
+
+#### Scenario: Listed package at its newest version stays
+
+- **WHEN** `packages` names, without a version, a package that is already installed at the newest version the enabled
+  repositories offer
+- **THEN** the feature succeeds and the package stays at that version
+
+### Requirement: Pinned versions override the installed version
+
+A pinned version SHALL be installed whatever version of the package is installed, so that `dnf` upgrades or downgrades
+the package, and any installed package that must change with it, to match the pin.
+
+#### Scenario: Pin below the installed version
+
+- **WHEN** `packages` holds `name-version-release` with a version older than the one installed, which the repositories
+  offer
+- **THEN** the feature succeeds and exactly the pinned version of the package is installed
+
+### Requirement: Cache-only refresh policy
+
+With `refreshPolicy=never`, the feature SHALL use DNF cache-only mode, SHALL NOT fetch metadata or package files, and
+SHALL fail before installation if any enabled repository lacks usable cached metadata or a required package file is
+absent or invalid. Existing cached metadata MAY be expired.
+
+#### Scenario: Cache-only installation without usable metadata fails
+
+- **WHEN** `refreshPolicy=never` and an enabled repository has no usable cached metadata
+- **THEN** the feature fails before installing without attempting a metadata download
+
+### Requirement: Signature checking changes no image configuration
+
+The feature SHALL NOT itself add or remove a repository, or change any repository file, signing key, or `dnf`
+configuration file in the image. Enabling or disabling a repository through `enableRepositories` and
+`disableRepositories` applies to the invocation only and changes none of those files. Files that the packages it
+installs ship are not the feature's changes.
+
+#### Scenario: Installation leaves the image configuration unchanged
+
+- **WHEN** the feature has installed packages none of which, with their dependencies, ships a file under
+  `/etc/yum.repos.d`, `/etc/dnf`, or `/etc/pki/rpm-gpg`, and every key their signatures need was already in the RPM
+  keyring
+- **THEN** the repository files, the `dnf` configuration, the key files, and the keys in the RPM keyring are the same as
+  before it ran
 
 ### Requirement: Repository-configured signing keys retain native trust
 
-DNF MAY import a repository-configured signing key from a local or remote location; it remains in the RPM keyring after
-verification failure. The feature SHALL name or supply no key and check no fingerprint or checksum. Remote transport
-alone protects the key (TLS on HTTPS, none on HTTP). An explicitly enabled repository retains image key and signature
-settings; this is accepted because those settings are visible in image configuration.
+When a package's signature needs a key that is not yet in the RPM keyring, `dnf` MAY import, without confirmation, the
+key that the package's repository configuration names for it, from a local file or a remote location, and that key stays
+in the keyring even when the signature check then fails. The feature names no key and passes no key location; every key
+`dnf` imports is one the image's repository configuration names, and the feature SHALL NOT itself add a signing key.
 
 #### Scenario: Repository key is imported under image configuration
 
 - **WHEN** a package signature requires a key named by the enabled repository configuration and not yet in the RPM
   keyring
-- **THEN** DNF may import that configured key without confirmation, and the feature adds no key source or fingerprint
-  check
+- **THEN** `dnf` may import that configured key without confirmation, and the feature names no key and passes no key
+  location
+
+### Requirement: Imported keys rely on their transport
+
+The feature checks a key that `dnf` imports for a package's signature against no pinned fingerprint or checksum: a key
+from a remote location relies on that location's transport alone, which is TLS for an HTTPS URL and no protection for a
+plain HTTP URL. The feature SHALL NOT pass any option or configuration that disables or relaxes that TLS check.
+
+#### Scenario: Remote key over HTTPS keeps TLS in effect
+
+- **WHEN** a repository configuration names a key at an HTTPS URL that is not yet in the RPM keyring and `dnf` imports
+  it
+- **THEN** the image's TLS checks apply to that download, and the feature checks the key against no pinned fingerprint
+  or checksum
+
+### Requirement: Temporarily enabled repositories keep their image settings
+
+A repository named in `enableRepositories` is used with the settings its own configuration in the image gives it, its
+signature check and key location included, and all signature rules of this specification hold for it; the feature SHALL
+NOT add a repository or relax a check.
+
+#### Scenario: Enabled repository applies its own signature check
+
+- **WHEN** `enableRepositories` names a repository whose configuration turns the package signature check on, and a
+  package to install from it carries a signature its configured keys cannot verify
+- **THEN** the feature exits with a non-zero status and installs none of the listed packages
+
+### Requirement: Image-configured repositories may be enabled explicitly
+
+The feature SHALL NOT add a repository or relax a check; `enableRepositories` lets a `devcontainer.json` install from a
+repository the image's author configured and left disabled, such as a testing repository, one whose signature check is
+turned off, or one that names a remote key. The feature accepts this: the repository and its settings come from the
+image, the feature adds no repository and relaxes no check, and the identifier is explicit in the configuration, where a
+reviewer can see it.
+
+#### Scenario: Disabled repository with signature check off is used as configured
+
+- **WHEN** `enableRepositories` names a repository the image configures and leaves disabled, whose configuration turns
+  the package signature check off, and `packages` names a package only that repository offers
+- **THEN** the feature installs the package without turning the signature check on, and afterwards the repository is
+  still disabled in the image
+
+### Requirement: Native cache deletion is independent of cleanup
+
+Package-manager configuration or image hooks MAY independently delete downloads; `cleanup=none` does not guarantee that
+package files are retained, and `cleanup=packages` does not guarantee that missing metadata is created. The feature
+SHALL NOT override such a native deletion.
+
+#### Scenario: Native deletion under cleanup none
+
+- **WHEN** `cleanup=none` but a native setting or image hook deletes package files
+- **THEN** the feature does not override the native deletion and does not promise retained packages
+
+### Requirement: Controls of an earlier installation do not carry over
+
+The second invocation SHALL use its own control values, with no permanent override of image configuration. Earlier cache
+choices SHALL NOT override the later refresh or cleanup policy. Disabling optional dependencies on a later invocation
+SHALL NOT uninstall previously installed packages.
+
+#### Scenario: Later refresh and cleanup values apply
+
+- **WHEN** the first invocation preserves metadata and the second uses different refresh or cleanup values with a
+  non-empty compatible package list
+- **THEN** the second invocation follows its own values and does not persist control settings
+
+### Requirement: Repository and solver controls of an earlier installation do not carry over
+
+A repository the first invocation enabled or left out, its best-version policy, and its parallel-download bound SHALL
+NOT apply to the second, which starts from the image's configuration; a package the first invocation installed from a
+temporarily enabled repository SHALL stay installed when the second does not enable that repository.
+
+#### Scenario: Earlier repository selection does not apply
+
+- **WHEN** the first invocation installs a package from a repository named in `enableRepositories`, and the second runs
+  with default controls and a list naming a package the image's enabled repositories offer
+- **THEN** the second installation succeeds using only the image's enabled repositories, and the package from the
+  temporarily enabled repository stays installed
+
+### Requirement: Best true selects the highest version
+
+When the feature sets DNF's `best` setting to `true`, as it SHALL for `best=true`, `dnf` uses the highest version the
+enabled repositories offer of each listed package or fails, so a listed package that is installed and named without a
+version is upgraded when a higher version is offered.
+
+#### Scenario: Best true upgrades an installed unversioned package
+
+- **WHEN** `best=true` and `packages` names, without a version, an installed package of which the enabled repositories
+  offer a higher version that can be installed
+- **THEN** the feature succeeds and the package is upgraded to that version
+
+### Requirement: Best false allows a lower version
+
+When the feature sets DNF's `best` setting to `false`, as it SHALL for `best=false`, `dnf` MAY fall back to a lower
+version of a listed package, and a listed package that is installed and named without a version stays as installed
+unless another package of the transaction requires a higher version of it.
+
+#### Scenario: Best false keeps an installed unversioned package
+
+- **WHEN** `best=false` and `packages` names, without a version, an installed package of which the enabled repositories
+  offer a higher version, and nothing else to install requires that higher version
+- **THEN** the feature succeeds and the package stays at its installed version
+
+### Requirement: Enabled repositories mean the selected set
+
+Wherever this specification speaks of the enabled repositories, it means the set that "Repository selection is scoped to
+installation" defines, which SHALL be the repositories enabled for an invocation: the refresh policy, the network
+timeout, the parallel-download bound, and the signature requirement apply to a temporarily enabled repository as to any
+other, and a repository left out is neither loaded nor required to hold cached metadata.
+
+#### Scenario: Left-out repository needs no cached metadata
+
+- **WHEN** `refreshPolicy=never`, an enabled repository has no usable cached metadata, `disableRepositories` names it,
+  and every other requirement of the cache-only policy is met
+- **THEN** the feature installs the listed packages from the remaining repositories
+
+### Requirement: Unknown repository identifiers fail before installation
+
+Both options name only repositories the image already configures. A listed identifier that equals, in the same letter
+case, no identifier of a repository the image configures SHALL fail the feature with status 1 and a message naming the
+option and the identifier, before `dnf` loads repository metadata or changes a package, alike on every supported `dnf`
+generation.
+
+#### Scenario: Unconfigured identifier fails
+
+- **WHEN** either list names an identifier of no repository the image configures, with a non-empty package list
+- **THEN** the feature exits with status 1, names the option and the identifier, loads no repository metadata, and
+  installs none of the listed packages
+
+### Requirement: Repository identifiers are checked locally
+
+The feature SHALL make the check of "Unknown repository identifiers fail before installation" itself, from `dnf`'s list
+of configured repositories and without network access, and only when the package list is not empty; when that list
+cannot be read, the feature SHALL fail with status 1 before installing. An identifier whose repository is already in the
+requested state SHALL be accepted and change nothing.
+
+#### Scenario: Configured repository list is unreadable
+
+- **WHEN** a repository list is not empty, the package list is not empty, and `dnf` fails to list the configured
+  repositories
+- **THEN** the feature exits with status 1 and installs none of the listed packages
+
+### Requirement: Repository selection changes no repository file
+
+The selection SHALL apply to the feature's install call only: the feature SHALL NOT create, edit, or remove a repository
+file, SHALL NOT select an exclusive repository set, expand a pattern, or pass a repository location, and the image's
+enabled set SHALL be the same after the feature as before it. The cleanup the `cleanup` option selects SHALL cover the
+cache of a temporarily enabled repository like that of any other.
+
+#### Scenario: Enabled repository stays disabled in the image
+
+- **WHEN** `enableRepositories` names a repository the image configures and leaves disabled, and `packages` names a
+  package only that repository offers
+- **THEN** afterwards the repository is still disabled in the image and its repository file is unchanged
+
+### Requirement: Omitted repositories have explicit resolution risks
+
+A repository left out SHALL stay enabled in the image, as "Repository selection changes no repository file" requires.
+Leaving a repository out is the developer's choice and is not checked: when it carries a listed package or a dependency
+the installation fails as unresolvable, and when it carries the image's updates `dnf` selects the older versions the
+remaining repositories offer. The feature accepts this because the value is explicit in the configuration.
+
+#### Scenario: Left-out repository carries a listed package
+
+- **WHEN** `disableRepositories` names a repository the image enables, and `packages` names a package only that
+  repository offers
+- **THEN** the feature exits with a non-zero status, installs none of the listed packages, and afterwards the repository
+  is still enabled in the image
+
+### Requirement: Per-mirror download limit is kept
+
+`parallelDownloads` is an upper bound only: the feature SHALL NOT change the image's limit of downloads per mirror,
+which MAY keep the number of simultaneous downloads from one mirror below the value.
+
+#### Scenario: Per-mirror limit lowers concurrency
+
+- **WHEN** `parallelDownloads` is higher than the image's limit of downloads per mirror and every package comes from one
+  mirror
+- **THEN** the feature succeeds, and the number of simultaneous downloads stays within the image's per-mirror limit
+
+### Requirement: Proxy, variable, retry, and lock behavior comes from the image
+
+Because the feature passes `dnf` none of these settings, proxy settings, repository variables, retry behavior, and lock
+waiting come from the image's configuration and the build environment, unchanged by the feature, which SHALL NOT set a
+proxy or a repository variable.
+
+#### Scenario: Image proxy reaches dnf
+
+- **WHEN** the image's configuration or the build environment sets a proxy or a repository variable
+- **THEN** `dnf` receives it as it would outside the feature, and the feature adds, changes, and removes none

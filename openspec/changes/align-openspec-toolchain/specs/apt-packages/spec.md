@@ -4,11 +4,11 @@
 
 ### Requirement: Install the listed packages
 
-The feature SHALL install listed packages and dependencies only from image repositories. installSuggests and
-installRecommends independently control whether APT considers each class; otherwise only listed packages and their needs
-may upgrade. It SHALL never remove installed packages: if removal is required, fail before changing installed packages.
-Enabling suggestions knowingly can grow the installed set by orders of magnitude; the developer chooses this and the
-feature sets no limit.
+The feature SHALL install, with `apt-get`, every package named in the comma-separated `packages` option, taking each
+package and its dependencies only from the repositories configured in the image.
+
+Accepted risk: with `installSuggests=true`, APT follows the suggestions of every package it newly installs, so the
+installed set can grow by orders of magnitude; the developer who enables it chooses that, and the feature sets no limit.
 
 #### Scenario: Conflicting package fails without removal
 
@@ -60,10 +60,10 @@ feature sets no limit.
 
 ### Requirement: Entries are validated before anything changes
 
-The feature SHALL accept only a package name whose prefix before the first colon or equals starts lowercase or a digit
-and contains lowercase letters, digits, dot, plus, hyphen; the rest permits letters, digits, dot, plus, hyphen, colon,
-tilde, equals. Entries cannot end in hyphen. Invalid entries fail status 1 before checking apt-get, refreshing, or
-installing; accepted values are single arguments, never shell code.
+The feature SHALL accept an entry only when its package name, the part before the first `:` or `=`, starts with a
+lower-case letter or a digit and consists only of lower-case letters, digits, and the characters `.`, `+`, and `-`; when
+the rest of the entry consists only of letters, digits, and the characters `.`, `+`, `-`, `:`, `~`, and `=`; and when
+the entry does not end in `-`.
 
 #### Scenario: URL or path is refused
 
@@ -99,9 +99,10 @@ installing; accepted values are single arguments, never shell code.
 
 ### Requirement: Entries name packages exactly
 
-After index readiness and before install, the feature SHALL check each exact actual or virtual package name, excluding
-its qualifier. It SHALL NOT accept regex, glob, task, or search-pattern matches. Virtual names need exactly one
-provider; version pins match an available version exactly, and trailing plus is not an install marker.
+The feature SHALL install a package for an entry only when the entry's package name, without its qualifier, is the exact
+name of a package known to the image's repositories. An entry SHALL NOT be matched as a regular expression, a glob, a
+task, or an APT search pattern. An entry that names a virtual package installs the package that provides it when exactly
+one package does, and fails when several do.
 
 #### Scenario: Unknown name ending in plus fails
 
@@ -141,10 +142,11 @@ provider; version pins match an available version exactly, and trailing plus is 
 
 ### Requirement: Package index refresh
 
-default SHALL refresh when no index exists and otherwise use the existing index regardless of age or coverage; always
-refreshes every configured repository. Any attempted refresh fails before install if a repository cannot refresh or
-verify. never uses existing indexes only and fails without fallback when unusable; it does not disable package downloads
-or relax authentication.
+With `refreshPolicy=default`, the feature SHALL refresh only when the image holds no package index, otherwise using the
+existing index without checking its age or repository coverage. With `always`, it SHALL refresh every configured
+repository even when an index exists. Any attempted refresh SHALL fail before installing if any repository cannot be
+refreshed or verified. The `refreshPolicy` option SHALL NOT disable package downloads or relax repository
+authentication.
 
 #### Scenario: Missing index is refreshed
 
@@ -180,9 +182,9 @@ or relax authentication.
 
 ### Requirement: Non-interactive installation
 
-The feature SHALL take package configuration questions’ defaults without input. For changed dpkg-tracked conffiles, keep
-retains the changed file and replace installs the packaged file, regardless of image APT/dpkg settings. It passes no
-policy for files managed by maintainer scripts such as ucf or debconf; those remain package-defined under either policy.
+The feature SHALL complete without reading any input: package configuration questions SHALL take their default answers,
+and when an upgrade ships a new version of a conffile dpkg tracks that was changed in the image, the changed file SHALL
+be kept with `conffilePolicy=keep` and replaced by the packaged file with `conffilePolicy=replace`.
 
 #### Scenario: Package that asks a question installs unattended
 
@@ -220,10 +222,9 @@ policy for files managed by maintainer scripts such as ucf or debconf; those rem
 
 ### Requirement: Clean package caches
 
-After success, all SHALL explicitly remove package files and repository metadata from APT’s effective archive/index
-paths; packages removes package files but retains usable metadata; none makes no explicit deletion. No mode removes
-installed-package databases, signing keys, or unrelated paths. Native configuration/hooks may delete files
-independently; none cannot guarantee retention and packages cannot create missing metadata.
+After successful installation, `cleanup=all` SHALL explicitly remove downloaded package files and repository metadata
+from APT's effective package archive and index locations. With `packages`, it SHALL explicitly remove downloaded package
+files while leaving usable metadata; with `none`, it SHALL perform no explicit cache deletion.
 
 #### Scenario: Caches are removed
 
@@ -247,10 +248,10 @@ independently; none cannot guarantee retention and packages cannot create missin
 
 ### Requirement: Installing the feature twice
 
-A second installation SHALL treat its list as a first would and retain packages from both successful lists. It fails
-without package changes if the second list requires removal. It may upgrade listed packages and dependencies, but uses
-its own target release, suggestion, conffile, retry, and lock settings; earlier optional packages remain, and later runs
-SHALL NOT downgrade a package installed from another release or restore a replaced configuration file.
+Installing the feature a second time SHALL treat the second list as a first installation would. When successful, it
+SHALL leave installed every package that either installation listed. If the second list requires removal of an installed
+package, it SHALL fail without changing installed packages. The second installation MAY upgrade an installed package
+that its list names without a version, or that a package of its list needs.
 
 #### Scenario: Same list on the second install
 
@@ -298,10 +299,9 @@ SHALL NOT downgrade a package installed from another release or restore a replac
 
 ### Requirement: Installation controls are validated before changes
 
-Before package-manager calls or cache creation, the feature SHALL validate all booleans, enums, entries, timeouts,
-retries, lock wait, and target release. Network/lock values are canonical decimals 1–3600; retries are 0–10, with only
-literal zero allowed to start with zero. Invalid values fail status 1 naming the option; valid empty lists do no package
-work.
+The feature SHALL validate `installRecommends`, `installSuggests`, `refreshPolicy`, `cleanup`, `conffilePolicy`,
+`networkTimeout`, `downloadRetries`, `lockTimeout`, `targetRelease` and all package entries before invoking any
+package-manager command or creating any cache. Invalid options SHALL fail with status 1 and a message naming the option.
 
 #### Scenario: Invalid control fails before any change
 
@@ -348,10 +348,10 @@ work.
 
 ### Requirement: Target release prefers a configured release
 
-An empty targetRelease SHALL add no preference; a value is an install-call preference, not a filter, and pins still win.
-APT compares the whole case-insensitive value with version fields only when it starts with a digit, otherwise
-suite/codename fields. The feature SHALL knowingly leave the risk that shared names hold back Debian security updates or
-raise Ubuntu backports, without warning.
+An empty `targetRelease` SHALL pass no release preference. A non-empty value SHALL make APT prefer that release on the
+install call only. It is a preference, not a filter: other releases stay usable, and a `name=version` entry keeps its
+version. APT compares the whole value, without regard to letter case, with one kind of release field only: a value that
+starts with a digit with release versions, and any other value with suite names and codenames.
 
 #### Scenario: Native release preference is inherited
 
@@ -403,10 +403,9 @@ raise Ubuntu backports, without warning.
 
 ### Requirement: Target release selects only among configured sources
 
-A targetRelease SHALL select only a release in the index used; the feature adds no source, component, or key, passes no
-target during refresh, and treats it as no pattern or key=value selector. If none matches, fail status 1 naming
-targetRelease and value after refresh and exact entry validation but before install. This check is needed because APT
-silently accepts other-kind release values and prefers nothing.
+A `targetRelease` SHALL select only among the releases present in the package index the feature uses. It SHALL add no
+source, component, or key, SHALL NOT be passed to the index refresh, and SHALL NOT be matched as a pattern, a regular
+expression, or a `key=value` selector.
 
 #### Scenario: Unknown release fails before any change
 
@@ -442,57 +441,212 @@ silently accepts other-kind release values and prefers nothing.
 
 ### Requirement: Optional package choices are independent
 
-installSuggests SHALL control suggested packages and installRecommends SHALL control recommended packages independently.
-With suggestions enabled, APT follows suggestions of every newly installed package; the feature knowingly places no
-limit on resulting growth because the developer explicitly enables it.
+Suggested packages SHALL be excluded when `installSuggests=false` and considered by APT when `installSuggests=true`,
+independently of `installRecommends`. Recommended packages SHALL be excluded when `installRecommends=false` and
+considered by APT when `installRecommends=true`. Apart from that dependency selection, the feature SHALL NOT upgrade
+installed packages other than the listed packages and what they need.
 
 #### Scenario: Suggestions are enabled independently
 
-- **WHEN** installSuggests=true and installRecommends=false
-- **THEN** APT considers suggestions but excludes recommendations
+- **WHEN** `installSuggests=true` and `installRecommends=false`, and a listed package has both a suggestion and a
+  recommendation
+- **THEN** the suggested package is installed and the recommended package is not
 
-### Requirement: Target-release validation follows index and entry checks
+### Requirement: Installation never removes packages
 
-The feature SHALL validate whether a target release exists only after refresh, exact package-name/version checks, and
-before install. It cannot validate source availability earlier because it needs the index and a non-empty package list;
-if an entry also fails, the entry failure ends the run first.
+The feature SHALL NOT remove any installed package to satisfy a listed package or its dependencies. When the requested
+installation requires removal, it SHALL fail before changing any installed package.
 
-#### Scenario: Invalid target fails after index checks
+#### Scenario: Required removal fails before any change
 
-- **WHEN** a non-empty package list names a well-formed target release absent from the refreshed index
-- **THEN** the feature fails naming targetRelease before installation
+- **WHEN** a listed package conflicts with a package already installed in the image
+- **THEN** the feature exits with a non-zero status, installs none of the listed packages, and leaves the installed
+  packages unchanged
 
-### Requirement: Apt control values are rejected before native misinterpretation
+### Requirement: Refused entries stop the run before package work
 
-The feature SHALL reject malformed retry and lock values because APT may interpret negative or oversized values as
-unbounded and other malformed numbers as its own default. It SHALL reject mistyped release key=value selectors that APT
-ignores and now, which names installed packages rather than a source.
+When any entry is refused by "Entries are validated before anything changes", the feature SHALL exit with status 1 and a
+message naming that entry before it checks for `apt-get`, refreshes the package index, or installs anything. The feature
+SHALL hand every accepted entry to `apt-get` as one argument and SHALL NOT evaluate it as shell code.
 
-#### Scenario: Native-invalid retry value is rejected
+#### Scenario: Refused entry is named and runs nothing
 
-- **WHEN** downloadRetries is negative or malformed
-- **THEN** validation fails before any APT command rather than allowing APT’s unbounded/default behavior
+- **WHEN** the `packages` value the feature receives holds an entry with a character outside the accepted set, such as
+  `;` or `$`
+- **THEN** the feature exits with status 1, names the entry, installs nothing, and runs no command contained in the
+  entry
 
-### Requirement: Target-release matching has no implicit pattern behavior
+### Requirement: Entry names are checked before installation
 
-The target release SHALL be compared as a whole value and according to its first character: digit-leading values against
-release versions, others against suite/codename fields, without case sensitivity. A shared field name selects every
-matching suite; the accepted risk is that this can hold back security updates on Debian or raise backports on Ubuntu
-without warning.
+The feature SHALL check every accepted entry's exact package name against APT's known actual and virtual names after the
+index is ready and before installation. A pinned version SHALL match an available version exactly; a trailing `+` SHALL
+NOT be interpreted as an install marker in a name or version.
 
-#### Scenario: Shared release field selects all matching suites
+#### Scenario: Pinned version ending in plus must match exactly
 
-- **WHEN** several configured suites carry the requested release name in the compared field kind
-- **THEN** APT prefers every matching suite
+- **WHEN** `packages` pins a package to an available version followed by `+`, and that resulting version is unavailable
+- **THEN** the feature exits with a non-zero status and leaves installed packages unchanged
+
+### Requirement: Refresh policy never uses only existing indexes
+
+With `refreshPolicy=never`, the feature SHALL use existing indexes without refreshing and SHALL fail before installation
+when no usable index exists; missing or unavailable requested packages SHALL fail without a refresh fallback.
+
+#### Scenario: Never refresh fails on missing metadata
+
+- **WHEN** refreshPolicy=never and a required repository has no usable cached metadata
+- **THEN** the feature fails before installing without attempting a metadata download
+
+### Requirement: Conffile outcomes do not depend on image settings
+
+Either outcome of `conffilePolicy` SHALL be reached without a question and SHALL NOT depend on the conffile handling
+that the image's APT or dpkg configuration selects. A configuration file that a package's own maintainer scripts manage,
+for example through ucf or debconf, is not a conffile: the feature passes no setting for it, and it is handled as that
+package decides under either policy.
+
+#### Scenario: Image setting does not defeat the policy
+
+- **WHEN** `conffilePolicy=keep` and the image's APT or dpkg configuration selects the packaged version of changed
+  conffiles
+- **THEN** the changed conffile is kept
+
+### Requirement: Cache cleanup leaves other data and native deletion alone
+
+No `cleanup` mode SHALL remove installed-package databases, signing keys, or unrelated paths. Package-manager
+configuration or image hooks MAY independently delete downloads; `cleanup=none` does not guarantee that package files
+are retained, and `cleanup=packages` does not guarantee that missing metadata is created.
+
+#### Scenario: Native deletion is not overridden
+
+- **WHEN** cleanup=none but a native setting or image hook deletes package files
+- **THEN** the feature does not override the native deletion and does not promise retained packages
+
+### Requirement: A later invocation uses its own control values
+
+The second invocation SHALL use its own control values, with no permanent override of image configuration. Earlier cache
+choices SHALL NOT override the later refresh or cleanup policy. Disabling optional dependencies on a later invocation
+SHALL NOT uninstall previously installed packages.
+
+#### Scenario: Second invocation follows its own controls
+
+- **WHEN** the first invocation preserves metadata and the second uses different refresh or cleanup values with a
+  non-empty compatible package list
+- **THEN** the second invocation follows its own values, retains the packages guaranteed by "Installing the feature
+  twice", and does not persist control settings
+
+### Requirement: Earlier source and download choices do not carry over
+
+An earlier invocation's target release, suggestion choice, configuration-file policy, retry count, and lock wait SHALL
+NOT apply to a later one. A later invocation SHALL NOT undo what an earlier one did under its own values: it SHALL NOT
+downgrade a package installed from another release, and SHALL NOT restore a configuration file that was replaced.
+
+#### Scenario: Later invocation does not downgrade
+
+- **WHEN** the first invocation installed a package from a target release, and the second lists the same package with
+  `targetRelease` empty
+- **THEN** the second invocation succeeds, removes no package, and downgrades none
+
+### Requirement: Empty list does no package work
+
+With valid options and an empty package list, the feature SHALL succeed without refreshing, upgrading, cleaning, or
+changing any configuration, also without the package manager.
+
+#### Scenario: Valid controls with an empty list change nothing
+
+- **WHEN** packages is empty and valid non-default controls are provided
+- **THEN** the feature succeeds without invoking the package manager or touching any cache
+
+### Requirement: Boolean and enum options accept only declared values
+
+Boolean options SHALL accept only `true` or `false`; enum options SHALL accept only their declared values.
+
+#### Scenario: Undeclared enum or boolean value is refused
+
+- **WHEN** conffilePolicy is a value other than `keep` or `replace`, or installSuggests is neither `true` nor `false`
+- **THEN** the feature exits with status 1, names the option, and changes nothing, also when packages is empty
+
+### Requirement: Control values are canonical
+
+A non-empty `networkTimeout` SHALL be a canonical ASCII decimal integer string from `1` through `3600`, with no sign,
+whitespace, leading zero, or other character. A non-empty `lockTimeout` SHALL follow the same rule with the same range.
+A non-empty `downloadRetries` SHALL follow the same rule from `0` through `10`, where the single digit `0` is the only
+accepted value that starts with a zero.
+
+#### Scenario: Non-canonical number is refused
+
+- **WHEN** `lockTimeout` is `01` or `-1`, or `downloadRetries` is `00`
+- **THEN** the feature exits with status 1, names the option, and changes nothing, also when packages is empty
 
 ### Requirement: Target-release syntax is validated
 
-A non-empty `targetRelease` SHALL be 1–64 ASCII characters, start with a letter or digit, contain only letters, digits,
-`.`, `+`, `_`, `~`, or `-`, and not equal `now` in any letter case.
+A non-empty `targetRelease` SHALL be one name of at most 64 characters that starts with an ASCII letter or digit and
+consists only of ASCII letters, digits, and the characters `.`, `+`, `_`, `~`, and `-`, and SHALL NOT be `now` in any
+letter case.
 
 #### Scenario: Target-release syntax restrictions apply
 
-- **WHEN** `targetRelease` is empty, a valid suite, codename or dotted version, or an invalid value with disallowed
-  characters, an invalid first character, excess length, or the value `now` in any case
-- **THEN** empty and valid names pass syntax validation, and each invalid value fails with status 1 naming
-  `targetRelease`
+- **WHEN** `targetRelease` holds `=`, `/`, or whitespace, starts with `-`, is longer than 64 characters, or is `now` in
+  any letter case
+- **THEN** the feature exits with status 1 naming `targetRelease` before a package-manager command
+
+### Requirement: Apt control values are rejected before native misinterpretation
+
+The feature SHALL refuse invalid control values itself because APT does not: APT reads a negative or oversized retry
+count and a negative lock wait as unbounded, replaces any other malformed number with a value of its own, does not check
+a release given as a `key=value` selector, so a mistyped one is ignored without an error, and accepts `now`, which names
+the installed packages and no source.
+
+#### Scenario: Native-invalid retry value is rejected
+
+- **WHEN** `downloadRetries` is `-1` or a number of twenty digits
+- **THEN** the feature exits with status 1 naming `downloadRetries` before a package-manager command
+
+### Requirement: Shared release names are an accepted risk
+
+A non-empty `targetRelease` SHALL make APT prefer every suite that carries the name in a release field of the kind it is
+compared with. Accepted risk: the name selects every such suite, so it holds back security updates where suites differ
+in them (Debian) and raises backports where they share them (Ubuntu), without a warning.
+
+#### Scenario: Shared release name prefers every suite carrying it
+
+- **WHEN** the configured sources hold several suites that carry the same codename or version, one of which the image
+  ranks below the default priority, and `targetRelease` holds that codename or version
+- **THEN** every such suite is preferred, so a listed package can be installed from the lower-ranked suite
+
+### Requirement: Unmatched target release fails before install
+
+When a non-empty package list is given and a non-empty `targetRelease` would make APT prefer no release of that index,
+by the comparison that "Target release prefers a configured release" states, the feature SHALL fail with status 1 and a
+message naming `targetRelease` and the given value, without installing or upgrading anything.
+
+#### Scenario: Unmatched release names option and value
+
+- **WHEN** `targetRelease` is a well-formed name that no release of the package index carries
+- **THEN** the feature exits with status 1, the output names `targetRelease` and the given value, the install call is
+  not made, and no package is installed or changed
+
+### Requirement: Target-release validation follows index and entry checks
+
+The feature SHALL make the check of "Unmatched target release fails before install" after the index refresh when one
+runs, after the name and version check of "Entry names are checked before installation", and before the install call;
+when an entry fails that check as well, the entry's failure ends the run. This check is not part of the validation of
+"Installation controls are validated before changes": it needs the index and a non-empty package list.
+
+#### Scenario: Unmatched release is reported before installation
+
+- **WHEN** a non-empty package list of accepted, known entries is given and `targetRelease` is a well-formed name that
+  no release of the package index carries
+- **THEN** the feature exits with status 1 naming `targetRelease`, and the install call is not made
+
+### Requirement: Target-release check covers APT's narrower refusal
+
+The feature SHALL make the check of "Unmatched target release fails before install" itself because APT's own refusal is
+narrower: APT accepts a value that equals a release field of the other kind, a suite name or codename that starts with a
+digit or a version that starts with a letter, and then prefers no release, without an error.
+
+#### Scenario: Release field of the other kind fails
+
+- **WHEN** `targetRelease` starts with a digit and equals a suite name or a codename of the package index, but the
+  version of no release
+- **THEN** the feature exits with status 1, the output names `targetRelease` and the given value, the install call is
+  not made, and no package is installed or changed
