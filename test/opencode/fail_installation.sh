@@ -102,5 +102,27 @@ if [[ "$(uname -m)" == x86_64 ]]; then
 fi
 check "the platform package follows upstream's target selection" \
   grep -qx "https://registry.npmjs.org/@opencode%2fcli-${expected_target}/2.1.2" "${work}/requests.log"
+# Runs the installer for a home whose ~/.config/opencode is an existing $1 (directory or foreign link).
+build_conflict_preserved() {
+  local kind="$1" home="${work}/conflict-$1" output
+  mkdir -p "${home}/.config"
+  case "${kind}" in
+    directory) mkdir "${home}/.config/opencode" && printf 'keep\n' >"${home}/.config/opencode/marker" ;;
+    foreign) ln -s /tmp/opencode-elsewhere "${home}/.config/opencode" ;;
+  esac
+  if output="$(sudo env VERSION=2.1.2 _REMOTE_USER="$(id -un)" _REMOTE_USER_HOME="${home}" bash "${INSTALLER}" 2>&1)"
+  then
+    printf '%s\n' "${output}"
+    return 1
+  fi
+  [[ "${output}" == *"opencode: error: ${home}/.config/opencode "* ]] || { printf '%s\n' "${output}"; return 1; }
+  case "${kind}" in
+    directory) [[ "$(cat "${home}/.config/opencode/marker")" == keep ]] ;;
+    foreign) [[ "$(readlink "${home}/.config/opencode")" == /tmp/opencode-elsewhere ]] ;;
+  esac
+}
+for kind in directory foreign; do
+  check "an existing ${kind} at an OpenCode path fails the build and is preserved" build_conflict_preserved "${kind}"
+done
 check "the installed CLI is unchanged after every rejection" test "$(opencode --version)" = "${before}"
 reportResults

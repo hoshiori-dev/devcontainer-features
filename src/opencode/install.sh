@@ -151,7 +151,7 @@ resolve_release() {
 install_release() {
   local package metadata tarball integrity expected actual installed=""
   work_dir="$(mktemp --directory /usr/local/share/.opencode-install.XXXXXX)"
-  mkdir "${work_dir}/home"
+  mkdir "${work_dir}/home" "${work_dir}/home/tmp"
   if [[ -x "${CLI_PATH}" ]]; then installed="$(run_isolated "${CLI_PATH}" --version)" || installed=""; fi
   if [[ "${installed}" == "opencode v${release}" ]]; then
     log "OpenCode ${release} is already installed at ${CLI_PATH}"
@@ -185,8 +185,8 @@ install_release() {
 # Runs executable $1 with arguments $2... in the temporary home, so no state reaches the remote user or the image.
 run_isolated() {
   local home="${work_dir}/home"
-  env HOME="${home}" XDG_DATA_HOME="${home}/data" XDG_CONFIG_HOME="${home}/config" XDG_STATE_HOME="${home}/state" \
-    XDG_CACHE_HOME="${home}/cache" "$@"
+  env HOME="${home}" TMPDIR="${home}/tmp" XDG_DATA_HOME="${home}/data" XDG_CONFIG_HOME="${home}/config" \
+    XDG_STATE_HOME="${home}/state" XDG_CACHE_HOME="${home}/cache" "$@"
 }
 
 # Creates directory $1 and its missing parents below the remote user's home, owned by the remote user.

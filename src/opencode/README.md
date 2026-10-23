@@ -54,11 +54,11 @@ OpenCode keeps its data, configuration, state, and cache in four XDG directories
 | `~/.local/state/opencode`    | `/var/lib/opencode/state`  | runtime state                                     |
 | `~/.cache/opencode`          | `/var/lib/opencode/cache`  | caches and downloaded tools                       |
 
-When `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, or `XDG_CACHE_HOME` is set, the link is created inside that
-root instead; the feature never sets these variables and never links a whole XDG root, so other tools' files stay where
-they are. The roots must be absolute paths. Configuration that points OpenCode elsewhere, such as `OPENCODE_CONFIG`,
-`OPENCODE_CONFIG_DIR`, or `OPENCODE_DB`, and project configuration in your checkout, are outside the volume and outside
-this persistence guarantee.
+When `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, or `XDG_CACHE_HOME` is set, the initializer also creates the
+link inside that root; the feature never sets these variables and never links a whole XDG root, so other tools' files
+stay where they are. The roots must be absolute paths. Configuration that points OpenCode elsewhere, such as
+`OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, or `OPENCODE_DB`, and project configuration in your checkout, are outside the
+volume and outside this persistence guarantee.
 
 An existing OpenCode directory, a file, a dangling link, or a link to another location is a conflict: initialization
 stops with an error and changes nothing. Back up such content, move it aside, and migrate it explicitly.
@@ -91,8 +91,11 @@ Sign in after the container is created; nothing is requested or stored during th
 connects a provider with its supported methods, such as an API key or an account login; OpenCode stores those
 credentials in `opencode.db` in its data directory, which the volume keeps. API keys you supply through environment
 variables, files outside the four directories, and any keyring are yours to persist; the feature does not configure,
-unlock, or back them up. A retained database file does not guarantee that a provider still accepts the login: tokens can
-expire or be revoked. `opencode auth export` prints secrets; never paste its output into logs or issues.
+unlock, or back them up. To keep such a store, add your own entry to `mounts` in `devcontainer.json` (a named volume or
+a bind mount for the file's directory), and pass API keys from the host with `remoteEnv`, for example
+`"ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"`, or with your platform's secrets, rather than committing them. A
+retained database file does not guarantee that a provider still accepts the login: tokens can expire or be revoked.
+`opencode auth export` prints secrets; never paste its output into logs or issues.
 
 ## Editor integrations
 

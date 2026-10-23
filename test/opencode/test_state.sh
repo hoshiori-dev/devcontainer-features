@@ -17,13 +17,17 @@ mkdir "${PROJECT}"
 
 "${INITIALIZE}"
 
+# find and sudo both fail here, so a scan or a repair, which runs through sudo with its own PATH, fails the check.
 healthy_without_scan() {
-  mkdir "${work}/no-find"
-  printf '#!/bin/sh\nexit 91\n' >"${work}/no-find/find"
-  chmod +x "${work}/no-find/find"
-  PATH="${work}/no-find:${PATH}" "${INITIALIZE}"
+  local output
+  mkdir "${work}/no-scan"
+  printf '#!/bin/sh\nexit 91\n' >"${work}/no-scan/find"
+  cp "${work}/no-scan/find" "${work}/no-scan/sudo"
+  chmod +x "${work}/no-scan/find" "${work}/no-scan/sudo"
+  output="$(PATH="${work}/no-scan:${PATH}" "${INITIALIZE}")" || return 1
+  [[ "${output}" != *repairing* ]]
 }
-check "a healthy volume initializes without a full-tree scan" healthy_without_scan
+check "a healthy volume initializes without a full-tree scan or repair" healthy_without_scan
 
 rejects_initialization() {
   local output
@@ -149,6 +153,8 @@ changed_uid() {
   local before
   printf 'outside\n' >"${work}/external"
   chmod 0644 "${work}/external"
+  # Owned by neither the remote user nor the fake UID, so a repair that follows the link changes it visibly.
+  sudo chown root:root "${work}/external"
   before="$(stat -c %u:%g:%a "${work}/external")"
   ln -s "${work}/external" "${STATE_DIR}/state/external-link"
   sudo chown -R -h 23456:23456 "${STATE_DIR}"
@@ -186,5 +192,16 @@ replacement_keeps_state() {
   [[ "$(opencode --version)" == "opencode v${current}" ]] || return 1
   lists_credential && lists_session && cmp "${work}/opencode.json" "${STATE_DIR}/config/opencode.json"
 }
+same_release_skipped() {
+  local current before output
+  current="$(opencode --version)"
+  before="$(stat -c %i:%Y /usr/local/bin/opencode)"
+  output="$(sudo env PATH="${PATH}" VERSION="${current#opencode v}" _REMOTE_USER="$(id -un)" \
+    _REMOTE_USER_HOME="${HOME}" bash "${FIXTURES}/_feature/install.sh")" || return 1
+  [[ "${output}" == *"is already installed at /usr/local/bin/opencode"* \
+    && "$(stat -c %i:%Y /usr/local/bin/opencode)" == "${before}" ]] || return 1
+  lists_credential && lists_session
+}
+check "installing the same release again skips the replacement and keeps state" same_release_skipped
 check "another release replaces the CLI and keeps credentials, sessions, and configuration" replacement_keeps_state
 reportResults

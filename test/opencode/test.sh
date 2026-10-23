@@ -21,6 +21,9 @@ private_state() {
   done
 }
 
+# Runs before any check starts OpenCode, which creates its temporary directory for the caller.
+no_build_tmp() { [[ ! -e /tmp/opencode ]] && ! compgen -G '/tmp/.bun-*' >/dev/null; }
+check "the build leaves no OpenCode temporary files in the image" no_build_tmp
 check "the native CLI runs as the remote user with a stable 2.x release" stable_cli
 check "the executable is installed at /usr/local/bin/opencode" test -x /usr/local/bin/opencode
 check "the state volume is mounted at /var/lib/opencode" mountpoint -q /var/lib/opencode
