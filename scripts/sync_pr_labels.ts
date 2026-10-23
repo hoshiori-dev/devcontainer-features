@@ -35,7 +35,7 @@ export const ARCHIVED = "spec:archived";
 export const STATE_LABELS = [PENDING, APPROVED, ARCHIVED];
 
 /** The areas github-workflow.md defines, in the order their labels are printed. */
-export const AREAS = ["feature", "ci", "scripts", "spec-workflow", "harness"] as const;
+export const AREAS = ["feature", "ci", "scripts", "spec-workflow", "harness", "document"] as const;
 export type Area = (typeof AREAS)[number];
 export const AREA_PREFIX = "area:";
 
@@ -267,6 +267,7 @@ export function areaOf(path: string): Area | "none" | undefined {
         under(path, "openspec/", ".agents/skills/openspec-", ".claude/commands/opsx/") ||
         path === ".agents/knowledge/spec-workflow.md"
     ) return "spec-workflow";
+    if (["CONTRIBUTING.md", "SECURITY.md", "README.md", "README.zh.md"].includes(path)) return "document";
     if (under(path, ".agents/", ".claude/", ".devcontainer/", ".github/") || !path.includes("/")) return "harness";
     return undefined;
 }

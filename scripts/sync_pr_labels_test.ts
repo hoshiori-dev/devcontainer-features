@@ -651,7 +651,10 @@ Deno.test("areaOf follows the table: first match wins", () => {
         ".github/ISSUE_TEMPLATE/01-bug.yml": "harness",
         ".github/pull_request_template.md": "harness",
         "AGENTS.md": "harness",
-        "README.zh.md": "harness",
+        "CONTRIBUTING.md": "document",
+        "SECURITY.md": "document",
+        "README.md": "document",
+        "README.zh.md": "document",
         ".gitignore": "harness",
         "docs/index.md": undefined,
         "srcs/x": undefined,
@@ -667,7 +670,18 @@ Deno.test("areasOf counts a renamed file under both names, in the order of the a
             { path: "README.md", status: "modified" },
             { path: "docs/unknown.md", status: "added" },
         ]),
-        ["area:ci", "area:scripts", "area:harness"],
+        ["area:ci", "area:scripts", "area:document"],
+    );
+});
+
+Deno.test("reader documentation gets only the document area, with harness added for agent guidance", () => {
+    const files = ["CONTRIBUTING.md", "SECURITY.md", "README.md", "README.zh.md"]
+        .map((path) => ({ path, status: "modified" }));
+    assertEquals(areasOf(files), ["area:document"]);
+    assertEquals(areasOf([...files, { path: "AGENTS.md", status: "modified" }]), ["area:harness", "area:document"]);
+    assertEquals(
+        areasOf([{ path: "CONTRIBUTING.md", status: "renamed", previous: "AGENTS.md" }]),
+        ["area:harness", "area:document"],
     );
 });
 
