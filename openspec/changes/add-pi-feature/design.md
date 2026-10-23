@@ -26,10 +26,36 @@ result cannot establish private credential availability.
 
 ### Installation and dependencies
 
-Use native Linux archives from the selected Earendil Works release and verify the matching SHA256SUMS entry. The initial
-supported release is 1.3.0 or newer, whose archives include amd64 and arm64. Keep the complete extracted runtime payload
-together outside the state mount. This avoids introducing Node solely for Pi. If a native archive fails on a proposed
-target, that target fails coverage rather than silently changing distribution.
+Install upstream's native executable, not the npm package. Every stable release publishes `pi-linux-x64.tar.gz`,
+`pi-linux-arm64.tar.gz`, and a `SHA256SUMS` that lists every asset; the feature downloads the archive for the target,
+verifies its `SHA256SUMS` entry, and extracts it. The initial supported release is 1.3.0 or newer.
+
+Observed on 2026-10-23 at v1.4.0 (latest stable, read and inspected, `--version` run with no Node.js or npm on `PATH`):
+the archive holds one `pi/` directory whose `pi` is a single executable compiled with Bun, linked against glibc only
+(highest symbol `GLIBC_2.17`). Beside it are the files it loads at runtime (`theme/`, `export-html/`, `assets/`,
+`photon_rs_bg.wasm`, `native/linux/prebuilds/<arch>/*.node`, `package.json`), which it finds from the executable's own
+location. The feature installs the whole directory atomically to `/usr/local/lib/pi` and links `/usr/local/bin/pi` to
+it, outside the state mount; the link is accepted only if those files load through it. No musl build is published, so
+musl targets fail coverage. If a native archive fails on a proposed target, that target fails coverage rather than
+silently changing distribution. The binary has no self-update method (`pi update` prints the releases URL instead), so
+it never replaces itself; new versions come from reinstalling the feature.
+
+Rejected:
+
+- Upstream's installer (`https://pi.dev/install.sh`, read on 2026-10-23, not executed): it requires Node.js 22.19 or
+  newer and npm, can install Node.js itself through the distro package manager or a download, installs the npm package
+  under `~/.pi/agent/install`, and may append a `PATH` line to shell startup files. It never uses the native archive.
+- `@earendil-works/pi-coding-agent` through npm: needs Node.js 22.19 or newer and npm. The feature would have to install
+  them or depend on a Node feature. Either way it could pin or override the Node.js version a user configures with their
+  own Node feature, or install a global package into that user's toolchain. The native archive is the same CLI without
+  that coupling. `NOTES.md` records the direct download and this reason (proposal, Acceptance).
+- The Nix flake: needs Nix in the container, a package-manager dependency of its own.
+
+Pi packages are a runtime concern of the user, not of the feature. `pi install npm:<pkg>` and `pi install git:<url>` run
+whichever `npm` (or the `npmCommand` setting) and `git` are on `PATH`, installing into `~/.pi/agent/npm` inside the
+agent directory rather than a global prefix. Without npm the command fails with "Executable not found in $PATH" and
+nothing else breaks. The feature provides neither npm nor git for this; NOTES tells users to add their own Node or git
+feature if they want such packages.
 
 ### Options
 
@@ -45,11 +71,12 @@ conflicting channel/version combinations; there is no arbitrary URL or source-re
 ### Runtime state
 
 Leave PI_CODING_AGENT_DIR unset by the feature. Locate the supported release's default agent directory in an isolated
-remote-user home, then link that whole directory to /var/lib/pi/agent. Verify auth.json, settings, skills, installed
-user Pi packages, and default sessions use the linked directory through real save and replacement operations. Keep the
-base CLI outside this home. A release that cannot preserve complete required state through this mapping is unsupported;
-do not silently switch to a global environment override. Explicit session-directory overrides outside the volume remain
-outside the guarantee. Do not migrate deprecated owner/package identities or install community bridges.
+remote-user home, then link that whole directory to /var/lib/pi/agent. Verify auth.json, settings, skills, the user
+package directory (with a fixture that needs no npm), and default sessions use the linked directory through real save
+and replacement operations. Keep the base CLI outside this home. A release that cannot preserve complete required state
+through this mapping is unsupported; do not silently switch to a global environment override. Explicit session-directory
+overrides outside the volume remain outside the guarantee. Do not migrate deprecated owner/package identities or install
+community bridges.
 
 Prepare only known link paths during construction; resolve runtime-only paths at container creation. Reuse links to
 intended mounted targets. Existing files, directories, dangling links, or links to other targets are actionable

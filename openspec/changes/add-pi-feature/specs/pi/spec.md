@@ -52,6 +52,40 @@ It SHALL verify the matching SHA-256 before installing outside the state volume.
 - **WHEN** the required checksum is absent, unreadable, or mismatched
 - **THEN** installation fails without replacing the previous CLI
 
+### Requirement: Native executable installation
+
+The feature SHALL install upstream's native `pi` executable from the release archive, keeping the archive's extracted
+directory together at `/usr/local/lib/pi` with `pi` on `PATH` at `/usr/local/bin/pi`, outside the runtime-state volume.
+It SHALL neither install nor require npm, Node.js, another JavaScript runtime, or another language package manager, and
+SHALL not run upstream's installer script.
+
+#### Scenario: Native executable
+
+- **WHEN** the feature is installed on an image without Node.js or npm
+- **THEN** the remote user can run `pi --version` and load its bundled themes, and neither `node` nor `npm` was added to
+  the image
+
+#### Scenario: Existing JavaScript tooling
+
+- **WHEN** the image already has Node.js or npm
+- **THEN** the feature leaves their versions, global packages, and configuration unchanged
+
+#### Scenario: No native archive for the target
+
+- **WHEN** the target has no matching archive, such as a musl C library
+- **THEN** installation fails clearly and does not fall back to npm or upstream's installer script
+
+### Requirement: User-managed Pi packages
+
+The feature SHALL not provide npm, git, or another package manager for `pi install`. Packages that need one SHALL use
+the tool the consumer puts on `PATH`, and their install directory SHALL stay inside the volume-backed agent directory.
+Tests SHALL seed package state with synthetic fixtures and run no package manager.
+
+#### Scenario: Package manager absent
+
+- **WHEN** `pi install npm:<package>` runs and no npm is on `PATH`
+- **THEN** the command reports the missing executable, and the CLI and its state remain usable
+
 ### Requirement: Supported targets
 
 `test/pi/compatibility.json` SHALL record tested image and architecture combinations. A target covered by the selected
@@ -325,9 +359,9 @@ explain that keyring setup, unlocking, and persistence are outside this feature.
 
 ### Requirement: Independent user runtimes
 
-Installation SHALL preserve user runtime versions, paths, package-manager settings, and defaults. Agent-owned runtimes
-SHALL remain outside the state volume and SHALL not override user toolchains. Required runtime dependencies SHALL not
-inject conflicting options into a separately configured runtime Feature.
+Installation SHALL preserve user runtime versions, paths, package-manager settings, and defaults. The CLI's runtime is
+embedded in the upstream `pi` executable: the feature SHALL add no separate runtime and no `PATH` or shell startup entry
+other than the `pi` command, and SHALL declare no `dependsOn` or `installsAfter` on a language-runtime Feature.
 
 #### Scenario: Runtime composition
 

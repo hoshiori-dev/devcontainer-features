@@ -52,6 +52,10 @@ effective PR specification approval.
   review.
 - The feature has its declared compatibility coverage, install-twice test, NOTES, and generated documentation;
   `just check`, feature tests, and scenario tests pass.
+- `src/pi/NOTES.md` states that the feature installs upstream's native executable from the release archive instead of
+  installing it with a package manager. It also explains why: an npm install, or upstream's installer, would make the
+  feature install or require Node.js and npm, which could get in the way of a user choosing their own Node.js version
+  with a Node feature. It also states that `pi install` of npm or git packages uses the consumer's own npm or git.
 
 ### Stays true
 
