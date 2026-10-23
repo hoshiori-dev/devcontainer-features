@@ -54,6 +54,11 @@ list; `tasks.md` follows effective PR specification approval.
   recorded in the PR before review.
 - The feature has its declared compatibility coverage, install-twice test, NOTES, and generated documentation;
   `just check`, feature tests, and scenario tests pass.
+- `src/hermes-agent/NOTES.md` states that upstream publishes no native Linux CLI, so the feature runs upstream's source
+  installer, which brings its own private runtimes, instead of installing Hermes with a package manager. It also
+  explains why: a pip, uv, or npm install would make the feature install or require Python or Node.js and their package
+  managers, which could get in the way of a user choosing their own versions of them with a runtime feature; the private
+  runtimes stay off the user's `PATH` and out of their configuration.
 
 ### Stays true
 

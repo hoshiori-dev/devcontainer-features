@@ -98,6 +98,37 @@ contents; it is not an unverified mirror chosen by this feature.
 - **WHEN** the installer prepares ripgrep or FFmpeg
 - **THEN** the artifact matches its lock digest and the declared distribution prefix, or installation fails
 
+### Requirement: No user package-manager dependency
+
+The feature SHALL neither install for the user nor require npm, Node.js, Python, pip, pipx, uv, or another language
+package manager from the image, the user, or another Feature, and SHALL declare no dependency on a runtime Feature.
+Ambient `UV_*`, `PIP_*`, `npm_config_*`, `PYTHON*`, and `NODE_*` settings present during the build SHALL not redirect
+the private installation.
+
+#### Scenario: Image without language tooling
+
+- **WHEN** the feature is installed on an image without Node.js, npm, Python 3.14, pip, or uv
+- **THEN** the remote user can run `hermes` and `hermes acp --check`, and none of those tools was added to the remote
+  user's `PATH`
+
+#### Scenario: Existing language tooling
+
+- **WHEN** the image already has Node.js, npm, Python, pip, or uv
+- **THEN** the feature leaves which of them the remote user's `PATH` selects, their versions, global packages, managed
+  Python installs, and configuration unchanged
+
+### Requirement: Private installer runtimes
+
+The runtimes upstream's installer brings SHALL stay in the application directory: only the `hermes` launchers SHALL be
+on `PATH`, and `node`, `npm`, `python`, `pip`, and `uv` from that directory SHALL not be. Installation SHALL write no
+npm, pip, or uv configuration, no global npm prefix, nothing in uv's per-user managed-Python directory, and no change to
+the remote user's shell startup files.
+
+#### Scenario: Shell startup files
+
+- **WHEN** the feature is installed
+- **THEN** the remote user's shell startup files are byte-for-byte unchanged
+
 ### Requirement: Lean default installation
 
 The feature SHALL enable the CLI and official ACP capability without requesting desktop, browser, or computer-use

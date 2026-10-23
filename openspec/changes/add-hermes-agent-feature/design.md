@@ -34,6 +34,47 @@ distributions and official Node, plus package registries and the upstream-select
 checks remain controlled by the selected source commit. Reject an arbitrary moving branch, an unrelated PyPI package, or
 a separate unpinned pip bootstrap.
 
+Prefer a native install; none exists for a Linux CLI, so the source installer is the closest route. Observed on
+2026-10-23 at v0.22.5 (scripts, PM, and docs read, not executed): GitHub releases v0.22.0 to v0.22.5 carry no assets;
+self-contained bundles ship only as the macOS and Windows desktop apps, and Linux desktop packaging is disabled in the
+release workflow. The source installer is upstream's only supported Linux CLI route and it does not use system package
+managers. It downloads a pinned, SHA-256-checked uv and ignores any uv on `PATH`; PM (Hermes' in-repo package and
+runtime manager, `pm/`) then installs private Python, Node, npm, uv, ripgrep, and FFmpeg from `pm/lock.json` into its
+own tool store and strips `UV_*`, `PYTHON*`, `VIRTUAL_ENV`, `npm_config_*`, and `NODE_*` from its child processes. Node
+builds the TUI and web frontends; the core CLI and ACP server are Python.
+
+The installer still has side effects on the user's tooling, which the feature prevents or the release is unsupported:
+
+- `wire_shell_path` runs in the products stage even with `--non-interactive` and appends a `~/.local/bin` `PATH` line to
+  bash, zsh, and fish startup files; `expose_cli` publishes the `hermes`, `hermes-acp`, and `hermes-agent` launchers
+  there (`cli.expose_on_path: false` disables it). Only those launchers reach `PATH`, never PM's `node` or `python`. The
+  feature exposes the launchers through `/usr/local/bin` instead and leaves shell startup files unchanged.
+- The bootstrap looks for a uv-managed Python 3.14, then a host one (`uv python find --system`), and otherwise runs
+  `uv python install`, which writes into uv's per-user managed-Python directory, the one the user's own uv uses. That uv
+  inherits the build environment unfiltered, so the user's `UV_*` settings can redirect it. The feature runs the
+  installer with a sanitized environment, keeps the bootstrap inside the application directory (for example through
+  `UV_PYTHON_INSTALL_DIR`; unverified), and never requires a host Python.
+- PM's tool store, uv cache, and download partials default to under `~/.hermes`, which the state mapping moves into the
+  volume. The feature places them in the application directory (`HERMES_RUNTIME_DIR`, which upstream's own Docker image
+  sets; whether source launchers honor it is unverified) and verifies an empty volume cannot hide them.
+- On glibc images without `libatomic.so.1`, PM runs the distro package manager. The feature installs `libatomic1` itself
+  first, as an OS package, not a language package manager.
+
+Rejected:
+
+- `pip`, `pipx`, or `uv tool install hermes-agent` from PyPI: upstream lists PyPI installs as unsupported, and the PyPI
+  package stops at 0.19.0. It would also make the feature depend on a Python and package manager that could pin or
+  override the versions a user configures with their own Python or uv feature.
+- The npm package `hermes-agent`: an unofficial third-party bridge, needing Node.js and npm and so the same coupling
+  with a user's Node feature.
+- Homebrew: listed as unsupported upstream, and a package manager the image does not otherwise need.
+- The Docker image `nousresearch/hermes-agent`: a whole image, not something a Feature installs; it also links PM's
+  `python3`, `node`, and `npm` into `/usr/local/bin`, which would shadow a runtime Feature.
+- The Nix flake: needs Nix in the container, and upstream no longer lists it as an explicitly supported route.
+
+`NOTES.md` records why the feature uses the source installer with private runtimes instead of a package manager
+(proposal, Acceptance).
+
 ### Options
 
 | Name    | Type   | Default    | Enum / proposals             | Meaning                                      |
