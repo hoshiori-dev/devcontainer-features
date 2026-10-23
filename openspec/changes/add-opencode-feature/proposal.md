@@ -52,6 +52,9 @@ list; `tasks.md` follows effective PR specification approval.
   the PR before review.
 - The feature has its declared compatibility coverage, install-twice test, NOTES, and generated documentation;
   `just check`, feature tests, and scenario tests pass.
+- `src/opencode/NOTES.md` states that the feature downloads upstream's native executable directly instead of installing
+  it with a package manager. It also explains why: an npm install would make the feature install or require Node.js and
+  npm, which could get in the way of a user choosing their own Node.js version with a Node feature.
 
 ### Stays true
 

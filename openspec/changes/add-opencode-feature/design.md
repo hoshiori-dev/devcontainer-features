@@ -44,8 +44,10 @@ update method and does not replace itself.
 
 Rejected:
 
-- `@opencode/cli` through npm: needs Node.js and npm for its launcher and `postinstall` script, which this feature would
-  then have to supply without disturbing user toolchains; the native payload is the same.
+- `@opencode/cli` through npm: needs Node.js and npm for its launcher and `postinstall` script. The feature would have
+  to install them or depend on a Node feature. Either way it could pin or override the Node.js version a user configures
+  with their own Node feature, or install a global package into that user's toolchain. The native payload is the same
+  executable without that coupling. `NOTES.md` records the direct download and this reason (proposal, Acceptance).
 - Running upstream's installer script: installs per user under `~/.opencode/bin`, edits shell startup files, and does
   not verify the tarball it downloads; the feature reproduces its download with verification instead.
 - GitHub release assets: they carry v1 only.
