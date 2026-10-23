@@ -1,6 +1,6 @@
 # Installs the pinned toolchain CI jobs share: Deno always; just unless a job turns it off; the
 # devcontainer CLI and OpenSpec when a job asks for them. Versions are pinned here and only here for
-# CI; the dev container installs its own (see .agents/knowledge/github/checks.md).
+# CI; the dev container reads the OpenSpec pin here (see .agents/knowledge/github/checks.md).
 name: Set up repository tools
 description: Install Deno, just unless turned off, and on request the devcontainer CLI and OpenSpec.
 inputs:
@@ -36,7 +36,7 @@ runs:
       run: >-
         deno install --global --force
         --allow-read --allow-write --allow-env --allow-sys=cpus,homedir,uid --allow-net=edge.openspec.dev
-        npm:@fission-ai/openspec@1.13.2
+        npm:@fission-ai/openspec@1.14.3
     - name: Put the OpenSpec binary on PATH
       if: inputs.openspec == 'true'
       shell: bash

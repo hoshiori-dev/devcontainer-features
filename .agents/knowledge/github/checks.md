@@ -102,19 +102,21 @@ on the head commit, so the ruleset keeps the merge blocked whatever the run's ou
 
 CI pins Deno, just, the devcontainer CLI, and OpenSpec in `.github/actions/setup-tools/action.yml`, the only place CI
 versions live; shellcheck is the runner image's (0.9.0 on ubuntu-24.04, as in the dev container's apt package). The dev
-container installs its own copies (OpenSpec at `@latest` via `.devcontainer/setup.sh`). Before bumping a pin, run
-`just check` locally with that version. Only `lint`, `scripts`, `validate`, and `spec` need just. Direct-script jobs
-(`plan`, all `feature-test` modes, `pr-title`, `pr-checklist`, `archive-verdict`, `verify`, `publish`, `sync`, and
-`label`) skip its install with `just: "false"`; a job that starts calling just must remove that opt-out. `publish` is
-the only job whose checkout keeps git credentials (`persist-credentials`), which `scripts/tag_releases.ts` needs to push
-tags. `attest` checks out nothing and uses `actions/attest`, a GitHub-owned action. Every action, `actions/*` included,
-is pinned by full commit SHA with its version in a comment (`@<sha> # vX.Y.Z`); Dependabot proposes updates for them.
-Deno scripts pin their `jsr:` / `npm:` imports inline, and CI's OpenSpec install uses the same permission flags as
-`setup.sh`. The local registry image the feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in
-`scripts/test_feature.ts`. The TruffleHog action in `secret.yml` is pinned by commit SHA, and the image it runs by
-digest in its `version` input: Dependabot bumps only the action, so update the image with it. The `gh` that `sync`
-(Labels) runs through `scripts/sync_labels.ts` and `label` (PR labels) through `scripts/sync_pr_labels.ts` is the runner
-image's, like shellcheck, and no file pins it, which is why the scripts call only `gh api`.
+container installs its own copies except OpenSpec: `.devcontainer/setup.sh` reads its exact installation target from
+that action. Verify the installed version matches that pin when accepting an upgrade; this is a review step, not a
+repository version-check mechanism. Before bumping a pin, run `just check` locally with that version. Only `lint`,
+`scripts`, `validate`, and `spec` need just. Direct-script jobs (`plan`, all `feature-test` modes, `pr-title`,
+`pr-checklist`, `archive-verdict`, `verify`, `publish`, `sync`, and `label`) skip its install with `just: "false"`; a
+job that starts calling just must remove that opt-out. `publish` is the only job whose checkout keeps git credentials
+(`persist-credentials`), which `scripts/tag_releases.ts` needs to push tags. `attest` checks out nothing and uses
+`actions/attest`, a GitHub-owned action. Every action, `actions/*` included, is pinned by full commit SHA with its
+version in a comment (`@<sha> # vX.Y.Z`); Dependabot proposes updates for them. Deno scripts pin their `jsr:` / `npm:`
+imports inline, and CI's OpenSpec install uses the same permission flags as `setup.sh`. The local registry image the
+feature tests publish to is pinned by digest as `REGISTRY_IMAGE` in `scripts/test_feature.ts`. The TruffleHog action in
+`secret.yml` is pinned by commit SHA, and the image it runs by digest in its `version` input: Dependabot bumps only the
+action, so update the image with it. The `gh` that `sync` (Labels) runs through `scripts/sync_labels.ts` and `label` (PR
+labels) through `scripts/sync_pr_labels.ts` is the runner image's, like shellcheck, and no file pins it, which is why
+the scripts call only `gh api`.
 
 ## Release path
 
