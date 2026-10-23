@@ -33,6 +33,15 @@ network-disabled Debian 12 container. The log selected file token storage becaus
 GEMINI_FORCE_FILE_STORAGE was also set, but its independent effect was not proved and is not an assumed dependency. Set
 documented AGY_CLI_DISABLE_AUTO_UPDATE=true by default.
 
+Google's installer (`https://antigravity.google/cli/install.sh`, read on 2026-10-23, not executed) is the link that ties
+both hosts to Google: it hard-codes the manifest service as its download base, selects `linux_<arch>` or
+`linux_<arch>_musl`, checks the archive against the manifest's SHA-512, extracts `antigravity` as `~/.local/bin/agy`,
+and finally runs `agy install`. Run offline with 1.4.6 on 2026-10-23, that subcommand only appended
+`export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc` and `~/.profile` and deleted `alias agy=` and `alias antigravity=`
+lines; it downloaded nothing and wrote no state. A system directory already on PATH makes both steps unnecessary, so the
+feature skips the script and the subcommand. Neither the manifest nor the archive is signed, so the manifest relies on
+TLS alone, as the delta states.
+
 ### Options
 
 None. No options: use the current verified platform manifest. A pinned-version control is omitted until an immutable

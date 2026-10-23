@@ -17,7 +17,8 @@ Upstream sources:
 The feature SHALL resolve the current Linux platform manifest from
 `https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/`, download its archive only from
 `https://storage.googleapis.com/antigravity-public/antigravity-cli/`, and verify its SHA-512. Manifest and payload
-redirects SHALL retain HTTPS.
+redirects SHALL retain HTTPS. The manifest and the archive are unsigned: the SHA-512 proves that the archive matches the
+manifest, and the manifest relies on TLS alone.
 
 #### Scenario: Current platform
 
@@ -28,6 +29,18 @@ redirects SHALL retain HTTPS.
 
 - **WHEN** the URL is outside the allowed distribution prefix, verification data is missing, or the digest mismatches
 - **THEN** installation fails before replacing a working CLI
+
+### Requirement: Official installer route
+
+Both download hosts SHALL be the ones Google's documented installer, `https://antigravity.google/cli/install.sh`, uses:
+it hard-codes the manifest service and downloads the archive the manifest names. The feature SHALL run neither that
+installer nor the `agy install` subcommand it ends with, which only adds a `~/.local/bin` PATH export to shell profiles
+and removes earlier `agy` and `antigravity` aliases; it SHALL install `agy` in a system directory on the default PATH.
+
+#### Scenario: Shell profiles untouched
+
+- **WHEN** the feature is installed
+- **THEN** the remote user's shell profiles are unchanged and `agy` runs from the default PATH
 
 ### Requirement: Supported targets
 
