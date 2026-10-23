@@ -68,15 +68,7 @@ included; the release it names is verified like any other.
 
 ### Requirement: Verified download from GitHub releases
 
-The feature SHALL download the release archive only from
-`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.zip` over HTTPS, where `<target>` is
-`x86_64-unknown-linux-gnu` on amd64 and `aarch64-unknown-linux-gnu` on arm64. Before extracting it, the feature SHALL
-verify the archive against the SHA-256 checksum published at
-`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.zip.sha256sum`. Before installing the
-extracted `deno` executable, the feature SHALL verify it against the SHA-256 checksum published at
-`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.sha256sum`. Deno publishes no signature for
-the checksum files, so the feature SHALL rely on TLS alone for them, over HTTPS on every hop, redirects included. The
-feature SHALL NOT install a release that does not publish both checksum files.
+The feature SHALL download and verify Deno release artifacts before installing the executable.
 
 #### Scenario: Archive checksum mismatch
 
@@ -114,23 +106,7 @@ before the failure MAY remain.
 
 ### Requirement: Shared location for global tools
 
-The feature SHALL set `DENO_INSTALL_ROOT` to `/usr/local/share/deno` in the container environment and SHALL put
-`/usr/local/share/deno/bin` on `PATH` there, so that executables created with `deno install --global` land in that
-directory and run by name in every shell. `/usr/local/share/deno/bin` SHALL come after the image's own `PATH` entries.
-Because a login shell's startup files may reset `PATH` (Debian's `/etc/profile` does), the feature SHALL also append the
-directory to `PATH` in login shells through a file of its own under `/etc/profile.d/`, adding it only when it is not
-already there. When the remote user exists at build time and is not root, the feature SHALL make `/usr/local/share/deno`
-and `/usr/local/share/deno/bin` writable by that user without elevated privileges, also after the Dev Container CLI
-changes that user's UID or GID to match the host; otherwise it SHALL leave them owned by root.
-
-For a non-root remote user, an existing `deno` group SHALL be reused only when it has no supplementary members other
-than that user and is not any account's primary group. A conflict SHALL fail before package installation or downloads,
-with a message naming the conflicting account, without changing group membership or the tools directories.
-
-For a non-root remote user, the feature SHALL require `groupadd` only when the `deno` group does not exist yet, and
-`usermod` only when that user is not yet a member of the `deno` group. When a command it requires is missing, the
-feature SHALL fail before package installation or downloads, with a message naming the missing command, without changing
-group membership or the tools directories.
+The feature SHALL provide a shared location for globally installed Deno tools, available by name in every shell.
 
 #### Scenario: Existing group belongs to another account
 
@@ -204,14 +180,8 @@ the installed version.
 
 ### Requirement: Prerequisite packages
 
-On an image that lacks `curl`, `unzip`, or a CA certificate bundle, the feature SHALL install the missing ones with the
-package manager of the image's family (`apt-get` for the Debian family, `dnf` for the Fedora family, `zypper` for the
-openSUSE family), SHALL leave them installed, and SHALL leave no repository metadata or downloaded package in that
-package manager's cache. A CA certificate bundle is present when `/etc/ssl/certs/ca-certificates.crt`,
-`/etc/pki/tls/certs/ca-bundle.crt`, `/etc/ssl/ca-bundle.pem`, or `/etc/ssl/cert.pem` is a non-empty file. On an image
-that has all three, the feature SHALL install and remove no package. When one is missing and the image lacks its
-family's package manager, the feature SHALL fail before downloading anything, with a message naming what is missing and
-the package manager it needs.
+The feature SHALL install missing download prerequisites and leave no repository metadata or downloaded package in the
+package manager's cache.
 
 #### Scenario: Debian-family image without the prerequisites
 
@@ -246,12 +216,7 @@ the package manager it needs.
 
 ### Requirement: Supported platforms
 
-The feature SHALL support the images listed in `test/deno/compatibility.json`, and SHALL install only on images with
-Bash already installed and glibc 2.27 or newer, on amd64 or arm64, whose `/etc/os-release` places them in a supported
-family: the Debian family (`debian` or `ubuntu`), the Fedora family (`fedora`, `rhel`, or `centos`), or the openSUSE
-family (`opensuse`). The first word of `ID`, then of `ID_LIKE`, that names a family decides it. Images without Bash are
-unsupported; the feature SHALL NOT install Bash. On other unsupported images with Bash it SHALL fail before downloading
-anything, with a message naming what is unsupported.
+The feature SHALL support the images listed in `test/deno/compatibility.json`.
 
 #### Scenario: musl-based image
 
@@ -351,3 +316,172 @@ installation rather than claiming to uninstall an already installed extension.
 - **WHEN** a developer wants the CLI without its VS Code companion extension
 - **THEN** the notes provide a project configuration example using `-denoland.vscode-deno`
 - **AND** they explain that exclusion does not uninstall an existing extension
+
+### Requirement: Deno release archive selection
+
+The feature SHALL download the release archive only from
+`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.zip` over HTTPS, where `<target>` is
+`x86_64-unknown-linux-gnu` on amd64 and `aarch64-unknown-linux-gnu` on arm64.
+
+#### Scenario: Architecture selects archive target
+
+- **WHEN** Deno is installed on amd64 or arm64
+- **THEN** the feature downloads the archive for the matching `<target>` from the stated HTTPS release URL
+
+### Requirement: Deno archive checksum
+
+Before extracting the release archive, the feature SHALL verify the archive against the SHA-256 checksum published at
+`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.zip.sha256sum`.
+
+#### Scenario: Archive checksum is checked before extraction
+
+- **WHEN** the feature has downloaded a Deno release archive
+- **THEN** it verifies the archive against the release's `.zip.sha256sum` checksum before extracting it
+
+### Requirement: Deno executable checksum
+
+Before installing the extracted `deno` executable, the feature SHALL verify it against the SHA-256 checksum published at
+`https://github.com/denoland/deno/releases/download/v<version>/deno-<target>.sha256sum`.
+
+#### Scenario: Executable checksum is checked before installation
+
+- **WHEN** the archive is verified and extracted
+- **THEN** the feature verifies the `deno` executable against the release's `deno-<target>.sha256sum` checksum before
+  installing it
+
+### Requirement: Deno checksum transport and availability
+
+Deno publishes no signature for the checksum files, so the feature SHALL rely on TLS alone for them, over HTTPS on every
+hop, redirects included. The feature SHALL NOT install a release that does not publish both checksum files.
+
+#### Scenario: Missing checksum file
+
+- **WHEN** a release does not publish both checksum files
+- **THEN** the feature does not install that release
+
+### Requirement: Deno global tool locations
+
+The feature SHALL set `DENO_INSTALL_ROOT` to `/usr/local/share/deno` in the container environment and SHALL put
+`/usr/local/share/deno/bin` on `PATH` there, so that executables created with `deno install --global` land in that
+directory and run by name in every shell. `/usr/local/share/deno/bin` SHALL come after the image's own `PATH` entries.
+
+#### Scenario: Global tool location in the container environment
+
+- **WHEN** a shell starts in a container with the feature installed
+- **THEN** `DENO_INSTALL_ROOT` is `/usr/local/share/deno` and `/usr/local/share/deno/bin` is on `PATH` after the image's
+  own entries
+
+### Requirement: Deno global tools in login shells
+
+Because a login shell's startup files may reset `PATH` (Debian's `/etc/profile` does), the feature SHALL also append
+`/usr/local/share/deno/bin` to `PATH` in login shells through a file of its own under `/etc/profile.d/`, adding it only
+when it is not already there.
+
+#### Scenario: Global tool path in login shell
+
+- **WHEN** a login shell starts as the remote user, including on an image whose `/etc/profile` resets `PATH`
+- **THEN** `/usr/local/share/deno/bin` appears in its `PATH` once, after the image's own entries, and tools created with
+  `deno install --global` run by name
+
+### Requirement: Deno global tool directory access
+
+When the remote user exists at build time and is not root, the feature SHALL make `/usr/local/share/deno` and
+`/usr/local/share/deno/bin` writable by that user without elevated privileges, also after the Dev Container CLI changes
+that user's UID or GID to match the host; otherwise it SHALL leave them owned by root.
+
+#### Scenario: Non-root UID or GID changes
+
+- **WHEN** the remote user is a non-root user that exists at build time and the Dev Container CLI changes its UID or GID
+  to match the host
+- **THEN** that user can still write to `/usr/local/share/deno` and `/usr/local/share/deno/bin` without elevated
+  privileges
+
+### Requirement: Safe reuse of the Deno group
+
+For a non-root remote user, an existing `deno` group SHALL be reused only when it has no supplementary members other
+than that user and is not any account's primary group. A conflict SHALL fail before package installation or downloads,
+with a message naming the conflicting account, without changing group membership or the tools directories.
+
+#### Scenario: Deno group conflicts
+
+- **WHEN** a non-root remote user exists and another account is a supplementary member of the existing `deno` group or
+  uses its GID as its primary group
+- **THEN** installation fails before package installation or downloads, names the conflicting account, and changes
+  neither group membership nor the tools directories
+
+### Requirement: Required Deno group commands
+
+For a non-root remote user, the feature SHALL require `groupadd` only when the `deno` group does not exist yet, and
+`usermod` only when that user is not yet a member of the `deno` group. When a command it requires is missing, the
+feature SHALL fail before package installation or downloads, with a message naming the missing command, without changing
+group membership or the tools directories.
+
+#### Scenario: Required group command missing
+
+- **WHEN** a non-root remote user exists and a `groupadd` or `usermod` command the feature requires is missing
+- **THEN** installation fails before package installation or downloads, names the missing command, and changes neither
+  group membership nor the tools directories
+
+### Requirement: Deno prerequisite package handling
+
+On an image that lacks `curl`, `unzip`, or a CA certificate bundle, the feature SHALL install the missing ones with the
+package manager of the image's family (`apt-get` for the Debian family, `dnf` for the Fedora family, `zypper` for the
+openSUSE family), SHALL leave them installed, and SHALL leave no repository metadata or downloaded package in that
+package manager's cache.
+
+#### Scenario: Missing prerequisite installed
+
+- **WHEN** the feature is installed on a supported image that lacks `curl` and has its family's package manager
+- **THEN** `curl` is installed with that package manager and stays installed, and that package manager's cache holds no
+  repository metadata and no downloaded package
+
+### Requirement: Deno missing package manager
+
+When `curl`, `unzip`, or a CA certificate bundle is missing and the image lacks its family's package manager, the
+feature SHALL fail before downloading anything, with a message naming what is missing and the package manager it needs.
+
+#### Scenario: Missing prerequisite and package manager
+
+- **WHEN** a prerequisite is missing and the image lacks its family's package manager
+- **THEN** installation fails before downloading anything, with a message naming the missing prerequisite and the
+  package manager it needs
+
+### Requirement: Deno CA bundle detection
+
+A CA certificate bundle is present when `/etc/ssl/certs/ca-certificates.crt`, `/etc/pki/tls/certs/ca-bundle.crt`,
+`/etc/ssl/ca-bundle.pem`, or `/etc/ssl/cert.pem` is a non-empty file. On an image that has `curl`, `unzip`, and a CA
+certificate bundle, the feature SHALL install and remove no package.
+
+#### Scenario: Prerequisites already exist
+
+- **WHEN** the image has `curl`, `unzip`, and a non-empty file at one of those CA certificate bundle paths
+- **THEN** the feature installs and removes no package
+
+### Requirement: Deno supported runtime platforms
+
+The feature SHALL install only on images with Bash already installed and glibc 2.27 or newer, on amd64 or arm64, whose
+`/etc/os-release` places them in a supported family: the Debian family (`debian` or `ubuntu`), the Fedora family
+(`fedora`, `rhel`, or `centos`), or the openSUSE family (`opensuse`). The first word of `ID`, then of `ID_LIKE`, that
+names a family decides it.
+
+#### Scenario: Family decided by ID_LIKE
+
+- **WHEN** the feature is installed on an image whose `/etc/os-release` has an `ID` that names no supported family and
+  an `ID_LIKE` whose first family-naming word is `debian`
+- **THEN** the feature treats the image as Debian family
+
+### Requirement: Deno unsupported images
+
+Images without Bash are unsupported; the feature SHALL NOT install Bash. On other unsupported images with Bash it SHALL
+fail before downloading anything, with a message naming what is unsupported.
+
+#### Scenario: Image without Bash
+
+- **WHEN** the feature is installed on an image without Bash
+- **THEN** the feature does not install Bash
+
+#### Scenario: Unsupported image with Bash
+
+- **WHEN** the feature is installed on an image with Bash whose glibc is older than 2.27, whose architecture is neither
+  amd64 nor arm64, or whose `/etc/os-release` names no supported family
+- **THEN** the installation fails before downloading anything, with a message naming what is unsupported

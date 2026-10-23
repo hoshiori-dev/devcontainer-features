@@ -28,11 +28,8 @@ run time, installing it when the image lacks it.
 
 ### Requirement: Option version
 
-The feature SHALL accept the option `version` as declared here and install the release it selects: `latest` means the
-release that https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest redirects to at build time, and any other
-value is a release version `MAJOR.MINOR.PATCH` of decimal numbers at or above `1.47.0`, with or without a leading `v`;
-the feature SHALL reject any other value before downloading anything, and SHALL fail before downloading any archive when
-`latest` resolves to a tag of any other form.
+The feature SHALL accept the option `version` as declared here and install the release it selects, as stated in "Glab
+release version selection".
 
 | Field   | Value      |
 | ------- | ---------- |
@@ -79,17 +76,8 @@ the feature SHALL reject any other value before downloading anything, and SHALL 
 
 ### Requirement: Verified download from the GitLab release
 
-The feature SHALL download the release archive from
-`https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/glab_<version>_linux_<arch>.tar.gz` and its checksum
-list from `https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/checksums.txt`, where `<version>` has no
-leading `v` and `<arch>` is `amd64` or `arm64`, over HTTPS only, including every redirect, and SHALL fail when the
-requested release has no archive for the architecture. It SHALL install the archive's `glab` only when the checksum list
-holds exactly one entry whose file name equals the archive's name and the archive's SHA-256 digest equals that entry.
-The feature SHALL rely on TLS alone for the checksum list itself, which upstream publishes unsigned from the same origin
-as the archive, so this verification establishes the archive's integrity against the published release, not the
-publisher's authenticity. To resolve `latest`, the feature SHALL read the redirect of the latest-release permanent link
-over HTTPS without following it and SHALL rely on TLS alone for it, since upstream publishes no checksum or signature
-for it.
+The feature SHALL download the release archive and its checksum list as stated in "Glab release assets and checksum",
+verify the archive against that list, and trust them as stated in "Glab release metadata trust".
 
 #### Scenario: Digest matches
 
@@ -110,11 +98,8 @@ for it.
 
 ### Requirement: Supported platforms
 
-The feature SHALL support the images and architectures listed in `test/glab/compatibility.json`. It SHALL fail, before
-downloading or installing anything, with a message naming what is unsupported when the machine architecture is neither
-x86_64 nor aarch64; when `/etc/os-release` is missing or identifies, by its `ID` or `ID_LIKE`, a distribution outside
-the Debian, Ubuntu, Fedora, and Alpine families; or when the image lacks the package manager of the family it matched
-(`apt-get` for Debian and Ubuntu, `dnf` for Fedora, `apk` for Alpine).
+The feature SHALL support the images and architectures listed in `test/glab/compatibility.json`, and SHALL reject an
+unsupported platform before downloading or installing anything, as stated in "Glab platform gate".
 
 #### Scenario: Unsupported architecture
 
@@ -224,3 +209,66 @@ support.
 - **THEN** they identify the plugins supplied by the feature without requiring the user to add them manually
 - **AND** show `-GitLab.gitlab-workflow` as VS Code automatic-install exclusion, not uninstallation
 - **AND** explain remote-backend installation and user-controlled editor authentication and IDE selection
+
+### Requirement: Glab release version selection
+
+For `version`, `latest` SHALL mean the release that https://gitlab.com/gitlab-org/cli/-/releases/permalink/latest
+redirects to at build time, and any other value SHALL be a release version `MAJOR.MINOR.PATCH` of decimal numbers at or
+above `1.47.0`, with or without a leading `v`; the feature SHALL reject any other value before downloading anything, and
+SHALL fail before downloading any archive when `latest` resolves to a tag of any other form.
+
+#### Scenario: Unsupported version form
+
+- **WHEN** the feature is installed with `version` set to a malformed value or a version below `1.47.0`, or with
+  `latest` while the permanent link points to a tag that is not a release version at or above `1.47.0`
+- **THEN** the install fails before downloading any archive
+
+### Requirement: Glab release assets and checksum
+
+The feature SHALL download the release archive from
+`https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/glab_<version>_linux_<arch>.tar.gz` and its checksum
+list from `https://gitlab.com/gitlab-org/cli/-/releases/v<version>/downloads/checksums.txt`, where `<version>` has no
+leading `v` and `<arch>` is `amd64` or `arm64`, over HTTPS only, including every redirect, and SHALL fail when the
+requested release has no archive for the architecture.
+
+#### Scenario: Release without an archive for the architecture
+
+- **WHEN** the requested release has no archive for the machine's architecture
+- **THEN** the install fails
+
+### Requirement: Glab archive checksum match
+
+The feature SHALL install the archive's `glab` only when the checksum list holds exactly one entry whose file name
+equals the archive's name and the archive's SHA-256 digest equals that entry.
+
+#### Scenario: Checksum entry matches
+
+- **WHEN** the checksum list holds exactly one entry whose file name equals the archive's name and the archive's SHA-256
+  digest equals that entry
+- **THEN** the feature installs the `glab` from that archive
+
+### Requirement: Glab release metadata trust
+
+The feature SHALL rely on TLS alone for the checksum list itself, which upstream publishes unsigned from the same origin
+as the archive, so this verification establishes the archive's integrity against the published release, not the
+publisher's authenticity. To resolve `latest`, the feature SHALL read the redirect of the latest-release permanent link
+over HTTPS without following it and SHALL rely on TLS alone for it, since upstream publishes no checksum or signature
+for it.
+
+#### Scenario: Latest resolved from the redirect
+
+- **WHEN** the feature is installed with `version` set to `latest`
+- **THEN** it reads the redirect of the latest-release permanent link over HTTPS without following it
+
+### Requirement: Glab platform gate
+
+The feature SHALL fail, before downloading or installing anything, with a message naming what is unsupported when the
+machine architecture is neither x86_64 nor aarch64; when `/etc/os-release` is missing or identifies, by its `ID` or
+`ID_LIKE`, a distribution outside the Debian, Ubuntu, Fedora, and Alpine families; or when the image lacks the package
+manager of the family it matched (`apt-get` for Debian and Ubuntu, `dnf` for Fedora, `apk` for Alpine).
+
+#### Scenario: Unsupported platform prerequisite
+
+- **WHEN** the machine architecture is neither x86_64 nor aarch64, `/etc/os-release` is missing or names none of the
+  supported families, or the image lacks the matched family's package manager
+- **THEN** the install fails before downloading or installing anything, with a message naming what is unsupported

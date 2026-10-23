@@ -1,0 +1,28 @@
+{
+  "id": "act",
+  "version": "1.0.0",
+  "name": "act",
+  "description": "Installs act, which runs GitHub Actions workflows locally, from its checksum-verified GitHub release archive; needs a Docker Engine the feature does not install.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/act",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "0.2.80"],
+      "default": "latest",
+      "description": "act version to install: 'latest', or a release such as 0.2.89 (a leading 'v' is accepted; 0.2.23 or later)."
+    },
+    "defaultImage": {
+      "type": "string",
+      "enum": ["none", "medium", "large"],
+      "default": "none",
+      "description": "Runner images to preselect in the remote user's ~/.config/act/actrc, as act's first-run prompt would: 'medium' (catthehacker/ubuntu:act-*), 'large' (catthehacker/ubuntu:full-*), or 'none' to write nothing."
+    }
+  },
+  "containerEnv": {
+    "ACT_DISABLE_VERSION_CHECK": "1"
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/docker-in-docker",
+    "ghcr.io/devcontainers/features/docker-outside-of-docker"
+  ]
+}

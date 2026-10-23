@@ -1,0 +1,52 @@
+{
+  "test_version_explicit": {
+    "image": "debian:12",
+    "features": {
+      "act": {
+        "version": "0.2.80"
+      }
+    }
+  },
+  "test_version_explicit_fedora": {
+    "image": "fedora:44",
+    "features": {
+      "act": {
+        "version": "0.2.80"
+      }
+    }
+  },
+  "test_version_leading_v": {
+    "image": "alpine:3.24",
+    "features": {
+      "act": {
+        "version": "v0.2.80"
+      }
+    }
+  },
+  "test_version_leading_v_ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "act": {
+        "version": "v0.2.80"
+      }
+    }
+  },
+  "test_default_image_medium": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "act": {
+        "defaultImage": "medium"
+      }
+    }
+  },
+  "test_default_image_large": {
+    "image": "alpine:3.24",
+    "features": {
+      "act": {
+        "defaultImage": "large"
+      }
+    }
+  }
+}

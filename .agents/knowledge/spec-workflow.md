@@ -6,8 +6,8 @@ before editing any file under `openspec/`.
 Level: spec-anchored. Selected because each feature is maintained for years and its options and behavior are a contract
 consumers pin by major version. Obligation: every merged change to a feature's behavior leaves
 `openspec/specs/<feature-id>/spec.md` describing the feature as merged. Approach: OpenSpec (schema `spec-driven`) —
-layout and commands verified from `openspec --help` and https://openspec.dev/llms.txt with OpenSpec 1.13.2 on
-2026-09-29. Re-verify a command with `openspec <command> --help` before running or documenting it; do not rely on a
+layout and commands verified from `openspec --help` and https://openspec.dev/llms.txt with OpenSpec 1.14.3 on
+2026-10-23. Re-verify a command with `openspec <command> --help` before running or documenting it; do not rely on a
 remembered one. No separate skill wraps OpenSpec here: its own generated skills (`.agents/skills/openspec-*`, also
 `/opsx:*` in Claude Code) are the command surface, and the checks below are this project's own.
 
@@ -39,7 +39,7 @@ Regenerate with `openspec init --tools claude`, never `openspec update`. `.claud
 `.agents/skills`, where OpenSpec's generic "agents" tool keeps its skills too, so `update` treats both tools as
 configured, rewrites the shared skills to the agents tool's command names (`/openspec-apply-change` instead of
 `/opsx:apply`), and adds `.agents/skills/.openspec-target`. `init` with only the claude tool reproduces the committed
-files (verified with OpenSpec 1.13.2 on 2026-09-29), and `just spec-check` fails when they drift from its output
+files (verified with OpenSpec 1.14.3 on 2026-10-23), and `just spec-check` fails when they drift from its output
 (`scripts/check_openspec.ts`).
 
 ## Artifact roles
