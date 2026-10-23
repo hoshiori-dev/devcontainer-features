@@ -1,0 +1,29 @@
+{
+  "id": "opencode",
+  "version": "1.0.0",
+  "name": "OpenCode",
+  "description": "Installs the native OpenCode v2 CLI and keeps its configuration, credentials, and sessions in a private project volume.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/opencode",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "The stable OpenCode 2.x release: latest, or an exact MAJOR.MINOR.PATCH version.",
+      "proposals": [
+        "latest",
+        "2.1.2"
+      ]
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ],
+  "mounts": [
+    {
+      "source": "opencode-${devcontainerId}",
+      "target": "/var/lib/opencode",
+      "type": "volume"
+    }
+  ],
+  "onCreateCommand": "/usr/local/share/opencode-feature/initialize"
+}
