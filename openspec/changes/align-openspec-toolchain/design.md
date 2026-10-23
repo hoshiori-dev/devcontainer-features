@@ -34,16 +34,12 @@ contracts.
 ### One authoritative OpenSpec pin
 
 Keep `.github/actions/setup-tools/action.yml` as the authoritative exact OpenSpec pin. The OpenSpec install line in
-`.devcontainer/setup.sh` will read that pin rather than independently track latest. A small validation helper will read
-the same authority and compare `openspec --version` before running checks; mismatch fails with the installed and
-required versions and a remediation command. Validate malformed/missing pins and version output with meaningful fixture
-tests. Other tool pins and environment configuration remain outside the migration.
+`.devcontainer/setup.sh` reads that installation target directly rather than independently tracking latest. Other tool
+pins and environment configuration remain outside the migration.
 
-An npm registry lookup for `@fission-ai/openspec`'s stable dist-tag reports an available newer release for maintainer
-approval and never rewrites the pin. Check output explicitly distinguishes lookup failure from current-version success;
-an unavailable advisory service does not invalidate otherwise reproducible local contract validation. Registry requests
-use existing TLS verification and bounded timeouts. Verify newer, current, failed and malformed lookup responses using
-fixtures rather than requiring network access for unit tests.
+At acceptance, compare `openspec --version` with the shared pin and query the npm registry's stable version. Report a
+mismatch or unsuccessful lookup as an incomplete check; do not automatically raise the pin. These constraints guide the
+upgrade review and add no version checker, update notification, or enforcement mechanism to the repository.
 
 Duplicated local and CI constants were rejected because they can drift. Automatically installing latest was rejected
 because a validation-rule change must be reviewed before it becomes required.

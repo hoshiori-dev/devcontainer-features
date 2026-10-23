@@ -11,8 +11,8 @@ Issue: https://github.com/hoshiori-dev/devcontainer-features/issues/129
 
 - Bring every existing main specification into compliance with OpenSpec 1.14.3 description limits.
 - Preserve existing obligations and scenarios while compressing descriptions and extracting independent requirements.
-- Align CI and local OpenSpec on 1.14.3, detect installed-version drift, and report newer stable releases for a
-  maintainer decision without automatically upgrading.
+- Align CI and local OpenSpec on 1.14.3. Verify version equality and check for newer stable releases when accepting this
+  upgrade; these are review actions, not new repository enforcement or notification mechanisms.
 - Refresh generated OpenSpec skills and commands using the selected version and reconcile the associated knowledge.
 
 ## Capabilities
@@ -60,9 +60,9 @@ package; implementation and main-spec synchronization remain subject to the repo
 - Every resulting main-spec requirement description, including option tables, is at most 500 characters according to
   OpenSpec 1.14.3; all resulting main specs and this change pass strict validation with that release.
 - CI and a newly built dev container install the same exact OpenSpec 1.14.3 release from one authoritative pin.
-- Validation fails with an actionable diagnostic when the installed version differs from that pin.
-- Validation reports a newer stable release, when available, without changing the pin; failed update lookups are
-  reported explicitly and do not masquerade as an up-to-date result.
+- The upgrade review confirms the installed version matches the shared pin and records the registry's current stable
+  release. A mismatch or unsuccessful lookup is reported without claiming successful verification.
+- No new version-check command, automatic update notice, or enforcement mechanism is added to the repository.
 - Generated OpenSpec files match `openspec init --tools claude` under the selected release and `just check` passes.
 
 **Stays true**
