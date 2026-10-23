@@ -27,9 +27,18 @@ require_mount() {
   fi
 }
 
+# Rejects directory links before inspecting credential paths, whose intermediate components must stay inside the mount.
+check_state_links() {
+  local name
+  for name in "${STATE_NAMES[@]}" "${CREDENTIAL_FILES[@]}"; do
+    [[ ! -L "${STATE_DIR}/${name}" ]] || fail "${STATE_DIR}/${name} is a symlink; preserve it and resolve the mapping"
+  done
+}
+
 # Restores private modes on the state root, its subdirectories, and the known credential files, without recursion.
 restore_modes() {
   local name file
+  check_state_links
   chmod 0700 "${STATE_DIR}"
   for name in "${STATE_NAMES[@]}"; do
     if [[ -d "${STATE_DIR}/${name}" && ! -L "${STATE_DIR}/${name}" ]]; then chmod 0700 "${STATE_DIR}/${name}"; fi
@@ -46,6 +55,7 @@ repair_state() {
   [[ "$(id --user)" == 0 && "${uid}" =~ ^[0-9]+$ && "${gid}" =~ ^[0-9]+$ ]] \
     || fail "invalid repair identity; rerun initialization as the remote user"
   require_mount
+  check_state_links
   log "repairing ownership inside ${STATE_DIR} for UID ${uid}"
   find -P "${STATE_DIR}" -xdev -exec chown --no-dereference "${uid}:${gid}" -- {} +
   find -P "${STATE_DIR}" -xdev -type d -exec chmod 0700 -- {} +
@@ -58,6 +68,7 @@ initialize_state() {
   local mappings=()
   local repair=none
   require_mount
+  check_state_links
   uid="$(id --user)"
   gid="$(id --group)"
   home_path="${HOME:-$(getent passwd "${uid}" | cut --delimiter=: --fields=6)}"
@@ -103,9 +114,7 @@ initialize_state() {
     log "restoring private permissions inside ${STATE_DIR}"
     restore_modes
   fi
-  for name in "${STATE_NAMES[@]}" "${CREDENTIAL_FILES[@]}"; do
-    [[ ! -L "${STATE_DIR}/${name}" ]] || fail "${STATE_DIR}/${name} is a symlink; preserve it and resolve the mapping"
-  done
+  check_state_links
   for name in "${STATE_NAMES[@]}"; do
     if [[ ! -e "${STATE_DIR}/${name}" ]]; then mkdir --mode 0700 "${STATE_DIR}/${name}"; fi
     [[ -d "${STATE_DIR}/${name}" && -r "${STATE_DIR}/${name}" && -w "${STATE_DIR}/${name}" \

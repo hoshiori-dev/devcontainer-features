@@ -152,6 +152,35 @@ mode_repair() {
 }
 check "private modes are restored without privileged repair" mode_repair
 
+state_link_conflicts() {
+  local name file mode before output
+  local result=0
+  mkdir "${work}/link-home" "${work}/outside-state"
+  printf 'synthetic external token fixture\n' >"${work}/outside-state/antigravity-oauth-token"
+  printf 'synthetic external plugin fixture\n' >"${work}/outside-state/plugin-secrets.json"
+  for name in cli plugin-secrets; do
+    if [[ "${name}" == cli ]]; then file=antigravity-oauth-token; else file=plugin-secrets.json; fi
+    mv "${STATE_DIR}/${name}" "${STATE_DIR}/${name}.saved"
+    ln -s "${work}/outside-state" "${STATE_DIR}/${name}"
+    # Both entry points must reject the intermediate link before changing external modes or ownership.
+    for mode in normal repair; do
+      chmod 0644 "${work}/outside-state/${file}"
+      before="$(stat -c %u:%g:%a "${work}/outside-state/${file}")"
+      if [[ "${mode}" == normal ]]; then
+        if output="$(HOME="${work}/link-home" XDG_CONFIG_HOME="" "${INITIALIZE}" 2>&1)"; then result=1; fi
+      else
+        if output="$(sudo "${INITIALIZE}" --repair "$(id -u)" "$(id -g)" 2>&1)"; then result=1; fi
+      fi
+      [[ "${output}" == *"${STATE_DIR}/${name} is a symlink"* ]] || result=1
+      [[ "$(stat -c %u:%g:%a "${work}/outside-state/${file}")" == "${before}" ]] || result=1
+    done
+    rm "${STATE_DIR}/${name}"
+    mv "${STATE_DIR}/${name}.saved" "${STATE_DIR}/${name}"
+  done
+  return "${result}"
+}
+check "state directory links fail before normal or root repair changes external credentials" state_link_conflicts
+
 changed_uid() {
   printf 'outside\n' >"${work}/external"
   chmod 0644 "${work}/external"
