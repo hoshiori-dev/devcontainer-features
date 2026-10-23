@@ -7,7 +7,8 @@ set -euo pipefail
 source dev-container-features-test-lib
 
 # The release the latest dist-tag names when the test runs; a release between build and test fails once.
-latest="$(curl --fail --silent --show-error https://registry.npmjs.org/-/package/@opencode%2fcli/dist-tags \
+latest="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error \
+  https://registry.npmjs.org/-/package/@opencode%2fcli/dist-tags \
   | jq --raw-output .latest)"
 
 single_links() {

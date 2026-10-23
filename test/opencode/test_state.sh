@@ -166,7 +166,9 @@ unavailable_repair() {
   chmod +x "${work}/no-sudo/sudo"
   sudo chown -R -h 23456:23456 "${STATE_DIR}"
   PATH="${work}/no-sudo:${PATH}" rejects_initialization || result=1
-  [[ "$(stat -c %u:%a "${STATE_DIR}")" == 23456:700 && -f "${STATE_DIR}/data/opencode.db" ]] || result=1
+  # The remote user cannot enter the foreign-owned root, so root inspects what is left.
+  [[ "$(stat -c %u:%a "${STATE_DIR}")" == 23456:700 ]] || result=1
+  sudo test -f "${STATE_DIR}/data/opencode.db" || result=1
   "${INITIALIZE}" || return 1
   return "${result}"
 }

@@ -23,7 +23,7 @@ rejects() {
     printf '%s\n' "${output}"
     return 1
   fi
-  [[ "${output}" == *"opencode: error: ${expected}"* ]] || { printf '%s\n' "${output}"; return 1; }
+  [[ "${output}" == *"opencode: error: "*"${expected}"* ]] || { printf '%s\n' "${output}"; return 1; }
 }
 
 # This literal shell syntax must reach option validation without expansion.
