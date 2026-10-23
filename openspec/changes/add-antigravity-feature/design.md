@@ -53,7 +53,14 @@ Map verified owned CLI directories and active plugin-secret storage into /var/li
 default discovery paths. The reference run observed .gemini/antigravity-cli and .config/antigravity/plugin-secrets.json;
 these observations do not establish complete authenticated state coverage. Link only directories confirmed to belong
 exclusively to Antigravity. Never link the whole shared .gemini or .config tree. Shared .gemini/config entries require
-an upstream-supported mapping that preserves unrelated Gemini data.
+an upstream-supported mapping that preserves unrelated Gemini data. The implementation check on 2026-10-23 found that
+.gemini/config is such a mapping as a whole directory: the 1.4.6 CLI names it Antigravity's global configuration
+directory, writes `mcp_config.json` there through `agy mcp add`, keeps `projects/`, plugins, skills, and hooks there,
+and migrates them from .gemini/antigravity-cli. Gemini CLI's storage paths (`packages/core/src/config/storage.ts` in
+`google-gemini/gemini-cli`) are entries directly under .gemini, such as `settings.json`, `oauth_creds.json`, `tmp`,
+`history`, `commands`, `skills`, `policies`, and `agents`, and none is under .gemini/config, so linking that directory
+leaves Gemini data in place. Antigravity's IDE and desktop app read the same directory. Every entry directly under
+.gemini stays unmapped.
 
 Identify application-owned credential-file paths from upstream documentation/source and verify writes and atomic
 replacement with synthetic fixtures; do not perform account login or credential refresh tests. A file link that an
