@@ -17,13 +17,17 @@ trap 'rm -rf "${work}"' EXIT
 make_curl_stub "${work}/downloads"
 "${INITIALIZE}"
 
+# find and sudo both fail here, so a scan or a repair, which runs through sudo with its own PATH, fails the check.
 healthy_without_scan() {
-  mkdir "${work}/no-find"
-  printf '#!/bin/sh\nexit 91\n' >"${work}/no-find/find"
-  chmod +x "${work}/no-find/find"
-  PATH="${work}/no-find:${PATH}" "${INITIALIZE}"
+  local output
+  mkdir "${work}/no-scan"
+  printf '#!/bin/sh\nexit 91\n' >"${work}/no-scan/find"
+  cp "${work}/no-scan/find" "${work}/no-scan/sudo"
+  chmod +x "${work}/no-scan/find" "${work}/no-scan/sudo"
+  output="$(PATH="${work}/no-scan:${PATH}" "${INITIALIZE}")" || return 1
+  [[ "${output}" != *repairing* && "${output}" != *restoring* ]]
 }
-check "a healthy volume initializes without a full-tree scan" healthy_without_scan
+check "a healthy volume initializes without a full-tree scan or repair" healthy_without_scan
 check "no start or attach hook is declared" jq -e '(has("postStartCommand") or has("postAttachCommand")) | not' \
   "$(dirname "$0")/_feature/devcontainer-feature.json"
 
@@ -151,6 +155,8 @@ check "private modes are restored without privileged repair" mode_repair
 changed_uid() {
   printf 'outside\n' >"${work}/external"
   chmod 0644 "${work}/external"
+  # Owned by neither the remote user nor the fake UID, so a repair that follows the link changes it visibly.
+  sudo chown root:root "${work}/external"
   local before
   before="$(stat -c %u:%g:%a "${work}/external")"
   ln -s "${work}/external" "${STATE_DIR}/cli/external-link"

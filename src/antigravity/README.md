@@ -30,7 +30,8 @@ image's version stays fixed until you rebuild; override the variable in your con
 Targets outside the tested compatibility list get a warning and an installation attempt when Google publishes an archive
 for them. Systems or CPUs without an official archive, an unreachable manifest, a failed digest check, or an executable
 that cannot run stop the installation with the cause; a working CLI is replaced only after the new one runs. Your own
-Node, Python, or other runtimes are left alone: the CLI is a single static executable.
+Node, Python, or other runtimes are left alone: the CLI is a single executable linked against the C library (glibc, or
+musl for the musl build).
 
 The CLI keeps Antigravity's approval and sandbox defaults. Sign in after creating the container; the image build never
 asks for or stores credentials.
@@ -48,7 +49,9 @@ directories link into it, keeping their default locations:
 
 `$XDG_CONFIG_HOME` defaults to `~/.config`. The rest of `~/.gemini` and `~/.config` is not linked, so other tools' data
 there, such as Gemini CLI's `settings.json` and extensions, stays in the container and is unaffected. The Antigravity
-IDE's own directories (`~/.gemini/antigravity`, `~/.gemini/antigravity-ide`) are not mapped either.
+IDE's own directories (`~/.gemini/antigravity`, `~/.gemini/antigravity-ide`) are not mapped either. Antigravity's IDE
+and desktop app also read `~/.gemini/config`, so an Antigravity app running in this container shares that configuration
+with the CLI.
 
 Existing files, directories, or links to other locations at any of the three paths cause a clear conflict; the feature
 neither overwrites nor imports them. Back them up and migrate them explicitly. Options or environment variables that
