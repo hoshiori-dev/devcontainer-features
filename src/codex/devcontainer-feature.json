@@ -1,0 +1,29 @@
+{
+  "id": "codex",
+  "version": "1.0.0",
+  "name": "OpenAI Codex",
+  "description": "Installs the Codex CLI and preserves its home in a private project volume, including credentials, configuration, skills, and sessions.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/codex",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "The stable Codex release: latest, or an exact MAJOR.MINOR.PATCH version.",
+      "proposals": [
+        "latest",
+        "0.162.0"
+      ]
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ],
+  "mounts": [
+    {
+      "source": "codex-${devcontainerId}",
+      "target": "/var/lib/codex",
+      "type": "volume"
+    }
+  ],
+  "onCreateCommand": "/usr/local/share/codex-feature/initialize"
+}

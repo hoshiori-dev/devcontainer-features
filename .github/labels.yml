@@ -1,5 +1,5 @@
 # The repository's labels, all of them: scripts/sync_labels.ts makes the repository match this list,
-# and `just validate` checks it offline. The five area labels are defined in
+# and `just validate` checks it offline. The area labels are defined in
 # .agents/knowledge/github-workflow.md; a description here is GitHub's hover text, at most 100
 # characters. The three spec: labels state where a pull request's specification stands; the PR
 # labels workflow sets them (.github/workflows/pr-labels.yml). The last two are the labels GitHub
@@ -19,7 +19,10 @@
   description: The OpenSpec process, its configuration, and its generated skills
 - name: area:harness
   color: "6e7781"
-  description: The knowledge base, project skills, templates and forms, dev container, and root documents
+  description: The knowledge base, project skills, templates and forms, dev container, and root configuration
+- name: area:document
+  color: "0075ca"
+  description: CONTRIBUTING.md, SECURITY.md, README.md, and README.zh.md for human readers
 - name: spec:pending
   color: "fef2c0"
   description: The pull request holds an OpenSpec change whose approval package is not approved
