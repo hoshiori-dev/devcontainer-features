@@ -26,12 +26,33 @@ repair result cannot establish private credential availability.
 
 ### Installation and dependencies
 
-Use @opencode/cli from its official npm registry, resolving a stable 2.x version before installation. The observed
-current package is 2.1.2, with native payloads under @opencode/cli-*. npm retains integrity checking. Do not inherit the
-obsolete Codex shared Node 24 dependency design. Determine whether the supported npm launcher requires Node even when
-its payload is native; if required, isolate that runtime without injecting shared Node Feature options or changing user
-toolchains. Verify the runtime source and integrity before implementation. Reject the v1 opencode-ai package and its
-GitHub asset names; the GitHub Latest entry is not the authoritative v2 channel.
+Install upstream's native executable, not the npm package. The v2 native installer (`https://opencode.ai/v2/install`,
+read on 2026-10-23, not executed) selects a platform package `@opencode/cli-<target>`, downloads its tarball from
+`registry.npmjs.org`, and installs the single `package/bin/opencode` it holds. The feature does the same, without the
+script: it reads the package version's metadata from the registry, downloads `dist.tarball`, verifies the tarball's
+SHA-512 against `dist.integrity`, and installs the executable atomically to `/usr/local/bin/opencode`. `latest` is the
+`latest` dist-tag of `@opencode/cli`, accepted only as a stable 2.x release. Target selection follows the installer:
+`linux-x64` or `linux-arm64`, `-baseline` on x86_64 without AVX2, `-musl` on musl.
+
+Observed on 2026-10-23: `latest` is `2.1.3`; `@opencode/cli-linux-x64@2.1.3` is a 240 MB static ELF with `package.json`
+beside it; its tarball matches `dist.integrity`; the executable prints `opencode v2.1.3` on `debian:12` with no Node.js
+present. Variants exist for `linux-x64`, `linux-arm64`, both `-musl`, `linux-x64-baseline`, and
+`linux-x64-baseline-musl`. The packages carry npm's registry signature but no provenance attestation, and no v2 GitHub
+release exists (the GitHub Latest entry is v1.19.4). The v2 updater recognizes an installer copy only at
+`~/.opencode/bin/opencode` and package-manager installs by their package, so an executable at `/usr/local/bin` has no
+update method and does not replace itself.
+
+Rejected:
+
+- `@opencode/cli` through npm: needs Node.js and npm for its launcher and `postinstall` script, which this feature would
+  then have to supply without disturbing user toolchains; the native payload is the same.
+- Running upstream's installer script: installs per user under `~/.opencode/bin`, edits shell startup files, and does
+  not verify the tarball it downloads; the feature reproduces its download with verification instead.
+- GitHub release assets: they carry v1 only.
+- Verifying npm's registry signature in addition to `dist.integrity`: it attests the registry, not upstream, and needs
+  npm's rotating key set; integrity against the registry's metadata over TLS is the verification this route offers.
+
+Reject the v1 `opencode-ai` package and its GitHub asset names.
 
 ### Options
 
@@ -127,11 +148,11 @@ settings. Initialization checks only state paths, mounts, ownership, private per
 an agent configuration service. NOTES documents retained paths and consumer-managed keyring, external files, and
 environment credentials. No authentication workflow or credential-service design is included.
 
-Validate staged executables in an isolated temporary home before replacing a working installation. Keep complete
-required runtime payloads outside the state mount. Check that installation and later runtime Feature configuration do
-not alter user tool versions or defaults; compare explicit, partial, and empty configurations with runtime-only
-controls. Audit first-party installation entry points, artifact/registry locations, and verification sources separately
-from base-image repositories and upstream-selected dependency distributors.
+Validate the staged executable in an isolated temporary home before replacing a working installation. Keep the
+executable outside the state mount. Check that installation and later runtime Feature configuration do not alter user
+tool versions or defaults; compare explicit, partial, and empty configurations with runtime-only controls. Audit
+first-party installation entry points, artifact/registry locations, and verification sources separately from base-image
+repositories and upstream-selected dependency distributors.
 
 ## Risks / Trade-offs
 

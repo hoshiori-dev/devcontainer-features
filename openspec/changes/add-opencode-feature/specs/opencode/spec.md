@@ -36,21 +36,49 @@ The feature SHALL accept the option `version` as declared here.
 - **WHEN** the value is malformed, prerelease, unavailable, or outside the supported range
 - **THEN** installation fails clearly without treating the input as shell syntax
 
-### Requirement: Official registry installation
+### Requirement: Native executable installation
 
-The feature SHALL install `@opencode/cli` through npm from `https://registry.npmjs.org/`, preserving npm integrity
-verification. It SHALL not require a shared Node Feature with injected version or tool options. Its CLI installation and
-any required isolated runtime SHALL remain outside the runtime-state volume.
+The feature SHALL install upstream's native `opencode` executable, the one upstream's native installer installs, at
+`/usr/local/bin/opencode`, outside the runtime-state volume. It SHALL neither install nor require npm, Node.js, or
+another JavaScript runtime, and SHALL not run upstream's installer script.
 
-#### Scenario: Registry package
+#### Scenario: Native executable
 
-- **WHEN** the resolved package is installed
-- **THEN** npm verifies registry integrity and the remote user can run the CLI
+- **WHEN** the feature is installed on an image without Node.js or npm
+- **THEN** the remote user can run `opencode --version`, and neither `node` nor `npm` was added to the image
 
-#### Scenario: Corrupt registry payload
+#### Scenario: Existing JavaScript tooling
 
-- **WHEN** npm rejects the downloaded package integrity
-- **THEN** installation fails without reporting success
+- **WHEN** the image already has Node.js or npm
+- **THEN** the feature leaves their versions, global packages, and configuration unchanged
+
+### Requirement: Native package source
+
+The feature SHALL download the platform package `@opencode/cli-<target>` for the selected release from
+`https://registry.npmjs.org/`, where `<target>` is `linux-x64` or `linux-arm64`, with the suffix `-baseline` on an
+x86_64 CPU without AVX2 and `-musl` on a musl C library, as upstream's native installer selects it. `latest` SHALL mean
+the registry's `latest` dist-tag of `@opencode/cli` at build time. Every request SHALL use HTTPS, redirects included.
+
+#### Scenario: Target selection
+
+- **WHEN** the feature is installed on x86_64 with AVX2 and glibc
+- **THEN** it installs from `@opencode/cli-linux-x64`
+
+#### Scenario: Resolving latest
+
+- **WHEN** `version` is `latest` and the `latest` dist-tag names a stable 2.x release
+- **THEN** that release is installed; any other dist-tag value fails installation before a package is downloaded
+
+### Requirement: Native package verification
+
+The feature SHALL install the executable only when the downloaded package's SHA-512 digest equals the `dist.integrity`
+value the registry publishes for that package version, and SHALL rely on TLS alone for that metadata, since upstream
+publishes no separate signature for the package.
+
+#### Scenario: Corrupt package
+
+- **WHEN** the downloaded package does not match its published integrity
+- **THEN** installation fails without reporting success, and an earlier `/usr/local/bin/opencode` is left as it was
 
 ### Requirement: Supported targets
 
