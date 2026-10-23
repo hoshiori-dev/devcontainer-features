@@ -1,5 +1,6 @@
 ### Devcontainer ###
 devcontainer-lock.json
+devcontainer.local.json
 
 ### Skills Lock ###
 skills-lock.json

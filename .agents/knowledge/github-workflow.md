@@ -48,7 +48,8 @@ the hover text of its label (Synchronization).
 | `area:ci`            | The workflows, the composite actions, and Dependabot.                                                       |
 | `area:scripts`       | The Deno scripts and the `justfile`.                                                                        |
 | `area:spec-workflow` | The OpenSpec process, its configuration, and its generated skills.                                          |
-| `area:harness`       | The knowledge base, the project skills, the templates and forms, the dev container, and the root documents. |
+| `area:harness`       | The knowledge base, project skills, templates and forms, dev container, and remaining root files.           |
+| `area:document`      | `CONTRIBUTING.md`, `SECURITY.md`, `README.md`, and `README.zh.md`, written for human readers.               |
 
 A triaged issue of any type has at least one area label, usually one. An Epic carries the area of its sub-issues. A pull
 request gets the area labels of the paths it changes from the PR labels workflow, which adds and never removes them; the
