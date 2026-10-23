@@ -68,12 +68,16 @@ repair_state() {
   done
 }
 
-# Fails on any OpenCode XDG path that is not missing and not a link to its volume directory; changes nothing.
+# Fails on OpenCode XDG paths that overlap, or that are neither missing nor a link to their volume directory; changes
+# nothing.
 check_links() {
   local kind root path
+  local -a kinds=() roots=()
   for kind in "${STATE_KINDS[@]}"; do
     root="$(effective_root "${kind}")"
     path="${root}/opencode"
+    kinds+=("${kind}")
+    roots+=("$(readlink --canonicalize-missing "${root}")")
     if [[ -L "${path}" ]]; then
       [[ "$(readlink "${path}")" == "${STATE_DIR}/${kind}" ]] \
         || fail "${path} links elsewhere; preserve it and resolve the mapping manually"
@@ -82,6 +86,28 @@ check_links() {
     elif [[ -e "${root}" && ! -d "${root}" ]]; then
       fail "${root} is not a directory; move it aside and rerun ${SELF_PATH}"
     fi
+  done
+  check_roots_apart kinds roots
+}
+
+# Fails when two canonical XDG roots coincide, or one lies in another kind's OpenCode directory or in the state volume.
+# $1 and $2 name the arrays of kinds and their canonical roots.
+check_roots_apart() {
+  local -n kind_list="$1" root_list="$2"
+  local i j inner
+  for i in "${!kind_list[@]}"; do
+    [[ "${root_list[i]}" != "${STATE_DIR}" && "${root_list[i]}" != "${STATE_DIR}"/* ]] \
+      || fail "the XDG root for OpenCode ${kind_list[i]} lies inside ${STATE_DIR}; use a root outside the state volume"
+    for j in "${!kind_list[@]}"; do
+      if (( i == j )); then continue; fi
+      if (( i < j )) && [[ "${root_list[i]}" == "${root_list[j]}" ]]; then
+        fail "OpenCode ${kind_list[i]} and ${kind_list[j]} share the XDG root ${root_list[i]}; give each its own root"
+      fi
+      # A root of / must not become //opencode.
+      inner="${root_list[j]%/}/opencode"
+      [[ "${root_list[i]}" != "${inner}" && "${root_list[i]}" != "${inner}/"* ]] \
+        || fail "the XDG root for OpenCode ${kind_list[i]} lies inside ${inner}; give each its own root"
+    done
   done
 }
 

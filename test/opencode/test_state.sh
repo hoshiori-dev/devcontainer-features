@@ -140,6 +140,47 @@ custom_roots() {
   [[ "${output}" == *ses_fixture0000000000000000001* ]]
 }
 check "custom XDG roots map only the OpenCode directories and reach the same state" custom_roots
+shared_roots_rejected() {
+  local output
+  mkdir "${work}/shared-root"
+  if output="$(XDG_DATA_HOME="${work}/shared-root" XDG_CONFIG_HOME="${work}/shared-root" "${INITIALIZE}" 2>&1)"; then
+    return 1
+  fi
+  [[ "${output}" == *"OpenCode data and config share the XDG root ${work}/shared-root;"* \
+    && ! -e "${work}/shared-root/opencode" && ! -L "${work}/shared-root/opencode" ]]
+}
+check "XDG roots that coincide are rejected before any link is created" shared_roots_rejected
+
+# Sets XDG_CONFIG_HOME to $1 and XDG_DATA_HOME to $2, and succeeds when initialization names $3 as the enclosing
+# OpenCode directory and creates nothing under $4.
+nested_root_rejected() {
+  local output
+  if output="$(XDG_CONFIG_HOME="$1" XDG_DATA_HOME="$2" "${INITIALIZE}" 2>&1)"; then return 1; fi
+  [[ "${output}" == *"the XDG root for OpenCode data lies inside $3;"* ]] || return 1
+  [[ ! -e "$4/opencode" && ! -L "$4/opencode" ]]
+}
+mkdir "${work}/nested-root"
+check "an XDG root equal to another OpenCode directory is rejected before any change" \
+  nested_root_rejected "${work}/nested-root" "${work}/nested-root/opencode" "${work}/nested-root/opencode" \
+  "${work}/nested-root"
+check "an XDG root deeper in another OpenCode directory is rejected before any change" \
+  nested_root_rejected "${work}/nested-root" "${work}/nested-root/opencode/sub" "${work}/nested-root/opencode" \
+  "${work}/nested-root"
+check "an XDG root inside the OpenCode directory of the root / is rejected" \
+  nested_root_rejected / /opencode /opencode /
+volume_root_rejected() {
+  local output
+  if output="$(XDG_CACHE_HOME="${STATE_DIR}/cache" "${INITIALIZE}" 2>&1)"; then return 1; fi
+  [[ "${output}" == *"the XDG root for OpenCode cache lies inside ${STATE_DIR};"* \
+    && ! -e "${STATE_DIR}/cache/opencode" ]]
+}
+check "an XDG root inside the state volume is rejected" volume_root_rejected
+volume_itself_rejected() {
+  local output
+  if output="$(XDG_CACHE_HOME="${STATE_DIR}" "${INITIALIZE}" 2>&1)"; then return 1; fi
+  [[ "${output}" == *"the XDG root for OpenCode cache lies inside ${STATE_DIR};"* && ! -e "${STATE_DIR}/opencode" ]]
+}
+check "the state volume itself is rejected as an XDG root" volume_itself_rejected
 check "a relative XDG root is rejected" env XDG_CONFIG_HOME=relative bash -c "! '${INITIALIZE}'"
 
 private_database_repaired() {
