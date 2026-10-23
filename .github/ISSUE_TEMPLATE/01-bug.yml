@@ -6,7 +6,7 @@ body:
     id: feature
     attributes:
       label: Feature
-      description: Feature id and the version or tag you used, e.g. `node:1.4.0`, or the harness area (`ci`, `scripts`, `spec-workflow`, `harness`).
+      description: Feature id and the version or tag you used, e.g. `node:1.4.0`, or the repository area (`ci`, `scripts`, `spec-workflow`, `harness`, `document`).
     validations:
       required: true
   - type: input

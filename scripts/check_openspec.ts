@@ -1,7 +1,7 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write=/tmp --allow-run=git,openspec --allow-env=LOG_TOKENS,LOG_STREAM
 // --allow-env=LOG_TOKENS,LOG_STREAM: npm:yaml reads both to decide whether to print debug output.
 // Three checks OpenSpec's own validator does not make (.agents/knowledge/spec-workflow.md):
-// - openspec/config.yaml holds no rule OpenSpec would drop. OpenSpec 1.13.2 replaces an invalid
+// - openspec/config.yaml holds no rule OpenSpec would drop. OpenSpec 1.14.3 replaces an invalid
 //   `rules` field with a warning on stderr: a rule that is not a string — an unquoted rule with a
 //   colon followed by a space parses as a mapping — drops that artifact's whole rule set, and an
 //   empty rule is dropped alone. The file is parsed with the YAML parser OpenSpec uses.
@@ -16,7 +16,7 @@
 //   default, enum). The spec compared is what archive would produce: in a copy of openspec/ walked
 //   from the working tree, so uncommitted changes count, every active change with both specs/ and a
 //   tasks.md is archived in name order; a change without tasks.md is still before its package gate,
-//   so its deltas do not count yet. It relies on OpenSpec 1.13.2 behavior to re-verify on upgrade:
+//   so its deltas do not count yet. It relies on OpenSpec 1.14.3 behavior to re-verify on upgrade:
 //   `openspec archive <change> -y` applies deltas without prompting, whether or not tasks.md exists
 //   or its tasks are ticked, and refuses (exit code non-zero, nothing changed) a delta it cannot
 //   apply; a MODIFIED requirement replaces the whole requirement; archive keeps a table in a
@@ -49,7 +49,7 @@ function yamlKind(value: unknown): string {
 }
 
 /**
- * The rules in a parsed config.yaml that OpenSpec 1.13.2 drops: `rules` that is not a mapping, a value that is not a
+ * The rules in a parsed config.yaml that OpenSpec 1.14.3 drops: `rules` that is not a mapping, a value that is not a
  * list of strings (the whole artifact's rules go), and empty strings (dropped one by one).
  */
 export function ruleProblems(config: unknown): string[] {

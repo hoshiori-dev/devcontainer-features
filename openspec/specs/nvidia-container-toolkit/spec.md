@@ -18,14 +18,7 @@ Upstream sources:
 
 ### Requirement: Install the toolkit from NVIDIA's stable repository
 
-The feature SHALL install the packages `nvidia-container-toolkit`, `nvidia-container-toolkit-base`,
-`libnvidia-container-tools`, and `libnvidia-container1`, all at the same version, from NVIDIA's stable package
-repository for the image's package manager and architecture: on apt-based images from
-`https://nvidia.github.io/libnvidia-container/stable/deb/<arch>` (`<arch>` being `amd64` or `arm64`), and on dnf- and
-zypper-based images from `https://nvidia.github.io/libnvidia-container/stable/rpm/<arch>` (`<arch>` being `x86_64` or
-`aarch64`). The feature SHALL leave that repository configured in the image and SHALL NOT configure NVIDIA's
-experimental channel. The installed commands SHALL be on the default `PATH` of every user. The supported images are
-those listed in `test/nvidia-container-toolkit/compatibility.json`.
+The feature SHALL install NVIDIA's four toolkit packages at one selected version from the stable repository.
 
 #### Scenario: Default install on a supported image
 
@@ -42,13 +35,7 @@ those listed in `test/nvidia-container-toolkit/compatibility.json`.
 
 ### Requirement: Trust only NVIDIA's pinned signing key
 
-The feature SHALL download NVIDIA's repository signing key from `https://nvidia.github.io/libnvidia-container/gpgkey`
-and SHALL use it only after verifying that the downloaded file contains exactly one primary key, whose full fingerprint
-is `C95B321B61E88C1809C4F759DDCAE044F796ECB0`. The configured repository SHALL accept only content signed by that key:
-on apt-based images the repository's signed index is checked against that key alone, and on dnf- and zypper-based images
-both the repository metadata and every package are signature-checked against a local copy of that key. Neither the
-feature nor the repository configuration it writes SHALL import or trust any key other than the verified copy of that
-key.
+The feature SHALL trust only the verified NVIDIA repository signing key.
 
 #### Scenario: Key with the pinned fingerprint
 
@@ -70,10 +57,7 @@ key.
 
 ### Requirement: Option version
 
-The feature SHALL accept the option `version` as declared here: `latest` installs the newest version that NVIDIA's
-stable repository offers at build time, a version of the form `MAJOR.MINOR.PATCH` that the repository offers installs
-exactly that version of all four packages with no minimum version, including releases with known vulnerabilities, and
-any other value, including a version with a package release suffix, fails the build.
+The feature SHALL accept `version` to select a stable repository version.
 
 | Field   | Value      |
 | ------- | ---------- |
@@ -109,11 +93,7 @@ any other value, including a version with a package release suffix, fails the bu
 
 ### Requirement: Option configureDocker
 
-The feature SHALL accept the option `configureDocker` as declared here: when it is enabled, the feature registers the
-NVIDIA runtime with a Docker daemon installed in the image as "Register the NVIDIA runtime with Docker" states, or, when
-no Docker daemon is installed, installs the toolkit, prints a message that it skipped the Docker configuration, and
-succeeds without creating `/etc/docker/daemon.json`; when it is disabled, the feature does not create or change
-`/etc/docker/daemon.json`; and any value other than `true` or `false`, including an empty value, fails the build.
+The feature SHALL accept `configureDocker` to control Docker runtime registration.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -147,11 +127,9 @@ succeeds without creating `/etc/docker/daemon.json`; when it is disabled, the fe
 ### Requirement: Register the NVIDIA runtime with Docker
 
 When the `configureDocker` option is enabled and a Docker daemon (`dockerd`) is installed in the image when the feature
-runs, the feature SHALL register a runtime named `nvidia` whose path is `nvidia-container-runtime` in
-`/etc/docker/daemon.json`, creating the file when it is missing or empty. It SHALL keep every other setting already in
-that file and SHALL NOT change the daemon's default runtime. When that file exists but is not valid JSON, the feature
-SHALL fail the build and leave the file unchanged. The feature SHALL be ordered after
-`ghcr.io/devcontainers/features/docker-in-docker` when both are installed.
+runs, the feature SHALL register the `nvidia` runtime in `/etc/docker/daemon.json` as "NVIDIA Docker runtime
+registration" states, and SHALL be ordered after docker-in-docker as "NVIDIA feature ordering after docker-in-docker"
+states.
 
 #### Scenario: Docker daemon installed by docker-in-docker
 
@@ -204,10 +182,8 @@ disabled leaves an entry an earlier install registered in place.
 ### Requirement: Unsupported platforms fail the build
 
 The feature SHALL fail the build with a message naming the distribution or architecture, before it changes the image,
-when the distribution is not Debian- or Ubuntu-based with apt, Fedora- or RHEL-based with dnf, or openSUSE- or
-SLES-based with zypper, or when the architecture is not `amd64` or `arm64`. A distribution of one of these families that
-is not listed in `test/nvidia-container-toolkit/compatibility.json` is not refused, but it is not supported: the feature
-attempts the install there without a guarantee that it succeeds.
+when the distribution is outside the apt, dnf, and zypper families or the architecture is not `amd64` or `arm64`, as
+"NVIDIA supported platform gate" states; an unlisted distribution of those families is not refused.
 
 #### Scenario: Distribution without a supported package manager
 
@@ -218,3 +194,108 @@ attempts the install there without a guarantee that it succeeds.
 
 - **WHEN** the feature is installed on an image whose architecture is neither `amd64` nor `arm64`
 - **THEN** the build fails with a message naming the architecture, and no repository or key has been added
+
+### Requirement: NVIDIA stable repository package selection
+
+The feature SHALL install `nvidia-container-toolkit`, `nvidia-container-toolkit-base`, `libnvidia-container-tools`, and
+`libnvidia-container1` at one version from NVIDIA's stable repository. Apt uses
+`https://nvidia.github.io/libnvidia-container/stable/deb/<arch>` (`amd64` or `arm64`); dnf and zypper use
+`https://nvidia.github.io/libnvidia-container/stable/rpm/<arch>` (`x86_64` or `aarch64`).
+
+#### Scenario: Stable repository packages
+
+- **WHEN** the feature installs on a supported image
+- **THEN** all four packages come from the stable architecture-specific repository at one version
+
+### Requirement: Keep NVIDIA repository and expose commands
+
+The feature SHALL leave NVIDIA's stable repository configured, SHALL NOT configure the experimental channel, and SHALL
+expose installed commands on every user's default `PATH`. Supported images are listed in
+`test/nvidia-container-toolkit/compatibility.json`.
+
+#### Scenario: Repository remains configured
+
+- **WHEN** installation succeeds
+- **THEN** the stable repository remains configured and installed commands resolve on every user's default PATH
+
+### Requirement: NVIDIA repository signing key verification
+
+The feature SHALL download NVIDIA's repository signing key from `https://nvidia.github.io/libnvidia-container/gpgkey`
+and SHALL use it only after verifying that the downloaded file contains exactly one primary key, whose full fingerprint
+is `C95B321B61E88C1809C4F759DDCAE044F796ECB0`.
+
+#### Scenario: Downloaded key fingerprint
+
+- **WHEN** the feature downloads NVIDIA's repository key
+- **THEN** it uses the file only when it holds exactly one primary key and that key has the pinned full fingerprint
+
+### Requirement: NVIDIA repository signature enforcement
+
+The configured repository SHALL accept only content signed by the verified pinned key: on apt-based images the
+repository's signed index is checked against that key alone, and on dnf- and zypper-based images both the repository
+metadata and every package are signature-checked against a local copy of that key. Neither the feature nor the
+repository configuration it writes SHALL import or trust any key other than the verified copy of that key.
+
+#### Scenario: Repository signatures use only pinned key
+
+- **WHEN** package metadata or packages are fetched from NVIDIA's repository
+- **THEN** signatures are checked by the package-manager-specific method against only the verified pinned key
+
+### Requirement: NVIDIA stable version selection
+
+For option `version`, `latest` SHALL install the newest version that NVIDIA's stable repository offers at build time, a
+version of the form `MAJOR.MINOR.PATCH` that the repository offers SHALL install exactly that version of all four
+packages with no minimum version, including releases with known vulnerabilities, and any other value, including a
+version with a package release suffix, SHALL fail the build.
+
+#### Scenario: Exact vulnerable version remains selectable
+
+- **WHEN** the stable repository offers a requested `MAJOR.MINOR.PATCH` version, even one with known vulnerabilities
+- **THEN** all four packages install at that exact version
+
+### Requirement: Docker configuration option outcomes
+
+When `configureDocker` is enabled and no Docker daemon is installed, the feature SHALL install the toolkit, print a
+message that it skipped the Docker configuration, and succeed without creating `/etc/docker/daemon.json`. When it is
+disabled, the feature SHALL NOT create or change `/etc/docker/daemon.json`. Any value other than `true` or `false`,
+including an empty value, SHALL fail the build.
+
+#### Scenario: Docker configuration skipped or disabled
+
+- **WHEN** no Docker daemon (`dockerd`) is installed with configuration enabled, or configuration is disabled
+- **THEN** the enabled case reports the skip without creating daemon settings, and the disabled case leaves settings
+  unchanged
+
+### Requirement: NVIDIA Docker runtime registration
+
+When `configureDocker` is enabled and `dockerd` is installed in the image when the feature runs, the feature SHALL
+register runtime `nvidia` with path `nvidia-container-runtime` in `/etc/docker/daemon.json`, creating the file if
+missing or empty, SHALL keep every other setting in it, and SHALL NOT change the default runtime. When that file exists
+but is not valid JSON, the feature SHALL fail the build and leave the file unchanged.
+
+#### Scenario: Docker settings are invalid
+
+- **WHEN** runtime registration is enabled and the existing daemon settings are invalid JSON
+- **THEN** the build fails and leaves the file unchanged
+
+### Requirement: NVIDIA feature ordering after docker-in-docker
+
+The feature SHALL be ordered after `ghcr.io/devcontainers/features/docker-in-docker` when both are installed.
+
+#### Scenario: Installed together with docker-in-docker
+
+- **WHEN** the feature and `ghcr.io/devcontainers/features/docker-in-docker` are installed in the same dev container
+- **THEN** the feature runs after docker-in-docker
+
+### Requirement: NVIDIA supported platform gate
+
+The feature SHALL fail the build with a message naming the distribution or architecture, before changing the image, when
+the distribution is not Debian- or Ubuntu-based with apt, Fedora- or RHEL-based with dnf, or openSUSE- or SLES-based
+with zypper, or the architecture is not `amd64` or `arm64`. A distribution of these families not in
+`test/nvidia-container-toolkit/compatibility.json` is not refused but unsupported: the feature attempts the install
+without a guarantee that it succeeds.
+
+#### Scenario: Unlisted family distribution
+
+- **WHEN** a family-compatible distribution is absent from the compatibility list
+- **THEN** the feature attempts installation without promising success
