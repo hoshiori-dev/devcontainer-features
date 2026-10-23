@@ -447,15 +447,20 @@ bits; the feature SHALL NOT restore them or otherwise change modes, and SHALL ad
 
 ### Requirement: Continue when uv volume repair fails
 
-If passwordless sudo is unavailable or ownership change fails, the feature SHALL leave `/var/lib/uv` unchanged, warn
-with its path and reason, and continue container creation. It SHALL change nothing when the volume fits, when the user
-is root, or outside `/var/lib/uv`.
+If passwordless sudo is unavailable, the feature SHALL leave `/var/lib/uv` unchanged and warn with its path and reason.
+If ownership change fails, it SHALL warn with the path and reason. Container creation SHALL continue in either case. The
+feature SHALL change nothing when the volume fits, when the user is root, or outside `/var/lib/uv`.
 
 #### Scenario: Repair unavailable or unnecessary
 
-- **WHEN** repair is unavailable, the volume fits, or the remote user is root
-- **THEN** container creation continues; unavailable repair warns and leaves the volume unchanged, while fitting and
-  root volumes are not changed
+- **WHEN** passwordless sudo is unavailable, the volume fits, or the remote user is root
+- **THEN** container creation continues; unavailable sudo warns and leaves the volume unchanged, while fitting and root
+  volumes are not changed
+
+#### Scenario: Ownership change fails after partial repair
+
+- **WHEN** ownership repair changes some entries in `/var/lib/uv` and then fails
+- **THEN** a warning names `/var/lib/uv` and the reason, and container creation continues
 
 ### Requirement: Configure uv locations and PATH
 

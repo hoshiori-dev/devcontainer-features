@@ -250,7 +250,7 @@ independently; none cannot guarantee retention and packages cannot create missin
 A second installation SHALL treat its list as a first would and retain packages from both successful lists. It fails
 without package changes if the second list requires removal. It may upgrade listed packages and dependencies, but uses
 its own target release, suggestion, conffile, retry, and lock settings; earlier optional packages remain, and later runs
-do not undo prior downgrades or conffile replacements.
+SHALL NOT downgrade a package installed from another release or restore a replaced configuration file.
 
 #### Scenario: Same list on the second install
 
