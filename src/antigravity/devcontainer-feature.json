@@ -1,0 +1,21 @@
+{
+  "id": "antigravity",
+  "version": "1.0.0",
+  "name": "Google Antigravity CLI",
+  "description": "Installs the Google Antigravity CLI (agy) and preserves its private login, configuration, and conversation state in a project volume.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/antigravity",
+  "containerEnv": {
+    "AGY_CLI_DISABLE_AUTO_UPDATE": "true"
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ],
+  "mounts": [
+    {
+      "source": "antigravity-${devcontainerId}",
+      "target": "/var/lib/antigravity",
+      "type": "volume"
+    }
+  ],
+  "onCreateCommand": "/usr/local/share/antigravity-feature/initialize"
+}

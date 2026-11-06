@@ -51,6 +51,7 @@
 | Feature                                                            | 说明                                                                                                                                                                        |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [act](src/act/README.md)                                           | 从经过校验和验证的 GitHub 发布包安装 act，用于在本地运行 GitHub Actions 工作流；它需要的 Docker Engine 不由本 feature 安装。                                                |
+| [antigravity](src/antigravity/README.md)                           | 安装 Google Antigravity CLI（agy），并在项目卷中保留其私有登录、配置和对话状态。                                                                                            |
 | [apk-packages](src/apk-packages/README.md)                         | 用 apk 从 Alpine Linux 镜像已配置的软件源安装一组系统软件包。                                                                                                               |
 | [apptainer](src/apptainer/README.md)                               | 以非特权、非 setuid 的形式安装 Apptainer：Fedora 用自带软件源，RHEL 衍生版用 EPEL，Ubuntu 用项目的 PPA，Debian 用 GitHub 发布包；并声明非特权用户运行它所需的容器安全选项。 |
 | [apt-packages](src/apt-packages/README.md)                         | 用 apt-get 从 Debian 或 Ubuntu 镜像已配置的软件源安装一组系统软件包。                                                                                                       |
@@ -67,6 +68,7 @@
 | [hf-mount](src/hf-mount/README.md)                                 | 从上游发布的二进制文件安装 hf-mount 守护进程及其 NFS 和 FUSE 后端，用来把 Hugging Face Buckets 和仓库挂载为本地文件系统。                                                   |
 | [latex](src/latex/README.md)                                       | 安装用户可管理的 TinyTeX LaTeX 环境，支持学术宏包、中日文排版、格式化、语法检查和代码高亮。                                                                                 |
 | [nvidia-container-toolkit](src/nvidia-container-toolkit/README.md) | 从 NVIDIA 签名的软件源安装 NVIDIA Container Toolkit，并把 nvidia 运行时注册到 dev container 内的 Docker 守护进程。                                                          |
+| [opencode](src/opencode/README.md)                                 | 安装原生 OpenCode v2 CLI，并把它的配置、凭据和会话保存在私有的项目卷中。                                                                                                    |
 | [openspec](src/openspec/README.md)                                 | 从 npm registry 安装 OpenSpec CLI（openspec），验证每个包的完整性哈希和 registry 签名；所需的 Node.js 运行时作为依赖一并带入。                                              |
 | [pacman-packages](src/pacman-packages/README.md)                   | 用 pacman 从 Arch Linux 镜像已配置的软件源安装一组系统软件包，安装时会做一次完整的系统升级。                                                                                |
 | [quarto](src/quarto/README.md)                                     | 从经过校验和验证的官方发布包安装 Quarto CLI，并配置 Quarto VS Code 扩展。                                                                                                   |

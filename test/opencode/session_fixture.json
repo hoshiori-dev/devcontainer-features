@@ -1,0 +1,19 @@
+{
+  "info": {
+    "id": "ses_fixture0000000000000000001",
+    "projectID": "0000000000000000000000000000000000000000",
+    "cost": 0,
+    "tokens": { "input": 0, "output": 0, "reasoning": 0, "cache": { "read": 0, "write": 0 } },
+    "time": { "created": 1792749895978, "updated": 1792749951293 },
+    "location": { "directory": "/tmp/opencode-session-fixture" }
+  },
+  "messages": [
+    {
+      "id": "msg_fixture00000000000000001",
+      "time": { "created": 1792749896044 },
+      "text": "synthetic fixture message",
+      "files": [],
+      "type": "user"
+    }
+  ]
+}
