@@ -26,5 +26,5 @@
 
 - [x] 3.1 Run `just check`, `just test blender`, and `just test-scenarios blender`, review the diff against the approved
       specification, and resolve findings.
-- [ ] 3.2 Record each Acceptance item and scenario with its evidence and the CI run in the PR's Validation section;
+- [x] 3.2 Record each Acceptance item and scenario with its evidence and the CI run in the PR's Validation section;
       verify every item names its evidence.
