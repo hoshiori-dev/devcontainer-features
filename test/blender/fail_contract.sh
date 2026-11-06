@@ -242,6 +242,12 @@ chmod +x "${FIXTURE_DIR}/bin/uname"
 check "arm64 fails stating that Blender publishes no build for it" \
   fails_with 5.0.0 'unsupported architecture aarch64: Blender publishes no Linux build'
 rm "${FIXTURE_DIR}/bin/uname"
+# A 32-bit image on an amd64 kernel: uname still reports x86_64, the package manager reports i386.
+printf '#!/bin/sh\necho i386\n' >"${FIXTURE_DIR}/bin/dpkg"
+chmod +x "${FIXTURE_DIR}/bin/dpkg"
+check "an i386 image on an amd64 kernel fails stating that Blender publishes no build for it" \
+  fails_with 5.0.0 'unsupported architecture i386: Blender publishes no Linux build'
+rm "${FIXTURE_DIR}/bin/dpkg"
 check "unsupported platforms fail before any request" test "$(requests)" = "${before}"
 check "unsupported platforms fail before installing packages" test ! -e "${FIXTURE_DIR}/apt-get"
 rm "${FIXTURE_DIR}/bin/dpkg-query" "${FIXTURE_DIR}/bin/apt-get"

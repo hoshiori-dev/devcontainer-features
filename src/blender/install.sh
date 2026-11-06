@@ -94,6 +94,16 @@ detect_platform() {
   machine="$(uname --machine)"
   [[ "${machine}" == x86_64 ]] \
     || fail "unsupported architecture ${machine}: Blender publishes no Linux build for it; use an amd64 image"
+  # uname names the kernel's architecture; a 32-bit image on an amd64 kernel reports x86_64 too, so ask the image.
+  if [[ "${package_manager}" == apt ]]; then
+    machine="$(dpkg --print-architecture)"
+    [[ "${machine}" == amd64 ]] \
+      || fail "unsupported architecture ${machine}: Blender publishes no Linux build for it; use an amd64 image"
+  else
+    machine="$(rpm --eval '%{_arch}')"
+    [[ "${machine}" == x86_64 ]] \
+      || fail "unsupported architecture ${machine}: Blender publishes no Linux build for it; use an amd64 image"
+  fi
 }
 
 # Accepts only this feature's tree and link, and finds foreign blender commands without executing them.
