@@ -95,7 +95,8 @@ validate_options() {
 check_paths() {
   local path
   remote_user="${_REMOTE_USER:-root}"
-  remote_home="${_REMOTE_USER_HOME:-$(getent passwd "${remote_user}" | cut --delimiter=: --fields=6)}"
+  # An unknown user leaves the home empty, so the check below reports it instead of set -e ending the build silently.
+  remote_home="${_REMOTE_USER_HOME:-$(getent passwd "${remote_user}" | cut --delimiter=: --fields=6 || true)}"
   [[ "${remote_home}" == /* && -d "${remote_home}" ]] || fail "remote-user home is unavailable; configure remoteUser"
   # Pi ignores an empty value, so only a non-empty one points it elsewhere.
   [[ -z "${PI_CODING_AGENT_DIR:-}" ]] \
@@ -113,6 +114,10 @@ check_paths() {
   fi
   if [[ -e "${CLI_PATH}" || -L "${CLI_PATH}" ]] && [[ "$(readlink "${CLI_PATH}")" != "${APPLICATION_DIR}/pi" ]]; then
     fail "${CLI_PATH} exists and is not this feature's link; remove the other Pi installation first"
+  fi
+  # The check above leaves an existing CLI_PATH only as the feature's link, so without one the directory is not ours.
+  if [[ ( -e "${APPLICATION_DIR}" || -L "${APPLICATION_DIR}" ) && ! -L "${CLI_PATH}" ]]; then
+    fail "${APPLICATION_DIR} exists without this feature's link at ${CLI_PATH}; move it aside first"
   fi
 }
 
@@ -147,7 +152,7 @@ resolve_release() {
   if [[ "${VERSION}" == latest ]]; then endpoint="${RELEASES_API}/latest"; fi
   log "resolving release ${VERSION} from ${endpoint}"
   fetch --output "${work_dir}/release.json" "${endpoint}" \
-    || fail "cannot read release ${VERSION} from ${endpoint}; select a published stable release and check access to GitHub"
+    || fail "cannot read release ${VERSION} from ${endpoint}; check the version, GitHub access, and the API rate limit"
   tag="$(jq --raw-output 'select(.draft == false and .prerelease == false) | .tag_name // empty' \
     "${work_dir}/release.json")" || fail "cannot read the release metadata from ${endpoint}; installation stopped"
   [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] \

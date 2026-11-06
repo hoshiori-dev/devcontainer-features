@@ -61,8 +61,8 @@ repair_state() {
   chmod 00700 "${AGENT_DIR}"
   for file in "${CREDENTIAL_FILES[@]}"; do
     if [[ -f "${AGENT_DIR}/${file}" && ! -L "${AGENT_DIR}/${file}" ]]; then
-      chown "${uid}:${gid}" "${AGENT_DIR}/${file}"
-      chmod 0600 "${AGENT_DIR}/${file}"
+      chown --no-dereference "${uid}:${gid}" -- "${AGENT_DIR}/${file}"
+      chmod 0600 -- "${AGENT_DIR}/${file}"
     fi
   done
 }

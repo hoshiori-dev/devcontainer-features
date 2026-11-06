@@ -39,8 +39,8 @@ GitHub. Pi cannot update this executable itself; change `version` and rebuild in
 
 Archives exist for glibc Linux on x86_64 and aarch64. Images outside the tested compatibility list get a warning and an
 installation attempt. Pi publishes no musl build, so musl images such as Alpine are unsupported; other systems and other
-CPUs fail with the reason. If the image already has another Pi at `/usr/local/bin/pi`, such as a global npm install, the
-build stops and changes nothing; remove that installation first.
+CPUs fail with the reason. If the image already has another Pi at `/usr/local/bin/pi`, such as a global npm install, or
+other content at `/usr/local/lib/pi`, the build stops and changes nothing; remove or move it first.
 
 ### Pi packages
 

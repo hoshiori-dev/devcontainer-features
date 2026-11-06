@@ -186,6 +186,34 @@ foreign_cli_preserved() {
   return "${result}"
 }
 check "another tool's /usr/local/bin/pi fails the build and is preserved" foreign_cli_preserved
+
+# Removes the feature's link for one run, so /usr/local/lib/pi looks like another tool's directory, and restores it.
+foreign_application_dir_preserved() {
+  local output inode result=0
+  inode="$(stat -c %i /usr/local/lib/pi/pi)"
+  sudo mv /usr/local/bin/pi "${work}/feature-link"
+  if output="$(sudo env VERSION=1.4.0 _REMOTE_USER="$(id -un)" _REMOTE_USER_HOME="${HOME}" bash "${INSTALLER}" 2>&1)"
+  then
+    result=1
+  fi
+  [[ "${output}" == *"pi: error: /usr/local/lib/pi exists without this feature's link at /usr/local/bin/pi;"* ]] \
+    || result=1
+  [[ "$(stat -c %i /usr/local/lib/pi/pi)" == "${inode}" ]] || result=1
+  sudo mv "${work}/feature-link" /usr/local/bin/pi
+  if [[ "${result}" != 0 ]]; then printf '%s\n' "${output}"; fi
+  return "${result}"
+}
+check "an unlinked /usr/local/lib/pi fails the build and is preserved" foreign_application_dir_preserved
+unknown_user_reported() {
+  local output
+  if output="$(sudo env VERSION=1.4.0 _REMOTE_USER=pi-no-such-user bash "${INSTALLER}" 2>&1)"; then
+    printf '%s\n' "${output}"
+    return 1
+  fi
+  [[ "${output}" == *"pi: error: remote-user home is unavailable; configure remoteUser"* ]] \
+    || { printf '%s\n' "${output}"; return 1; }
+}
+check "an unknown remote user without a home fails with the reason" unknown_user_reported
 check "the installed CLI is unchanged after every rejection" test "$(pi --version)" = "${before}"
 check "the link still names the feature's installation" test "$(readlink /usr/local/bin/pi)" = /usr/local/lib/pi/pi
 reportResults
