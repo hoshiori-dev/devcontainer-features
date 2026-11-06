@@ -1,0 +1,19 @@
+{
+  "id": "blender",
+  "version": "1.0.0",
+  "name": "Blender",
+  "description": "Installs the official Blender release build from download.blender.org, verified against its checksum file, for headless scripting, rendering, and extension development.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/blender",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Blender release: latest, a series such as 5.2 for its newest release, or an exact MAJOR.MINOR.PATCH release; 4.2.0 or later.",
+      "proposals": [
+        "latest",
+        "4.5",
+        "5.2"
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "fail_contract": {
+    "image": "debian:12",
+    "features": {
+      "blender": {}
+    }
+  },
+  "test_series": {
+    "image": "fedora:44",
+    "features": {
+      "blender": {
+        "version": "4.5"
+      }
+    }
+  },
+  "test_floor": {
+    "image": "almalinux:9",
+    "features": {
+      "blender": {
+        "version": "4.2.0"
+      }
+    }
+  },
+  "test_extension_offline": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "runArgs": ["--network=none"],
+    "features": {
+      "blender": {}
+    }
+  }
+}
