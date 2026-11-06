@@ -53,5 +53,5 @@
 
 ## 4. Validation
 
-- [ ] 4.1 Run `just check`, `just test pi`, and `just test-scenarios pi`, and record the results in the PR's Validation
+- [x] 4.1 Run `just check`, `just test pi`, and `just test-scenarios pi`, and record the results in the PR's Validation
       section
