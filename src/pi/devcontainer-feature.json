@@ -1,0 +1,29 @@
+{
+  "id": "pi",
+  "version": "1.0.0",
+  "name": "Pi",
+  "description": "Installs the native Pi coding agent CLI and keeps its configuration, credentials, and sessions in a private project volume.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/pi",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "The stable Pi release, 1.3.0 or newer: latest, or an exact MAJOR.MINOR.PATCH version.",
+      "proposals": [
+        "latest",
+        "1.4.0"
+      ]
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ],
+  "mounts": [
+    {
+      "source": "pi-${devcontainerId}",
+      "target": "/var/lib/pi",
+      "type": "volume"
+    }
+  ],
+  "onCreateCommand": "/usr/local/share/pi-feature/initialize"
+}

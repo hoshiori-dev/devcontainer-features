@@ -71,6 +71,7 @@
 | [opencode](src/opencode/README.md)                                 | 安装原生 OpenCode v2 CLI，并把它的配置、凭据和会话保存在私有的项目卷中。                                                                                                    |
 | [openspec](src/openspec/README.md)                                 | 从 npm registry 安装 OpenSpec CLI（openspec），验证每个包的完整性哈希和 registry 签名；所需的 Node.js 运行时作为依赖一并带入。                                              |
 | [pacman-packages](src/pacman-packages/README.md)                   | 用 pacman 从 Arch Linux 镜像已配置的软件源安装一组系统软件包，安装时会做一次完整的系统升级。                                                                                |
+| [pi](src/pi/README.md)                                             | 安装原生 Pi coding agent CLI，并把它的配置、凭据和会话保存在私有的项目卷中。                                                                                                |
 | [quarto](src/quarto/README.md)                                     | 从经过校验和验证的官方发布包安装 Quarto CLI，并配置 Quarto VS Code 扩展。                                                                                                   |
 | [slurm](src/slurm/README.md)                                       | 安装发行版的 Slurm 和 MUNGE，每次容器启动时在 dev container 内运行一个真实的单节点 Slurm 集群，或只作为外部集群的客户端；配置目录保存在命名卷中。                           |
 | [uv](src/uv/README.md)                                             | 安装 Astral 的 uv 和 uvx，可选安装 Python 命令行工具；uv 的 Python 解释器和缓存保存在重建后仍然保留的卷上。                                                                 |

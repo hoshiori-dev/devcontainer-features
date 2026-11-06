@@ -1,0 +1,10 @@
+{
+  "anthropic": {
+    "type": "api_key",
+    "key": "test-placeholder-not-a-real-key"
+  },
+  "openai": {
+    "type": "api_key",
+    "key": "!printf %s test-placeholder-from-a-command"
+  }
+}
