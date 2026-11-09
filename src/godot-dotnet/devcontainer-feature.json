@@ -1,0 +1,23 @@
+{
+  "id": "godot-dotnet",
+  "version": "1.0.0",
+  "name": "Godot .NET",
+  "description": "Installs the .NET build of the Godot editor from verified official releases, with the LTS .NET SDK, for headless C# use.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/godot-dotnet",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Godot stable release: latest, or MAJOR.MINOR or MAJOR.MINOR.PATCH at or above 4.2.2, optionally with -stable.",
+      "proposals": [
+        "latest",
+        "4.6.3"
+      ]
+    }
+  },
+  "dependsOn": {
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "lts"
+    }
+  }
+}
