@@ -47,7 +47,7 @@
 
 ## 4. Integration
 
-- [ ] 4.1 Run `just check`, `just test godot-dotnet`, and `just test-scenarios godot-dotnet`; record the results and the
+- [x] 4.1 Run `just check`, `just test godot-dotnet`, and `just test-scenarios godot-dotnet`; record the results and the
       CI run in the PR's Validation section
 
 ## Workflow follow-up
