@@ -24,6 +24,11 @@ for example for 4.7.2:
 </Project>
 ```
 
+Name the file after the project's assembly name, `<name>.csproj` beside `project.godot`: the assembly name is
+`dotnet/project/assembly_name` in `project.godot` or, when that is unset, the project's `config/name` with characters
+such as `:`, `/`, and `;` replaced by `-`. Godot builds only that file; with no file of that name, `--build-solutions`
+exits 0 without building anything, and the C# scripts fail when the project runs.
+
 It installs nothing for a graphical session. To open the editor window, you need a display forwarded into the container
 and the X11 or Wayland client, OpenGL or Vulkan, and audio libraries from your distribution; the feature does not test
 this.
@@ -122,8 +127,8 @@ tag="${version}-stable"
 base="https://github.com/godotengine/godot/releases/download/${tag}"
 templates="Godot_v${tag}_mono_export_templates.tpz"
 dir="${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/${version}.stable.mono"
-curl --fail --location --remote-name "${base}/${templates}"
-curl --fail --location --remote-name "${base}/SHA512-SUMS.txt"
+curl --proto '=https' --proto-redir '=https' --fail --location --remote-name "${base}/${templates}"
+curl --proto '=https' --proto-redir '=https' --fail --location --remote-name "${base}/SHA512-SUMS.txt"
 grep "  ${templates}\$" SHA512-SUMS.txt | sha512sum --check \
   && mkdir -p "${dir}" && unzip -j "${templates}" 'templates/*' -d "${dir}" \
   && rm "${templates}" SHA512-SUMS.txt

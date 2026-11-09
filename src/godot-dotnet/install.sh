@@ -67,8 +67,9 @@ cleanup() {
 }
 
 # Runs curl over HTTPS only, including each redirect, with failing HTTP statuses as errors. --retry 6 handles a known
-# failure mode: a transient network error or a 5xx answer, such as the bursts of 504 that GitHub's release downloads
-# return at times; curl waits 1, 2, 4, ... seconds between tries, about a minute in all.
+# failure mode: what curl counts as transient, a timeout or an HTTP 408, 429, 500, 502, 503, or 504 answer, such as the
+# bursts of 504 that GitHub's release downloads return at times; curl waits 1, 2, 4, ... seconds between tries, about
+# a minute in all.
 fetch() {
   curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --retry 6 "$@"
 }

@@ -36,6 +36,16 @@ restore_os_release() {
   cp -P "${FIXTURE_DIR}/os-release" /etc/os-release
 }
 
+# Runs install.sh with version $3 (latest when not given) on an /etc/os-release that holds only ID=$1 and, when $2 is
+# given, ID_LIKE="$2", then puts back the image's file.
+run_installer_with_os_id() {
+  rm /etc/os-release
+  printf 'ID=%s\n' "$1" >/etc/os-release
+  if [[ -n "${2-}" ]]; then printf 'ID_LIKE="%s"\n' "$2" >>/etc/os-release; fi
+  run_installer "${3:-latest}"
+  restore_os_release
+}
+
 # Puts back /usr/bin/apt-get when a run set it aside.
 restore_apt_get() {
   if [[ -e "${FIXTURE_DIR}/apt-get.real" ]]; then mv "${FIXTURE_DIR}/apt-get.real" /usr/bin/apt-get; fi
@@ -165,6 +175,14 @@ for value in 4.6 4.6.0 4.6-stable; do
   check "version ${value} with 4.6 installed: no install residue remains" no_install_residue
 done
 
+# ID_LIKE decides when ID names no supported family: a derivative of Ubuntu is accepted, and with 4.6 installed the
+# run goes on to the skip check.
+run_installer_with_os_id linuxmint "ubuntu debian" 4.6
+check "ID=linuxmint, ID_LIKE=\"ubuntu debian\" with 4.6 installed: the install succeeds" succeeded
+check "ID=linuxmint, ID_LIKE=\"ubuntu debian\" with 4.6 installed: the installation is left unchanged" \
+  installation_is "${state}"
+check "ID=linuxmint, ID_LIKE=\"ubuntu debian\" with 4.6 installed: nothing is requested" requested_nothing
+
 # The runs that must fail before any change find the font configuration library missing, as a fresh debian:12 does,
 # so a run that reached the prerequisites would call the apt-get stub.
 dpkg --remove libfontconfig1
@@ -215,14 +233,6 @@ check "/etc/os-release missing: the install fails with a message saying that /et
   failed_with '/etc/os-release is missing'
 checks_nothing_changed "/etc/os-release missing" "${state}"
 
-# Runs install.sh with version latest on an /etc/os-release that holds only ID=$1, then puts back the image's file.
-run_installer_with_os_id() {
-  rm /etc/os-release
-  printf 'ID=%s\n' "$1" >/etc/os-release
-  run_installer latest
-  restore_os_release
-}
-
 run_installer_with_os_id alpine
 check "ID=alpine: the install fails with a message saying that upstream's builds need the GNU C library" \
   failed_with 'need the GNU C library'
@@ -234,6 +244,17 @@ for os_id in arch fedora; do
     failed_with "unsupported distribution \"${os_id}\""
   checks_nothing_changed "ID=${os_id}" "${state}"
 done
+
+# ID_LIKE decides when ID names no supported family: a musl derivative and a derivative of another family are refused.
+run_installer_with_os_id postmarketos alpine
+check "ID=postmarketos, ID_LIKE=alpine: the install fails with a message saying the builds need the GNU C library" \
+  failed_with 'need the GNU C library'
+checks_nothing_changed "ID=postmarketos, ID_LIKE=alpine" "${state}"
+
+run_installer_with_os_id rocky "rhel centos fedora"
+check "ID=rocky, ID_LIKE=\"rhel centos fedora\": the install fails with a message naming the distribution" \
+  failed_with 'unsupported distribution "rocky"'
+checks_nothing_changed "ID=rocky, ID_LIKE=\"rhel centos fedora\"" "${state}"
 
 # debian:12 without apt-get: the real one is set aside, and the run's stubs hold curl alone.
 mv /usr/bin/apt-get "${FIXTURE_DIR}/apt-get.real"

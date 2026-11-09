@@ -118,10 +118,16 @@ dotnet_root_names_dotnet() {
 }
 check "DOTNET_ROOT is set and names the directory that dotnet on PATH resolves into" dotnet_root_names_dotnet
 
-# Every SDK that `dotnet --list-sdks` lists lies under DOTNET_ROOT.
+# `dotnet --list-sdks` lists at least one SDK, and every SDK it lists lies under DOTNET_ROOT.
 sdks_under_dotnet_root() {
+  local sdks
   local line
   local directory
+  sdks="$(dotnet --list-sdks)" || return 1
+  if [[ -z "${sdks}" ]]; then
+    echo '  dotnet --list-sdks lists no SDK'
+    return 1
+  fi
   while read -r line; do
     directory="${line##*[}"
     directory="${directory%]}"
@@ -129,7 +135,7 @@ sdks_under_dotnet_root() {
       printf '  %s lies outside DOTNET_ROOT %s\n' "${line}" "${DOTNET_ROOT}"
       return 1
     fi
-  done < <(dotnet --list-sdks)
+  done <<<"${sdks}"
 }
 check "the SDK that dotnet --list-sdks lists lies under DOTNET_ROOT" sdks_under_dotnet_root
 
