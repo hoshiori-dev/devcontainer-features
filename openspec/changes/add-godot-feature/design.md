@@ -56,14 +56,16 @@ containers of the planned images:
   other editor commands also write `~/.config/godot/` and `~/.cache/godot/`, and with fontconfig present
   `~/.cache/fontconfig/`. Absolute `XDG_*_HOME` values are honoured. A file `_sc_` or `._sc_` beside the executable
   switches the editor to a self-contained mode that writes beside the executable.
-- `--lsp-port` first appears in `4.2-stable`. The Godot Tools extension (`geequlim.godot-tools`, source in
-  `godotengine/godot-vscode-plugin`, on the VS Code Marketplace and Open VSX; checked at `2.7.1`) activates in any
-  workspace containing `project.godot`. It reads the project's major version only from `config/features` in
-  `project.godot` (a project without a `"4.N"` entry counts as Godot 3) and uses `godotTools.editorPath.godot4` (default
-  `godot`) or `godotTools.editorPath.godot3` (default `godot3`) accordingly. On every activation it runs that path with
-  `--version` as a shell command string, retrying a path it cannot run relative to the workspace folder; the settings
-  are window-scoped, so a workspace's own settings can change them. With its default `godotTools.lsp.headless` (`false`)
-  it then only connects to an editor a user has open; set to `true`, it runs
+- `--lsp-port` first appears in `4.2-stable`, and `--import` in `4.2.2-stable`, the last 4.2 release: `4.2` and `4.2.1`
+  do not know `--import` and run the project's main scene instead of importing and exiting (checked on 2026-11-09, after
+  the implementation review found it, against `main/main.cpp` at the three tags and by running the three builds). The
+  Godot Tools extension (`geequlim.godot-tools`, source in `godotengine/godot-vscode-plugin`, on the VS Code Marketplace
+  and Open VSX; checked at `2.7.1`) activates in any workspace containing `project.godot`. It reads the project's major
+  version only from `config/features` in `project.godot` (a project without a `"4.N"` entry counts as Godot 3) and uses
+  `godotTools.editorPath.godot4` (default `godot`) or `godotTools.editorPath.godot3` (default `godot3`) accordingly. On
+  every activation it runs that path with `--version` as a shell command string, retrying a path it cannot run relative
+  to the workspace folder; the settings are window-scoped, so a workspace's own settings can change them. With its
+  default `godotTools.lsp.headless` (`false`) it then only connects to an editor a user has open; set to `true`, it runs
   `godot --path <project> --editor --headless --no-window --lsp-port <port>` itself as soon as it activates. An editor
   opened on a project runs the project's enabled editor plugins and `@tool` scripts. The extension compares only major
   versions: it refuses when the executable's major version differs from the project's, or, for a Godot 4 project, when
@@ -154,7 +156,7 @@ containers of the planned images:
 - Export templates: left out of `1.0.0` by the maintainer's decision; `NOTES.md` shows how to install them from the same
   release and verify them against its checksum list. A later MINOR change may add an option.
 - Pre-releases (`dev`, `alpha`, `beta`, `rc`) and `godotengine/godot-builds`.
-- Releases before `4.2`, the 3.x branch, and the x86_32 and arm32 builds.
+- Releases before `4.2.2`, the 3.x branch, and the x86_32 and arm32 builds.
 - A graphical session: no X11, Wayland, GL, Vulkan, or audio package, and no check that the editor's window opens.
   `NOTES.md` says what a user who forwards a display has to add.
 - Alpine and other musl images, distroless images, and images of a supported family that lack its package manager; the
@@ -165,16 +167,16 @@ containers of the planned images:
 
 The feature has one option, new in this change; the spec's Option requirement states it.
 
-| Name      | Type     | Default    | Enum or proposals              | Meaning                                                                                                                |
-| --------- | -------- | ---------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `version` | `string` | `"latest"` | proposals `["latest","4.6.3"]` | The stable release to install: `latest`, or `MAJOR.MINOR[.PATCH]` at or above `4.2`, with an optional `-stable` suffix |
+| Name      | Type     | Default    | Enum or proposals              | Meaning                                                                                                                  |
+| --------- | -------- | ---------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `version` | `string` | `"latest"` | proposals `["latest","4.6.3"]` | The stable release to install: `latest`, or `MAJOR.MINOR[.PATCH]` at or above `4.2.2`, with an optional `-stable` suffix |
 
 - **`version` default `latest`.** Only the newest patch of each branch receives fixes under upstream's release policy,
   so the newest stable release is what most users want; a project pins `version` to the release its `project.godot` was
   made with, since any editor run, including one an editor extension starts, imports the project with the installed
   release. The second proposal, `4.6.3`, is the newest release of the previous branch, which still receives fixes, and
-  older than `latest`, so the duplicate test's first install is replaced by the second. Rejected: the minimum `4.2` — an
-  unsupported branch is a poor suggestion in the generated README; the current release — it equals what `latest`
+  older than `latest`, so the duplicate test's first install is replaced by the second. Rejected: the minimum `4.2.2` —
+  an unsupported branch is a poor suggestion in the generated README; the current release — it equals what `latest`
   resolves to, so the replace path would never run in CI.
 - **Accepted forms.** `4.6.3-stable` is how upstream writes tags and archive names, so a value copied from a release
   page works; `4.6.0` means `4.6`, because upstream never writes a zero patch and a user may. `4.6` names the release
@@ -200,18 +202,21 @@ The feature has one option, new in this change; the spec's Option requirement st
   second source without adding a release; Flathub, the snaps, and distribution packages — community builds, often behind
   upstream; Steam, the Epic Games Store, and itch.io — upstream-operated, but they need an account and a client;
   community CI images and setup actions — the ones examined download the same archives without verifying them.
-- **`latest` from the latest-release link, read without following it, validated as a stable tag at or above `4.2`.** As
-  in the `act` design. A tag of an older branch below `4.2` (3.x) fails the install; one at or above it is installed.
-  The 3.x branch's archives are named differently (`_x11.64.zip`), and its 3.6.x arm64 archive shares the 4.x name, so
-  the minimum, not the archive name, keeps a 3.x tag out. Rejected: the highest version among `git ls-remote` tags — it
+- **`latest` from the latest-release link, read without following it, validated as a stable tag at or above `4.2.2`.**
+  As in the `act` design. A tag below `4.2.2` (a 3.x release) fails the install; one at or above it is installed. The
+  3.x branch's archives are named differently (`_x11.64.zip`), and its 3.6.x arm64 archive shares the 4.x name, so the
+  minimum, not the archive name, keeps a 3.x tag out. Rejected: the highest version among `git ls-remote` tags — it
   needs `git` in the image, and a tag is pushed before its release has assets, so builds would fail more often; the
   releases API — rate-limited to 60 requests an hour per address without a token;
   `https://godotengine.org/versions.json` — a data file of the website with no documented contract and no checksum.
-- **Minimum version `4.2`.** The first 4.x release with an arm64 archive, so every accepted version installs on both
-  architectures; the archive names, layout, checksum list, and `--version` output are the same from there to `4.7.2`;
-  and `--lsp-port`, which a headless language server needs, first appears in it. Rejected: `4.0` with an amd64-only
-  range — a version that installs on one architecture and fails on the other is a trap; a higher minimum — nothing in
-  the tested range differs.
+- **Minimum version `4.2.2`.** `4.2` is the first 4.x release with an arm64 archive, so every accepted version installs
+  on both architectures, and the first with `--lsp-port`, which a headless language server needs; `4.2.2` is the first
+  with `--import`, so from it on every headless command the spec names works. The archive names, layout, checksum list,
+  and `--version` output are the same from `4.2` to `4.7.2`. `4.2.2` is the last 4.2 release, so a 4.2 project moves to
+  it without changing branch. Rejected: `4.2` — the minimum approved first, until the implementation review found that
+  `4.2` and `4.2.1` lack `--import`, so an import there runs the project instead and does not exit; `4.0` with an
+  amd64-only range — a version that installs on one architecture and fails on the other is a trap; a higher minimum —
+  nothing in the tested range differs.
 - **Fail when the checksum list is missing; fetch it first.** Upstream publishes one for every accepted release, so a
   missing list means the release is still being uploaded or something is wrong; feature-authoring.md requires the
   failure. Fetching it before the archive means a build during an upload fails naming the list, which is uploaded last,
@@ -306,8 +311,8 @@ requests its own settings allow; the feature itself requests nothing.
 ## Risks / Trade-offs
 
 - [GitHub's latest-release link briefly points to a newly published release of an older branch] → A `latest` build in
-  that window installs that release when it is at or above `4.2`, or fails naming the tag; a rebuild later installs the
-  newest. Users who need a fixed release pin `version`.
+  that window installs that release when it is at or above `4.2.2`, or fails naming the tag; a rebuild later installs
+  the newest. Users who need a fixed release pin `version`.
 - [A release is public before its archives and checksum list are uploaded] → The checksum list is fetched first and
   uploaded last, so a build in those minutes fails naming the checksum list; a rebuild passes. CI runs share the window.
 - [The checksum list is unsigned and served from the same origin, and releases are mutable] → The spec states integrity

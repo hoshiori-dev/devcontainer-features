@@ -85,8 +85,8 @@ The feature SHALL accept `version` and install the stable release it selects.
 
 #### Scenario: Version below the minimum
 
-- **WHEN** the feature is installed with `version` set to `4.1.4`
-- **THEN** the install fails before downloading anything, with a message naming `4.2` as the minimum
+- **WHEN** the feature is installed with `version` set to a release below `4.2.2`, such as `4.2.1` or `4.1.4`
+- **THEN** the install fails before downloading anything, with a message naming `4.2.2` as the minimum
 
 #### Scenario: Pre-release version
 
@@ -108,9 +108,9 @@ The feature SHALL accept `version` and install the stable release it selects.
 
 The feature SHALL install the release `version` selects: `latest` means the release that
 https://github.com/godotengine/godot/releases/latest redirects to at build time; any other value is a selected version
-`MAJOR.MINOR` or `MAJOR.MINOR.PATCH` of decimal numbers without leading zeros, at or above `4.2`, optionally followed by
-`-stable`, and names the release tagged `<version>-stable`, where `<version>` is the selected version without the suffix
-and without a zero patch.
+`MAJOR.MINOR` or `MAJOR.MINOR.PATCH` of decimal numbers without leading zeros, at or above `4.2.2`, optionally followed
+by `-stable`, and names the release tagged `<version>-stable`, where `<version>` is the selected version without the
+suffix and without a zero patch.
 
 #### Scenario: Two-part version
 
@@ -123,12 +123,12 @@ and without a zero patch.
 The feature SHALL reject, before downloading anything, any `version` value other than `latest` or a selected version
 that requirement "Godot release version selection" accepts. When `version` is `latest`, it SHALL use the tag the link
 names unchanged and SHALL fail before downloading any archive unless that tag is exactly `MAJOR.MINOR-stable` or
-`MAJOR.MINOR.PATCH-stable` with a non-zero patch, of decimal numbers without leading zeros, at or above `4.2`.
+`MAJOR.MINOR.PATCH-stable` with a non-zero patch, of decimal numbers without leading zeros, at or above `4.2.2`.
 
 #### Scenario: Latest-release link to an unusable tag
 
 - **WHEN** the feature is installed with `version` set to `latest` and the latest-release link points to a tag of
-  another form or below `4.2`, such as `3.6.3-stable`
+  another form or below `4.2.2`, such as `3.6.3-stable` or `4.2.1-stable`
 - **THEN** the install fails before downloading any archive, with a message naming the tag, and `/usr/local/bin/godot`
   is left as it was before the install
 
