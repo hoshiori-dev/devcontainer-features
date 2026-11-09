@@ -66,6 +66,7 @@
 | [gitleaks](src/gitleaks/README.md)                                 | 从经过校验和验证的 GitHub 发布包安装 Gitleaks 密钥扫描器，用于与仍在运行它的流水线保持一致；新项目应优先使用 betterleaks feature。                                          |
 | [glab](src/glab/README.md)                                         | 从经过校验和验证的 GitLab 发布包安装 GitLab CLI（glab），不配置任何认证。                                                                                                   |
 | [godot](src/godot/README.md)                                       | 从经过验证的官方发布包安装 Godot 编辑器的标准版，用于 headless 场景。                                                                                                       |
+| [godot-dotnet](src/godot-dotnet/README.md)                         | 从经过验证的官方发布包安装 Godot 编辑器的 .NET 版，并附带 LTS 版 .NET SDK，用于 headless 的 C# 开发。                                                                       |
 | [hf-cli](src/hf-cli/README.md)                                     | 用官方独立安装器为远程用户安装 Hugging Face CLI，可选安装上游的 hf-cli agent skill。                                                                                        |
 | [hf-mount](src/hf-mount/README.md)                                 | 从上游发布的二进制文件安装 hf-mount 守护进程及其 NFS 和 FUSE 后端，用来把 Hugging Face Buckets 和仓库挂载为本地文件系统。                                                   |
 | [latex](src/latex/README.md)                                       | 安装用户可管理的 TinyTeX LaTeX 环境，支持学术宏包、中日文排版、格式化、语法检查和代码高亮。                                                                                 |
@@ -75,6 +76,7 @@
 | [pacman-packages](src/pacman-packages/README.md)                   | 用 pacman 从 Arch Linux 镜像已配置的软件源安装一组系统软件包，安装时会做一次完整的系统升级。                                                                                |
 | [pi](src/pi/README.md)                                             | 安装原生 Pi coding agent CLI，并把它的配置、凭据和会话保存在私有的项目卷中。                                                                                                |
 | [quarto](src/quarto/README.md)                                     | 从经过校验和验证的官方发布包安装 Quarto CLI，并配置 Quarto VS Code 扩展。                                                                                                   |
+| [rclone](src/rclone/README.md)                                     | 从经过签名验证的官方发布包安装 rclone（在各种云存储之间复制、同步、提供和挂载文件），附带 bash、zsh 和 fish 补全；可选安装 rclone mount 所需的 FUSE 辅助程序。              |
 | [slurm](src/slurm/README.md)                                       | 安装发行版的 Slurm 和 MUNGE，每次容器启动时在 dev container 内运行一个真实的单节点 Slurm 集群，或只作为外部集群的客户端；配置目录保存在命名卷中。                           |
 | [uv](src/uv/README.md)                                             | 安装 Astral 的 uv 和 uvx，可选安装 Python 命令行工具；uv 的 Python 解释器和缓存保存在重建后仍然保留的卷上。                                                                 |
 | [zypper-packages](src/zypper-packages/README.md)                   | 从镜像已启用的软件源安装列出的系统软件包。                                                                                                                                  |
