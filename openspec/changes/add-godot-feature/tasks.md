@@ -42,11 +42,11 @@
 
 ## 3. Manual checks and documentation
 
-- [ ] 3.1 Run the manual checks design.md (Goals) lists on amd64 (the Ubuntu 18.04 version-check failure and the
+- [x] 3.1 Run the manual checks design.md (Goals) lists on amd64 (the Ubuntu 18.04 version-check failure and the
       `NOTES.md` editor example), and record each result in the PR's Validation section
 - [x] 3.2 Add the translated `godot` row to `README.zh.md`; verify it matches the generated row of `README.md`
 
 ## 4. Integration
 
-- [ ] 4.1 Run `just check`, `just test godot`, and `just test-scenarios godot`; record the results and the CI run in the
+- [x] 4.1 Run `just check`, `just test godot`, and `just test-scenarios godot`; record the results and the CI run in the
       PR's Validation section
