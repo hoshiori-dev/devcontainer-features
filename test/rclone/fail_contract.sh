@@ -19,7 +19,9 @@ case "$(uname -m)" in
   aarch64) arch=arm64 ;;
 esac
 archive_name="rclone-v1.70.0-linux-${arch}.zip"
-installed_version="$(isolated_rclone version | sed -n 1p)"
+# Saved before it is cut to the first line, so a failing rclone stops the script here instead of hiding in a pipeline.
+installed_version="$(isolated_rclone version)"
+installed_version="$(printf '%s\n' "${installed_version}" | sed -n 1p)"
 installed_version="${installed_version#rclone v}"
 
 FIXTURE_DIR="$(mktemp -d)"
@@ -29,15 +31,16 @@ mkdir -p "${fixtures}" "${FIXTURE_DIR}/bin" "${FIXTURE_DIR}/uname" "${FIXTURE_DI
   "${FIXTURE_DIR}/original"
 cp "${test_dir}/fixture_curl.sh" "${FIXTURE_DIR}/bin/curl"
 # shellcheck disable=SC2016 # The stand-ins' own parameters, expanded when they run.
-printf '#!/bin/sh\nif [ "${1-}" = -m ]; then echo riscv64; else exec /usr/bin/uname "$@"; fi\n' \
+printf '#!/bin/sh\nif [ "${1-}" = --machine ]; then echo riscv64; else exec /usr/bin/uname "$@"; fi\n' \
   >"${FIXTURE_DIR}/uname/uname"
 # shellcheck disable=SC2016 # The stand-in's own parameters, expanded when it runs.
 printf '#!/bin/sh\nexec /usr/bin/gpg --weak-digest SHA1 "$@"\n' >"${FIXTURE_DIR}/weak-gpg/gpg"
 chmod +x "${FIXTURE_DIR}/bin/curl" "${FIXTURE_DIR}/uname/uname" "${FIXTURE_DIR}/weak-gpg/gpg"
 touch "${FIXTURE_DIR}/requests" "${FIXTURE_DIR}/violations"
 
-# The build's binary and completion files, restored at the end whatever the cases did to them.
-cp -p "${TARGET}" "${FIXTURE_DIR}/original/rclone"
+# The build's binary and completion files, restored at the end whatever the cases did to them. The binary is saved as
+# "binary": the bash completion file is also named rclone.
+cp -p "${TARGET}" "${FIXTURE_DIR}/original/binary"
 for completion in ${RCLONE_COMPLETIONS}; do cp -p "${completion}" "${FIXTURE_DIR}/original/${completion##*/}"; done
 restore() {
   if [ -e /usr/bin/apt-get.hidden ]; then mv /usr/bin/apt-get.hidden /usr/bin/apt-get; fi
@@ -46,7 +49,7 @@ restore() {
     mv /etc/os-release.saved /etc/os-release
   fi
   rm -rf "${TARGET}" "${ZSH_TARGET}"
-  cp -p "${FIXTURE_DIR}/original/rclone" "${TARGET}"
+  cp -p "${FIXTURE_DIR}/original/binary" "${TARGET}"
   for restore_completion in ${RCLONE_COMPLETIONS}; do
     cp -p "${FIXTURE_DIR}/original/${restore_completion##*/}" "${restore_completion}"
   done
@@ -54,10 +57,17 @@ restore() {
 }
 trap restore EXIT
 
+# Replaces ${TARGET} with file $1 by a rename next to it, never by writing into it: writing into an executable that has
+# just run can fail with "Text file busy".
+replace_target() {
+  cp -p "$1" /usr/local/bin/.fixture-rclone
+  mv -f /usr/local/bin/.fixture-rclone "${TARGET}"
+}
+
 # Preparation, before the baselines: the real key list, two releases' signed lists, and one real archive, fetched with
 # the real curl; and gpg-agent, which only this script needs, to make a key that is not upstream's.
 real_fetch() {
-  /usr/bin/curl --proto '=https' --fail --silent --show-error --retry 3 --output "$1" "$2"
+  /usr/bin/curl --proto '=https' --location --max-redirs 0 --fail --silent --show-error --retry 3 --output "$1" "$2"
 }
 real_fetch "${fixtures}/KEYS" https://rclone.org/KEYS
 real_fetch "${fixtures}/sums-1.70.0" https://downloads.rclone.org/v1.70.0/SHA256SUMS
@@ -279,6 +289,39 @@ serve_release "${fixtures}/sums-1.70.0" "${fixtures}/${archive_name}"
 check "a GnuPG that refuses SHA-1 signatures fails verification without a fallback" \
   rejected "verification failed" .zip VERSION=1.70.0 PATH="${FIXTURE_DIR}/weak-gpg:${FIXTURE_DIR}/bin:${PATH}"
 
+# A failure after files are staged next to the targets: an installed stand-in reports the requested release, so the
+# install keeps it and fails when it generates the completions. The staged files must not remain, and the completion
+# files must not change.
+completions_state() {
+  for completions_state_path in ${RCLONE_COMPLETIONS}; do
+    printf '%s %s\n' "$(sha256sum <"${completions_state_path}")" "$(stat -c '%i %Y' "${completions_state_path}")"
+  done
+}
+failure_after_staging_cleaned() {
+  reset_serve
+  failure_after_staging_before="$(completions_state)"
+  # shellcheck disable=SC2016 # The stand-in's own parameter, expanded when it runs.
+  printf '#!/bin/sh\nif [ "${1-}" = version ]; then echo "rclone v1.70.0"; exit 0; fi\nexit 1\n' \
+    >"${FIXTURE_DIR}/stand-in"
+  chmod 0755 "${FIXTURE_DIR}/stand-in"
+  replace_target "${FIXTURE_DIR}/stand-in"
+  run_installer VERSION=1.70.0
+  failure_after_staging_ok=true
+  last_run_failed "rclone completion bash failed" none || failure_after_staging_ok=false
+  [ "$(completions_state)" = "${failure_after_staging_before}" ] || {
+    echo '  the completion files changed'
+    failure_after_staging_ok=false
+  }
+  no_install_leftovers || failure_after_staging_ok=false
+  replace_target "${FIXTURE_DIR}/original/binary"
+  if [ "${failure_after_staging_ok}" = "false" ]; then
+    show_run
+    return 1
+  fi
+}
+check "a failure after staging leaves no staged file and the completion files unchanged" \
+  failure_after_staging_cleaned
+
 same_release_kept() {
   reset_serve
   same_release_before="$(stat -c '%i %Y' "${TARGET}")"
@@ -286,6 +329,8 @@ same_release_kept() {
   if [ "${run_status}" -ne 0 ] || [ -s "${FIXTURE_DIR}/requests" ] \
     || [ "$(stat -c '%i %Y' "${TARGET}")" != "${same_release_before}" ]; then
     echo '  expected success, no request, and an unchanged binary'
+    printf '  installed: %s, reports: %s\n' "$(ls -l "${TARGET}")" \
+      "$(isolated_rclone version 2>&1 | sed -n 1p)"
     show_run
     return 1
   fi
@@ -293,7 +338,9 @@ same_release_kept() {
 check "the installed release requested again is kept without any request" same_release_kept
 
 unreadable_replaced() {
-  printf '#!/bin/sh\nexit 1\n' >"${TARGET}"
+  printf '#!/bin/sh\nexit 1\n' >"${FIXTURE_DIR}/stand-in"
+  chmod 0755 "${FIXTURE_DIR}/stand-in"
+  replace_target "${FIXTURE_DIR}/stand-in"
   serve_release "${fixtures}/sums-1.70.0" "${fixtures}/${archive_name}"
   run_installer VERSION=1.70.0
   if [ "${run_status}" -ne 0 ] || [ -s "${FIXTURE_DIR}/violations" ]; then

@@ -44,7 +44,7 @@ as_root() {
 # Prints the release the version file names when called, read as install.sh reads it, without the leading "v"; a
 # release between build and test fails the comparison once.
 latest_release() {
-  latest_release_text="$(curl --proto '=https' --fail --silent --show-error --retry 3 \
+  latest_release_text="$(curl --proto '=https' --location --max-redirs 0 --fail --silent --show-error --retry 3 \
     https://downloads.rclone.org/version.txt)" || return 1
   case "${latest_release_text}" in
     "rclone v"*) printf '%s\n' "${latest_release_text#rclone v}" ;;

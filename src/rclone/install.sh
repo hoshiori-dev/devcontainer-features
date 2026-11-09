@@ -26,6 +26,9 @@ readonly FISH_COMPLETION="/usr/share/fish/vendor_completions.d/rclone.fish"
 readonly STAGING_NAME=".rclone-feature.XXXXXX"
 readonly APT_LISTS_DIR="/var/lib/apt/lists"
 readonly FAMILIES="the Debian, Ubuntu, Fedora, or Alpine family"
+# A newline, for cutting command output to its first line with parameter expansion.
+readonly NEWLINE='
+'
 
 VERSION="${VERSION-latest}"
 INSTALLMOUNTDEPENDENCIES="${INSTALLMOUNTDEPENDENCIES-false}"
@@ -103,13 +106,20 @@ fetch() {
   curl --proto '=https' --location --max-redirs 0 --fail --silent --show-error --retry 3 "$@"
 }
 
-# Runs the rclone at $1 with the remaining arguments, isolated from the image: every home and configuration path points
-# into the work directory, so the run reads no real configuration and writes nothing outside ${work}.
+# Runs the rclone at $1 with the remaining arguments in a cleared environment that holds only PATH and home and
+# configuration paths inside the work directory: no RCLONE_* or other variable of the build can change what the run
+# does or make it read a real configuration or write outside ${work}.
 run_rclone() {
   run_rclone_binary="$1"
   shift
-  env HOME="${work}/home" XDG_CONFIG_HOME="${work}/home/.config" XDG_CACHE_HOME="${work}/home/.cache" \
-    RCLONE_CONFIG="${work}/home/.config/rclone/rclone.conf" "${run_rclone_binary}" "$@"
+  env --ignore-environment PATH="${PATH}" HOME="${work}/home" XDG_CONFIG_HOME="${work}/home/.config" \
+    XDG_CACHE_HOME="${work}/home/.cache" RCLONE_CONFIG="${work}/home/.config/rclone/rclone.conf" \
+    "${run_rclone_binary}" "$@"
+}
+
+# Succeeds when the first line of `rclone version` output $1 is "rclone v${version}".
+is_requested_version() {
+  [ "${1%%"${NEWLINE}"*}" = "rclone v${version}" ]
 }
 
 # Fails unless VERSION is "latest" or a release version at or above MIN_VERSION, and INSTALLMOUNTDEPENDENCIES is a
@@ -133,7 +143,7 @@ validate_options() {
 # package manager; sets ${arch} to upstream's archive name for the machine, ${pm}, and ${gpg_package}. Runs before
 # VERSION becomes readonly: /etc/os-release assigns it too.
 detect_platform() {
-  detect_platform_machine="$(uname -m)"
+  detect_platform_machine="$(uname --machine)"
   case "${detect_platform_machine}" in
     x86_64) arch=amd64 ;;
     aarch64) arch=arm64 ;;
@@ -277,13 +287,13 @@ resolve_latest() {
 }
 
 # Sets ${installed} to "true" when ${TARGET} already reports ${version}. An rclone that exits non-zero or prints
-# anything else is replaced.
+# anything else is replaced. Its stderr is discarded, here and in stage_binary: a notice there is not the version.
 check_installed() {
   [ -f "${TARGET}" ] || return 0
   if ! check_installed_output="$(run_rclone "${TARGET}" version 2>/dev/null)"; then
     return 0
   fi
-  if [ "$(printf '%s\n' "${check_installed_output}" | sed -n 1p)" = "rclone v${version}" ]; then
+  if is_requested_version "${check_installed_output}"; then
     log "rclone ${version} is already installed at ${TARGET}; leaving it unchanged"
     installed="true"
   fi
@@ -306,7 +316,7 @@ verify_checksum_list() {
 
   # The key list is turned into a keyring file and used in place, not imported: importing starts gpg-agent, which the
   # minimal gpg packages of Debian and Alpine do not include, and verifying needs no agent.
-  mkdir -m 700 "${work}/gnupg"
+  mkdir --mode=700 "${work}/gnupg"
   gpg --batch --homedir "${work}/gnupg" --output "${work}/keys.gpg" --dearmor "${work}/KEYS" \
     2>"${work}/gpg-keys.log" \
     || fail "cannot read the keys from ${KEYS_URL}: $(cat "${work}/gpg-keys.log")"
@@ -318,7 +328,7 @@ verify_checksum_list() {
   fi
   # Every signature must be good and made by the pinned primary key; the last field of VALIDSIG is the primary key's
   # fingerprint.
-  if grep -q -E '^\[GNUPG:\] (BADSIG|ERRSIG|EXPSIG|EXPKEYSIG|REVKEYSIG) ' "${work}/gpg-status"; then
+  if grep --quiet --extended-regexp '^\[GNUPG:\] (BADSIG|ERRSIG|EXPSIG|EXPKEYSIG|REVKEYSIG) ' "${work}/gpg-status"; then
     fail "verification failed: ${verify_checksum_list_url} carries a signature that is not good"
   fi
   verify_checksum_list_signers="$(awk '$1 == "[GNUPG:]" && $2 == "VALIDSIG" { print $NF }' "${work}/gpg-status")"
@@ -361,66 +371,58 @@ download_archive() {
 stage_binary() {
   stage_binary_member="rclone-v${version}-linux-${arch}/rclone"
   mkdir "${work}/extract"
+  # Short options: unzip has no long ones.
   unzip -q -o "${work}/${archive}" "${stage_binary_member}" -d "${work}/extract" \
     || fail "cannot extract ${stage_binary_member} from ${archive}; set version to another release"
   # Only a regular file is installed: cp would follow a symbolic link out of the work directory.
   if [ ! -f "${work}/extract/${stage_binary_member}" ] || [ -L "${work}/extract/${stage_binary_member}" ]; then
     fail "${archive} does not hold ${stage_binary_member} as a regular file; set version to another release"
   fi
-  mkdir -p "${TARGET%/*}"
-  staged="$(mktemp "${TARGET%/*}/${STAGING_NAME}")"
+  staged="$(new_staged_file "${TARGET}")"
   cp "${work}/extract/${stage_binary_member}" "${staged}"
   chmod 0755 "${staged}"
-  if ! stage_binary_output="$(run_rclone "${staged}" version 2>&1)" \
-    || [ "$(printf '%s\n' "${stage_binary_output}" | sed -n 1p)" != "rclone v${version}" ]; then
+  if ! stage_binary_output="$(run_rclone "${staged}" version 2>/dev/null)" \
+    || ! is_requested_version "${stage_binary_output}"; then
     fail "the rclone from ${archive} does not run or does not report v${version}:" \
-      "$(printf '%s\n' "${stage_binary_output}" | sed -n 1p)"
+      "\"${stage_binary_output%%"${NEWLINE}"*}\""
   fi
 }
 
-# Creates directory $1 and each missing directory above it with mode 0755; existing ones keep their mode.
-make_dir() {
-  if [ -z "$1" ] || [ -d "$1" ]; then return 0; fi
-  make_dir "${1%/*}"
-  mkdir -m 755 "$1"
-}
-
-# Creates the directory of target $1 when it is missing and prints the path of a new staged file next to the target.
+# Creates the directory of target $1 when it is missing, with mode 0755 under the umask main sets, and prints the path
+# of a new staged file next to the target.
 new_staged_file() {
-  make_dir "${1%/*}"
+  mkdir --parents "${1%/*}"
   mktemp "${1%/*}/${STAGING_NAME}"
 }
 
-# Writes the completion script the rclone at $1 generates for shell $2 to staged file $3, readable by every user.
-write_completion() {
-  run_rclone "$1" completion "$2" - >"$3" || fail "rclone completion $2 failed; set version to another release"
-  chmod 0644 "$3"
-}
-
-# Stages the three completion scripts from the rclone at $1. Each staged path is recorded before the file is written,
-# so cleanup removes it whatever happens next.
+# Stages the three completion scripts from the rclone at $1, readable by every user. Each staged path is recorded
+# before the file is written, so cleanup removes it whatever happens next.
 stage_completions() {
   staged_bash="$(new_staged_file "${BASH_COMPLETION}")"
-  write_completion "$1" bash "${staged_bash}"
+  run_rclone "$1" completion bash - >"${staged_bash}" \
+    || fail "rclone completion bash failed; set version to another release"
   staged_zsh="$(new_staged_file "${ZSH_COMPLETION}")"
-  write_completion "$1" zsh "${staged_zsh}"
+  run_rclone "$1" completion zsh - >"${staged_zsh}" \
+    || fail "rclone completion zsh failed; set version to another release"
   staged_fish="$(new_staged_file "${FISH_COMPLETION}")"
-  write_completion "$1" fish "${staged_fish}"
+  run_rclone "$1" completion fish - >"${staged_fish}" \
+    || fail "rclone completion fish failed; set version to another release"
+  chmod 0644 "${staged_bash}" "${staged_zsh}" "${staged_fish}"
 }
 
 # Renames every staged file over its target. Everything was staged first, so a failure before this point left every
 # earlier file as it was.
 activate() {
   if [ -n "${staged}" ]; then
-    mv -f "${staged}" "${TARGET}"
+    mv --force "${staged}" "${TARGET}"
     staged=""
     log "installed rclone ${version} from ${archive} to ${TARGET}"
   fi
-  mv -f "${staged_bash}" "${BASH_COMPLETION}"
+  mv --force "${staged_bash}" "${BASH_COMPLETION}"
   staged_bash=""
-  mv -f "${staged_zsh}" "${ZSH_COMPLETION}"
+  mv --force "${staged_zsh}" "${ZSH_COMPLETION}"
   staged_zsh=""
-  mv -f "${staged_fish}" "${FISH_COMPLETION}"
+  mv --force "${staged_fish}" "${FISH_COMPLETION}"
   staged_fish=""
   log "wrote the completion scripts to ${BASH_COMPLETION}, ${ZSH_COMPLETION}, and ${FISH_COMPLETION}"
 }
@@ -437,10 +439,13 @@ main() {
   trap 'exit 130' INT
   trap 'exit 143' TERM
 
+  # Every directory the install creates is 0755, whatever umask the build runs with; files get explicit modes.
+  umask 022
+
   check_targets
   install_packages
-  work="$(mktemp -d "${TMPDIR:-/tmp}/rclone-feature.XXXXXX")"
-  mkdir -m 700 "${work}/home"
+  work="$(mktemp --directory "${TMPDIR:-/tmp}/rclone-feature.XXXXXX")"
+  mkdir --mode=700 "${work}/home"
   if [ "${VERSION}" = "latest" ]; then resolve_latest; fi
   check_installed
   if [ "${installed}" = "true" ]; then

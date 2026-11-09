@@ -6,13 +6,15 @@ The feature writes no rclone configuration. Run `rclone config` in the container
 
 ```jsonc
 "mounts": [
-  "source=${localEnv:HOME}/.config/rclone,target=/home/vscode/.config/rclone,type=bind"
+  "source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/rclone,target=/home/vscode/.config/rclone,type=bind"
 ]
 ```
 
-Use your remote user's home as the target. The file holds your remotes' tokens and passwords, so everything running in
-the container can read them; mount only the remotes the container needs, or define them through `RCLONE_CONFIG_*`
-environment variables instead.
+`${localEnv:HOME}${localEnv:USERPROFILE}` names your home directory on Linux, macOS, and Windows alike. The directory
+must exist on your machine, or the container does not start; it is where rclone keeps its configuration on Linux and
+macOS, and on Windows rclone uses `%APPDATA%\rclone` instead, so adjust the source there. Use your remote user's home as
+the target. The file holds your remotes' tokens and passwords, so everything running in the container can read them;
+mount only the remotes the container needs, or define them through `RCLONE_CONFIG_*` environment variables instead.
 
 ## Shell completions
 

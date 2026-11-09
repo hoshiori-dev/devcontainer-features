@@ -30,6 +30,8 @@ no_fuse_mount() {
 check "no FUSE filesystem is mounted" no_fuse_mount
 check "/etc/fuse.conf holds no uncommented user_allow_other line" \
   sh -c '! grep -q -E "^[[:space:]]*user_allow_other" /etc/fuse.conf'
-check "rclone version reports the release the version file names" rclone_reports_version "$(latest_release)"
+# Computed at run time: the default version installs whatever release the version file names.
+latest="$(latest_release)"
+check "rclone version reports the release the version file names" rclone_reports_version "${latest}"
 
 reportResults

@@ -17,7 +17,13 @@ check "no environment variable starting with RCLONE_ is set" no_rclone_variables
 latest="$(latest_release)"
 
 check "command -v rclone resolves to /usr/local/bin/rclone" rclone_resolves_to_usr_local_bin
-check "/usr/local/bin/rclone is executable by every user" test -x /usr/local/bin/rclone
+# By mode, not `test -x`: the test runs as root on three of the images, and root passes `test -x` with any execute bit.
+rclone_executable_by_every_user() {
+  rclone_mode="$(stat -c '%a %U' /usr/local/bin/rclone)" || return 1
+  printf '  mode and owner: %s\n' "${rclone_mode}"
+  [ "${rclone_mode}" = "755 root" ]
+}
+check "/usr/local/bin/rclone is executable by every user" rclone_executable_by_every_user
 check "rclone version reports the release the version file names" rclone_reports_version "${latest}"
 check "the three completion files equal what the installed rclone generates" completions_match
 
