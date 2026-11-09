@@ -341,6 +341,10 @@ extract_archive() {
   if [[ ! -d "${work}/extract/${top}/GodotSharp" || -L "${work}/extract/${top}/GodotSharp" ]]; then
     fail "${reason}: GodotSharp is not a directory; set version to another release"
   fi
+  # The listing marks a link by its Unix mode, but an entry recorded on another host system can carry a link that the
+  # listing does not show, so the extracted tree is checked as well: it holds only regular files and directories.
+  [[ -z "$(find "${work}/extract" ! -type f ! -type d -print -quit)" ]] \
+    || fail "${reason}: it holds a symbolic link or a special file; set version to another release"
 }
 
 # Writes the marker, owned by root and readable by everyone, naming the tag that is being or was installed.
@@ -356,8 +360,8 @@ stage_release() {
   local output
   if [[ ! -d "${INSTALL_ROOT}" ]]; then
     log "creating ${INSTALL_ROOT}"
-    created_root="true"
     mkdir --mode 0755 "${INSTALL_ROOT}"
+    created_root="true"
     write_marker
   fi
   # A new directory in this image layer: a release directory of an earlier layer is never renamed or reused.
@@ -367,7 +371,8 @@ stage_release() {
   mv "${work}/extract/${top}/GodotSharp" "${staged}/GodotSharp"
   # The archive records its own owner and modes; the installation sets them, whatever the archive holds.
   chown --recursive root:root "${staged}"
-  chmod --recursive u=rwX,go=rX "${staged}"
+  find "${staged}" -type d -exec chmod 0755 {} +
+  find "${staged}" -type f -exec chmod 0644 {} +
   chmod 0755 "${staged}/godot"
   if ! output="$(run_isolated "${staged}/godot" --version 2>"${work}/version.stderr")" \
     || ! reports_version "${output}"; then
@@ -383,14 +388,17 @@ stage_release() {
 # ${INSTALL_ROOT}, such as the release the link pointed into before.
 switch_release() {
   local release="${staged}"
-  temp_link="$(mktemp --dry-run "${LINK_TEMPLATE}")"
-  ln --symbolic "${release}/godot" "${temp_link}"
+  local name
+  name="$(mktemp --dry-run "${LINK_TEMPLATE}")"
+  ln --symbolic "${release}/godot" "${name}"
+  temp_link="${name}"
   mv --no-target-directory "${temp_link}" "${LINK}"
   temp_link=""
   staged=""
   created_root="false"
   log "linked ${LINK} to ${release}/godot"
   write_marker
+  log "removing the entries of ${INSTALL_ROOT} other than the marker and ${release}"
   find "${INSTALL_ROOT}" -mindepth 1 -maxdepth 1 ! -name "${MARKER_NAME}" ! -path "${release}" \
     -exec rm --recursive --force -- {} +
 }

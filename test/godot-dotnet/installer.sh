@@ -131,10 +131,12 @@ installation_is() {
   fi
 }
 
-# No temporary directory or temporary link of install.sh remains.
+# No temporary directory or temporary link of install.sh remains, and nothing beside /opt/godot-dotnet in /opt has a
+# name that starts with godot-dotnet or .godot-dotnet.
 no_temp_residue() {
   local path
-  for path in "${TMPDIR:-/tmp}"/godot-dotnet-feature.* /usr/local/bin/.godot-dotnet-feature.*; do
+  for path in "${TMPDIR:-/tmp}"/godot-dotnet-feature.* /usr/local/bin/.godot-dotnet-feature.* /opt/godot-dotnet?* \
+    /opt/.godot-dotnet*; do
     if [[ -e "${path}" || -L "${path}" ]]; then
       printf '  leftover: %s\n' "${path}"
       show_run

@@ -71,8 +71,9 @@ echo serve >"${FIXTURE_DIR}/mode"
 # one defect: exits_nonzero (the executable prints that line but exits 1), other_version (it reports 4.6.2),
 # standard_build (it reports the standard build), missing_entry and duplicate_entry (the list holds no entry or two for
 # this machine's archive), digest_mismatch (the archives differ from their entries), outside_entry (README.txt beside
-# the top directory), extra_entry (README.txt in it), symlink_entry (a link in GodotSharp/), dotdot_entry (an entry
-# named <top>/GodotSharp/../../evil), no_executable, no_godotsharp, and godotsharp_file (GodotSharp is a file).
+# the top directory), extra_entry (README.txt in it), symlink_entry (a link in GodotSharp/), vms_symlink_entry (a link
+# in GodotSharp/ whose entry is marked as made on VMS, so the listing shows no Unix mode for it), dotdot_entry (an
+# entry named <top>/GodotSharp/../../evil), no_executable, no_godotsharp, and godotsharp_file (GodotSharp is a file).
 make_release() {
   local version="$1"
   local defect="${2-none}"
@@ -86,6 +87,7 @@ make_release() {
   local executable
   local archive
   local entries
+  local offset
   case "${defect}" in
     exits_nonzero) exit_status=1 ;;
     other_version) reported="4.6.2.stable.mono.official.0123456789" ;;
@@ -116,6 +118,11 @@ EXECUTABLE
         ;;
       extra_entry) echo 'not part of a release' >"${build}/${top}/README.txt" ;;
       symlink_entry) ln -s /etc/passwd "${build}/${top}/GodotSharp/link" ;;
+      vms_symlink_entry)
+        ln -s /root "${build}/${top}/GodotSharp/link"
+        # Added first, so its record is the first in the central directory.
+        (cd "${build}" && zip -q --symlinks "${release}/${archive}" "${top}/GodotSharp/link")
+        ;;
       dotdot_entry) echo 'not part of a release' >"${build}/${top}/GodotSharp/evil" ;;
       no_executable) rm "${build}/${top}/${executable}" ;;
       no_godotsharp) rm -r "${build}/${top}/GodotSharp" ;;
@@ -126,6 +133,11 @@ EXECUTABLE
     esac
     # --symlinks stores a link as a link instead of following it.
     (cd "${build}" && zip -q -r --symlinks "${release}/${archive}" "${entries[@]}")
+    if [[ "${defect}" == vms_symlink_entry ]]; then
+      # Byte 5 of a central directory record is the host system the entry was made on; 2 is VMS.
+      offset="$(grep -obUaP '\x50\x4b\x01\x02' "${release}/${archive}" | head -n 1 | cut -d: -f1)"
+      printf '\x02' | dd of="${release}/${archive}" bs=1 seek=$(( offset + 5 )) count=1 conv=notrunc status=none
+    fi
     if [[ "${defect}" == dotdot_entry ]]; then
       # zipnote renames an entry: the line after "@ <name>" gives the new name as "@=<name>".
       zipnote "${release}/${archive}" \
@@ -345,7 +357,8 @@ run_installer 4.6.1
 check "a digest mismatch: the install fails with a message saying verification failed" failed_with 'verification failed'
 checks_installation_kept "a digest mismatch" "${state}"
 
-for defect in outside_entry extra_entry symlink_entry dotdot_entry no_executable no_godotsharp godotsharp_file; do
+for defect in outside_entry extra_entry symlink_entry vms_symlink_entry dotdot_entry no_executable no_godotsharp \
+  godotsharp_file; do
   make_release 4.6.1 "${defect}"
   run_installer 4.6.1
   check "an archive with ${defect}: the install fails with a message naming the archive" failed_with "${archive}"
@@ -413,8 +426,8 @@ check "a first install: no install residue remains" no_install_residue
 # /opt/godot-dotnet is made a link to the installation moved beside it, then a file; each is put back afterwards. The
 # font configuration library is removed again, so a run that reached the prerequisites would call the apt-get stub.
 dpkg --remove libfontconfig1
-mv "${INSTALL_ROOT}" /opt/godot-dotnet-moved
-ln -s /opt/godot-dotnet-moved "${INSTALL_ROOT}"
+mv "${INSTALL_ROOT}" /opt/moved-godot-dotnet
+ln -s /opt/moved-godot-dotnet "${INSTALL_ROOT}"
 checks_path_refused "/opt/godot-dotnet as a link to a directory holding the marker" \
   '/opt/godot-dotnet exists but is not a directory this feature created'
 rm "${INSTALL_ROOT}"
@@ -422,6 +435,6 @@ rm "${INSTALL_ROOT}"
 echo 'not a directory' >"${INSTALL_ROOT}"
 checks_path_refused "/opt/godot-dotnet as a file" '/opt/godot-dotnet exists but is not a directory this feature created'
 rm "${INSTALL_ROOT}"
-mv /opt/godot-dotnet-moved "${INSTALL_ROOT}"
+mv /opt/moved-godot-dotnet "${INSTALL_ROOT}"
 
 reportResults

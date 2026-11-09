@@ -61,12 +61,12 @@ opened in a dev container window. To leave the extension out, list it with a lea
 
 The dotnet feature checks the SDK it downloads only by its size; see that feature for how it installs.
 
-To build with another SDK as well, add your own entry, for example
-`"ghcr.io/devcontainers/features/dotnet:2": { "version": "9.0" }`; the SDKs install side by side, and a `global.json` in
-the project selects one for `dotnet build`. The Godot editor, though, runs on the newest .NET runtime in the container
-and builds with the SDK of that major. An SDK of a newer major than the LTS can therefore break the editor's C# builds:
-with the .NET 11 release candidate, Godot 4.7.2's `--build-solutions` failed with `MSB4236` while `dotnet build` worked.
-An entry with the dotnet feature's defaults installs the newest SDK.
+To build with another SDK as well, add your own entry, `"ghcr.io/devcontainers/features/dotnet:2"` with the `version`
+that SDK needs (see that feature's options); the SDKs install side by side, and a `global.json` in the project selects
+one for `dotnet build`. The Godot editor, though, runs on the newest .NET runtime in the container and builds with the
+SDK of that major. An SDK of a newer major than the LTS can therefore break the editor's C# builds: with the .NET 11
+release candidate, Godot 4.7.2's `--build-solutions` failed with `MSB4236` while `dotnet build` worked. An entry with
+the dotnet feature's defaults installs the newest SDK.
 
 ## Godot Tools for VS Code
 

@@ -32,6 +32,8 @@ as_root() {
 no_godot_files_in_homes() {
   local home
   local path
+  # A refused sudo would read as "absent" below, so root access is confirmed first.
+  as_root true || return 1
   for home in "${HOME}" /root; do
     for path in "${HOME_LOCATIONS[@]}"; do
       if as_root test -e "${home}/${path}"; then
@@ -46,8 +48,10 @@ no_godot_files_in_homes() {
 check "neither the remote user's nor root's home holds any of ${HOME_LOCATIONS[*]}" no_godot_files_in_homes
 # The self-contained mode marker would sit beside the executable, in the release directory the link points into.
 no_self_contained_marker() {
+  local target
   local release
-  release="$(dirname "$(readlink "${LINK}")")" || return 1
+  target="$(readlink "${LINK}")" || return 1
+  release="$(dirname "${target}")"
   [[ ! -e "${release}/_sc_" && ! -e "${release}/._sc_" ]]
 }
 check "the release directory under /opt/godot-dotnet holds neither _sc_ nor ._sc_" no_self_contained_marker
