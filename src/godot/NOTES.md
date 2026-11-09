@@ -66,15 +66,16 @@ tag="${version}-stable"
 base="https://github.com/godotengine/godot/releases/download/${tag}"
 templates="Godot_v${tag}_export_templates.tpz"
 dir="${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/${version}.stable"
-curl --fail --location --remote-name "${base}/${templates}"
-curl --fail --location --remote-name "${base}/SHA512-SUMS.txt"
-grep "  ${templates}\$" SHA512-SUMS.txt | sha512sum --check \
+curl --proto '=https' --proto-redir '=https' --fail --location --remote-name "${base}/${templates}"
+curl --proto '=https' --proto-redir '=https' --fail --location --remote-name "${base}/SHA512-SUMS.txt"
+awk -v name="${templates}" 'NF == 2 && $2 == name' SHA512-SUMS.txt >templates.sha512
+[ "$(wc -l <templates.sha512)" -eq 1 ] && sha512sum --check templates.sha512 \
   && mkdir -p "${dir}" && unzip -j "${templates}" 'templates/*' -d "${dir}" \
-  && rm "${templates}" SHA512-SUMS.txt
+  && rm "${templates}" SHA512-SUMS.txt templates.sha512
 ```
 
-The templates are extracted only when the checksum matches, and the downloads are removed afterwards; on a mismatch they
-stay in the current directory for you to inspect.
+The templates are extracted only when the checksum list holds exactly one entry for them and the download matches it,
+and the downloads are removed afterwards; otherwise they stay in the current directory for you to inspect.
 
 `--export-pack` needs no templates.
 
@@ -92,7 +93,8 @@ The feature installs the standard build only. The .NET build of Godot, which C# 
 - Installs `curl`, `ca-certificates`, `unzip`, and the font configuration library (`libfontconfig1` or `fontconfig`)
   from the image's own package repositories when they are missing, and leaves them installed.
 - Writes nothing under a home directory, sets no environment variable, and runs no project at build time.
-- Needs network access to github.com at build time; nothing is fetched when the container starts.
+- Needs network access at build time to github.com and to release-assets.githubusercontent.com, where GitHub serves
+  release downloads; nothing is fetched when the container starts.
 
 ## OS support
 
