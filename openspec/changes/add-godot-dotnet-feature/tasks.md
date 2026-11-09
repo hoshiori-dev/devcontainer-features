@@ -22,18 +22,18 @@
 
 - [x] 2.1 Write `test/godot-dotnet/compatibility.json` with the two images of design.md (Supported images), both
       architectures, `scenarioArchitectures` both; verify `just validate`
-- [ ] 2.2 Write `test/godot-dotnet/test.sh` and its shared project helper covering Default install, SDK available to the
+- [x] 2.2 Write `test/godot-dotnet/test.sh` and its shared project helper covering Default install, SDK available to the
       remote user, SDK installed by the dependency, Dependency environment reaches the remote user, Omitted version,
       Building C# scripts headless, Running a C# project headless, Running a project headless, Importing a project
       headless, Language server headless, Minimal image, No graphical session libraries, Nothing else configured after
       install, Package-manager caches after install, and No install residue; verify `just test godot-dotnet` passes on
       every image of this machine's architecture
-- [ ] 2.3 Write `test/godot-dotnet/duplicate.sh` covering Different version the second time, with the guard that the
+- [x] 2.3 Write `test/godot-dotnet/duplicate.sh` covering Different version the second time, with the guard that the
       replace path runs; verified by the same `just test godot-dotnet` run
-- [ ] 2.4 Write `test/godot-dotnet/scenarios.json` and the version scenarios of design.md (Decisions: Scenarios):
+- [x] 2.4 Write `test/godot-dotnet/scenarios.json` and the version scenarios of design.md (Decisions: Scenarios):
       `test_version_explicit` (with the C# build), `test_version_tag_form`, `test_version_two_part`; verify each with
       `just test-scenarios godot-dotnet --scenario <name>`
-- [ ] 2.5 Write `fail_installation.sh`, the `installer.sh` helper, and the `fixture_curl.sh` stub covering every run
+- [x] 2.5 Write `fail_installation.sh`, the `installer.sh` helper, and the `fixture_curl.sh` stub covering every run
       design.md (Goals) lists for `fail_installation`; verify
       `just test-scenarios godot-dotnet --scenario
       fail_installation` passes
