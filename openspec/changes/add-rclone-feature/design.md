@@ -31,8 +31,9 @@ Upstream facts this change relies on, checked on 2026-11-09 against `downloads.r
   expiry), which https://rclone.org/release_signing/ documents as the release key. The other is an RSA-4096 key
   `E3B358DC858FB307F48170B9CB0DBEBC5F32C81D` (created 2022-09-16), which signs no release checked.
 - `gpg --verify` of the `v1.76.0` list with that key list succeeded on Debian 12 (GnuPG 2.2.40), Ubuntu 24.04 (2.4.4),
-  Fedora 44 (2.4.9), and Alpine 3.24 (2.4.9). The minimal package `gpg` is enough on Debian and Alpine, both for
-  importing the key list and for `--decrypt`, which prints the signed text (47 lines for `v1.76.0`).
+  Fedora 44 (2.4.9), and Alpine 3.24 (2.4.9). The minimal package `gpg`, without `gpg-agent`, is enough on Debian and
+  Alpine for `--dearmor` and for `--decrypt` against the resulting keyring file, which prints the signed text (47 lines
+  for `v1.76.0`); `--import` fails there, since it starts `gpg-agent` (found during implementation).
 - The zip holds `rclone-v<version>-linux-<arch>/` with `rclone`, `rclone.1`, `README.txt`, `README.html`, and
   `git-log.txt`. Both the `amd64` and the `arm64` `rclone` of `v1.76.0` are static ELF executables (no `PT_INTERP`), so
   they need no particular C library.
@@ -149,11 +150,14 @@ redirect upstream adds later fails the install clearly and a PATCH release of th
 
 ### Signature verification
 
-Fetch `https://rclone.org/KEYS` and `SHA256SUMS` into the temporary directory, and import the key list into a GnuPG home
-there. Then run `gpg --decrypt` on the list with status output. It must exit 0 and report `GOODSIG` and `VALIDSIG`, and
-the last field of `VALIDSIG` (the primary key fingerprint) must equal `FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA`, a
-constant in `install.sh`. Only the text `--decrypt` prints is searched for the archive's entry, which must occur exactly
-once, as `<64 hex digits>  rclone-v<version>-linux-<arch>.zip`.
+Fetch `https://rclone.org/KEYS` and `SHA256SUMS` into the temporary directory, and turn the key list into a keyring file
+with `gpg --dearmor` in a GnuPG home there. Importing it instead would start `gpg-agent`, which the minimal `gpg`
+packages of Debian and Alpine do not include, while verifying needs no agent. Then run `gpg --decrypt` on the list
+against that keyring alone, with status output. It must exit 0, report no `BADSIG`, `ERRSIG`, `EXPSIG`, `EXPKEYSIG`, or
+`REVKEYSIG`, and report at least one `VALIDSIG`. The last field of every `VALIDSIG` (the primary key fingerprint) must
+equal `FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA`, a constant in `install.sh`. Only the text `--decrypt` prints is
+searched for the archive's entry, which must occur exactly once, as
+`<64 hex digits>  rclone-v<version>-linux-<arch>.zip`.
 
 - Reading the signed text, not the file, matters: lines outside the signature block are not covered by the signature,
   yet `gpg --verify` would still report it good (the spec's "Entry outside the signed text").
@@ -279,8 +283,8 @@ package that reads zip on all four families.
 - **Verification:** OpenPGP signature of the checksum list by the pinned key, then SHA-256 of the archive against its
   single entry in the signed text. This detects a tampered archive, list, or key list, and a compromised download host.
   It does not detect a compromise of upstream's signing key. The key's weakness (DSA-1024, SHA-1) is stated in the spec.
-- **Keys:** one fingerprint pinned in `install.sh`; the key list is fetched at build time and imported only into a
-  temporary GnuPG home. A rotation fails the install until the feature follows it (Risks).
+- **Keys:** one fingerprint pinned in `install.sh`; the key list is fetched at build time and used only as a keyring
+  file in a temporary GnuPG home. A rotation fails the install until the feature follows it (Risks).
 - **Metadata:** no `containerEnv`, `dependsOn`, `installsAfter`, `mounts`, `capAdd`, `privileged`, `securityOpt`,
   `init`, `entrypoint`, or lifecycle command. The feature never widens what the container may do.
 - **Set-user-ID binary:** `installMountDependencies` adds the distribution's `fusermount3`, set-user-ID root, from the

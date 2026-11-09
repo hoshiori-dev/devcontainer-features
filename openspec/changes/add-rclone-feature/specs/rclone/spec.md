@@ -294,8 +294,8 @@ environment variables, or edit shell startup files.
 #### Scenario: Nothing configured after install
 
 - **WHEN** the feature has been installed
-- **THEN** neither the remote user's nor root's home holds a file or directory whose name contains `rclone`, or a
-  `.gnupg` directory the install created
+- **THEN** neither the remote user's nor root's home holds `.config/rclone`, `.cache/rclone`, `.rclone.conf`, or a
+  `.gnupg` directory
 - **AND** no environment variable whose name starts with `RCLONE_` is set in the remote user's environment
 
 ### Requirement: Supported platforms
