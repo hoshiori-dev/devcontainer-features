@@ -75,6 +75,7 @@
 | [pacman-packages](src/pacman-packages/README.md)                   | 用 pacman 从 Arch Linux 镜像已配置的软件源安装一组系统软件包，安装时会做一次完整的系统升级。                                                                                |
 | [pi](src/pi/README.md)                                             | 安装原生 Pi coding agent CLI，并把它的配置、凭据和会话保存在私有的项目卷中。                                                                                                |
 | [quarto](src/quarto/README.md)                                     | 从经过校验和验证的官方发布包安装 Quarto CLI，并配置 Quarto VS Code 扩展。                                                                                                   |
+| [rclone](src/rclone/README.md)                                     | 从经过签名验证的官方发布包安装 rclone（在各种云存储之间复制、同步、提供和挂载文件），附带 bash、zsh 和 fish 补全；可选安装 rclone mount 所需的 FUSE 辅助程序。              |
 | [slurm](src/slurm/README.md)                                       | 安装发行版的 Slurm 和 MUNGE，每次容器启动时在 dev container 内运行一个真实的单节点 Slurm 集群，或只作为外部集群的客户端；配置目录保存在命名卷中。                           |
 | [uv](src/uv/README.md)                                             | 安装 Astral 的 uv 和 uvx，可选安装 Python 命令行工具；uv 的 Python 解释器和缓存保存在重建后仍然保留的卷上。                                                                 |
 | [zypper-packages](src/zypper-packages/README.md)                   | 从镜像已启用的软件源安装列出的系统软件包。                                                                                                                                  |

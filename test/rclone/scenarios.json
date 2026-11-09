@@ -1,0 +1,33 @@
+{
+  "test_version_floor": {
+    "image": "alpine:3.24",
+    "features": {
+      "rclone": {
+        "version": "v1.63.0"
+      }
+    }
+  },
+  "test_version_explicit": {
+    "image": "fedora:44",
+    "features": {
+      "rclone": {
+        "version": "1.70.0"
+      }
+    }
+  },
+  "test_mount_dependencies": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "rclone": {
+        "installMountDependencies": true
+      }
+    }
+  },
+  "fail_contract": {
+    "image": "debian:12",
+    "features": {
+      "rclone": {}
+    }
+  }
+}
