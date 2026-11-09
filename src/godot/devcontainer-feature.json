@@ -1,0 +1,18 @@
+{
+  "id": "godot",
+  "version": "1.0.0",
+  "name": "Godot",
+  "description": "Installs the standard build of the Godot editor from verified official releases, for headless use.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/godot",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "Godot stable release: latest, or MAJOR.MINOR or MAJOR.MINOR.PATCH at or above 4.2.2, optionally with -stable.",
+      "proposals": [
+        "latest",
+        "4.6.3"
+      ]
+    }
+  }
+}

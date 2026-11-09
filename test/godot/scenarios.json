@@ -1,0 +1,35 @@
+{
+  "test_version_explicit": {
+    "image": "debian:12",
+    "features": {
+      "godot": {
+        "version": "4.6.3"
+      }
+    }
+  },
+  "test_version_tag_form": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "godot": {
+        "version": "4.6.3-stable"
+      }
+    }
+  },
+  "test_version_two_part": {
+    "image": "fedora:44",
+    "features": {
+      "godot": {
+        "version": "4.6"
+      }
+    }
+  },
+  "fail_installation": {
+    "image": "debian:12",
+    "features": {
+      "godot": {
+        "version": "4.6"
+      }
+    }
+  }
+}
