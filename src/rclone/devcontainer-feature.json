@@ -1,0 +1,20 @@
+{
+  "id": "rclone",
+  "version": "1.0.0",
+  "name": "rclone",
+  "description": "Installs rclone, which copies, syncs, serves, and mounts files across cloud storage providers, from its signature-verified release archive, with bash, zsh, and fish completions; optionally installs the FUSE helper rclone mount needs.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/rclone",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "1.70.0"],
+      "default": "latest",
+      "description": "rclone version to install: 'latest', or a release such as 1.76.0 (a leading 'v' is accepted; 1.63.0 or later)."
+    },
+    "installMountDependencies": {
+      "type": "boolean",
+      "default": false,
+      "description": "Install fuse3, which provides the fusermount3 helper rclone mount needs. The container also needs the run-time settings the notes describe."
+    }
+  }
+}
