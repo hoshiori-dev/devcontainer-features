@@ -4,11 +4,11 @@
 # archive relies on TLS and is compared with the digest https://api.github.com reports when that API answers. elan
 # goes to /usr/local/bin/elan, with the proxies lean, lake, leanc, leanmake, leanchecker, and leanpkg as links to it.
 # Toolchains listed in preinstallToolchains are installed with that elan, through upstream's release index at
-# https://release.lean-lang.org, into /usr/local/share/lean/toolchains. Prepares the mount point of the per-dev-container
-# volume at /var/lib/lean, the group lean for a non-root remote user, and the container-creation script
-# /usr/local/share/lean-feature/initialize with the default toolchain it sets. Installs curl, CA certificates, tar,
-# gzip, git, and find from the image's own repositories when they are missing. Runs as root at image build time; the
-# option elanVersion arrives as ELANVERSION, defaultToolchain as DEFAULTTOOLCHAIN, and preinstallToolchains as
+# https://release.lean-lang.org, into /usr/local/share/lean/toolchains. Prepares the mount point of the
+# per-dev-container volume at /var/lib/lean, the group lean for a non-root remote user, and the container-creation
+# script /usr/local/share/lean-feature/initialize with the default toolchain it sets. Installs curl, CA certificates,
+# tar, gzip, git, and find from the image's own repositories when they are missing. Runs as root at image build time;
+# the option elanVersion arrives as ELANVERSION, defaultToolchain as DEFAULTTOOLCHAIN, and preinstallToolchains as
 # PREINSTALLTOOLCHAINS.
 set -euo pipefail
 
@@ -29,8 +29,13 @@ readonly VOLUME_DIR="/var/lib/lean"
 readonly GROUP="lean"
 # stable, beta, nightly, v<MAJOR>.<MINOR>.<PATCH>[-rc<N>], or nightly-<YYYY>-<MM>-<DD>, optionally prefixed with an
 # official origin.
-readonly TOOLCHAIN_RE='^((leanprover/lean4|leanprover/lean4-nightly):)?(stable|beta|nightly|v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?|nightly-[0-9]{4}-[0-9]{2}-[0-9]{2})$'
-readonly TOOLCHAIN_FORMS="stable, beta, nightly, vMAJOR.MINOR.PATCH[-rcN], or nightly-YYYY-MM-DD, optionally prefixed with leanprover/lean4: or leanprover/lean4-nightly:"
+readonly TOOLCHAIN_ORIGIN_RE='(leanprover/lean4|leanprover/lean4-nightly):'
+readonly TOOLCHAIN_VERSION_RE='v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?'
+readonly TOOLCHAIN_NIGHTLY_RE='nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}'
+readonly TOOLCHAIN_RELEASE_RE="stable|beta|nightly|${TOOLCHAIN_VERSION_RE}|${TOOLCHAIN_NIGHTLY_RE}"
+readonly TOOLCHAIN_RE="^(${TOOLCHAIN_ORIGIN_RE})?(${TOOLCHAIN_RELEASE_RE})\$"
+readonly TOOLCHAIN_FORMS="stable, beta, nightly, vMAJOR.MINOR.PATCH[-rcN], or nightly-YYYY-MM-DD, optionally prefixed \
+with leanprover/lean4: or leanprover/lean4-nightly:"
 
 ELANVERSION="${ELANVERSION-latest}"
 DEFAULTTOOLCHAIN="${DEFAULTTOOLCHAIN-stable}"
@@ -73,14 +78,15 @@ cleanup() {
   done
 }
 
-# Runs curl with the transport rules every request of this feature needs: HTTPS only, HTTP errors fail, three retries.
+# Runs curl with the transport rules every request of this feature needs: HTTPS only, redirects included, HTTP errors
+# fail, three retries.
 request() {
-  curl --proto '=https' --tlsv1.2 --fail --silent --show-error --retry 3 "$@"
+  curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --silent --show-error --retry 3 "$@"
 }
 
-# Runs request for a download: it follows redirects, over HTTPS only.
+# Runs request for a download: it follows redirects.
 download() {
-  request --proto-redir '=https' --location "$@"
+  request --location "$@"
 }
 
 # Whether release $1 is older than release $2, both MAJOR.MINOR.PATCH.
@@ -88,22 +94,21 @@ older_than() {
   local -a a b
   IFS=. read -r -a a <<<"$1"
   IFS=. read -r -a b <<<"$2"
-  if ((10#${a[0]} != 10#${b[0]})); then
-    ((10#${a[0]} < 10#${b[0]}))
+  if [[ $((10#${a[0]})) -ne $((10#${b[0]})) ]]; then
+    [[ $((10#${a[0]})) -lt $((10#${b[0]})) ]]
     return
   fi
-  if ((10#${a[1]} != 10#${b[1]})); then
-    ((10#${a[1]} < 10#${b[1]}))
+  if [[ $((10#${a[1]})) -ne $((10#${b[1]})) ]]; then
+    [[ $((10#${a[1]})) -lt $((10#${b[1]})) ]]
     return
   fi
-  ((10#${a[2]} < 10#${b[2]}))
+  [[ $((10#${a[2]})) -lt $((10#${b[2]})) ]]
 }
 
 # Whether the image has a CA certificate bundle where one of the supported distributions keeps it.
 has_ca_bundle() {
   local bundle
-  for bundle in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem \
-    /etc/ssl/cert.pem; do
+  for bundle in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem; do
     if [[ -s "${bundle}" ]]; then return 0; fi
   done
   return 1
@@ -288,7 +293,7 @@ install_missing() {
     pacman)
       # Arch supports installing a package only together with a full system upgrade.
       pacman --sync --refresh --sysupgrade --needed --noconfirm "${packages[@]}" || fail "${failure}"
-      find /var/cache/pacman/pkg -mindepth 1 -delete
+      find /var/cache/pacman/pkg /var/lib/pacman/sync -mindepth 1 -delete
       ;;
     zypper)
       zypper --non-interactive install --no-recommends "${packages[@]}" || fail "${failure}"
@@ -337,7 +342,8 @@ elan_release() {
 # under the name elan, since elan picks its mode from the name it runs as.
 fetch_elan() {
   local installed asset url archive json digest actual staged
-  if [[ -x "${ELAN_PATH}" && ! -d "${ELAN_PATH}" ]]; then
+  # Only a regular file can be the feature's elan; a link elsewhere, such as into a home directory, is replaced.
+  if [[ -f "${ELAN_PATH}" && ! -L "${ELAN_PATH}" && -x "${ELAN_PATH}" ]]; then
     installed="$(elan_release "${ELAN_PATH}")"
     if [[ "${installed}" == "${release}" ]]; then
       log "elan ${release} is already installed at ${ELAN_PATH}; nothing to download"
@@ -355,15 +361,16 @@ fetch_elan() {
     || fail "cannot download ${asset} of elan ${release}; check that release ${release} is published at" \
       "${RELEASES_URL}"
   # The digest GitHub's API reports for the asset, when the API answers (it is rate-limited for anonymous callers)
-  # and reports one: the digest line that follows the asset's name line in its object (the uploader object between
-  # them has no name). Absent, the download relies on TLS alone, as the spec states.
+  # and reports one: the digest that follows the asset's name in its object (the uploader object between them has no
+  # name). The JSON is split into one member per line first, so it parses compact and indented alike. Absent, the
+  # download relies on TLS alone, as the spec states.
   digest=""
-  if request --location --proto-redir '=https' --header 'Accept: application/vnd.github+json' --output "${json}" \
+  if request --location --header 'Accept: application/vnd.github+json' --output "${json}" \
     "${RELEASE_API_URL}/v${release}"; then
     digest="$(
-      awk -F'"' -v asset="${asset}" '
+      sed 's/[,{}]/\n/g' "${json}" | awk -F'"' -v asset="${asset}" '
         $2 == "name" { found = ($4 == asset) }
-        found && $2 == "digest" { print $4; exit }' "${json}"
+        found && $2 == "digest" { print $4; exit }'
     )"
   else
     log "GitHub's API at ${RELEASE_API_URL}/v${release} did not answer: no digest to compare"
@@ -391,7 +398,8 @@ fetch_elan() {
   chmod 0755 "${staged}"
   installed="$(elan_release "${staged}")"
   [[ "${installed}" == "${release}" ]] \
-    || fail "the elan in ${asset} reports \"${installed}\", not ${release}, so nothing was installed; report it upstream"
+    || fail "the elan in ${asset} reports \"${installed}\", not ${release}, so nothing was installed; report it" \
+      "upstream"
   elan_bin="${staged}"
 }
 
@@ -412,9 +420,17 @@ stage_toolchains() {
   shopt -u nullglob
   for name in "${toolchains[@]}"; do
     log "installing toolchain ${name} with elan ${release}, through https://release.lean-lang.org"
-    ELAN_HOME="${staging_home}" HOME="${staging_home}/home" "${elan_bin}" toolchain install "${name}" \
-      || fail "elan cannot install toolchain ${name}; check that upstream publishes it for ${arch}" \
-        "(https://release.lean-lang.org) and that release.lean-lang.org and github.com are reachable"
+    # elan runs in an empty directory: elan 4.2 reads a name as a relative path first when that directory exists.
+    if ! (cd "${staging_home}/home" \
+      && ELAN_HOME="${staging_home}" HOME="${staging_home}/home" "${elan_bin}" toolchain install "${name}") 2>&1 \
+      | tee "${work_dir}/toolchain.log"; then
+      # elan releases before 4.2.4 exit non-zero for a toolchain that is already installed, which here means the image
+      # or an earlier entry already holds it.
+      if grep --quiet "is already installed" "${work_dir}/toolchain.log"; then continue; fi
+      fail "elan cannot install toolchain ${name}; check that upstream publishes it for ${arch}" \
+        "(https://release.lean-lang.org) and that release.lean-lang.org, releases.lean-lang.org, and github.com are" \
+        "reachable"
+    fi
   done
 }
 
@@ -434,22 +450,10 @@ set_up_group() {
   fi
 }
 
-# Writes the files the feature installs, each staged beside its target and renamed into place: elan, its proxies, the
-# build-time toolchains, the creation script, and the default toolchain it sets.
+# Writes the files the feature installs, each staged beside its target and renamed into place: the build-time
+# toolchains first, then elan, its proxies, the creation script, and the default toolchain it sets.
 install_files() {
   local proxy entry name source_dir
-  if [[ "${elan_bin}" != "${ELAN_PATH}" ]]; then
-    log "installing elan ${release} to ${ELAN_PATH}"
-    cp "${elan_bin}" "${BIN_DIR}/.elan.new"
-    chmod 0755 "${BIN_DIR}/.elan.new"
-    mv --force --no-target-directory "${BIN_DIR}/.elan.new" "${ELAN_PATH}"
-  fi
-  log "linking ${PROXIES[*]} in ${BIN_DIR} to elan"
-  for proxy in "${PROXIES[@]}"; do
-    ln --symbolic --force elan "${BIN_DIR}/.${proxy}.new"
-    mv --force --no-target-directory "${BIN_DIR}/.${proxy}.new" "${BIN_DIR}/${proxy}"
-  done
-
   if [[ -n "${staging_home}" ]]; then
     mkdir --parents "${TOOLCHAINS_DIR}"
     chown root:root "${SHARE_DIR}" "${TOOLCHAINS_DIR}"
@@ -466,6 +470,20 @@ install_files() {
     done
     shopt -u nullglob
   fi
+
+  if [[ "${elan_bin}" != "${ELAN_PATH}" ]]; then
+    log "installing elan ${release} to ${ELAN_PATH}"
+    cp "${elan_bin}" "${BIN_DIR}/.elan.new"
+    chmod 0755 "${BIN_DIR}/.elan.new"
+    mv --force --no-target-directory "${BIN_DIR}/.elan.new" "${ELAN_PATH}"
+  fi
+  chown root:root "${ELAN_PATH}"
+  chmod 0755 "${ELAN_PATH}"
+  log "linking ${PROXIES[*]} in ${BIN_DIR} to elan"
+  for proxy in "${PROXIES[@]}"; do
+    ln --symbolic --force elan "${BIN_DIR}/.${proxy}.new"
+    mv --force --no-target-directory "${BIN_DIR}/.${proxy}.new" "${BIN_DIR}/${proxy}"
+  done
 
   source_dir="$(dirname "$0")"
   log "installing the container-creation script to ${INITIALIZE_PATH} and the default toolchain to" \

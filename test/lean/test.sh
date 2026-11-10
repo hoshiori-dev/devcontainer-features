@@ -32,17 +32,22 @@ shell_has_lean_env() {
   [[ "${values}" == "/var/lib/lean/elan|/var/lib/lean/cache/lake|/var/lib/lean/cache/mathlib" ]]
 }
 
-# Whether the package manager of this image keeps no package index and no downloaded package.
+# Whether the package manager of this image keeps no package index (repository metadata) and no downloaded package.
 package_caches_clean() {
+  local leftover
   if command -v apt-get >/dev/null; then
-    [[ -z "$(find /var/lib/apt/lists -name '*_Packages*' -print -quit)" ]]
+    leftover="$(find /var/lib/apt/lists /var/cache/apt/archives \( -name '*_Packages*' -o -name '*.deb' \) \
+      -print -quit)"
   elif command -v dnf >/dev/null; then
-    [[ -z "$(find /var/cache/dnf /var/cache/libdnf5 -name '*.rpm' -print -quit 2>/dev/null)" ]]
+    leftover="$(find /var/cache/dnf /var/cache/libdnf5 \( -name 'repomd.xml' -o -name '*.rpm' \) -print -quit \
+      2>/dev/null || true)"
   elif command -v pacman >/dev/null; then
-    [[ -z "$(find /var/cache/pacman/pkg -mindepth 1 -print -quit)" ]]
+    leftover="$(find /var/lib/pacman/sync /var/cache/pacman/pkg -mindepth 1 -print -quit)"
   else
-    [[ -z "$(find /var/cache/zypp/packages -type f -print -quit 2>/dev/null)" ]]
+    leftover="$(find /var/cache/zypp \( -name 'repomd.xml' -o -name '*.rpm' -o -name 'solv' \) -print -quit \
+      2>/dev/null || true)"
   fi
+  [[ -z "${leftover}" ]]
 }
 
 # Whether elan, run as "$@" --version, reports the release the test expects.
@@ -96,10 +101,13 @@ fi
 
 # Omitted elanVersion. The release the redirect names when the test runs cannot be a literal; a release published
 # between the image build and the test fails once.
-latest_url="$(curl --proto '=https' -fsS -o /dev/null -w '%{redirect_url}' https://github.com/leanprover/elan/releases/latest)"
+latest_url="$(curl --proto '=https' -fsS -o /dev/null -w '%{redirect_url}' \
+  https://github.com/leanprover/elan/releases/latest)"
 release="${latest_url##*/v}"
 printf '%s\n' "Expecting elan ${release}"
-check "elan is installed as /usr/local/bin/elan" [ "$(command -v elan)" == "/usr/local/bin/elan" ]
+# Resolved, because Fedora's /usr/local/sbin is a link to bin and comes first on root's PATH.
+check "elan runs by name and resolves to /usr/local/bin/elan" \
+  [ "$(readlink -f "$(command -v elan)")" == "/usr/local/bin/elan" ]
 check "elan is root's and executable by every user" [ "$(stat -c '%u %a' /usr/local/bin/elan)" == "0 755" ]
 check "elan --version reports the newest release" reports_release elan
 if [[ "$(id -u)" != "0" ]]; then

@@ -7,7 +7,8 @@
 # architecture", "musl image", "Unsupported distribution", the missing package manager, "Remote user that does not
 # exist", "Group is the remote user's primary group", "Group has another member", "No tool for the group", a directory
 # at a target path, and "Same options"). Each rejected run must exit non-zero with its message and leave the targets,
-# packages, groups, and temporary directory as they were; a run rejected for its options or platform makes no request.
+# packages, groups, and temporary directory as they were; a run rejected for its options or platform makes no request,
+# and every request the installer makes carries curl's HTTPS-only flags for itself and its redirects.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -73,6 +74,15 @@ rejected_before_any_request() {
     cat "${curl_log}"
     return 1
   fi
+}
+
+# Whether every request the last run made carried the HTTPS-only flags, for the request and for its redirects.
+requests_https_only() {
+  local line
+  [[ -s "${curl_log}" ]] || return 1
+  while read -r line; do
+    [[ "${line}" == *"--proto =https"* && "${line}" == *"--proto-redir =https"* ]] || return 1
+  done <"${curl_log}"
 }
 
 # Links every command of the image into the directory $1, except the commands $2...; a PATH of that directory hides
@@ -207,19 +217,30 @@ mv "${work_dir}/elan" /usr/local/bin/elan
 check "a malformed latest-release redirect fails, showing what it received" \
   rejected 'redirected to "https://github.com/leanprover/elan/releases/tag/nightly"' CURL_MODE=fixture \
   CURL_REDIRECT=https://github.com/leanprover/elan/releases/tag/nightly
+check "the latest-release request is HTTPS only" requests_https_only
 check "a release that does not exist fails, naming the version" \
   rejected "of elan 9.9.9" CURL_MODE=fixture ELANVERSION=9.9.9 CURL_ARCHIVE=
 check "an archive that does not match GitHub's digest fails" \
   rejected 'does not match the digest GitHub reports' CURL_MODE=fixture ELANVERSION=4.2.3 \
   CURL_ARCHIVE="${work_dir}/with.tar.gz" CURL_API="${work_dir}/wrong-digest.json"
+check "the archive and release API requests are HTTPS only, redirects included" requests_https_only
 check "an archive without elan-init fails" \
   rejected 'holds no elan-init' CURL_MODE=fixture ELANVERSION=4.2.3 \
   CURL_ARCHIVE="${work_dir}/without.tar.gz" CURL_API="${work_dir}/no-digest.json"
 
-# Toolchain cannot be installed, Toolchain download fails: a toolchain upstream does not publish, through the real
-# release index.
+# Toolchain cannot be installed: a toolchain upstream does not publish, through the real release index.
 check "a toolchain upstream does not publish fails, naming it, and leaves nothing in the image" \
   rejected 'elan cannot install toolchain v9.9.9' CURL_MODE=real PREINSTALLTOOLCHAINS=v9.9.9
+
+# Toolchain download fails: elan reaches the release index directly, and its download goes through a proxy that refuses
+# connections. elanVersion names the installed release, so the installer itself makes no request.
+installed_release="$(/usr/local/bin/elan --version)"
+installed_release="${installed_release#elan }"
+installed_release="${installed_release%% *}"
+check "a toolchain whose download fails fails the install and leaves no partial toolchain" \
+  rejected_before_any_request 'elan cannot install toolchain v4.35.0' ELANVERSION="${installed_release}" \
+  PREINSTALLTOOLCHAINS=v4.35.0 https_proxy=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 \
+  no_proxy=release.lean-lang.org NO_PROXY=release.lean-lang.org
 
 # Same options: no archive request, and elan unchanged.
 before="$(stat -c '%i %Y' /usr/local/bin/elan)"

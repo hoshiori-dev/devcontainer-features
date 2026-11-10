@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Scenario "test_changed_uid": debian:13 with the remote user developer, built with UID 23456, whose UID the dev
-# container tooling changed to the host user's ("Changed UID", "Remote user in the group", "Toolchain installed on
-# first use", "Volume that fits").
+# container tooling changed to the host user's, and a group lean without members in the image ("Changed UID", "Remote
+# user in the group", "Existing group", "Toolchain installed on first use", "Volume that fits").
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -55,6 +55,7 @@ work_dir="$(mktemp -d)"
 check "the tooling changed the remote user's UID" [ "$(id -u)" != "${BUILD_UID}" ]
 check "the remote user no longer owns the new volume" [ "$(stat -c %u "${VOLUME_DIR}")" != "$(id -u)" ]
 check "the remote user is a member of the group lean" member_of_lean
+check "the existing group lean keeps its ID" [ "$(getent group lean | cut -d: -f3)" == "23458" ]
 check "the new volume belongs to the group lean and is writable by its members" \
   [ "$(stat -c '%G %a' "${VOLUME_DIR}")" == "lean 2775" ]
 check "the creation step prepared the volume for the remote user" directories_prepared

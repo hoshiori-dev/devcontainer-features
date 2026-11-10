@@ -71,13 +71,15 @@ artifacts_in_lake_cache() {
 
 # Different options. The release the redirect names when the test runs cannot be a literal; a release published
 # between the image build and the test fails once.
-latest_url="$(curl --proto '=https' -fsS -o /dev/null -w '%{redirect_url}' https://github.com/leanprover/elan/releases/latest)"
+latest_url="$(curl --proto '=https' -fsS -o /dev/null -w '%{redirect_url}' \
+  https://github.com/leanprover/elan/releases/latest)"
 release="${latest_url##*/v}"
 check "elan --version reports the second install's release" reports_release
 check "the default toolchain after creation is the second install's" default_is stable
 check "the first install's toolchain is in the image" test -d "${IMAGE_TOOLCHAIN}"
 check "nothing under /usr/local/share/lean is writable by another user than root" share_dir_root_only
-check "the build-time toolchain is linked into elan's home" [ "$(readlink "${VOLUME_TOOLCHAIN}")" == "${IMAGE_TOOLCHAIN}" ]
+check "the build-time toolchain is linked into elan's home" \
+  [ "$(readlink "${VOLUME_TOOLCHAIN}")" == "${IMAGE_TOOLCHAIN}" ]
 check "elan lists the build-time toolchain as installed" lists_toolchain leanprover/lean4:v4.35.0
 if [[ "$(id -u)" != "0" ]]; then
   check "the group lean lists the remote user once" listed_once_in_lean

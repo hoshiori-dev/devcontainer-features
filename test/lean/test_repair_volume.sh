@@ -67,7 +67,8 @@ trap cleanup EXIT
 work_dir="$(mktemp -d)"
 
 check "the remote user is not root" [ "$(id -u)" != 0 ]
-check "the build-time toolchain is linked into the volume" test -L "${VOLUME_DIR}/elan/toolchains/leanprover--lean4---v4.35.0"
+check "the build-time toolchain is linked into the volume" \
+  test -L "${VOLUME_DIR}/elan/toolchains/leanprover--lean4---v4.35.0"
 
 # Volume filled under another UID. Setup: cache files and links to targets outside the volume, then everything in the
 # volume given to another UID.
@@ -150,6 +151,7 @@ sudo mkdir -p "${VOLUME_DIR}/cache/lake/root"
 sudo touch "${VOLUME_DIR}/cache/lake/root/file"
 
 check "the creation continues on a volume with a file that root left" "${INITIALIZE}"
-check "the remote user owns the file that root left" [ "$(stat -c %u "${VOLUME_DIR}/cache/lake/root/file")" == "$(id -u)" ]
+check "the remote user owns the file that root left" \
+  [ "$(stat -c %u "${VOLUME_DIR}/cache/lake/root/file")" == "$(id -u)" ]
 
 reportResults

@@ -49,6 +49,13 @@ links_to_image() {
   [[ "$(readlink "${VOLUME_DIR}/${NAME}")" == "${IMAGE_DIR}/${NAME}" ]]
 }
 
+# Whether nothing under /usr/local/share/lean belongs to another user than root or, apart from links, is writable by
+# its group or by every user.
+share_dir_root_only() {
+  [[ -z "$(find /usr/local/share/lean ! -user root -print -quit)" ]] \
+    && [[ -z "$(find /usr/local/share/lean ! -type l -perm /022 -print -quit)" ]]
+}
+
 entry_absent() {
   [[ ! -e "${VOLUME_DIR}/${NAME}" && ! -L "${VOLUME_DIR}/${NAME}" ]]
 }
@@ -64,6 +71,7 @@ work_dir="$(mktemp -d)"
 check "the container has no network" no_network
 check "the two names install one toolchain into the image" [ "$(ls -A "${IMAGE_DIR}")" == "${NAME}" ]
 check "the build-time toolchain is linked into elan's home" links_to_image
+check "nothing under /usr/local/share/lean is writable by another user than root" share_dir_root_only
 
 # Listed toolchains.
 check "a project pinned to the build-time toolchain builds offline and its executable runs" project_runs_offline

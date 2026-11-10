@@ -109,7 +109,9 @@ set_default_toolchain() {
   fi
   toolchain="$(<"${DEFAULT_TOOLCHAIN_PATH}")"
   if [[ -z "${toolchain}" ]]; then return 0; fi
-  if ! reason="$(ELAN_HOME="${ELAN_HOME_DIR}" "${ELAN_PATH}" default "${toolchain}" 2>&1)"; then
+  # From /, since elan 4.2 reads a name as a relative path first when the current directory, here the workspace, holds
+  # one.
+  if ! reason="$(cd / && ELAN_HOME="${ELAN_HOME_DIR}" "${ELAN_PATH}" default "${toolchain}" 2>&1)"; then
     warn "cannot set elan's default toolchain to ${toolchain}: ${reason}"
   fi
 }

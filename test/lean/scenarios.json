@@ -16,6 +16,7 @@
     "features": {
       "lean": {
         "elanVersion": "4.1.0",
+        "defaultToolchain": "leanprover/lean4:v4.35.0",
         "preinstallToolchains": "leanprover/lean4:v4.35.0"
       }
     }
