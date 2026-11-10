@@ -1,0 +1,55 @@
+{
+  "test_offline_toolchains": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "lean": {
+        "preinstallToolchains": " leanprover/lean4:v4.35.0 , , v4.35.0 "
+      }
+    }
+  },
+  "test_version_floor": {
+    "image": "fedora:44",
+    "features": {
+      "lean": {
+        "elanVersion": "4.1.0",
+        "preinstallToolchains": "leanprover/lean4:v4.35.0"
+      }
+    }
+  },
+  "test_unmanaged_default": {
+    "image": "debian:12",
+    "features": {
+      "lean": {
+        "defaultToolchain": ""
+      }
+    }
+  },
+  "test_changed_uid": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "remoteUser": "developer",
+    "features": {
+      "lean": {}
+    }
+  },
+  "test_repair_volume": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "lean": {
+        "preinstallToolchains": "leanprover/lean4:v4.35.0"
+      }
+    }
+  },
+  "fail_contract": {
+    "image": "debian:12",
+    "features": {
+      "lean": {}
+    }
+  }
+}
