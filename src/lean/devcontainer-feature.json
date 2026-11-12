@@ -1,0 +1,60 @@
+{
+  "id": "lean",
+  "version": "1.0.0",
+  "name": "Lean",
+  "description": "Installs elan, the Lean version manager, with the lean and lake commands, keeps Lean toolchains and the Lake and Mathlib caches on a volume that survives rebuilds, and optionally installs toolchains into the image.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/lean",
+  "options": {
+    "elanVersion": {
+      "type": "string",
+      "proposals": [
+        "latest",
+        "4.1.0"
+      ],
+      "default": "latest",
+      "description": "The elan release to install: latest, the newest release at build time, or one release as MAJOR.MINOR.PATCH, 4.1.0 or later."
+    },
+    "defaultToolchain": {
+      "type": "string",
+      "proposals": [
+        "stable",
+        "leanprover/lean4:v4.35.0",
+        ""
+      ],
+      "default": "stable",
+      "description": "The toolchain elan uses outside a project, set each time the container is created: stable, beta, nightly, a release such as v4.35.0, or nightly-YYYY-MM-DD, optionally prefixed with leanprover/lean4: or leanprover/lean4-nightly:. Empty leaves elan's default to you."
+    },
+    "preinstallToolchains": {
+      "type": "string",
+      "proposals": [
+        "",
+        "leanprover/lean4:v4.35.0"
+      ],
+      "default": "",
+      "description": "Toolchains to install into the image at build time, comma-separated, in the forms defaultToolchain accepts; each adds about 3 GB to the image."
+    }
+  },
+  "containerEnv": {
+    "ELAN_HOME": "/var/lib/lean/elan",
+    "LAKE_CACHE_DIR": "/var/lib/lean/cache/lake",
+    "MATHLIB_CACHE_DIR": "/var/lib/lean/cache/mathlib"
+  },
+  "mounts": [
+    {
+      "source": "lean-${devcontainerId}",
+      "target": "/var/lib/lean",
+      "type": "volume"
+    }
+  ],
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ],
+  "onCreateCommand": "/usr/local/share/lean-feature/initialize",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "leanprover.lean4"
+      ]
+    }
+  }
+}
