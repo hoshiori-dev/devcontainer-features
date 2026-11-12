@@ -44,7 +44,8 @@ package_caches_clean() {
   elif command -v pacman >/dev/null; then
     leftover="$(find /var/lib/pacman/sync /var/cache/pacman/pkg -mindepth 1 -print -quit)"
   else
-    leftover="$(find /var/cache/zypp \( -name 'repomd.xml' -o -name '*.rpm' -o -name 'solv' \) -print -quit \
+    # zypper clean keeps the empty directory /var/cache/zypp/solv; only files are cached data.
+    leftover="$(find /var/cache/zypp -type f \( -name 'repomd.xml' -o -name '*.rpm' -o -name 'solv' \) -print -quit \
       2>/dev/null || true)"
   fi
   [[ -z "${leftover}" ]]
