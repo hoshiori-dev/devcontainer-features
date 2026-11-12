@@ -10,3 +10,6 @@ skills-lock.json
 .agents/skills/scaffold-*/
 .claude/skills/meta-*
 .claude/skills/scaffold-*
+
+### Claude Code ###
+.claude/settings.local.json
