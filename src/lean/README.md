@@ -37,6 +37,11 @@ Installs elan, the Lean version manager, with the lean and lake commands, keeps 
 - Git, which Lake uses to fetch dependencies, plus curl, CA certificates, tar, gzip, and find when the image lacks them.
 - The VS Code extension `leanprover.lean4`.
 
+A build behind an egress allowlist reaches `github.com` and GitHub's asset host `release-assets.githubusercontent.com`
+for elan, and `api.github.com` for its digest; without that host the digest is not compared. With
+`preinstallToolchains`, it also reaches `release.lean-lang.org` and `releases.lean-lang.org`, whose toolchains GitHub's
+asset host serves.
+
 No toolchain is installed at build time by default, and the feature runs no project command: it does not run
 `lake build`, `lake update`, or `lake exe cache get`, and installs no Mathlib.
 
@@ -69,8 +74,9 @@ read-only. When the container is created they are linked into elan's home, so el
 `stable`, `beta`, `nightly`, a release such as `v4.35.0` or `v4.36.0-rc2`, or `nightly-YYYY-MM-DD`, each optionally
 prefixed with `leanprover/lean4:` or `leanprover/lean4-nightly:`. Other origins, paths, and
 `<repository>:lean-toolchain` references are rejected. Toolchains come from upstream's release index at
-`https://release.lean-lang.org` and its download hosts. Upstream publishes no checksum or signature for them and elan
-verifies none, so they rely on TLS, exactly as when elan downloads them at run time.
+`https://release.lean-lang.org` and its download hosts, `releases.lean-lang.org` and `github.com`. Upstream publishes no
+checksum or signature for them and elan verifies none, so they rely on TLS, exactly as when elan downloads them at run
+time.
 
 ## The volume
 

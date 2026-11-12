@@ -102,8 +102,9 @@ an arm64 host. Arch Linux was checked for prerequisites only, under amd64 emulat
 - Stage everything, then rename:
   - elan is written beside its target under a temporary name and renamed into place.
   - Each proxy is a new link renamed over the old one.
-  - Build-time toolchains are installed under a temporary `ELAN_HOME` in `/usr/local/share/lean/` and renamed into
-    `toolchains/` only after elan finished all of them.
+  - Build-time toolchains are installed under a temporary `ELAN_HOME` beside `/usr/local/share/lean/`, on the same file
+    system and outside it, and renamed into `toolchains/` only after elan finished all of them and every other file is
+    staged.
 
   A failure before the renames leaves every earlier file as it was. Checked by the failure cases of `fail_contract` and
   by `duplicate.sh`.
@@ -259,7 +260,7 @@ Rejected:
 
 ### Toolchains at build time
 
-`install.sh` runs the installed elan with a temporary `ELAN_HOME` under `/usr/local/share/lean/`. Its `toolchains/`
+`install.sh` runs the installed elan with a temporary `ELAN_HOME` beside `/usr/local/share/lean/`. Its `toolchains/`
 first holds links to the toolchains the image already has. The script then runs `elan toolchain install` for each listed
 name. elan resolves channels itself, and finds the linked ones installed, so nothing already in the image is downloaded.
 Each new directory elan created is then renamed into `/usr/local/share/lean/toolchains/`. Group and other write are
@@ -282,7 +283,7 @@ Rejected:
   | ----------------- | --------------------------------------------------------------------------------------- |
   | Debian and Ubuntu | `curl` `ca-certificates` `tar` `gzip` `git` `findutils`                                 |
   | Fedora and RHEL   | `curl` `ca-certificates` `tar` `gzip` `git-core` `findutils`                            |
-  | openSUSE          | `curl` `ca-certificates` `tar` `gzip` `git-core` `findutils`                            |
+  | openSUSE          | `curl` `ca-certificates-mozilla` `tar` `gzip` `git-core` `findutils`                    |
   | Arch Linux        | `curl` `ca-certificates` `tar` `gzip` `git` `findutils`, through `pacman -Syu --needed` |
 
   `git-core` is preferred where it exists, since it skips Perl and the extra tools. No `zstd`: elan unpacks it itself.
@@ -349,9 +350,11 @@ users who do not want it.
     - an unknown toolchain, which reaches the real index;
     - an architecture, a musl marker, an edited `/etc/os-release`, and a hidden package manager;
     - a missing remote user, the group as primary group, the group with another member, and a hidden `groupadd`;
-    - a directory at `/usr/local/bin/elan`.
+    - a directory at `/usr/local/bin/elan`;
+    - a failure after a new elan is staged (the creation script missing from the payload).
 
-    The same-options repeat (no request, inode unchanged) is asserted here too.
+    The same-options repeat (no request, inode unchanged) is asserted here too, over a mount point whose setgid bit an
+    install for root clears.
 - **Checked by hand**, once on amd64, with the results in the PR's Validation section:
   - a rebuild with `devcontainer up --remove-existing-container` keeps a run-time toolchain and cache files;
   - two workspaces get two volumes;
@@ -425,13 +428,14 @@ Requests made by `install.sh`:
 
 Requests made by elan at build time, only when `preinstallToolchains` is not empty:
 
-| URL                                                                                 | Purpose                                          | Verification             |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------ |
-| `https://release.lean-lang.org`                                                     | Release index; resolves names and channels       | TLS                      |
-| `https://releases.lean-lang.org/lean4/<tag>/lean-<version>-linux[_aarch64].tar.zst` | Release toolchain                                | TLS; 302 to the next row |
-| `https://github.com/leanprover/lean4/releases/download/<tag>/…`                     | Release toolchain                                | TLS                      |
-| `https://github.com/leanprover/lean4-nightly/releases/download/<tag>/…`             | Nightly toolchain                                | TLS                      |
-| `https://github.com/leanprover/elan/releases/latest`                                | elan's update notice; the result is only printed | TLS                      |
+| URL                                                                                 | Purpose                                          | Verification                    |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------- |
+| `https://release.lean-lang.org`                                                     | Release index; resolves names and channels       | TLS                             |
+| `https://releases.lean-lang.org/lean4/<tag>/lean-<version>-linux[_aarch64].tar.zst` | Release toolchain                                | TLS; 302 to the next row        |
+| `https://github.com/leanprover/lean4/releases/download/<tag>/…`                     | Release toolchain                                | TLS; 302 to GitHub's asset host |
+| `https://github.com/leanprover/lean4-nightly/releases/download/<tag>/…`             | Nightly toolchain                                | TLS; 302 to GitHub's asset host |
+| `https://release-assets.githubusercontent.com/…`                                    | GitHub's asset host for both toolchain rows      | TLS                             |
+| `https://github.com/leanprover/elan/releases/latest`                                | elan's update notice; the result is only printed | TLS                             |
 
 The creation script requests nothing. At run time, elan, Lake, and Mathlib's cache tool download what the user's
 commands ask for.

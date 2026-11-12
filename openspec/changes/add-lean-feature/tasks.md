@@ -16,7 +16,7 @@
       the redirect, the skip check, the archive download with GitHub's digest when reported, staging and renames of elan
       and the six proxies, the group and the mount point, the creation script and the default-toolchain file, and the
       `trap`; verify shellcheck passes through `just check`.
-- [x] 2.2 Implement build-time toolchains in `install.sh`: a temporary `ELAN_HOME` under `/usr/local/share/lean/` that
+- [x] 2.2 Implement build-time toolchains in `install.sh`: a temporary `ELAN_HOME` beside `/usr/local/share/lean/` that
       links the image's toolchains, `elan toolchain install` per name, renames into `toolchains/`, removal of group and
       other write, and cleanup on failure; verify with a local build that a listed toolchain lands root-owned in
       `/usr/local/share/lean/toolchains/` and a repeated name downloads nothing.
