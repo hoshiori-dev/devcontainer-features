@@ -6,9 +6,10 @@
 # "Toolchain cannot be installed", "Toolchain download fails", "Failure over an existing installation", "Unsupported
 # architecture", "musl image", "Unsupported distribution", the missing package manager, "Remote user that does not
 # exist", "Group is the remote user's primary group", "Group has another member", "No tool for the group", a directory
-# at a target path, and "Same options"). Each rejected run must exit non-zero with its message and leave the targets,
-# packages, groups, and temporary directory as they were; a run rejected for its options or platform makes no request,
-# and every request the installer makes carries curl's HTTPS-only flags for itself and its redirects.
+# at a target path, a failure after staging, and "Same options" over a setgid mount point). Each rejected run must exit
+# non-zero with its message and leave the targets, packages, groups, and temporary directory as they were; a run
+# rejected for its options or platform makes no request, and every request the installer makes carries curl's
+# HTTPS-only flags for itself and its redirects.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -31,7 +32,9 @@ cleanup() {
 state() {
   stat -c '%i %Y %F' /usr/local/bin/elan
   /usr/local/bin/elan --version 2>/dev/null || true
-  for proxy in lean lake leanc leanmake leanchecker leanpkg; do readlink "/usr/local/bin/${proxy}" || true; done
+  # The inode shows a proxy renamed over, which its unchanged target would not.
+  for proxy in lean lake leanc leanmake leanchecker leanpkg; do stat -c '%i %N' "/usr/local/bin/${proxy}" || true; done
+  find /usr/local/bin -maxdepth 1 -name '.*.new' | sort
   find /usr/local/share/lean /usr/local/share/lean-feature /var/lib/lean -printf '%p %U %G %m\n' 2>/dev/null | sort
   find /usr/local/share /tmp -maxdepth 1 \( -name '.lean-elan-home.*' -o -name 'tmp.*' \) | sort
   # The format names dpkg-query fields, not shell variables.
@@ -242,10 +245,23 @@ check "a toolchain whose download fails fails the install and leaves no partial 
   PREINSTALLTOOLCHAINS=v4.35.0 https_proxy=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 \
   no_proxy=release.lean-lang.org NO_PROXY=release.lean-lang.org
 
-# Same options: no archive request, and elan unchanged.
+# Failure over an existing installation, after elan 4.1.0 is downloaded and staged: the creation script cannot be
+# copied, so elan, its proxies, and every other target stay as they were.
+creation_script="$(dirname "${installer}")/scripts/initialize.sh"
+mv "${creation_script}" "${creation_script}.hidden"
+check "a failure after staging leaves the earlier installation as it was" \
+  rejected 'initialize.sh' CURL_MODE=real ELANVERSION=4.1.0
+mv "${creation_script}.hidden" "${creation_script}"
+check "the failed install had downloaded elan 4.1.0" grep -q 'releases/download/v4.1.0/' "${curl_log}"
+
+# Same options: no archive request, and elan unchanged. The mount point carries the setgid bit an install for a
+# non-root user gives it, which an install for root clears.
 before="$(stat -c '%i %Y' /usr/local/bin/elan)"
+chmod 2755 /var/lib/lean
 check "a second install with the same options succeeds" run_installer CURL_MODE=real
 check "the second install downloads no elan release" bash -c "! grep -q 'releases/download' '${curl_log}'"
 check "the second install leaves elan as it was" [ "$(stat -c '%i %Y' /usr/local/bin/elan)" == "${before}" ]
+check "the install for root leaves the mount point root's, mode 755" \
+  [ "$(stat -c '%U %G %a' /var/lib/lean)" == "root root 755" ]
 
 reportResults

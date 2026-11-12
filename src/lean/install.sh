@@ -57,6 +57,8 @@ elan_bin=""
 work_dir=""
 # The temporary elan home in which build-time toolchains are installed before they are renamed into TOOLCHAINS_DIR.
 staging_home=""
+# The toolchains in staging_home that stage_files prepared and rename_files moves into TOOLCHAINS_DIR.
+new_toolchains=()
 
 log() {
   printf 'lean: %s\n' "$*"
@@ -365,25 +367,26 @@ fetch_elan() {
   # name). The JSON is split into one member per line first, so it parses compact and indented alike. Absent, the
   # download relies on TLS alone, as the spec states.
   digest=""
-  if request --location --header 'Accept: application/vnd.github+json' --output "${json}" \
+  if ! request --location --header 'Accept: application/vnd.github+json' --output "${json}" \
     "${RELEASE_API_URL}/v${release}"; then
+    log "GitHub's API at ${RELEASE_API_URL}/v${release} did not answer: no digest to compare, so the download relies" \
+      "on TLS alone"
+  else
     digest="$(
       sed 's/[,{}]/\n/g' "${json}" | awk -F'"' -v asset="${asset}" '
         $2 == "name" { found = ($4 == asset) }
         found && $2 == "digest" { print $4; exit }'
     )"
-  else
-    log "GitHub's API at ${RELEASE_API_URL}/v${release} did not answer: no digest to compare"
-  fi
-  if [[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-    actual="$(sha256sum "${archive}")"
-    actual="${actual%% *}"
-    [[ "${actual}" == "${digest#sha256:}" ]] \
-      || fail "${asset} does not match the digest GitHub reports (${digest}), so nothing was installed; retry, and" \
-        "report it upstream if it persists"
-    log "verified ${asset} against the digest GitHub reports"
-  else
-    log "GitHub reports no digest for ${asset}: the download relies on TLS alone"
+    if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+      log "GitHub reports no digest for ${asset}: the download relies on TLS alone"
+    else
+      actual="$(sha256sum "${archive}")"
+      actual="${actual%% *}"
+      [[ "${actual}" == "${digest#sha256:}" ]] \
+        || fail "${asset} does not match the digest GitHub reports (${digest}), so nothing was installed; retry, and" \
+          "report it upstream if it persists"
+      log "verified ${asset} against the digest GitHub reports"
+    fi
   fi
 
   log "extracting elan-init from ${asset} in ${work_dir}"
@@ -405,7 +408,7 @@ fetch_elan() {
 
 # Installs each toolchain of preinstallToolchains with elan_bin into a staging home next to SHARE_DIR, whose
 # toolchains directory first links the toolchains the image already has, so elan downloads none of those again. Moves
-# nothing into TOOLCHAINS_DIR; install_files does, once every toolchain is installed.
+# nothing into TOOLCHAINS_DIR; rename_files does, once every file is staged.
 stage_toolchains() {
   local existing name
   if ((${#toolchains[@]} == 0)); then return 0; fi
@@ -428,8 +431,8 @@ stage_toolchains() {
       # or an earlier entry already holds it.
       if grep --quiet "is already installed" "${work_dir}/toolchain.log"; then continue; fi
       fail "elan cannot install toolchain ${name}; check that upstream publishes it for ${arch}" \
-        "(https://release.lean-lang.org) and that release.lean-lang.org, releases.lean-lang.org, and github.com are" \
-        "reachable"
+        "(https://release.lean-lang.org) and that release.lean-lang.org, releases.lean-lang.org, github.com, and" \
+        "release-assets.githubusercontent.com are reachable"
     fi
   done
 }
@@ -450,52 +453,67 @@ set_up_group() {
   fi
 }
 
-# Writes the files the feature installs, each staged beside its target and renamed into place: the build-time
-# toolchains first, then elan, its proxies, the creation script, and the default toolchain it sets.
-install_files() {
-  local proxy entry name source_dir
+# Stages every file the feature installs beside its target, so that a failure while writing them leaves every target
+# as it was: the build-time toolchains, made root's and read-only, in the staging home; elan and its proxies as hidden
+# .new files in BIN_DIR; the creation script and the default toolchain it sets as .new files beside them.
+stage_files() {
+  local proxy entry source_dir
   if [[ -n "${staging_home}" ]]; then
-    mkdir --parents "${TOOLCHAINS_DIR}"
-    chown root:root "${SHARE_DIR}" "${TOOLCHAINS_DIR}"
-    chmod 0755 "${SHARE_DIR}" "${TOOLCHAINS_DIR}"
     shopt -s nullglob
     for entry in "${staging_home}/toolchains"/*; do
       # Links stand for toolchains the image already has; only directories elan created are new.
       if [[ -L "${entry}" || ! -d "${entry}" ]]; then continue; fi
-      name="${entry##*/}"
-      log "installing toolchain ${name} to ${TOOLCHAINS_DIR}/${name}"
       chown --recursive --no-dereference root:root "${entry}"
       find "${entry}" ! -type l -perm /022 -exec chmod go-w {} +
-      mv --no-target-directory "${entry}" "${TOOLCHAINS_DIR}/${name}"
+      new_toolchains+=("${entry}")
     done
     shopt -u nullglob
   fi
-
   if [[ "${elan_bin}" != "${ELAN_PATH}" ]]; then
-    log "installing elan ${release} to ${ELAN_PATH}"
     cp "${elan_bin}" "${BIN_DIR}/.elan.new"
     chmod 0755 "${BIN_DIR}/.elan.new"
+  fi
+  for proxy in "${PROXIES[@]}"; do
+    ln --symbolic --force elan "${BIN_DIR}/.${proxy}.new"
+  done
+  source_dir="$(dirname "$0")"
+  mkdir --parents "${FEATURE_DIR}"
+  cp "${source_dir}/scripts/initialize.sh" "${INITIALIZE_PATH}.new"
+  chmod 0755 "${INITIALIZE_PATH}.new"
+  printf '%s\n' "${DEFAULTTOOLCHAIN}" >"${DEFAULT_TOOLCHAIN_PATH}.new"
+  chmod 0644 "${DEFAULT_TOOLCHAIN_PATH}.new"
+}
+
+# Renames the staged files into place: the build-time toolchains, elan, its proxies, the creation script, and the
+# default toolchain it sets. A numeric mode of five digits clears a setgid bit a directory may already have; GNU chmod
+# keeps it otherwise.
+rename_files() {
+  local proxy entry name
+  if [[ -n "${staging_home}" ]]; then
+    mkdir --parents "${TOOLCHAINS_DIR}"
+    chown root:root "${SHARE_DIR}" "${TOOLCHAINS_DIR}"
+    chmod 00755 "${SHARE_DIR}" "${TOOLCHAINS_DIR}"
+  fi
+  for entry in "${new_toolchains[@]}"; do
+    name="${entry##*/}"
+    log "installing toolchain ${name} to ${TOOLCHAINS_DIR}/${name}"
+    mv --no-target-directory "${entry}" "${TOOLCHAINS_DIR}/${name}"
+  done
+  if [[ "${elan_bin}" != "${ELAN_PATH}" ]]; then
+    log "installing elan ${release} to ${ELAN_PATH}"
     mv --force --no-target-directory "${BIN_DIR}/.elan.new" "${ELAN_PATH}"
   fi
   chown root:root "${ELAN_PATH}"
   chmod 0755 "${ELAN_PATH}"
   log "linking ${PROXIES[*]} in ${BIN_DIR} to elan"
   for proxy in "${PROXIES[@]}"; do
-    ln --symbolic --force elan "${BIN_DIR}/.${proxy}.new"
     mv --force --no-target-directory "${BIN_DIR}/.${proxy}.new" "${BIN_DIR}/${proxy}"
   done
-
-  source_dir="$(dirname "$0")"
   log "installing the container-creation script to ${INITIALIZE_PATH} and the default toolchain to" \
     "${DEFAULT_TOOLCHAIN_PATH}"
-  mkdir --parents "${FEATURE_DIR}"
   chown root:root "${FEATURE_DIR}"
-  chmod 0755 "${FEATURE_DIR}"
-  cp "${source_dir}/scripts/initialize.sh" "${INITIALIZE_PATH}.new"
-  chmod 0755 "${INITIALIZE_PATH}.new"
+  chmod 00755 "${FEATURE_DIR}"
   mv --force --no-target-directory "${INITIALIZE_PATH}.new" "${INITIALIZE_PATH}"
-  printf '%s\n' "${DEFAULTTOOLCHAIN}" >"${DEFAULT_TOOLCHAIN_PATH}.new"
-  chmod 0644 "${DEFAULT_TOOLCHAIN_PATH}.new"
   mv --force --no-target-directory "${DEFAULT_TOOLCHAIN_PATH}.new" "${DEFAULT_TOOLCHAIN_PATH}"
 }
 
@@ -504,10 +522,11 @@ prepare_mount_point() {
   local group mode
   if [[ "${remote_uid}" == "0" ]]; then
     group=root
-    mode=0755
+    # Five digits, so that the setgid bit of an earlier install for a non-root user is cleared.
+    mode=00755
   else
     group="${GROUP}"
-    mode=2775
+    mode=02775
   fi
   log "preparing ${VOLUME_DIR} with owner ${REMOTE_USER}:${group} and mode ${mode}"
   mkdir --parents "${VOLUME_DIR}"
@@ -527,8 +546,9 @@ main() {
   work_dir="$(mktemp --directory)"
   fetch_elan
   stage_toolchains
+  stage_files
   set_up_group
-  install_files
+  rename_files
   prepare_mount_point
   log "done: elan ${release} at ${ELAN_PATH}"
 }
