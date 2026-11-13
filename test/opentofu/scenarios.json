@@ -1,0 +1,24 @@
+{
+  "test_version_floor": {
+    "image": "alpine:3.24",
+    "features": {
+      "opentofu": {
+        "version": "v1.6.3"
+      }
+    }
+  },
+  "test_version_explicit": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "opentofu": {
+        "version": "1.12.12"
+      }
+    }
+  },
+  "fail_contract": {
+    "image": "debian:12",
+    "features": {
+      "opentofu": {}
+    }
+  }
+}

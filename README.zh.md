@@ -74,6 +74,7 @@
 | [nvidia-container-toolkit](src/nvidia-container-toolkit/README.md) | 从 NVIDIA 签名的软件源安装 NVIDIA Container Toolkit，并把 nvidia 运行时注册到 dev container 内的 Docker 守护进程。                                                          |
 | [opencode](src/opencode/README.md)                                 | 安装原生 OpenCode v2 CLI，并把它的配置、凭据和会话保存在私有的项目卷中。                                                                                                    |
 | [openspec](src/openspec/README.md)                                 | 从 npm registry 安装 OpenSpec CLI（openspec），验证每个包的完整性哈希和 registry 签名；所需的 Node.js 运行时作为依赖一并带入。                                              |
+| [opentofu](src/opentofu/README.md)                                 | 从经过签名验证的 GitHub 发布包安装 OpenTofu 的 tofu 命令（用于规划和应用基础设施即代码配置），并配置 OpenTofu VS Code 扩展。                                                |
 | [pacman-packages](src/pacman-packages/README.md)                   | 用 pacman 从 Arch Linux 镜像已配置的软件源安装一组系统软件包，安装时会做一次完整的系统升级。                                                                                |
 | [pi](src/pi/README.md)                                             | 安装原生 Pi coding agent CLI，并把它的配置、凭据和会话保存在私有的项目卷中。                                                                                                |
 | [quarto](src/quarto/README.md)                                     | 从经过校验和验证的官方发布包安装 Quarto CLI，并配置 Quarto VS Code 扩展。                                                                                                   |
