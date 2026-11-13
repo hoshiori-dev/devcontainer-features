@@ -74,6 +74,15 @@ check "Host GID changed: the entrypoint exits zero and changes nothing under /ru
 check "Host GID changed: libvirt-host has the new GID" test "$(group_gid libvirt-host)" = 4343
 check "Host GID changed: the remote user is still a member" is_member libvirt-host
 
+# Both sockets, as a host with the modular daemons and virtproxyd has them: the client opens virtqemud-sock.
+make_socket 0 0777
+as_root python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' /run/libvirt/virtqemud-sock
+as_root chown root:4343 /run/libvirt/virtqemud-sock
+as_root chmod 0770 /run/libvirt/virtqemud-sock
+check "Both sockets mounted: the entrypoint exits zero and changes nothing under /run/libvirt" align
+check "Both sockets mounted: the group is aligned with virtqemud-sock" \
+  bash -c "test \"\$(record_field socket)\" = /run/libvirt/virtqemud-sock && test \"\$(record_field result)\" = aligned"
+
 audio_gid="$(group_gid audio)"
 make_socket "${audio_gid}" 0770
 check "GID of an existing group: the entrypoint exits zero and changes nothing under /run/libvirt" align

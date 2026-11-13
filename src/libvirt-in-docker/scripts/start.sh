@@ -2,13 +2,13 @@
 # Starts the libvirt daemons: the entrypoint of the libvirt-in-docker feature, run as root at every container start
 # before the container's command. It reads the settings install.sh stored in
 # /usr/local/share/libvirt-in-docker/settings and nothing from its environment or its arguments. In order: it stops
-# when /run/libvirt is a mount point or the daemon already answers; stops daemons that run without answering;
-# removes the runtime state an earlier start of this container left under /run (libvirt's sockets, process ID files,
-# and record of what it started), which the start record of that start identifies; starts
-# virtlogd and then libvirtd or, on a distribution without it, the modular daemons; waits at most 30 seconds for
-# qemu:///system to answer; and, with defaultNetwork true, starts the network "default" when it is defined and not
-# active. The outcome goes to the start record /run/libvirt-in-docker/status, which check.sh reports. It always exits
-# zero, so the container's command runs whatever happened.
+# when /run/libvirt is a mount point, or when every daemon runs and qemu:///system answers; removes the runtime
+# state an earlier start of this container left under /run (libvirt's sockets, process ID files, and record of what
+# it started), which the start record of that start identifies; starts each daemon that does not run: virtlogd, and
+# libvirtd or, on a distribution without it, the modular daemons; waits at most 30 seconds for qemu:///system to
+# answer; and, with defaultNetwork true, starts the network "default" when it is defined and not active. It never
+# stops a daemon. The outcome goes to the start record /run/libvirt-in-docker/status, which check.sh reports. It
+# always exits zero, so the container's command runs whatever happened.
 set -euo pipefail
 
 readonly SETTINGS_FILE="/usr/local/share/libvirt-in-docker/settings"
@@ -38,6 +38,7 @@ export LC_ALL="C"
 # The settings of the image: whether to start the default network, and the daemon layout.
 default_network=""
 layout=""
+# Every daemon of the layout, the log daemon first.
 daemons=()
 # What the record says.
 result=""
@@ -112,8 +113,8 @@ read_settings() {
     esac
   done <"${SETTINGS_FILE}"
   case "${layout}" in
-    monolithic) daemons=("${MONOLITHIC_DAEMONS[@]}") ;;
-    modular) daemons=("${MODULAR_DAEMONS[@]}") ;;
+    monolithic) daemons=("${LOG_DAEMON}" "${MONOLITHIC_DAEMONS[@]}") ;;
+    modular) daemons=("${LOG_DAEMON}" "${MODULAR_DAEMONS[@]}") ;;
     *) finish failed "${SETTINGS_FILE} names no known daemon layout (\"${layout}\"); rebuild the container" ;;
   esac
 }
@@ -123,28 +124,24 @@ daemon_answers() {
   timeout 5 virsh --connect "${SYSTEM_URI}" version >/dev/null 2>&1
 }
 
-# Stops the daemon $1 when its process ID file names a running process of that name, and waits until it is gone: at
-# most 5 seconds after asking it to end, then it is killed.
-stop_daemon() {
+# Succeeds when the daemon $1 runs: its process ID file names a process of that name.
+daemon_runs() {
   local name="$1"
   local pid_file="${PID_DIR}/${name}.pid"
   local pid comm
-  [[ -r "${pid_file}" ]] || return 0
+  [[ -r "${pid_file}" ]] || return 1
   pid="$(<"${pid_file}")"
-  [[ "${pid}" =~ ^[0-9]+$ && -r "/proc/${pid}/comm" ]] || return 0
-  comm="$(<"/proc/${pid}/comm")"
-  [[ "${comm}" == "${name}" ]] || return 0
-  log "stopping a ${name} (process ${pid}) that no longer answers"
-  # The process may end between the look at /proc and the signal.
-  kill "${pid}" 2>/dev/null || return 0
-  for _ in {1..50}; do
-    [[ -e "/proc/${pid}" ]] || return 0
-    sleep 0.1
-  done
-  kill -KILL "${pid}" 2>/dev/null || return 0
-  for _ in {1..20}; do
-    [[ -e "/proc/${pid}" ]] || return 0
-    sleep 0.1
+  [[ "${pid}" =~ ^[0-9]+$ && -r "/proc/${pid}/comm" ]] || return 1
+  # The process may end between the two looks at /proc.
+  comm="$(cat "/proc/${pid}/comm" 2>/dev/null || true)"
+  [[ "${comm}" == "${name}" ]]
+}
+
+# Succeeds when every daemon of the layout runs.
+all_daemons_run() {
+  local name
+  for name in "${daemons[@]}"; do
+    daemon_runs "${name}" || return 1
   done
 }
 
@@ -160,17 +157,12 @@ recorded_start() {
   done <"${RECORD_FILE}"
 }
 
-# Stops daemons that still run but do not answer, and removes what an earlier start of the container left under
-# /run. A restarted container keeps /run, and libvirt would take the leftovers for its own state: it would not start
-# a network it believes started already. State of the current start is kept, so that daemons started again by hand
-# find their guests and networks; the start record tells the two apart.
+# Removes what an earlier start of the container left under /run. A restarted container keeps /run, and libvirt
+# would take the leftovers for its own state: it would not start a network it believes started already. State of
+# the current start is kept, so that daemons started again by hand find their guests and networks; the start record
+# tells the two apart. Nothing is removed while a daemon runs, whatever the record says.
 remove_earlier_state() {
   local name recorded current
-  step="stopping daemons that do not answer"
-  for name in "${daemons[@]}" "${LOG_DAEMON}"; do
-    stop_daemon "${name}"
-    rm --force "${PID_DIR}/${name}.pid"
-  done
   step="removing the runtime state of an earlier start"
   recorded="$(recorded_start)"
   current="$(start_time)"
@@ -178,6 +170,15 @@ remove_earlier_state() {
     log "keeping ${LIBVIRT_RUN_DIR}, which this start of the container wrote"
     return 0
   fi
+  for name in "${daemons[@]}"; do
+    if daemon_runs "${name}"; then
+      log "keeping ${LIBVIRT_RUN_DIR}, because ${name} runs"
+      return 0
+    fi
+  done
+  for name in "${daemons[@]}"; do
+    rm --force "${PID_DIR}/${name}.pid"
+  done
   if [[ -e "${LIBVIRT_RUN_DIR}" ]]; then
     log "removing ${LIBVIRT_RUN_DIR}, the runtime state of an earlier start"
     # Nothing mounted below the directory is entered: it would be another system's.
@@ -185,11 +186,15 @@ remove_earlier_state() {
   fi
 }
 
+# Starts each daemon of the layout that does not run, and waits for the system daemon to answer. A daemon that runs
+# is left alone, also when it does not answer: guests and their logs depend on it.
 start_daemons() {
   local name deadline
-  for name in "${LOG_DAEMON}" "${daemons[@]}"; do
+  for name in "${daemons[@]}"; do
+    if daemon_runs "${name}"; then continue; fi
     step="starting ${name}"
     log "starting ${name}"
+    rm --force "${PID_DIR}/${name}.pid"
     "${name}" --daemon
   done
   step="waiting for ${SYSTEM_URI} to answer"
@@ -199,7 +204,8 @@ start_daemons() {
     if daemon_answers; then return 0; fi
     sleep 1
   done
-  finish failed "${SYSTEM_URI} did not answer within ${WAIT_SECONDS} seconds of starting ${daemons[*]}; see ${LOG_DIR}"
+  finish failed "${SYSTEM_URI} did not answer within ${WAIT_SECONDS} seconds although ${daemons[*]} were started;" \
+    "see ${LOG_DIR}, and restart the container if a daemon hangs"
 }
 
 # Sets kvm to "available" when /dev/kvm can be opened for reading and writing, and to "unavailable" otherwise.
@@ -210,12 +216,18 @@ detect_kvm() {
 }
 
 # Sets network to the state of the default network, after starting it when defaultNetwork is true and it is defined
-# and not active. A network that is not defined or does not start is recorded and stops nothing.
+# and not active. A network that is not defined, cannot be read, or does not start is recorded and stops nothing.
 apply_default_network() {
   local info output
   step="looking at the network ${DEFAULT_NETWORK}"
   if ! info="$(timeout "${NETWORK_SECONDS}" virsh --connect "${SYSTEM_URI}" net-info "${DEFAULT_NETWORK}" 2>&1)"; then
-    network="not defined"
+    # libvirt's message for a network it does not know; every other failure is reported as it is.
+    if [[ "${info}" == *"Network not found"* ]]; then
+      network="not defined"
+    else
+      network="unknown: ${info//$'\n'/ }"
+      log "error: cannot read the state of the network ${DEFAULT_NETWORK}: ${info}"
+    fi
     return 0
   fi
   if grep --quiet '^Active: *yes' <<<"${info}"; then
@@ -254,17 +266,17 @@ main() {
     finish refused "${LIBVIRT_RUN_DIR} is a mount point, and a daemon started there would write into another" \
       "system's libvirt directory; remove the mount from devcontainer.json"
   fi
-  if daemon_answers; then
-    # A run by hand while the daemon answers: nothing is removed, restarted, or recorded anew.
+  if all_daemons_run && daemon_answers; then
+    # A run by hand while everything runs: nothing is removed, started, or recorded anew.
     result="started"
-    log "${SYSTEM_URI} already answers: nothing is changed"
+    log "${daemons[*]} run and ${SYSTEM_URI} answers: nothing is changed"
     exit 0
   fi
   remove_earlier_state
   start_daemons
   detect_kvm
   apply_default_network
-  finish started "${daemons[*]} and ${LOG_DAEMON} run and ${SYSTEM_URI} answers"
+  finish started "${daemons[*]} run and ${SYSTEM_URI} answers"
 }
 
 main "$@"

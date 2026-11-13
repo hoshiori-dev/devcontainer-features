@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Gives the remote user access to a mounted host libvirt socket: the entrypoint of the libvirt-outside-of-docker
 # feature, run at every container start before the container's command. When it runs as root, it looks at the first
-# of /run/libvirt/libvirt-sock and /run/libvirt/virtqemud-sock that is a socket and adds the remote user, whose name
+# of /run/libvirt/virtqemud-sock and /run/libvirt/libvirt-sock that is a socket and adds the remote user, whose name
 # install.sh stored in /usr/local/share/libvirt-outside-of-docker/settings, to a group of the container that has the
 # socket's GID; when no group has it, the group libvirt-host gets it. It changes nothing for a socket that every
 # user may write to or that belongs to GID 0, and it never writes under /run/libvirt. The outcome goes to the start
@@ -13,9 +13,9 @@ readonly SETTINGS_FILE="/usr/local/share/libvirt-outside-of-docker/settings"
 readonly RUN_DIR="/run/libvirt-outside-of-docker"
 readonly RECORD_FILE="/run/libvirt-outside-of-docker/status"
 readonly RECORD_TMP_FILE="/run/libvirt-outside-of-docker/status.tmp"
-# The sockets of the host's system daemon, in the order they are looked at: the monolithic daemon's (which
-# virtproxyd also provides), then the modular QEMU daemon's.
-readonly SOCKET_PATHS=("/run/libvirt/libvirt-sock" "/run/libvirt/virtqemud-sock")
+# The sockets of the host's system daemon, in the order the libvirt client prefers them for qemu:///system: the
+# modular QEMU daemon's, then the monolithic daemon's (which virtproxyd also provides beside the modular ones).
+readonly SOCKET_PATHS=("/run/libvirt/virtqemud-sock" "/run/libvirt/libvirt-sock")
 # The group that takes the socket's GID when no group of the container has it.
 readonly HOST_GROUP="libvirt-host"
 

@@ -61,14 +61,19 @@ SHALL NOT add a package repository or a signing key, and SHALL NOT download anyt
 
 The feature SHALL install the libvirt daemon with its QEMU, network, storage, node device, secret, and network filter
 drivers; the QEMU system emulator of the container's architecture; `qemu-img`; the UEFI firmware for guests of that
-architecture; `virsh`; `virt-install`; the definition of libvirt's `default` network; and the DHCP and packet filter
-tools that network needs.
+architecture and the boot ROMs of QEMU's network devices; `virsh`; `virt-install`; the definition of libvirt's `default`
+network; and the DHCP and packet filter tools that network needs.
 
 #### Scenario: Tools present
 
 - **WHEN** the feature has been installed
 - **THEN** `virsh`, `virt-install`, and `qemu-img` run, the QEMU system emulator of the container's architecture is
   installed, and a UEFI firmware image for that architecture is present
+
+#### Scenario: Guest with a network device
+
+- **WHEN** a guest of the container's architecture with a virtio network device is started, on amd64 or arm64
+- **THEN** QEMU finds the device's boot ROM and the guest runs
 
 ### Requirement: Option defaultNetwork
 
@@ -143,8 +148,8 @@ that does not run as root SHALL start nothing.
 ### Requirement: State of an earlier start
 
 Before it starts the daemons, the entrypoint SHALL remove the runtime state an earlier start of the same container left
-under `/run`: libvirt's sockets, its process ID files, and its record of what it started. When the script is run by root
-while the daemon answers, it SHALL remove nothing and restart nothing.
+under `/run`: libvirt's sockets, its process ID files, and its record of what it started. It SHALL keep the state of the
+current start, and SHALL remove nothing while a daemon runs.
 
 #### Scenario: Restart
 
@@ -152,15 +157,26 @@ while the daemon answers, it SHALL remove nothing and restart nothing.
 - **THEN** the daemon answers again, the guests defined before are listed as shut off, and with `defaultNetwork` `true`
   the network `default` is active
 
+### Requirement: Run again by hand
+
+The entrypoint's script SHALL be safe for root to run again in a running container. It SHALL never stop a daemon; it
+SHALL start each daemon that does not run; and when every daemon runs and the system daemon answers, it SHALL change
+nothing, the start record included.
+
 #### Scenario: Run again by hand
 
-- **WHEN** root runs the entrypoint's script while the daemon answers and a guest is running
-- **THEN** the guest keeps running and no daemon is restarted
+- **WHEN** root runs the entrypoint's script while every daemon runs and a guest is running
+- **THEN** the guest keeps running, no daemon is restarted, and the start record is unchanged
+
+#### Scenario: A daemon has stopped
+
+- **WHEN** root runs the script after one daemon has stopped
+- **THEN** that daemon is started, the others keep their processes, and the networks that were active are still active
 
 ### Requirement: Start settings from the image only
 
-The entrypoint SHALL read its settings, the remote user's name and the options among them, only from root-owned files
-written at build time, and SHALL NOT read them from its environment or from a file the remote user can change.
+The entrypoint SHALL read its settings, the options and the daemon layout, only from root-owned files written at build
+time, and SHALL NOT read them from its environment or from a file the remote user can change.
 
 #### Scenario: Environment does not change the start
 
@@ -189,8 +205,8 @@ it SHALL run `virtlogd`, and `qemu:///system` SHALL be the connection that reach
 
 The feature SHALL configure the QEMU driver, in a block of `/etc/libvirt/qemu.conf` it owns and replaces at each
 install, with no security driver, QEMU running as root, no changes of file ownership by libvirt, and no cgroup
-controllers, so that guests start in a container without systemd. Settings outside the block SHALL stay as the
-distribution or the developer wrote them.
+controllers, so that guests start in a container without systemd. Lines outside the block SHALL stay as the distribution
+or the developer wrote them (Requirement: Configuration blocks come first).
 
 #### Scenario: Guest starts
 
@@ -206,6 +222,17 @@ distribution or the developer wrote them.
 
 - **WHEN** the feature is installed a second time
 - **THEN** `/etc/libvirt/qemu.conf` holds the feature's block once
+
+### Requirement: Configuration blocks come first
+
+Each block the feature writes SHALL stand at the top of its file, because libvirt takes the first setting of a name and
+ignores a later one: the feature's settings hold whatever the rest of the file sets. The install SHALL log each setting
+outside a block that the block overrides, and SHALL keep the file's owner, group, and mode.
+
+#### Scenario: Earlier setting in the image
+
+- **WHEN** the image's `libvirtd.conf` or `qemu.conf` already sets a name the feature's block sets, to another value
+- **THEN** the daemon uses the feature's value, and the build log names the file and the setting
 
 ### Requirement: Guests are not confined
 
@@ -366,22 +393,27 @@ system's libvirt directory.
 
 ### Requirement: Container metadata
 
-The feature SHALL declare `privileged` (Requirement: Privileged container), two mounts (Requirement: Persistent
-volumes), one `containerEnv` variable (Requirement: Default connection), one entrypoint (Requirement: Daemons started at
-every start), and one `postStartCommand` (Requirement: Start check). It SHALL NOT request `capAdd`, `securityOpt`, or
-`init`, and SHALL declare no `dependsOn` and no `installsAfter`.
+The feature SHALL declare `privileged`, the two mounts of Requirement: Persistent volumes, one `containerEnv` variable,
+one entrypoint, and one `postStartCommand`, and SHALL NOT request `capAdd`, `securityOpt`, or `init`. It SHALL declare
+no `dependsOn` and SHALL name exactly `ghcr.io/devcontainers/features/common-utils` in `installsAfter`, so that a remote
+user that feature creates exists when this feature's install adds the user to a group.
 
 #### Scenario: Mounts of a built container
 
 - **WHEN** a container is built with only this feature
 - **THEN** its mounts the feature declared are exactly the two named volumes
 
+#### Scenario: Remote user missing
+
+- **WHEN** the remote user the dev container tool names does not exist in the image when the feature is installed
+- **THEN** the build fails, before any package is installed, with a message naming the user
+
 ### Requirement: Installing twice
 
 Installing the feature a second time SHALL succeed. With the same options, the image SHALL end up as after one install.
 With different options, a package an earlier install added SHALL stay, the feature's configuration blocks SHALL be
-present once, and the later install's `defaultNetwork` and remote user SHALL be the ones in effect from the next start
-on.
+present once, the later install's `defaultNetwork` SHALL be the one in effect from the next start on, and the remote
+user of each install SHALL stay a member of the `libvirt` group.
 
 #### Scenario: Same options twice
 

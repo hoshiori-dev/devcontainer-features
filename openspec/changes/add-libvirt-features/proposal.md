@@ -56,7 +56,8 @@ None.
 - Metadata of `libvirt-outside-of-docker`: `containerEnv`, `entrypoint`, and `postStartCommand`; no `mounts`,
   `privileged`, `capAdd`, `securityOpt`, `init`, `dependsOn`, or `installsAfter`.
 - Metadata of `libvirt-in-docker`: `privileged`, two `mounts` (named volumes), `containerEnv`, `entrypoint`, and
-  `postStartCommand`; no `capAdd`, `securityOpt`, `init`, `dependsOn`, or `installsAfter`.
+  `postStartCommand`, and `installsAfter` naming the external `common-utils` feature; no `capAdd`, `securityOpt`,
+  `init`, or `dependsOn`.
 - Network at build time: the image's configured package repositories only; nothing at container start.
 - CI: the PR runs both features' container tests through the existing jobs; no workflow changes. The jobs of
   `libvirt-in-docker` run privileged containers, as the feature's metadata declares.

@@ -49,7 +49,13 @@ start_time() {
 # Waits until the start record belongs to the current start: the entrypoint may still be running, and a record an
 # earlier start left counts as missing.
 wait_for_record() {
-  local start recorded waited
+  local start recorded waited owner
+  # The entrypoint runs as the user of PID 1 and starts nothing unless that user is root.
+  owner="$(stat --format '%u' /proc/1)"
+  if [[ "${owner}" != 0 ]]; then
+    fail "the container's user is not root (UID ${owner}), so the feature's entrypoint started no daemon; run the" \
+      "container as root and name the developer's user in remoteUser"
+  fi
   start="$(start_time)"
   for ((waited = 0; waited < WAIT_SECONDS; waited++)); do
     recorded="$(field start)"

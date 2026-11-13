@@ -33,5 +33,6 @@
     "LIBVIRT_DEFAULT_URI": "qemu:///system"
   },
   "entrypoint": "/usr/local/share/libvirt-in-docker/start.sh",
-  "postStartCommand": "/usr/local/share/libvirt-in-docker/check.sh"
+  "postStartCommand": "/usr/local/share/libvirt-in-docker/check.sh",
+  "installsAfter": ["ghcr.io/devcontainers/features/common-utils"]
 }

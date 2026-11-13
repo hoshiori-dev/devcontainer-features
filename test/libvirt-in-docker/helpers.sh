@@ -131,6 +131,11 @@ block_once() {
   [[ "${count}" == 1 ]]
 }
 
+# The feature's block is the first thing in the file $1, where libvirt gives its settings precedence.
+block_first() {
+  [[ "$(as_root head -n 1 "$1")" == "${LID_BLOCK_BEGIN}" ]]
+}
+
 # The configuration file of each daemon of the layout the start record names holds the feature's block once.
 daemon_blocks_once() {
   local name
@@ -144,5 +149,6 @@ daemon_blocks_once() {
 }
 
 # The checks that run inside `bash -c` strings call these functions and read these paths, so they are exported.
-export -f as_root record_field daemon_runs layout_daemons_run
+export -f as_root record_field daemon_runs layout_daemons_run block_first block_once
+export LID_BLOCK_BEGIN
 export LID_START LID_CHECK LID_RECORD LID_GUEST

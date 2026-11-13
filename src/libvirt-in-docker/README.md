@@ -63,8 +63,9 @@ Use this feature only for dev containers whose users you would trust with root o
 - The feature's `postStartCommand`, `/usr/local/share/libvirt-in-docker/check.sh`, reads that record, connects as the
   remote user, and fails with the reason when the daemons do not run. The daemons' logs are in `/var/log/libvirt`.
 
-The daemons are not supervised. If one stops, run `sudo /usr/local/share/libvirt-in-docker/start.sh`: it starts the
-daemons again when `qemu:///system` does not answer, and changes nothing when it does.
+The daemons are not supervised. If one stops, run `sudo /usr/local/share/libvirt-in-docker/start.sh`: it starts each
+daemon that does not run, never stops one, and changes nothing when all run and `qemu:///system` answers. Restart the
+container if a daemon hangs.
 
 ## KVM
 

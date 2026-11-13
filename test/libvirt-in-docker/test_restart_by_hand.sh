@@ -3,7 +3,8 @@
 # vscode. The script runs the entrypoint's script again as root in four states of the container and asserts what the
 # spec says of each: while the daemon answers ("Run again by hand", "Environment does not change the start"), with a
 # daemon binary that fails ("Daemon fails to start", "Daemon not started"), with a file system mounted at
-# /run/libvirt ("Mounted run directory"), and over the state a stopped daemon left ("State of an earlier start").
+# /run/libvirt ("Mounted run directory"), with one daemon stopped ("A daemon has stopped"), and over the state an
+# earlier start left ("State of an earlier start").
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -21,6 +22,22 @@ daemon_pid() {
 stop_daemon() {
   local pid
   pid="$(daemon_pid)"
+  as_root kill "${pid}"
+  for _ in $(seq 1 50); do
+    [[ -e "/proc/${pid}" ]] || return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+log_daemon_pid() {
+  as_root cat /run/virtlogd.pid
+}
+
+# Stops virtlogd and waits until its process is gone.
+stop_log_daemon() {
+  local pid
+  pid="$(log_daemon_pid)"
   as_root kill "${pid}"
   for _ in $(seq 1 50); do
     [[ -e "/proc/${pid}" ]] || return 0
@@ -56,6 +73,7 @@ check "the administration socket is root-only" \
 check "the guest is removed" remove_guest
 
 # A daemon binary that fails: the real one is put aside for one run.
+log_pid_before="$(log_daemon_pid)"
 check "the daemon stops" stop_daemon
 as_root mv "${DAEMON}" "${DAEMON}.real"
 printf '#!/bin/sh\necho "libvirtd: stand-in that fails" >&2\nexit 1\n' | as_root tee "${DAEMON}" >/dev/null
@@ -79,16 +97,18 @@ check "Mounted run directory: the start check exits non-zero and names the mount
   check_fails_naming 'remove the mount from devcontainer.json'
 as_root umount /run/libvirt
 
-# Daemons started again in the same start of the container keep libvirt's runtime state.
-check "Started again by hand: the script exits zero" as_root "${LID_START}"
-check "Started again by hand: the daemons run again" test "$(record_field result)" = started
-check "Started again by hand: the network default is still active" network_is_active
+# One daemon has stopped: it is started, and the daemon that ran is left alone, with libvirt's runtime state.
+check "A daemon has stopped: the script exits zero" as_root "${LID_START}"
+check "A daemon has stopped: the daemons run again" test "$(record_field result)" = started
+check "A daemon has stopped: virtlogd, which ran, kept its process" test "$(log_daemon_pid)" = "${log_pid_before}"
+check "A daemon has stopped: the network default is still active" network_is_active
 
 # The state an earlier start left, as a restarted container keeps it: libvirt's runtime directory with a leftover
-# file, a start record of another start, and no daemon. A restart also gives the container a new network namespace,
+# file, a start record of another start, and no daemon running. A restart also gives the container a new network namespace,
 # so the network's bridge is removed first.
 check "the network default stops" virsh net-destroy default
 check "the daemon stops" stop_daemon
+check "virtlogd stops" stop_log_daemon
 as_root touch /run/libvirt/left-by-an-earlier-start
 as_root sed -i 's/^start=.*/start=0/' "${LID_RECORD}"
 check "State of an earlier start: the script exits zero" as_root "${LID_START}"

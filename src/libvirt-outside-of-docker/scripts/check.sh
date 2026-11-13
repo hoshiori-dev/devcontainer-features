@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 # Reports whether the libvirt client reaches the host's daemon: the postStartCommand of the libvirt-outside-of-docker
-# feature, run as the remote user without privilege. When neither /run/libvirt/libvirt-sock nor
-# /run/libvirt/virtqemud-sock is a socket, it says that no host socket is mounted, names the mount to add, and exits
+# feature, run as the remote user without privilege. When neither /run/libvirt/virtqemud-sock nor
+# /run/libvirt/libvirt-sock is a socket, it says that no host socket is mounted, names the mount to add, and exits
 # zero. Otherwise it waits at most 30 seconds for the record align_group.sh writes for the current start, runs
 # `virsh --connect qemu:///system version`, and exits zero with a one-line summary, or non-zero with virsh's error
-# and the start record. It changes nothing and takes no options.
+# and the start record. When the entrypoint added the user to a group only after this script had started, it runs
+# virsh through `sg`, with that group, as a process started later would have it. It changes nothing and takes no
+# options.
 set -euo pipefail
 
 readonly RECORD_FILE="/run/libvirt-outside-of-docker/status"
-readonly SOCKET_PATHS=("/run/libvirt/libvirt-sock" "/run/libvirt/virtqemud-sock")
+readonly SOCKET_PATHS=("/run/libvirt/virtqemud-sock" "/run/libvirt/libvirt-sock")
 readonly SYSTEM_URI="qemu:///system"
 readonly MOUNT_LINE='"mounts": ["source=/run/libvirt,target=/run/libvirt,type=bind,readonly"]'
 readonly WAIT_SECONDS=30
 readonly CONNECT_SECONDS=20
+# What `sg` runs; it holds no value from outside this script.
+readonly VERSION_COMMAND="virsh --connect qemu:///system version --daemon"
 
 # virsh prints the untranslated text this script reads.
 export LC_ALL="C"
@@ -63,7 +67,10 @@ find_socket() {
 # earlier start left counts as missing. Returns non-zero when none appears, which an entrypoint that did not run as
 # root also causes.
 wait_for_record() {
-  local start recorded waited
+  local start recorded waited owner
+  # The entrypoint runs as the user of PID 1 and records nothing unless that user is root.
+  owner="$(stat --format '%u' /proc/1)"
+  if [[ "${owner}" != 0 ]]; then return 1; fi
   start="$(start_time)"
   for ((waited = 0; waited < WAIT_SECONDS; waited++)); do
     recorded="$(field start)"
@@ -77,8 +84,8 @@ wait_for_record() {
 alignment_summary() {
   local result reason
   if ! wait_for_record; then
-    printf '%s\n' "${RECORD_FILE} holds no record of this start after ${WAIT_SECONDS} seconds, so the entrypoint did" \
-      "not run as root and no group was aligned"
+    printf '%s\n' "${RECORD_FILE} holds no record of this start, so the entrypoint did not run as root or did not" \
+      "finish within ${WAIT_SECONDS} seconds, and no group was aligned"
     return 0
   fi
   result="$(field result)"
@@ -86,8 +93,21 @@ alignment_summary() {
   printf '%s\n' "group alignment at this start: ${result}: ${reason} (record: ${RECORD_FILE})"
 }
 
+# Succeeds when the start record names a group that the user has in the group database but this process, which
+# started before the entrypoint added the user, does not.
+group_added_after_start() {
+  local group="$1"
+  local mine database
+  [[ -n "${group}" ]] || return 1
+  mine="$(id --groups --name)"
+  database="$(id --groups --name "$(id --user --name)")"
+  [[ " ${mine} " != *" ${group} "* && " ${database} " == *" ${group} "* ]]
+}
+
 main() {
-  local alignment output version user uid
+  local alignment output version user uid group
+  local late=""
+  local connected=false
   find_socket
   if [[ -z "${socket}" ]]; then
     log "no host socket is mounted at ${SOCKET_PATHS[0]} or ${SOCKET_PATHS[1]};" \
@@ -96,7 +116,16 @@ main() {
   fi
   alignment="$(alignment_summary)"
   alignment="${alignment//$'\n'/ }"
-  if ! output="$(timeout "${CONNECT_SECONDS}" virsh --connect "${SYSTEM_URI}" version --daemon 2>&1)"; then
+  group="$(field group)"
+  if group_added_after_start "${group}" && command -v sg >/dev/null 2>&1; then
+    late=" (as a member of ${group}, which this process, started before the group alignment, does not have yet)"
+    if output="$(timeout "${CONNECT_SECONDS}" sg "${group}" -c "${VERSION_COMMAND}" 2>&1)"; then
+      connected=true
+    fi
+  elif output="$(timeout "${CONNECT_SECONDS}" virsh --connect "${SYSTEM_URI}" version --daemon 2>&1)"; then
+    connected=true
+  fi
+  if [[ "${connected}" != true ]]; then
     printf '%s\n' "${output}" >&2
     if [[ -r "${RECORD_FILE}" ]]; then
       printf '%s\n' "start record ${RECORD_FILE}:" >&2
@@ -108,7 +137,8 @@ main() {
       "check that the host's libvirt daemon runs and lets this user in"
   fi
   version="$(sed --quiet 's/^Running against daemon: //p' <<<"${output}")"
-  log "connected to the host's libvirt daemon ${version:-of unknown version} at ${SYSTEM_URI} through ${socket}"
+  log "connected to the host's libvirt daemon ${version:-of unknown version} at ${SYSTEM_URI} through" \
+    "${socket}${late}"
 }
 
 main "$@"

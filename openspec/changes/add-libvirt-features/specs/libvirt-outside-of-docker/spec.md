@@ -133,14 +133,20 @@ NOT write a libvirt client configuration file. A value the developer sets for th
 ### Requirement: Socket group alignment at every start
 
 On every start of the container the feature's entrypoint SHALL, when it runs as root and the remote user recorded at
-build time is not root, look at the first of `/run/libvirt/libvirt-sock` and `/run/libvirt/virtqemud-sock` that is a
-socket and make the remote user a member of a group that has the socket's GID (Requirement: Group for the socket). It
-SHALL then hand over to the container's command, whatever the outcome.
+build time is not root, look at the first of `/run/libvirt/virtqemud-sock` and `/run/libvirt/libvirt-sock` that is a
+socket, the order in which the libvirt client prefers them, and make the remote user a member of a group that has the
+socket's GID (Requirement: Group for the socket). It SHALL then hand over to the container's command, whatever the
+outcome.
 
 #### Scenario: Processes of the remote user can open the socket
 
 - **WHEN** the mounted socket is group-writable, not world-writable, and its GID is not 0
 - **THEN** after the start the processes the dev container tool starts for the remote user can open the socket
+
+#### Scenario: Both sockets mounted
+
+- **WHEN** the mount holds both `virtqemud-sock` and `libvirt-sock`, with different groups or modes
+- **THEN** the group is aligned with `virtqemud-sock`, the socket `virsh --connect qemu:///system` opens
 
 #### Scenario: Root remote user
 
@@ -229,17 +235,23 @@ or at start, whether or not it is a mount.
 ### Requirement: Start check
 
 The feature SHALL run, as its `postStartCommand` and as the remote user, a check that waits a bounded time for the
-current start's record and then reports on the connection (Requirement: Start check result). The check SHALL be safe to
-run any number of times and SHALL change nothing.
+current start's record and then reports on the connection (Requirement: Start check result). It SHALL NOT wait when the
+container's user is not root, since no record can come. The check SHALL be safe to run any number of times and SHALL
+change nothing.
 
 #### Scenario: Run by hand
 
 - **WHEN** the developer runs the check's script again from a shell
 - **THEN** it reports the same as at the start, and no group, file, or record has changed
 
+#### Scenario: Group added while the check was starting
+
+- **WHEN** the entrypoint adds the remote user to the socket's group after the check's process has started
+- **THEN** the check connects with that group, as a process started later has it, and says so in its summary
+
 ### Requirement: Start check result
 
-When neither `/run/libvirt/libvirt-sock` nor `/run/libvirt/virtqemud-sock` is a socket, the check SHALL print that no
+When neither `/run/libvirt/virtqemud-sock` nor `/run/libvirt/libvirt-sock` is a socket, the check SHALL print that no
 host socket is mounted, name the mount `NOTES.md` gives, and exit zero. When one is a socket, it SHALL run
 `virsh --connect qemu:///system version`: on success it SHALL print a one-line summary and exit zero, and on failure it
 SHALL print the command's error and the start record and exit non-zero.

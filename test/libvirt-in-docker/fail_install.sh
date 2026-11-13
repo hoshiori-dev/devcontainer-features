@@ -54,6 +54,13 @@ printf '%s\n' "${output}"
 check "an architecture other than amd64 and arm64 fails the install" test "${status}" -ne 0
 check "the failure names the detected architecture" grep -q 'unsupported architecture "riscv64"' <<<"${output}"
 
+status=0
+output="$(run_installer _REMOTE_USER=nobody-of-this-name)" || status=$?
+printf '%s\n' "${output}"
+check "Remote user missing: the install fails" test "${status}" -ne 0
+check "Remote user missing: the failure names the user" \
+  grep -q 'the remote user "nobody-of-this-name" does not exist in the image' <<<"${output}"
+
 as_root mkdir /usr/local/share/libvirt-outside-of-docker
 status=0
 output="$(run_installer)" || status=$?

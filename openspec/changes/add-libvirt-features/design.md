@@ -62,6 +62,19 @@ Found while implementing, on 2026-11-13, and carried into the delta specs:
   says. `swtpm_setup --version` of swtpm 0.7, which Debian 13 and Ubuntu 24.04 ship, prints the version and exits 1.
 - Daemons stopped and started again inside one start of the container find their networks and guests only when
   `/run/libvirt` is kept: the bridge of a network outlives the daemon, and libvirt cannot create it a second time.
+- On arm64, Debian's and Ubuntu's `qemu-system-arm` only recommends `ipxe-qemu`, which holds the boot ROMs of QEMU's
+  network devices; without it a guest with a virtio network device does not start (the first arm64 CI run). On amd64
+  `qemu-system-x86` depends on it. Fedora's arm64 job passed without a change.
+- libvirt takes the first setting of a name in a configuration file and ignores a later one (shown with two
+  `unix_sock_rw_perms` lines in `libvirtd.conf`), so the feature's blocks stand at the top of their files.
+- With both `virtqemud-sock` and `libvirt-sock` present, `virsh --connect qemu:///system` opens `virtqemud-sock`, so the
+  group alignment looks at that socket first.
+- A dev container tool may start `postStartCommand` while an entrypoint still runs, and a process keeps the groups it
+  started with; the start check of `libvirt-outside-of-docker` therefore connects through `sg` when the entrypoint added
+  the group after the check had started.
+- Review rounds on the pull request led to these further bounds: the entrypoint of `libvirt-in-docker` never stops a
+  daemon and starts only those that do not run; the removal of earlier state stays on one file system; and
+  `libvirt-in-docker` installs after `common-utils`, which may create the remote user its install needs.
 
 Repository facts: `just validate` requires `test/<id>/test.sh` and `test/<id>/compatibility.json` for every feature, and
 CI's plan fails for an affected feature without a compatibility list, so a feature cannot be left untested without

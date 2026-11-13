@@ -2,14 +2,16 @@
 # Installs the libvirt daemon, QEMU, and the libvirt client tools with the image's package manager from the
 # repositories the image already configures, and prepares them to run in a privileged container without systemd.
 # Packages on Debian and Ubuntu: libvirt-daemon-system, libvirt-daemon-config-network, libvirt-clients, virtinst,
-# qemu-utils, dnsmasq-base, iptables, and qemu-system-x86 with ovmf (amd64) or qemu-system-arm with qemu-efi-aarch64
-# (arm64). On Fedora: the libvirt-daemon-driver packages for QEMU, networks, node devices, network filters, secrets,
-# and storage, libvirt-daemon-log, libvirt-daemon-config-network, libvirt-client, virt-install, qemu-kvm-core,
-# qemu-img, dnsmasq, nftables, and edk2-ovmf (amd64) or edk2-aarch64 (arm64). With the option swtpm: swtpm and
-# swtpm-tools. Writes one marked block to /etc/libvirt/qemu.conf and one to the configuration file of each daemon the
-# feature starts, removes the autostart mark of the default network, adds the remote user to the libvirt group,
-# records the settings in /usr/local/share/libvirt-in-docker/settings, and installs the two start scripts beside it:
-# start.sh, the feature's entrypoint, and check.sh, its postStartCommand. Downloads nothing else.
+# qemu-utils, dnsmasq-base, iptables, ipxe-qemu (the boot ROMs of QEMU's network devices, which qemu-system-arm only
+# recommends), and qemu-system-x86 with ovmf (amd64) or qemu-system-arm with qemu-efi-aarch64 (arm64). On Fedora: the
+# libvirt-daemon-driver packages for QEMU, networks, node devices, network filters, secrets, and storage,
+# libvirt-daemon-log, libvirt-daemon-config-network, libvirt-client, virt-install, qemu-kvm-core, qemu-img, dnsmasq,
+# nftables, and edk2-ovmf (amd64) or edk2-aarch64 (arm64). With the option swtpm: swtpm and swtpm-tools. Writes one
+# marked block to the top of /etc/libvirt/qemu.conf and of the configuration file of each daemon the feature starts
+# (libvirt takes the first setting of a name), removes the autostart mark of the default network, adds the remote
+# user to the libvirt group, records the settings in /usr/local/share/libvirt-in-docker/settings, and installs the
+# two start scripts beside it: start.sh, the feature's entrypoint, and check.sh, its postStartCommand. Downloads
+# nothing else.
 # Runs as root at image build time; options arrive as environment variables:
 #   defaultNetwork: DEFAULTNETWORK
 #   swtpm: SWTPM
@@ -126,7 +128,7 @@ install_packages() {
   case "${family}" in
     apt)
       packages+=(libvirt-daemon-system libvirt-daemon-config-network libvirt-clients virtinst qemu-utils)
-      packages+=(dnsmasq-base iptables)
+      packages+=(dnsmasq-base iptables ipxe-qemu)
       case "${arch}" in
         amd64) packages+=(qemu-system-x86 ovmf) ;;
         arm64) packages+=(qemu-system-arm qemu-efi-aarch64) ;;
@@ -174,37 +176,47 @@ detect_layout() {
 }
 
 # Replaces the feature's block in the configuration file $1 with the lines read from standard input, creating the
-# file, readable by every user, when it does not exist. Everything outside the block stays as it is, and so do the
-# file's owner, group, and mode. Fails when the file holds a begin line without its end line, or the reverse: the
-# block's extent would be a guess.
+# file, readable by every user, when it does not exist. The block goes to the top of the file: libvirt takes the
+# first setting of a name and ignores a later one, so the block's settings hold whatever the rest of the file says.
+# Everything outside the block stays as it is, and so do the file's owner, group, and mode. A setting outside the
+# block that the block now overrides is logged. Fails when the file holds a begin line without its end line, or the
+# reverse: the block's extent would be a guess.
 write_block() {
   local file="$1"
   local staged="${file}.libvirt-in-docker"
-  local begins ends
+  local rest="${file}.libvirt-in-docker-rest"
+  local block begins ends line key
+  block="$(cat)"
   : >"${staged}"
+  : >"${rest}"
   if [[ -e "${file}" ]]; then
     # grep exits 1 when it counts no line.
     begins="$(grep --count --line-regexp --fixed-strings "${BLOCK_BEGIN}" "${file}" || true)"
     ends="$(grep --count --line-regexp --fixed-strings "${BLOCK_END}" "${file}" || true)"
     if [[ "${begins}" != "${ends}" ]]; then
-      rm --force "${staged}"
+      rm --force "${staged}" "${rest}"
       fail "${file} holds ${begins} begin and ${ends} end lines of the feature's block; remove what is left of the" \
         "block from the file"
     fi
     chmod --reference="${file}" "${staged}"
     chown --reference="${file}" "${staged}"
-    sed "/^${BLOCK_BEGIN}\$/,/^${BLOCK_END}\$/d" "${file}" >>"${staged}"
-    # A last line without a newline gets one, so the block starts on a line of its own. The command substitution
-    # is empty when the last byte is a newline.
-    if [[ -s "${staged}" && -n "$(tail --bytes 1 "${staged}")" ]]; then printf '\n' >>"${staged}"; fi
+    sed "/^${BLOCK_BEGIN}\$/,/^${BLOCK_END}\$/d" "${file}" >"${rest}"
   else
     chmod 0644 "${staged}"
   fi
+  while IFS= read -r line; do
+    key="${line%% =*}"
+    if grep --quiet --extended-regexp "^[[:space:]]*${key}[[:space:]]*=" "${rest}"; then
+      log "${file} sets ${key} outside the feature's block; the block's value takes its place"
+    fi
+  done <<<"${block}"
   {
     printf '%s\n' "${BLOCK_BEGIN}"
-    cat
+    printf '%s\n' "${block}"
     printf '%s\n' "${BLOCK_END}"
+    cat "${rest}"
   } >>"${staged}"
+  rm --force "${rest}"
   mv --force "${staged}" "${file}"
 }
 
@@ -276,8 +288,7 @@ grant_remote_user() {
 install_start_scripts() {
   mkdir --parents "${SHARE_DIR}"
   log "recording defaultNetwork=${DEFAULTNETWORK} and the layout ${layout} in ${SETTINGS_FILE}"
-  printf 'defaultNetwork=%s\nlayout=%s\nremoteUser=%s\n' "${DEFAULTNETWORK}" "${layout}" "${REMOTE_USER_NAME}" \
-    >"${SETTINGS_FILE}"
+  printf 'defaultNetwork=%s\nlayout=%s\n' "${DEFAULTNETWORK}" "${layout}" >"${SETTINGS_FILE}"
   chmod 0644 "${SETTINGS_FILE}"
   log "installing the entrypoint to ${START_SCRIPT} and the start check to ${CHECK_SCRIPT}"
   install --mode 0755 "${script_dir}/scripts/start.sh" "${START_SCRIPT}"

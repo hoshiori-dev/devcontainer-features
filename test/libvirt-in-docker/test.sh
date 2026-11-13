@@ -32,6 +32,7 @@ check "the network default is active" network_is_active
 check "the image's network default is not marked autostart" test "$(network_info Autostart)" = no
 check "a software-emulated guest on the network default reaches the running state" start_emulated_guest network=default
 check "the guest is removed" remove_guest
+check "the feature's block stands at the top of /etc/libvirt/qemu.conf" block_first /etc/libvirt/qemu.conf
 check "the image holds no libvirt-outside-of-docker" bash -c '! test -e /usr/local/share/libvirt-outside-of-docker'
 
 reportResults
