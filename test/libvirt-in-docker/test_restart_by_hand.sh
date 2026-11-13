@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Scenario "test_restart_by_hand": libvirt-in-docker with default options on the Ubuntu image, as the remote user
-# vscode. The script runs the entrypoint's script again as root in four states of the container and asserts what the
+# vscode. The script runs the entrypoint's script again as root in five states of the container and asserts what the
 # spec says of each: while the daemon answers ("Run again by hand", "Environment does not change the start"), with a
 # daemon binary that fails ("Daemon fails to start", "Daemon not started"), with a file system mounted at
 # /run/libvirt ("Mounted run directory"), with one daemon stopped ("A daemon has stopped"), and over the state an
@@ -104,8 +104,8 @@ check "A daemon has stopped: virtlogd, which ran, kept its process" test "$(log_
 check "A daemon has stopped: the network default is still active" network_is_active
 
 # The state an earlier start left, as a restarted container keeps it: libvirt's runtime directory with a leftover
-# file, a start record of another start, and no daemon running. A restart also gives the container a new network namespace,
-# so the network's bridge is removed first.
+# file, a start record of another start, and no daemon running. A restart also gives the container a new network
+# namespace, so the network's bridge is removed first.
 check "the network default stops" virsh net-destroy default
 check "the daemon stops" stop_daemon
 check "virtlogd stops" stop_log_daemon
@@ -116,5 +116,11 @@ check "State of an earlier start: the leftover is gone" bash -c '! test -e /run/
 check "State of an earlier start: the daemons run again" test "$(record_field result)" = started
 check "State of an earlier start: the network default is active again" network_is_active
 check "the start check exits zero" "${LID_CHECK}"
+
+# A start recorded as failed although the daemons answer by now, as after a slow start.
+as_root sed -i 's/^result=.*/result=failed/' "${LID_RECORD}"
+check "Record of a failed start: the script exits zero" as_root "${LID_START}"
+check "Record of a failed start: the record reports started daemons" test "$(record_field result)" = started
+check "Record of a failed start: the start check exits zero" "${LID_CHECK}"
 
 reportResults

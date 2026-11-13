@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Scenario "test_swtpm": libvirt-in-docker installed on debian:13 with swtpm true ("swtpm enabled"). The script then
 # gives the image's qemu.conf a setting that the feature's block also sets and runs the installer again ("Earlier
-# setting in the image", "Block replaced").
+# setting in the image", "Block replaced"), and starts the daemon again to see which setting it uses.
 set -euo pipefail
 
 # shellcheck source=/dev/null
@@ -24,5 +24,19 @@ check "Earlier setting in the image: the feature's block stands first, once" \
   bash -c 'block_first /etc/libvirt/qemu.conf && block_once /etc/libvirt/qemu.conf'
 check "Earlier setting in the image: the developer's line is kept" \
   as_root grep -q -x 'user = "libvirt-qemu"' /etc/libvirt/qemu.conf
+
+# The daemon reads its configuration when it starts: it is stopped, and the entrypoint's script starts it again.
+daemon_pid="$(cat /run/libvirtd.pid)"
+kill "${daemon_pid}"
+for _ in $(seq 1 50); do
+  [[ -e "/proc/${daemon_pid}" ]] || break
+  sleep 0.1
+done
+check "the entrypoint's script starts the stopped daemon" "${LID_START}"
+check "a software-emulated guest reaches the running state" start_emulated_guest network=default
+guest_pid="$(cat "/run/libvirt/qemu/${LID_GUEST}.pid")"
+check "Earlier setting in the image: the daemon uses the feature's value, QEMU as root" \
+  test "$(stat -c %u "/proc/${guest_pid}")" = 0
+check "the guest is removed" remove_guest
 
 reportResults

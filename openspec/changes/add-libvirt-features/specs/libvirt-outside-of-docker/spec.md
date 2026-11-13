@@ -235,9 +235,9 @@ or at start, whether or not it is a mount.
 ### Requirement: Start check
 
 The feature SHALL run, as its `postStartCommand` and as the remote user, a check that waits a bounded time for the
-current start's record and then reports on the connection (Requirement: Start check result). It SHALL NOT wait when the
-container's user is not root, since no record can come. The check SHALL be safe to run any number of times and SHALL
-change nothing.
+current start's record and then reports on the connection (Requirement: Start check result). It SHALL NOT wait when that
+record is absent and the container's first process is not root's, since no record can come. The check SHALL be safe to
+run any number of times and SHALL change nothing.
 
 #### Scenario: Run by hand
 

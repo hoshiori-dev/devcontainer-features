@@ -47,19 +47,20 @@ start_time() {
 }
 
 # Waits until the start record belongs to the current start: the entrypoint may still be running, and a record an
-# earlier start left counts as missing.
+# earlier start left counts as missing. When no record of this start exists and PID 1 is not root's, it does not
+# wait: the entrypoint runs as the container's user and starts nothing unless that user is root.
 wait_for_record() {
   local start recorded waited owner
-  # The entrypoint runs as the user of PID 1 and starts nothing unless that user is root.
-  owner="$(stat --format '%u' /proc/1)"
-  if [[ "${owner}" != 0 ]]; then
-    fail "the container's user is not root (UID ${owner}), so the feature's entrypoint started no daemon; run the" \
-      "container as root and name the developer's user in remoteUser"
-  fi
   start="$(start_time)"
+  owner="$(stat --format '%u' /proc/1)"
   for ((waited = 0; waited < WAIT_SECONDS; waited++)); do
     recorded="$(field start)"
     if [[ "${recorded}" == "${start}" ]]; then return 0; fi
+    if [[ "${owner}" != 0 ]]; then
+      fail "${RECORD_FILE} holds no record of the current start, and the container's process 1 is not root's (UID" \
+        "${owner}), so the feature's entrypoint started no daemon; run the container as root and name the" \
+        "developer's user in remoteUser, or run sudo /usr/local/share/libvirt-in-docker/start.sh"
+    fi
     sleep 1
   done
   fail "${RECORD_FILE} holds no record of the current start after ${WAIT_SECONDS} seconds, so the daemons were not" \

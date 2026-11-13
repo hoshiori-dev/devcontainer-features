@@ -47,9 +47,9 @@ mkdir "${work_dir}/bin"
 printf '#!/bin/sh\necho riscv64\n' >"${work_dir}/bin/uname"
 chmod +x "${work_dir}/bin/uname"
 chmod a+rx "${work_dir}"
+stub_path="${work_dir}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 status=0
-output="$(as_root env -i PATH="${work_dir}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" HOME=/root \
-  bash "$(dirname "$0")/_feature/install.sh" 2>&1)" || status=$?
+output="$(as_root env -i PATH="${stub_path}" HOME=/root bash "$(dirname "$0")/_feature/install.sh" 2>&1)" || status=$?
 printf '%s\n' "${output}"
 check "an architecture other than amd64 and arm64 fails the install" test "${status}" -ne 0
 check "the failure names the detected architecture" grep -q 'unsupported architecture "riscv64"' <<<"${output}"

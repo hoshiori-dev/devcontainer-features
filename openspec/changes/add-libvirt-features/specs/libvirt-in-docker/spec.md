@@ -160,8 +160,8 @@ current start, and SHALL remove nothing while a daemon runs.
 ### Requirement: Run again by hand
 
 The entrypoint's script SHALL be safe for root to run again in a running container. It SHALL never stop a daemon; it
-SHALL start each daemon that does not run; and when every daemon runs and the system daemon answers, it SHALL change
-nothing, the start record included.
+SHALL start each daemon that does not run; and when every daemon runs, the system daemon answers, and the record of the
+current start says so, it SHALL change nothing, the start record included.
 
 #### Scenario: Run again by hand
 
@@ -172,6 +172,11 @@ nothing, the start record included.
 
 - **WHEN** root runs the script after one daemon has stopped
 - **THEN** that daemon is started, the others keep their processes, and the networks that were active are still active
+
+#### Scenario: Record of a failed start
+
+- **WHEN** the current start was recorded as failed and the daemons answer by the time root runs the script
+- **THEN** the default network is applied and the record reports started daemons
 
 ### Requirement: Start settings from the image only
 

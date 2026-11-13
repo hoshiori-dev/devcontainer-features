@@ -2,7 +2,8 @@
 # Starts the libvirt daemons: the entrypoint of the libvirt-in-docker feature, run as root at every container start
 # before the container's command. It reads the settings install.sh stored in
 # /usr/local/share/libvirt-in-docker/settings and nothing from its environment or its arguments. In order: it stops
-# when /run/libvirt is a mount point, or when every daemon runs and qemu:///system answers; removes the runtime
+# when /run/libvirt is a mount point, or when every daemon runs, qemu:///system answers, and the record of this
+# start says so; removes the runtime
 # state an earlier start of this container left under /run (libvirt's sockets, process ID files, and record of what
 # it started), which the start record of that start identifies; starts each daemon that does not run: virtlogd, and
 # libvirtd or, on a distribution without it, the modular daemons; waits at most 30 seconds for qemu:///system to
@@ -124,17 +125,22 @@ daemon_answers() {
   timeout 5 virsh --connect "${SYSTEM_URI}" version >/dev/null 2>&1
 }
 
-# Succeeds when the daemon $1 runs: its process ID file names a process of that name.
+# Succeeds when the daemon $1 runs: its process ID file names a process of that name that has not ended. A process
+# that ended and that PID 1 has not collected (state Z) still has an entry in /proc; it does not count.
 daemon_runs() {
   local name="$1"
   local pid_file="${PID_DIR}/${name}.pid"
-  local pid comm
+  local pid comm stat fields
   [[ -r "${pid_file}" ]] || return 1
   pid="$(<"${pid_file}")"
   [[ "${pid}" =~ ^[0-9]+$ && -r "/proc/${pid}/comm" ]] || return 1
-  # The process may end between the two looks at /proc.
+  # The process may end between the looks at /proc.
   comm="$(cat "/proc/${pid}/comm" 2>/dev/null || true)"
-  [[ "${comm}" == "${name}" ]]
+  [[ "${comm}" == "${name}" ]] || return 1
+  stat="$(cat "/proc/${pid}/stat" 2>/dev/null || true)"
+  # The state is field 3, the first after the command name in parentheses.
+  read -ra fields <<<"${stat##*) }"
+  [[ -n "${fields[0]:-}" && "${fields[0]}" != Z ]]
 }
 
 # Succeeds when every daemon of the layout runs.
@@ -145,16 +151,26 @@ all_daemons_run() {
   done
 }
 
-# Prints the start time the start record names, and nothing when there is no record.
-recorded_start() {
+# Prints the value of the first "$1=value" line of the start record, and nothing when the record or the line is
+# missing.
+recorded() {
   local line
   if [[ ! -r "${RECORD_FILE}" ]]; then return 0; fi
   while IFS= read -r line; do
-    if [[ "${line}" == start=* ]]; then
-      printf '%s\n' "${line#start=}"
+    if [[ "${line}" == "$1="* ]]; then
+      printf '%s\n' "${line#*=}"
       return 0
     fi
   done <"${RECORD_FILE}"
+}
+
+# Succeeds when the start record belongs to the current start of the container and reports started daemons.
+recorded_as_started() {
+  local start result current
+  start="$(recorded start)"
+  result="$(recorded result)"
+  current="$(start_time)"
+  [[ "${start}" == "${current}" && "${result}" == started ]]
 }
 
 # Removes what an earlier start of the container left under /run. A restarted container keeps /run, and libvirt
@@ -164,7 +180,7 @@ recorded_start() {
 remove_earlier_state() {
   local name recorded current
   step="removing the runtime state of an earlier start"
-  recorded="$(recorded_start)"
+  recorded="$(recorded start)"
   current="$(start_time)"
   if [[ "${recorded}" == "${current}" ]]; then
     log "keeping ${LIBVIRT_RUN_DIR}, which this start of the container wrote"
@@ -204,8 +220,8 @@ start_daemons() {
     if daemon_answers; then return 0; fi
     sleep 1
   done
-  finish failed "${SYSTEM_URI} did not answer within ${WAIT_SECONDS} seconds although ${daemons[*]} were started;" \
-    "see ${LOG_DIR}, and restart the container if a daemon hangs"
+  finish failed "${SYSTEM_URI} did not answer within ${WAIT_SECONDS} seconds although the processes of" \
+    "${daemons[*]} exist; see ${LOG_DIR}, and restart the container if a daemon hangs"
 }
 
 # Sets kvm to "available" when /dev/kvm can be opened for reading and writing, and to "unavailable" otherwise.
@@ -219,12 +235,16 @@ detect_kvm() {
 # and not active. A network that is not defined, cannot be read, or does not start is recorded and stops nothing.
 apply_default_network() {
   local info output
+  local status=0
   step="looking at the network ${DEFAULT_NETWORK}"
-  if ! info="$(timeout "${NETWORK_SECONDS}" virsh --connect "${SYSTEM_URI}" net-info "${DEFAULT_NETWORK}" 2>&1)"; then
-    # libvirt's message for a network it does not know; every other failure is reported as it is.
+  info="$(timeout "${NETWORK_SECONDS}" virsh --connect "${SYSTEM_URI}" net-info "${DEFAULT_NETWORK}" 2>&1)" || status=$?
+  if ((status != 0)); then
+    # libvirt's message for a network it does not know; every other failure is reported as it is. timeout exits
+    # 124 when it ends a call that printed nothing.
     if [[ "${info}" == *"Network not found"* ]]; then
       network="not defined"
     else
+      if ((status == 124)); then info="no answer within ${NETWORK_SECONDS} seconds"; fi
       network="unknown: ${info//$'\n'/ }"
       log "error: cannot read the state of the network ${DEFAULT_NETWORK}: ${info}"
     fi
@@ -266,8 +286,8 @@ main() {
     finish refused "${LIBVIRT_RUN_DIR} is a mount point, and a daemon started there would write into another" \
       "system's libvirt directory; remove the mount from devcontainer.json"
   fi
-  if all_daemons_run && daemon_answers; then
-    # A run by hand while everything runs: nothing is removed, started, or recorded anew.
+  if recorded_as_started && all_daemons_run && daemon_answers; then
+    # A run by hand while everything runs and is recorded so: nothing is removed, started, or recorded anew.
     result="started"
     log "${daemons[*]} run and ${SYSTEM_URI} answers: nothing is changed"
     exit 0

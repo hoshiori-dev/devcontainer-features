@@ -67,7 +67,8 @@ check "Unused GID: a new process of the remote user can write to the socket" \
 check "Start record: it names the socket, its GID, the group, and the result" \
   bash -c "test \"\$(record_field socket)\" = ${SOCKET} && test \"\$(record_field socketGid)\" = 4242 \
     && test \"\$(record_field group)\" = libvirt-host && test \"\$(record_field result)\" = aligned"
-check "Start record: the remote user can read it and cannot write it" bash -c "test -r ${LOD_RECORD} -a ! -w ${LOD_RECORD}"
+check "Start record: the remote user can read it and cannot write it" \
+  bash -c "test -r ${LOD_RECORD} -a ! -w ${LOD_RECORD}"
 
 make_socket 4343 0770
 check "Host GID changed: the entrypoint exits zero and changes nothing under /run/libvirt" align
@@ -90,7 +91,8 @@ check "GID of an existing group: the remote user is a member of that group" is_m
 check "GID of an existing group: no group was renumbered" \
   test "$(group_gid libvirt-host):$(group_gid audio)" = "4343:${audio_gid}"
 check "GID of an existing group: the record names the group and its GID" \
-  bash -c "test \"\$(record_field group)\" = audio && record_field reason | grep -q 'existing group audio (GID ${audio_gid})'"
+  bash -c "test \"\$(record_field group)\" = audio \
+    && record_field reason | grep -q 'existing group audio (GID ${audio_gid})'"
 
 check "Refused: with a socket nobody listens on, the start check exits non-zero" bash -c "! ${LOD_CHECK}"
 check "Refused: the start check prints the recorded outcome" \

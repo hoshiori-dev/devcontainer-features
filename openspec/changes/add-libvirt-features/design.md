@@ -99,7 +99,7 @@ changing scripts or workflows.
   through `virsh`. Checked by review of every path the scripts name, and by the group alignment scenario, which compares
   a listing of the directory before and after.
 - `libvirt-in-docker` removes runtime state only under `/run/libvirt` and the daemons' own process ID files in `/run`,
-  and only after it has found that `/run/libvirt` is not a mount point and that no daemon answers. It removes
+  and only after it has found that `/run/libvirt` is not a mount point and that no daemon runs. It removes
   `/run/libvirt` only when the start record does not belong to the current start of the container, so daemons started
   again by hand keep their state. Checked by the "Mounted run directory", "Run again by hand", and "Restart" scenarios.
 - Each feature's configuration edits are one marked block per file, replaced as a whole. Checked by `duplicate.sh`,

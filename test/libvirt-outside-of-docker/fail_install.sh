@@ -27,7 +27,8 @@ status=0
 output="$(run_installer QEMUIMG=1)" || status=$?
 printf '%s\n' "${output}"
 check "an invalid qemuImg fails the install" test "${status}" -ne 0
-check "the failure names the accepted values of qemuImg" grep -q 'option qemuImg is "1"; use true or false' <<<"${output}"
+check "the failure names the accepted values of qemuImg" \
+  grep -q 'option qemuImg is "1"; use true or false' <<<"${output}"
 
 work_dir="$(mktemp -d)"
 cp /etc/os-release "${work_dir}/os-release"

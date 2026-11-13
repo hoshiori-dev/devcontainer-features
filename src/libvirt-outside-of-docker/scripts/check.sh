@@ -64,17 +64,17 @@ find_socket() {
 }
 
 # Waits until the start record belongs to the current start: the entrypoint may still be running, and a record an
-# earlier start left counts as missing. Returns non-zero when none appears, which an entrypoint that did not run as
-# root also causes.
+# earlier start left counts as missing. Returns non-zero when none appears. When no record of this start exists and
+# PID 1 is not root's, it does not wait: the entrypoint runs as the container's user and records nothing unless that
+# user is root.
 wait_for_record() {
   local start recorded waited owner
-  # The entrypoint runs as the user of PID 1 and records nothing unless that user is root.
-  owner="$(stat --format '%u' /proc/1)"
-  if [[ "${owner}" != 0 ]]; then return 1; fi
   start="$(start_time)"
+  owner="$(stat --format '%u' /proc/1)"
   for ((waited = 0; waited < WAIT_SECONDS; waited++)); do
     recorded="$(field start)"
     if [[ "${recorded}" == "${start}" ]]; then return 0; fi
+    if [[ "${owner}" != 0 ]]; then return 1; fi
     sleep 1
   done
   return 1
