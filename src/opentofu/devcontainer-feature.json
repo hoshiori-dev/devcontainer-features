@@ -1,0 +1,20 @@
+{
+  "id": "opentofu",
+  "version": "1.0.0",
+  "name": "OpenTofu",
+  "description": "Installs OpenTofu's tofu command, which plans and applies infrastructure-as-code configurations, from its signature-verified GitHub release archive, and requests the OpenTofu VS Code extension.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/opentofu",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "1.12.12"],
+      "default": "latest",
+      "description": "OpenTofu version to install: 'latest', the release upstream marks as latest, or a release such as 1.13.9 (a leading 'v' is accepted; 1.6.3 or later)."
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["opentofu.vscode-opentofu"]
+    }
+  }
+}
