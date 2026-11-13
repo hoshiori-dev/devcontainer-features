@@ -93,7 +93,8 @@ at every container start, and `false` leaves starting it to the developer (Requi
 ### Requirement: Option swtpm
 
 The feature SHALL accept the option `swtpm` as declared here: `true` installs the distribution's software TPM emulator
-and its setup tools, which a guest with an emulated TPM needs, and `false` does not install them.
+and its setup tools, which a guest with an emulated TPM needs, and `false` does not ask for them. A distribution whose
+libvirt packages depend on them installs them whatever the option says.
 
 | Field   | Value     |
 | ------- | --------- |
@@ -103,12 +104,12 @@ and its setup tools, which a guest with an emulated TPM needs, and `false` does 
 #### Scenario: Omitted swtpm
 
 - **WHEN** the feature is installed without `swtpm` on an image that does not hold `swtpm`
-- **THEN** `swtpm` is not installed
+- **THEN** `swtpm` is installed only when a package of Requirement: Installed components depends on it
 
 #### Scenario: swtpm enabled
 
 - **WHEN** the feature is installed with `swtpm` `true`
-- **THEN** `swtpm --version` and `swtpm_setup --version` succeed
+- **THEN** `swtpm --version` succeeds and `swtpm_setup` is on `PATH`
 
 ### Requirement: Privileged container
 

@@ -50,8 +50,18 @@ and a usable `/dev/kvm`:
   firmware are `qemu-system-arm` and `qemu-efi-aarch64` on Debian and Ubuntu, `qemu-system-aarch64-core` and
   `edk2-aarch64` on Fedora.
 
-Not checked before this change: anything on arm64, and how the dev container CLI merges a feature's `containerEnv` with
-the developer's (Open Questions).
+Not checked before this change: anything on arm64 (Open Questions).
+
+Found while implementing, on 2026-11-13, and carried into the delta specs:
+
+- The host's daemon looks up the connecting user ID in the host's own user database and refuses an ID it does not know
+  ("Failed to find user record for uid"), also where the socket's group admits the caller.
+- With dev container CLI 0.89.0, a `containerEnv` value of `devcontainer.json` reaches the container's configuration,
+  but the remote user's processes still get the feature's value; a `remoteEnv` value replaces it.
+- Fedora 44's `libvirt-daemon-driver-qemu` depends on `swtpm-tools`, so swtpm is installed there whatever the option
+  says. `swtpm_setup --version` of swtpm 0.7, which Debian 13 and Ubuntu 24.04 ship, prints the version and exits 1.
+- Daemons stopped and started again inside one start of the container find their networks and guests only when
+  `/run/libvirt` is kept: the bridge of a network outlives the daemon, and libvirt cannot create it a second time.
 
 Repository facts: `just validate` requires `test/<id>/test.sh` and `test/<id>/compatibility.json` for every feature, and
 CI's plan fails for an affected feature without a compatibility list, so a feature cannot be left untested without
@@ -76,8 +86,9 @@ changing scripts or workflows.
   through `virsh`. Checked by review of every path the scripts name, and by the group alignment scenario, which compares
   a listing of the directory before and after.
 - `libvirt-in-docker` removes runtime state only under `/run/libvirt` and the daemons' own process ID files in `/run`,
-  and only after it has found that `/run/libvirt` is not a mount point and that no daemon answers. Checked by the
-  "Mounted run directory" and "Run again by hand" scenarios.
+  and only after it has found that `/run/libvirt` is not a mount point and that no daemon answers. It removes
+  `/run/libvirt` only when the start record does not belong to the current start of the container, so daemons started
+  again by hand keep their state. Checked by the "Mounted run directory", "Run again by hand", and "Restart" scenarios.
 - Each feature's configuration edits are one marked block per file, replaced as a whole. Checked by `duplicate.sh`,
   which counts the markers.
 - The entrypoints are bounded: the wait for the socket has a fixed limit, after which the failure is recorded and the
@@ -225,13 +236,15 @@ Alpine, Arch Linux, and openSUSE are left out: their daemon packaging differs ag
   the variable, the "No socket" result of the check, and the metadata. A scenario makes a socket file at
   `/run/libvirt/libvirt-sock` with a chosen GID and mode, runs the entrypoint's script again as root, and asserts each
   case of the group alignment and that the directory's listing is unchanged. A `fail_*` scenario covers the unsupported
-  distribution (a `build` scenario image), the presence of `libvirt-in-docker`, and invalid options.
+  distribution (with `/etc/os-release` rewritten for one run, as `test/apptainer/` does), the presence of
+  `libvirt-in-docker`, and invalid options.
 - `libvirt-in-docker`: `test.sh` asserts, as the image's remote user, the daemons, the connection, the active network,
   and a diskless guest of type `qemu` that reaches the running state, so no job depends on KVM. Scenarios cover
   `defaultNetwork` `false`, `swtpm` `true`, a second start of the script by hand, and a failing daemon binary; a
-  `fail_*` scenario covers the same three refusals. What needs a second container start or a volume that outlives a
-  container ("Restart", "Rebuild keeps guests", "Volumes recreated", "Mounted run directory") is checked once, locally,
-  with `devcontainer up` against this checkout, and recorded in the PR's Validation section.
+  `fail_*` scenario covers the same three refusals and another architecture. "Mounted run directory" runs in a scenario
+  too, with a tmpfs the script mounts. What needs a second container start or a volume that outlives a container
+  ("Restart", "Rebuild keeps guests", "Volumes recreated") is checked once, locally, with `devcontainer up` against this
+  checkout, and recorded in the PR's Validation section.
 
 ### Local end-to-end test
 
@@ -261,6 +274,4 @@ records the run.
 
 ## Open Questions
 
-- Whether a `containerEnv` value in `devcontainer.json` replaces the feature's for every process. The spec's scenario
-  uses `remoteEnv`, which is applied last; `NOTES.md` will name whichever the implementation finds to work.
 - Whether every supported image on arm64 ships each package the features need; the first CI run on arm64 answers it.

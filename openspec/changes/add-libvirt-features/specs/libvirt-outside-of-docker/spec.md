@@ -115,10 +115,10 @@ mount, read-only. A container built with the feature SHALL start whether or not 
 
 ### Requirement: Default connection
 
-The feature SHALL set the container environment variable `LIBVIRT_DEFAULT_URI` to `qemu:///system`, so that the libvirt
-client tools of every user, the remote user included, connect to the system daemon behind `/run/libvirt` instead of a
-per-user session daemon. It SHALL NOT write a libvirt client configuration file. A value the developer sets for the
-variable in `devcontainer.json` takes the place of the feature's.
+The feature SHALL set the container environment variable `LIBVIRT_DEFAULT_URI` to `qemu:///system`, so that every user's
+libvirt client tools connect to the system daemon behind `/run/libvirt` instead of a per-user session daemon. It SHALL
+NOT write a libvirt client configuration file. A value the developer sets for the variable in `remoteEnv` of
+`devcontainer.json` replaces the feature's for the remote user's processes, and `NOTES.md` SHALL say so.
 
 #### Scenario: Remote user's default connection
 
@@ -325,11 +325,16 @@ container start only.
 ### Requirement: Documented host requirements
 
 `NOTES.md` SHALL state that the host must be Linux with a Docker daemon that runs as root beside the libvirt daemon,
-which excludes Docker Desktop, rootless Docker, and Podman; that a host that confines containers with SELinux needs that
-confinement lifted for the socket by the developer; and that a host whose socket is authorized by polkit decides by the
-numeric user ID of the container's user.
+which excludes Docker Desktop, rootless Docker, and Podman; that the numeric user ID of the container's user must belong
+to a user of the host, whom the host's daemon looks up and, where polkit authorizes the socket, decides by; and that a
+host that confines containers with SELinux needs that confinement lifted for the socket by the developer.
 
 #### Scenario: Notes list the host requirements
 
 - **WHEN** a developer reads the feature's `NOTES.md`
 - **THEN** each statement of this requirement is present
+
+#### Scenario: User ID unknown to the host
+
+- **WHEN** the socket's group admits the remote user and the host has no user with the remote user's numeric ID
+- **THEN** the host's daemon refuses the connection and the start check exits non-zero with the daemon's error
