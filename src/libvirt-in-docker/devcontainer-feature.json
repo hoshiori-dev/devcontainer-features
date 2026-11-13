@@ -1,0 +1,37 @@
+{
+  "id": "libvirt-in-docker",
+  "version": "1.0.0",
+  "name": "libvirt (in Docker)",
+  "description": "Installs the distribution's libvirt daemon, QEMU, UEFI firmware, virsh, and virt-install, and starts the daemon at every container start in a privileged dev container, so the remote user runs virtual machines inside the container, with KVM when the host offers it; guest definitions and disks persist in two named volumes.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/libvirt-in-docker",
+  "options": {
+    "defaultNetwork": {
+      "type": "boolean",
+      "default": true,
+      "description": "Start libvirt's default NAT network (virbr0, 192.168.122.0/24) at every container start."
+    },
+    "swtpm": {
+      "type": "boolean",
+      "default": false,
+      "description": "Install the software TPM emulator swtpm and its setup tools, for guests that need a TPM."
+    }
+  },
+  "privileged": true,
+  "mounts": [
+    {
+      "source": "libvirt-in-docker-data-${devcontainerId}",
+      "target": "/var/lib/libvirt",
+      "type": "volume"
+    },
+    {
+      "source": "libvirt-in-docker-config-${devcontainerId}",
+      "target": "/etc/libvirt/qemu",
+      "type": "volume"
+    }
+  ],
+  "containerEnv": {
+    "LIBVIRT_DEFAULT_URI": "qemu:///system"
+  },
+  "entrypoint": "/usr/local/share/libvirt-in-docker/start.sh",
+  "postStartCommand": "/usr/local/share/libvirt-in-docker/check.sh"
+}
