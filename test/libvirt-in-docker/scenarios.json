@@ -1,0 +1,31 @@
+{
+  "test_no_default_network": {
+    "image": "fedora:44",
+    "features": {
+      "libvirt-in-docker": {
+        "defaultNetwork": false
+      }
+    }
+  },
+  "test_swtpm": {
+    "image": "debian:13",
+    "features": {
+      "libvirt-in-docker": {
+        "swtpm": true
+      }
+    }
+  },
+  "test_restart_by_hand": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "libvirt-in-docker": {}
+    }
+  },
+  "fail_install": {
+    "image": "debian:13",
+    "features": {
+      "libvirt-in-docker": {}
+    }
+  }
+}
