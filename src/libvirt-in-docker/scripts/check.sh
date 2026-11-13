@@ -13,6 +13,9 @@ readonly SYSTEM_URI="qemu:///system"
 readonly WAIT_SECONDS=90
 readonly CONNECT_SECONDS=20
 
+# virsh prints the untranslated text this script reads.
+export LC_ALL="C"
+
 log() {
   printf 'libvirt-in-docker: %s\n' "$*"
 }

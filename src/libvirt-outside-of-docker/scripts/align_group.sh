@@ -83,7 +83,7 @@ finish() {
   step="writing the start record"
   reason="$2"
   result="$1"
-  write_record
+  write_record || log "error: cannot write the start record ${RECORD_FILE}, so the start check will report no record"
   log "${result}: ${reason}"
   exit 0
 }

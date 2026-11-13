@@ -14,6 +14,9 @@ readonly MOUNT_LINE='"mounts": ["source=/run/libvirt,target=/run/libvirt,type=bi
 readonly WAIT_SECONDS=30
 readonly CONNECT_SECONDS=20
 
+# virsh prints the untranslated text this script reads.
+export LC_ALL="C"
+
 socket=""
 
 log() {
@@ -95,6 +98,10 @@ main() {
   alignment="${alignment//$'\n'/ }"
   if ! output="$(timeout "${CONNECT_SECONDS}" virsh --connect "${SYSTEM_URI}" version --daemon 2>&1)"; then
     printf '%s\n' "${output}" >&2
+    if [[ -r "${RECORD_FILE}" ]]; then
+      printf '%s\n' "start record ${RECORD_FILE}:" >&2
+      cat "${RECORD_FILE}" >&2
+    fi
     user="$(id --user --name)"
     uid="$(id --user)"
     fail "cannot connect to ${SYSTEM_URI} through ${socket} as ${user} (UID ${uid}); ${alignment};" \

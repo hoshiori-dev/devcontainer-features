@@ -174,23 +174,38 @@ detect_layout() {
 }
 
 # Replaces the feature's block in the configuration file $1 with the lines read from standard input, creating the
-# file when it does not exist. Everything outside the block stays as it is.
+# file, readable by every user, when it does not exist. Everything outside the block stays as it is, and so do the
+# file's owner, group, and mode. Fails when the file holds a begin line without its end line, or the reverse: the
+# block's extent would be a guess.
 write_block() {
   local file="$1"
-  local kept
-  kept="$(mktemp)"
+  local staged="${file}.libvirt-in-docker"
+  local begins ends
+  : >"${staged}"
   if [[ -e "${file}" ]]; then
-    sed "/^${BLOCK_BEGIN}\$/,/^${BLOCK_END}\$/d" "${file}" >"${kept}"
+    # grep exits 1 when it counts no line.
+    begins="$(grep --count --line-regexp --fixed-strings "${BLOCK_BEGIN}" "${file}" || true)"
+    ends="$(grep --count --line-regexp --fixed-strings "${BLOCK_END}" "${file}" || true)"
+    if [[ "${begins}" != "${ends}" ]]; then
+      rm --force "${staged}"
+      fail "${file} holds ${begins} begin and ${ends} end lines of the feature's block; remove what is left of the" \
+        "block from the file"
+    fi
+    chmod --reference="${file}" "${staged}"
+    chown --reference="${file}" "${staged}"
+    sed "/^${BLOCK_BEGIN}\$/,/^${BLOCK_END}\$/d" "${file}" >>"${staged}"
+    # A last line without a newline gets one, so the block starts on a line of its own. The command substitution
+    # is empty when the last byte is a newline.
+    if [[ -s "${staged}" && -n "$(tail --bytes 1 "${staged}")" ]]; then printf '\n' >>"${staged}"; fi
+  else
+    chmod 0644 "${staged}"
   fi
   {
-    cat "${kept}"
     printf '%s\n' "${BLOCK_BEGIN}"
     cat
     printf '%s\n' "${BLOCK_END}"
-  } >"${file}.libvirt-in-docker"
-  rm --force "${kept}"
-  chmod 0644 "${file}.libvirt-in-docker"
-  mv --force "${file}.libvirt-in-docker" "${file}"
+  } >>"${staged}"
+  mv --force "${staged}" "${file}"
 }
 
 # Configures the QEMU driver for a container without systemd: no security driver, QEMU as root, no ownership

@@ -27,9 +27,13 @@ readonly LOG_DAEMON="virtlogd"
 readonly MONOLITHIC_DAEMONS=(libvirtd)
 readonly MODULAR_DAEMONS=(virtqemud virtnetworkd virtstoraged virtnodedevd virtsecretd virtnwfilterd)
 readonly WAIT_SECONDS=30
+# The limit of one virsh call that changes or reads a network.
+readonly NETWORK_SECONDS=30
 
-# The tools this script runs come from the system directories, whatever PATH the container was given.
+# The tools this script runs come from the system directories, whatever PATH the container was given, and virsh
+# prints the untranslated text this script reads.
 export PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+export LC_ALL="C"
 
 # The settings of the image: whether to start the default network, and the daemon layout.
 default_network=""
@@ -92,7 +96,7 @@ finish() {
   step="writing the start record"
   reason="$2"
   result="$1"
-  write_record
+  write_record || log "error: cannot write the start record ${RECORD_FILE}, so the start check will report no record"
   log "${result}: ${reason}"
   exit 0
 }
@@ -118,7 +122,8 @@ daemon_answers() {
   timeout 5 virsh --connect "${SYSTEM_URI}" version >/dev/null 2>&1
 }
 
-# Stops the daemon $1 when its process ID file names a running process of that name, and waits until it is gone.
+# Stops the daemon $1 when its process ID file names a running process of that name, and waits until it is gone: at
+# most 5 seconds after asking it to end, then it is killed.
 stop_daemon() {
   local name="$1"
   local pid_file="${PID_DIR}/${name}.pid"
@@ -129,8 +134,14 @@ stop_daemon() {
   comm="$(<"/proc/${pid}/comm")"
   [[ "${comm}" == "${name}" ]] || return 0
   log "stopping a ${name} (process ${pid}) that no longer answers"
-  kill "${pid}"
+  # The process may end between the look at /proc and the signal.
+  kill "${pid}" 2>/dev/null || return 0
   for _ in {1..50}; do
+    [[ -e "/proc/${pid}" ]] || return 0
+    sleep 0.1
+  done
+  kill -KILL "${pid}" 2>/dev/null || return 0
+  for _ in {1..20}; do
     [[ -e "/proc/${pid}" ]] || return 0
     sleep 0.1
   done
@@ -168,19 +179,22 @@ remove_earlier_state() {
   fi
   if [[ -e "${LIBVIRT_RUN_DIR}" ]]; then
     log "removing ${LIBVIRT_RUN_DIR}, the runtime state of an earlier start"
-    rm --recursive --force "${LIBVIRT_RUN_DIR}"
+    # Nothing mounted below the directory is entered: it would be another system's.
+    rm --recursive --force --one-file-system "${LIBVIRT_RUN_DIR}"
   fi
 }
 
 start_daemons() {
-  local name waited
+  local name deadline
   for name in "${LOG_DAEMON}" "${daemons[@]}"; do
     step="starting ${name}"
     log "starting ${name}"
     "${name}" --daemon
   done
   step="waiting for ${SYSTEM_URI} to answer"
-  for ((waited = 0; waited < WAIT_SECONDS; waited++)); do
+  # SECONDS counts the seconds since the script started; one attempt may itself take up to 5.
+  deadline=$((SECONDS + WAIT_SECONDS))
+  while ((SECONDS < deadline)); do
     if daemon_answers; then return 0; fi
     sleep 1
   done
@@ -199,7 +213,7 @@ detect_kvm() {
 apply_default_network() {
   local info output
   step="looking at the network ${DEFAULT_NETWORK}"
-  if ! info="$(virsh --connect "${SYSTEM_URI}" net-info "${DEFAULT_NETWORK}" 2>&1)"; then
+  if ! info="$(timeout "${NETWORK_SECONDS}" virsh --connect "${SYSTEM_URI}" net-info "${DEFAULT_NETWORK}" 2>&1)"; then
     network="not defined"
     return 0
   fi
@@ -213,7 +227,7 @@ apply_default_network() {
   fi
   step="starting the network ${DEFAULT_NETWORK}"
   log "starting the network ${DEFAULT_NETWORK}"
-  if output="$(virsh --connect "${SYSTEM_URI}" net-start "${DEFAULT_NETWORK}" 2>&1)"; then
+  if output="$(timeout "${NETWORK_SECONDS}" virsh --connect "${SYSTEM_URI}" net-start "${DEFAULT_NETWORK}" 2>&1)"; then
     network="active"
   else
     network="failed to start: ${output//$'\n'/ }"
@@ -232,8 +246,12 @@ main() {
   fi
   trap handle_exit EXIT
   read_settings
+  # Without the tool that tells a mount point, nothing may be removed or started.
+  command -v mountpoint >/dev/null \
+    || finish failed "the mountpoint command is missing, so ${LIBVIRT_RUN_DIR} cannot be checked; rebuild the container"
   if mountpoint --quiet "${LIBVIRT_RUN_DIR}"; then
-    finish refused "${LIBVIRT_RUN_DIR} is a mount point, and a daemon started there would write into another system's libvirt directory; remove the mount from devcontainer.json"
+    finish refused "${LIBVIRT_RUN_DIR} is a mount point, and a daemon started there would write into another" \
+      "system's libvirt directory; remove the mount from devcontainer.json"
   fi
   if daemon_answers; then
     # A run by hand while the daemon answers: nothing is removed, restarted, or recorded anew.
