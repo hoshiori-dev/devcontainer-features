@@ -76,7 +76,7 @@ check "Mounted run directory: nothing was created under the mount" \
   test -z "$(as_root find /run/libvirt -mindepth 1)"
 check "Mounted run directory: no daemon was started" bash -c '! test -e /run/libvirtd.pid'
 check "Mounted run directory: the start check exits non-zero and names the mount" \
-  check_fails_naming '/run/libvirt is a mount point'
+  check_fails_naming 'remove the mount from devcontainer.json'
 as_root umount /run/libvirt
 
 # Daemons started again in the same start of the container keep libvirt's runtime state.

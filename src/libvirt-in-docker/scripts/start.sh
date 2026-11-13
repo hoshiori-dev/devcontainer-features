@@ -91,10 +91,11 @@ handle_exit() {
   exit 0
 }
 
-# Ends the script with the result $1 (started, failed, or refused) and the reason $2 in the record.
+# Ends the script with the result $1 (started, failed, or refused) and, as the reason in the record, the remaining
+# arguments joined by spaces.
 finish() {
   step="writing the start record"
-  reason="$2"
+  reason="${*:2}"
   result="$1"
   write_record || log "error: cannot write the start record ${RECORD_FILE}, so the start check will report no record"
   log "${result}: ${reason}"

@@ -25,7 +25,7 @@
       with `devcontainer up` on this checkout; verify the scenarios "Read-only mount", "Remote user's default
       connection", "Developer's own URI", "Connected", "Refused", and "Writable mount", and note the commands and
       results for the PR's Validation section. In the same run, find out whether a `containerEnv` value of
-      `devcontainer.json` replaces the feature's (design.md, Open Questions).
+      `devcontainer.json` replaces the feature's (design.md, Context).
 - [x] 2.7 Write `NOTES.md`: the mount, the start record's path, every statement the spec's requirements assign to
       `NOTES.md`, and the test limits with the result of 2.6; verify each statement against the spec by reading.
 
