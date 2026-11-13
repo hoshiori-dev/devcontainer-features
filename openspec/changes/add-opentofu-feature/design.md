@@ -166,12 +166,15 @@ to the signature.
 
 ### Resolving latest
 
-Read the redirect of `https://github.com/opentofu/opentofu/releases/latest` without following it, and take the tag from
-the last path segment, as in the `gitleaks` design. The tag must pass the same validation as an explicit `version`, so a
-pre-release tag fails. Rejected: `https://api.github.com/repos/opentofu/opentofu/releases/latest`, which upstream's
-installer reads — the same answer as JSON, under the API's unauthenticated rate limit, which CI runners share.
-`https://get.opentofu.org/tofu/api.json` — an undocumented format that needs a JSON parser in the image. The highest
-version among all tags — it needs the full release list and would ignore which line upstream marks as current.
+Read the redirect of `https://github.com/opentofu/opentofu/releases/latest` without following it, as in the `gitleaks`
+design. Since the redirect is not followed, `--proto-redir` does not guard it: the target must start with
+`https://github.com/opentofu/opentofu/releases/tag/`, and the tag is the rest of it without a query, a fragment, or a
+trailing slash (found in review: the `gitleaks` design's last-segment parsing would accept a plain-HTTP or foreign
+target). The tag must pass the same validation as an explicit `version`, so a pre-release tag fails. Rejected:
+`https://api.github.com/repos/opentofu/opentofu/releases/latest`, which upstream's installer reads — the same answer as
+JSON, under the API's unauthenticated rate limit, which CI runners share. `https://get.opentofu.org/tofu/api.json` — an
+undocumented format that needs a JSON parser in the image. The highest version among all tags — it needs the full
+release list and would ignore which line upstream marks as current.
 
 ### Minimum version `1.6.3`
 
@@ -230,8 +233,8 @@ layer also needs.
     archive of `1.6.3`, fetched at the start, plus files the script derives from them. It asserts every rejection and
     verification failure the spec lists that a successful build cannot show, each leaving the target, packages, and the
     temporary directory as they were:
-    - a malformed, pre-release, or below-minimum `version`;
-    - a latest-release link to a pre-release tag;
+    - a malformed (including a leading zero), pre-release, or below-minimum `version`;
+    - a latest-release link to a pre-release tag, to a plain-HTTP URL, and to another host;
     - a missing release, a list without the architecture's entry, and a missing signature file;
     - an unreachable key;
     - a list altered by one byte;
@@ -243,8 +246,9 @@ layer also needs.
     It also asserts the success cases that need fixtures: the same version twice (no archive request; inode and
     modification time unchanged), and an unreadable installed version (a stand-in that exits 1 is replaced).
 - Checked by review only: more than one entry for the archive in the list, which no fixture can produce without the
-  pinned key, and the redirect to a non-HTTPS URL, which the stand-in covers only by asserting `--proto-redir '=https'`
-  on every request. The entry count and the `curl` calls in `install.sh` are read against the spec.
+  pinned key, and a followed download redirecting to a non-HTTPS URL, which the stand-in covers only by asserting
+  `--proto-redir '=https'` on every request. The entry count and the `curl` calls in `install.sh` are read against the
+  spec.
 - Checked by hand, once: the package-manager branch of the families whose listed images lack no prerequisite. On
   `fedora:44`, `almalinux:9`, `opensuse/leap:16.0`, and `archlinux:latest`, `tar` is removed without its dependents
   (`rpm -e --nodeps`, `pacman -Rdd`), `install.sh` runs, and the PR records that it installed `tar` and left the cache
