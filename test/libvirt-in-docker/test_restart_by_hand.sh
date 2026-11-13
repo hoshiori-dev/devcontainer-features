@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Scenario "test_restart_by_hand": libvirt-in-docker with default options on the Ubuntu image, as the remote user
-# vscode. The script runs the entrypoint's script again as root in five states of the container and asserts what the
+# vscode. The script runs the entrypoint's script again as root in several states of the container and asserts what the
 # spec says of each: while the daemon answers ("Run again by hand", "Environment does not change the start"), with a
 # daemon binary that fails ("Daemon fails to start", "Daemon not started"), with a file system mounted at
 # /run/libvirt ("Mounted run directory"), with one daemon stopped ("A daemon has stopped"), and over the state an
@@ -23,7 +23,7 @@ stop_daemon() {
   local pid
   pid="$(daemon_pid)"
   as_root kill "${pid}"
-  for _ in $(seq 1 50); do
+  for _ in $(seq 1 600); do
     [[ -e "/proc/${pid}" ]] || return 0
     sleep 0.1
   done
@@ -39,7 +39,7 @@ stop_log_daemon() {
   local pid
   pid="$(log_daemon_pid)"
   as_root kill "${pid}"
-  for _ in $(seq 1 50); do
+  for _ in $(seq 1 600); do
     [[ -e "/proc/${pid}" ]] || return 0
     sleep 0.1
   done
@@ -102,6 +102,21 @@ check "A daemon has stopped: the script exits zero" as_root "${LID_START}"
 check "A daemon has stopped: the daemons run again" test "$(record_field result)" = started
 check "A daemon has stopped: virtlogd, which ran, kept its process" test "$(log_daemon_pid)" = "${log_pid_before}"
 check "A daemon has stopped: the network default is still active" network_is_active
+
+# Hold a daemon while it is stopping, so it ends after the start script has checked its process. A failed record
+# makes the script enter its start path without the early probe of an already successful start.
+pid_before="$(daemon_pid)"
+as_root kill -STOP "${pid_before}"
+as_root kill -TERM "${pid_before}"
+as_root sed -i 's/^result=.*/result=failed/' "${LID_RECORD}"
+(sleep 2; as_root kill -CONT "${pid_before}") &
+resume_pid=$!
+check "A daemon stopping during the wait: the script exits zero" as_root "${LID_START}"
+wait "${resume_pid}"
+check "A daemon stopping during the wait: the start check exits zero" "${LID_CHECK}"
+check "A daemon stopping during the wait: the daemon has a new process" test "$(daemon_pid)" != "${pid_before}"
+check "A daemon stopping during the wait: virtlogd kept its process" test "$(log_daemon_pid)" = "${log_pid_before}"
+check "A daemon stopping during the wait: the network default is still active" network_is_active
 
 # The state an earlier start left, as a restarted container keeps it: libvirt's runtime directory with a leftover
 # file, a start record of another start, and no daemon running. A restart also gives the container a new network

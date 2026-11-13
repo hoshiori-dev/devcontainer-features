@@ -203,20 +203,21 @@ remove_earlier_state() {
 }
 
 # Starts each daemon of the layout that does not run, and waits for the system daemon to answer. A daemon that runs
-# is left alone, also when it does not answer: guests and their logs depend on it.
+# is left alone, also when it does not answer: guests and their logs depend on it. Check again during the wait,
+# because a daemon that was already stopping can end after the first check.
 start_daemons() {
   local name deadline
-  for name in "${daemons[@]}"; do
-    if daemon_runs "${name}"; then continue; fi
-    step="starting ${name}"
-    log "starting ${name}"
-    rm --force "${PID_DIR}/${name}.pid"
-    "${name}" --daemon
-  done
-  step="waiting for ${SYSTEM_URI} to answer"
   # SECONDS counts the seconds since the script started; one attempt may itself take up to 5.
   deadline=$((SECONDS + WAIT_SECONDS))
   while ((SECONDS < deadline)); do
+    for name in "${daemons[@]}"; do
+      if daemon_runs "${name}"; then continue; fi
+      step="starting ${name}"
+      log "starting ${name}"
+      rm --force "${PID_DIR}/${name}.pid"
+      "${name}" --daemon
+    done
+    step="waiting for ${SYSTEM_URI} to answer"
     if daemon_answers; then return 0; fi
     sleep 1
   done
