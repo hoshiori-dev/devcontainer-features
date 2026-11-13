@@ -35,7 +35,7 @@
 
 ## 4. Integration
 
-- [ ] 4.1 Run `just check`, `just test opentofu`, and `just test-scenarios opentofu`, review the diff against the
+- [x] 4.1 Run `just check`, `just test opentofu`, and `just test-scenarios opentofu`, review the diff against the
       approved specification and design, and resolve findings.
-- [ ] 4.2 Record each Acceptance item and scenario with its evidence and the CI run in the PR's Validation section;
+- [x] 4.2 Record each Acceptance item and scenario with its evidence and the CI run in the PR's Validation section;
       verify every item names its evidence.
