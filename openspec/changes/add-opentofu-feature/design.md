@@ -49,7 +49,8 @@ throwaway containers, on amd64:
   working directory.
 - Tools present before any install: the Ubuntu base image, `fedora:44`, `almalinux:9`, `opensuse/leap:16.0`, and
   `archlinux:latest` have `curl`, `gpg`, `tar`, and `gzip`. `debian:12` has `tar` and `gzip` but neither `curl` nor
-  `gpg` (only `gpgv`). `alpine:3.24` has BusyBox `tar` and `gzip` but neither `curl` nor `gpg`.
+  `gpg` (only `gpgv`). `alpine:3.24` has BusyBox `tar` and `gzip` but neither `curl` nor `gpg`. `opensuse/leap:16.0`
+  ships an empty `/root/.gnupg` and no `find` (found during implementation).
 - After installing the missing packages (`gpg` on Debian and Alpine, `gnupg2` on Fedora and AlmaLinux, `gpg2` on
   openSUSE, `gnupg` on Arch Linux), `gpg --dearmor` of the key and `gpg --verify` of the `v1.13.9` list against the
   resulting keyring file succeeded with GnuPG 2.2.40 (Debian 12), 2.3.3 (AlmaLinux 9), 2.4.4 (Ubuntu 24.04), 2.4.9

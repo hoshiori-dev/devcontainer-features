@@ -205,8 +205,8 @@ variables, or edit shell startup files; and SHALL install no `terraform` command
 #### Scenario: Nothing configured after install
 
 - **WHEN** the feature has been installed
-- **THEN** neither the remote user's nor root's home holds `.terraform.d`, `.terraformrc`, `.tofurc`, or a `.gnupg`
-  directory
+- **THEN** neither the remote user's nor root's home holds `.terraform.d`, `.terraformrc`, or `.tofurc`, or a `.gnupg`
+  directory that holds a file
 - **AND** no environment variable whose name starts with `TF_` or `TOFU_` is set in the remote user's environment
 - **AND** `terraform` does not resolve on the remote user's `PATH`
 
