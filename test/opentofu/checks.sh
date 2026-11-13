@@ -37,19 +37,22 @@ as_root() {
   fi
 }
 
-# Prints the release the latest-release link redirects to when called, read as install.sh reads it, without the
+# Prints the release the latest-release link redirects to when called, parsed as install.sh parses it, without the
 # leading "v"; a release between build and test fails the comparison once.
 latest_release() {
   latest_release_location="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --retry 3 \
     --head --output /dev/null --write-out '%{redirect_url}' https://github.com/opentofu/opentofu/releases/latest)" \
     || return 1
   case "${latest_release_location}" in
-    */releases/tag/v*) printf '%s\n' "${latest_release_location##*/v}" ;;
+    https://github.com/opentofu/opentofu/releases/tag/v*) ;;
     *)
       printf 'unexpected latest-release redirect: %s\n' "${latest_release_location}" >&2
       return 1
       ;;
   esac
+  latest_release_tag="${latest_release_location#https://github.com/opentofu/opentofu/releases/tag/v}"
+  latest_release_tag="${latest_release_tag%%[?#]*}"
+  printf '%s\n' "${latest_release_tag%/}"
 }
 
 # Runs tofu with HOME in a new temporary directory, so a check leaves no ~/.terraform.d behind.
