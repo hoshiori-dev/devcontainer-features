@@ -37,8 +37,9 @@ as_root() {
   fi
 }
 
-# Prints the release the latest-release link redirects to when called, parsed as install.sh parses it, without the
-# leading "v"; a release between build and test fails the comparison once.
+# Prints the release the latest-release link redirects to when called, without the leading "v": the same prefix,
+# query, fragment, and trailing-slash handling as install.sh, but requiring the "v" every OpenTofu tag has. A release
+# between build and test fails the comparison once.
 latest_release() {
   latest_release_location="$(curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --retry 3 \
     --head --output /dev/null --write-out '%{redirect_url}' https://github.com/opentofu/opentofu/releases/latest)" \

@@ -275,10 +275,10 @@ resolve_latest() {
   [ -n "${resolve_latest_location}" ] \
     || fail "${LATEST_URL} did not redirect to a release; set version to a release"
   log "read the latest release from ${LATEST_URL}: ${resolve_latest_location}"
-  # The redirect is not followed, so --proto-redir does not apply to it: only a release page of the same repository
-  # over HTTPS is accepted (openspec/specs/opentofu/spec.md, "OpenTofu release assets"). curl prints a relative Location
-  # resolved against the link. The tag is the path segment after "tag/", without a query, a fragment, or a trailing
-  # slash.
+  # The redirect is not followed, so --proto-redir does not apply to it. Only a release page of the same repository
+  # over HTTPS is accepted: HTTPS is the spec's "OpenTofu release assets", and the same repository is the design's
+  # "Resolving latest". curl prints a relative Location resolved against the link. The tag is the rest of the URL after
+  # "tag/", without a query, a fragment, or a trailing slash.
   case "${resolve_latest_location}" in
     "${RELEASES}/tag/"*) ;;
     *)

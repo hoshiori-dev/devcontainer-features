@@ -244,6 +244,10 @@ check "a latest-release link redirecting to a plain HTTP URL fails before any ch
 serve_latest "https://example.invalid/opentofu/releases/tag/v1.6.3"
 check "a latest-release link redirecting to another host fails before any checksum list" \
   rejected "not to a release page under https://github.com/opentofu/opentofu/releases/tag/" SHA256SUMS
+# An owner name GitHub cannot register (it starts and ends with "-"), so it names no real account.
+serve_latest "https://github.com/-not-opentofu-/opentofu/releases/tag/v1.6.3"
+check "a latest-release link redirecting to another repository on github.com fails before any checksum list" \
+  rejected "not to a release page under https://github.com/opentofu/opentofu/releases/tag/" SHA256SUMS
 reset_serve
 touch "${FIXTURE_DIR}/serve/github.com/opentofu/opentofu/releases/latest"
 check "a latest-release link that does not redirect fails before any checksum list" \
