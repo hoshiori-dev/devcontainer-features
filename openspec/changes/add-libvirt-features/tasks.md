@@ -63,6 +63,6 @@
 ## 5. Integration
 
 - [x] 5.1 Run `just check`, `just test` and `just test-scenarios` for both features; verify all pass.
-- [ ] 5.2 Push through the publish gate and read the CI run, the arm64 jobs in particular (design.md, Open Questions);
+- [x] 5.2 Push through the publish gate and read the CI run, the arm64 jobs in particular (design.md, Open Questions);
       verify every required check passes, and record each Acceptance item and scenario with its result in the PR's
       Validation section.
