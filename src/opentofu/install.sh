@@ -49,7 +49,8 @@ cleanup() {
   if [ -n "${work}" ]; then rm -rf "${work}"; fi
 }
 
-# Prints $1 without a leading "v" when it is v?MAJOR.MINOR.PATCH of decimal numbers; else returns 1.
+# Prints $1 without a leading "v" when it is v?MAJOR.MINOR.PATCH of decimal numbers without leading zeros, as
+# release tags are; else returns 1.
 normalize_version() {
   normalize_version_value="${1#v}"
   case "${normalize_version_value}" in
@@ -64,7 +65,7 @@ normalize_version() {
   for normalize_version_part in \
     "${normalize_version_major}" "${normalize_version_minor}" "${normalize_version_patch}"; do
     case "${normalize_version_part}" in
-      '' | *[!0-9]*) return 1 ;;
+      '' | *[!0-9]* | 0?*) return 1 ;;
     esac
   done
   printf '%s\n' "${normalize_version_value}"
@@ -274,11 +275,20 @@ resolve_latest() {
   [ -n "${resolve_latest_location}" ] \
     || fail "${LATEST_URL} did not redirect to a release; set version to a release"
   log "read the latest release from ${LATEST_URL}: ${resolve_latest_location}"
-  # The Location header may be absolute or relative, and curl prints the URL it resolves to. The tag is the last path
-  # segment of that URL, without a query, a fragment, or a trailing slash.
-  resolve_latest_tag="${resolve_latest_location%%[?#]*}"
+  # The redirect is not followed, so --proto-redir does not apply to it: only a release page of the same repository
+  # over HTTPS is accepted (openspec/specs/opentofu/spec.md, "OpenTofu release assets"). curl prints a relative Location
+  # resolved against the link. The tag is the path segment after "tag/", without a query, a fragment, or a trailing
+  # slash.
+  case "${resolve_latest_location}" in
+    "${RELEASES}/tag/"*) ;;
+    *)
+      fail "${LATEST_URL} redirects to \"${resolve_latest_location}\", not to a release page under ${RELEASES}/tag/;" \
+        "set version to a release"
+      ;;
+  esac
+  resolve_latest_tag="${resolve_latest_location#"${RELEASES}/tag/"}"
+  resolve_latest_tag="${resolve_latest_tag%%[?#]*}"
   resolve_latest_tag="${resolve_latest_tag%/}"
-  resolve_latest_tag="${resolve_latest_tag##*/}"
   if ! version="$(normalize_version "${resolve_latest_tag}")" \
     || ! version_at_least "${version}" "${MIN_VERSION}"; then
     fail "the latest release is \"${resolve_latest_tag}\", not a release version MAJOR.MINOR.PATCH at or above" \

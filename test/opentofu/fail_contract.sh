@@ -194,6 +194,7 @@ reset_serve
 check "a two-part version is rejected before any request" rejected "${accepted_forms}" none VERSION=1.13
 check "a branch name is rejected before any request" rejected "${accepted_forms}" none VERSION=main
 check "a pre-release version is rejected before any request" rejected "${accepted_forms}" none VERSION=1.13.0-rc1
+check "a version with a leading zero is rejected before any request" rejected "${accepted_forms}" none VERSION=1.06.3
 check "a version below the minimum is rejected naming 1.6.3" rejected "below the minimum 1.6.3" none VERSION=1.6.2
 check "an unsupported architecture is rejected naming it" \
   rejected 'unsupported architecture "riscv64"' none PATH="${FIXTURE_DIR}/uname:${FIXTURE_DIR}/bin:${PATH}"
@@ -237,6 +238,12 @@ check "a directory at /usr/local/bin/tofu fails the install before any request a
 serve_latest "https://github.com/opentofu/opentofu/releases/tag/v1.14.0-beta1"
 check "a latest-release link to a pre-release tag fails before any checksum list, naming the tag" \
   rejected 'the latest release is "v1.14.0-beta1"' SHA256SUMS
+serve_latest "http://github.com/opentofu/opentofu/releases/tag/v1.6.3"
+check "a latest-release link redirecting to a plain HTTP URL fails before any checksum list" \
+  rejected 'redirects to "http://github.com/opentofu/opentofu/releases/tag/v1.6.3"' SHA256SUMS
+serve_latest "https://example.invalid/opentofu/releases/tag/v1.6.3"
+check "a latest-release link redirecting to another host fails before any checksum list" \
+  rejected "not to a release page under https://github.com/opentofu/opentofu/releases/tag/" SHA256SUMS
 reset_serve
 touch "${FIXTURE_DIR}/serve/github.com/opentofu/opentofu/releases/latest"
 check "a latest-release link that does not redirect fails before any checksum list" \
