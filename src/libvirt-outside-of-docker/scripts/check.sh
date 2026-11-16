@@ -131,8 +131,9 @@ main() {
       printf '%s\n' "start record ${RECORD_FILE}:" >&2
       cat "${RECORD_FILE}" >&2
     fi
-    user="$(id --user --name)"
     uid="$(id --user)"
+    # A user ID without a name in the container is reported by its number.
+    user="$(id --user --name 2>/dev/null || printf '%s\n' "${uid}")"
     fail "cannot connect to ${SYSTEM_URI} through ${socket} as ${user} (UID ${uid}); ${alignment};" \
       "check that the host's libvirt daemon runs and lets this user in"
   fi

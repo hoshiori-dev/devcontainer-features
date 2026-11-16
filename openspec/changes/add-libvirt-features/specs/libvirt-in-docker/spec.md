@@ -382,13 +382,18 @@ it SHALL print the reason and the daemons' log directory and exit non-zero. It S
 
 The install SHALL fail, before changing the image, with a message naming both features, when the image already holds the
 `libvirt-outside-of-docker` feature. At every start the entrypoint SHALL start no daemon and remove nothing when
-`/run/libvirt` is a mount point, and SHALL record that as the reason: a daemon started there would write into another
-system's libvirt directory.
+`/run/libvirt` is a mount point or holds one, and SHALL record that as the reason: a daemon started there would write
+into another system's libvirt directory.
 
 #### Scenario: Installed after libvirt-outside-of-docker
 
 - **WHEN** the feature is installed on an image on which `libvirt-outside-of-docker` was installed
 - **THEN** the build fails with a message naming both features and saying they are alternatives
+
+#### Scenario: Mounted socket file
+
+- **WHEN** a container with the feature starts with a single file mounted below `/run/libvirt`
+- **THEN** no daemon is started, nothing under `/run/libvirt` is removed, and the start record names that mount point
 
 #### Scenario: Mounted run directory
 
@@ -398,8 +403,8 @@ system's libvirt directory.
 
 ### Requirement: Container metadata
 
-The feature SHALL declare `privileged`, the two mounts of Requirement: Persistent volumes, one `containerEnv` variable,
-one entrypoint, and one `postStartCommand`, and SHALL NOT request `capAdd`, `securityOpt`, or `init`. It SHALL declare
+The feature SHALL declare `privileged`, `init`, the two mounts of Requirement: Persistent volumes, one `containerEnv`
+variable, one entrypoint, and one `postStartCommand`, and SHALL NOT request `capAdd` or `securityOpt`. It SHALL declare
 no `dependsOn` and SHALL name exactly `ghcr.io/devcontainers/features/common-utils` in `installsAfter`, so that a remote
 user that feature creates exists when this feature's install adds the user to a group.
 
@@ -412,6 +417,18 @@ user that feature creates exists when this feature's install adds the user to a 
 
 - **WHEN** the remote user the dev container tool names does not exist in the image when the feature is installed
 - **THEN** the build fails, before any package is installed, with a message naming the user
+
+### Requirement: Init process
+
+The feature SHALL declare `init`, so that the container's first process collects processes that have ended. libvirt
+starts QEMU processes that outlive their parent and waits for them to disappear; under a first process that collects
+nothing, such as a container command of `sleep infinity`, they never do and the daemon never answers. `NOTES.md` SHALL
+say that the container needs such a first process.
+
+#### Scenario: Container command that collects nothing
+
+- **WHEN** the dev container keeps its own command, one that does not collect ended processes, as its main process
+- **THEN** the container's first process is the init the feature requested, and the daemon answers after the start
 
 ### Requirement: Installing twice
 

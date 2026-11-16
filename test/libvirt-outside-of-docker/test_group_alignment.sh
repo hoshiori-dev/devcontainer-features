@@ -58,6 +58,13 @@ check "World-writable socket: the entrypoint exits zero and changes nothing unde
 check "World-writable socket: the remote user's groups are unchanged" test "$(id -nG vscode)" = "${groups_before}"
 check "World-writable socket: no group libvirt-host was created" bash -c '! getent group libvirt-host'
 
+make_socket 4242 0700
+check "Socket its group may not write to: the entrypoint exits zero and changes nothing under /run/libvirt" align
+check "Socket its group may not write to: the remote user's groups are unchanged" \
+  test "$(id -nG vscode)" = "${groups_before}"
+check "Socket its group may not write to: no group libvirt-host was created, and the record says why" \
+  bash -c "! getent group libvirt-host && record_field reason | grep -q 'may not write to it'"
+
 make_socket 4242 0770
 check "Unused GID: the entrypoint exits zero and changes nothing under /run/libvirt" align
 check "Unused GID: libvirt-host has the socket's GID" test "$(group_gid libvirt-host)" = 4242

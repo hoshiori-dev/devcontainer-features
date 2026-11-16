@@ -56,8 +56,8 @@ only to a dev container whose users you would trust with root on the host.
   adds the remote user to a group of the container that has the socket's group ID. When no group has it, the group
   `libvirt-host` gets it. If a group of the container already has that ID, the remote user joins that group and also
   gets what the group grants inside the container. The socket and everything else under `/run/libvirt` are never
-  changed. Nothing is done for a socket that every user may write to, or one that belongs to the root group: there the
-  host decides who may connect by other means.
+  changed. Nothing is done for a socket that every user may write to, one that belongs to the root group, or one that
+  its group may not write to: there the host decides who may connect by other means.
 - The outcome is recorded in `/run/libvirt-outside-of-docker/status`.
 - The feature's `postStartCommand`, `/usr/local/share/libvirt-outside-of-docker/check.sh`, reports the connection. With
   no socket mounted it prints the mount above and exits zero. With a socket it runs

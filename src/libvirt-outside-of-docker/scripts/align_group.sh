@@ -4,7 +4,8 @@
 # of /run/libvirt/virtqemud-sock and /run/libvirt/libvirt-sock that is a socket and adds the remote user, whose name
 # install.sh stored in /usr/local/share/libvirt-outside-of-docker/settings, to a group of the container that has the
 # socket's GID; when no group has it, the group libvirt-host gets it. It changes nothing for a socket that every
-# user may write to or that belongs to GID 0, and it never writes under /run/libvirt. The outcome goes to the start
+# user may write to, that belongs to GID 0, or that its group may not write to, and it never writes under
+# /run/libvirt. The outcome goes to the start
 # record /run/libvirt-outside-of-docker/status, which check.sh reports. It always exits zero, so the container's
 # command runs whatever happened. It takes no option from its environment or its arguments.
 set -euo pipefail
@@ -170,6 +171,10 @@ main() {
   fi
   if [[ "${socket_gid}" == 0 ]]; then
     finish unchanged "the group of ${socket} is root (GID 0), and the remote user is never added to the root group"
+  fi
+  # The middle octal digit of the mode holds the permissions of the socket's group; 2 is write.
+  if (((8#${socket_mode} & 8#20) == 0)); then
+    finish unchanged "the group of ${socket} may not write to it (mode ${socket_mode}), so membership would not help"
   fi
   align
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Reports whether the libvirt daemons of the current container start run: the postStartCommand of the
-# libvirt-in-docker feature, run as the remote user without privilege. It waits at most 90 seconds for the record
+# libvirt-in-docker feature, run as the remote user without privilege. It waits at most 150 seconds for the record
 # start.sh writes to /run/libvirt-in-docker/status, takes a record of an earlier start for a missing one, and runs
 # `virsh --connect qemu:///system version`. It exits zero with a one-line summary when the record reports started
 # daemons and the command succeeds, and non-zero with the reason and the daemons' log directory otherwise. It changes
@@ -10,7 +10,8 @@ set -euo pipefail
 readonly RECORD_FILE="/run/libvirt-in-docker/status"
 readonly LOG_DIR="/var/log/libvirt"
 readonly SYSTEM_URI="qemu:///system"
-readonly WAIT_SECONDS=90
+# Longer than the entrypoint can take: its waits for the daemons and for two network calls add up to 95 seconds.
+readonly WAIT_SECONDS=150
 readonly CONNECT_SECONDS=20
 
 # virsh prints the untranslated text this script reads.
@@ -78,7 +79,8 @@ main() {
   fi
   if ! output="$(timeout "${CONNECT_SECONDS}" virsh --connect "${SYSTEM_URI}" version --daemon 2>&1)"; then
     printf '%s\n' "${output}" >&2
-    user="$(id --user --name)"
+    # A user ID without a name in the container is reported by its number.
+    user="$(id --user --name 2>/dev/null || id --user)"
     fail "cannot connect to ${SYSTEM_URI} as ${user}, although the start record reports started daemons; a user" \
       "other than root must be a member of the libvirt group; logs: ${LOG_DIR}; record: ${RECORD_FILE}"
   fi

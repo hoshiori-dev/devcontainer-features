@@ -97,6 +97,16 @@ check "Mounted run directory: the start check exits non-zero and names the mount
   check_fails_naming 'remove the mount from devcontainer.json'
 as_root umount /run/libvirt
 
+# A single file mounted below /run/libvirt, as a mount of another system's socket would be.
+as_root touch /run/libvirt/mounted-file /run/mounted-file-source
+as_root mount --bind /run/mounted-file-source /run/libvirt/mounted-file
+check "Mounted socket file: the script exits zero" as_root "${LID_START}"
+check "Mounted socket file: the start record says the start was refused and names the mount point" \
+  bash -c "test \"\$(record_field result)\" = refused && record_field reason | grep -q '^/run/libvirt/mounted-file is'"
+check "Mounted socket file: the file is still there" test -e /run/libvirt/mounted-file
+as_root umount /run/libvirt/mounted-file
+as_root rm /run/libvirt/mounted-file /run/mounted-file-source
+
 # One daemon has stopped: it is started, and the daemon that ran is left alone, with libvirt's runtime state.
 check "A daemon has stopped: the script exits zero" as_root "${LID_START}"
 check "A daemon has stopped: the daemons run again" test "$(record_field result)" = started

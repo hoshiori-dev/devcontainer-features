@@ -75,9 +75,9 @@ container_is_privileged() {
   (((16#${caps} >> 21) & 1))
 }
 
-# The directory $1 is a mount.
-is_mount() {
-  grep -q " $1 " /proc/self/mounts
+# The container's first process is an init that collects ended processes: Docker's, which the feature requests.
+container_has_init() {
+  [[ "$(cat /proc/1/comm)" =~ ^(docker-init|tini)$ ]]
 }
 
 # Prints the value of the line "$1:" of `virsh net-info default`, such as Active or Autostart. The output is read

@@ -2,14 +2,14 @@
 # Starts the libvirt daemons: the entrypoint of the libvirt-in-docker feature, run as root at every container start
 # before the container's command. It reads the settings install.sh stored in
 # /usr/local/share/libvirt-in-docker/settings and nothing from its environment or its arguments. In order: it stops
-# when /run/libvirt is a mount point, or when every daemon runs, qemu:///system answers, and the record of this
-# start says so; removes the runtime
-# state an earlier start of this container left under /run (libvirt's sockets, process ID files, and record of what
-# it started), which the start record of that start identifies; starts each daemon that does not run: virtlogd, and
-# libvirtd or, on a distribution without it, the modular daemons; waits at most 30 seconds for qemu:///system to
-# answer; and, with defaultNetwork true, starts the network "default" when it is defined and not active. It never
-# stops a daemon. The outcome goes to the start record /run/libvirt-in-docker/status, which check.sh reports. It
-# always exits zero, so the container's command runs whatever happened.
+# when /run/libvirt is a mount point or holds one, or when every daemon runs, qemu:///system answers, and the record
+# of this start says so; removes the runtime state an earlier start of this container left under /run (libvirt's
+# sockets, process ID files, and record of what it started), which the start record of that start identifies; starts
+# each daemon that does not run: virtlogd, and libvirtd or, on a distribution without it, the modular daemons; waits
+# at most 30 seconds until all of them run and qemu:///system answers; and, with defaultNetwork true, starts the
+# network "default" when it is defined and not active. It never stops a daemon. The outcome goes to the start record
+# /run/libvirt-in-docker/status, which check.sh reports. It always exits zero, so the container's command runs
+# whatever happened.
 set -euo pipefail
 
 readonly SETTINGS_FILE="/usr/local/share/libvirt-in-docker/settings"
@@ -202,9 +202,9 @@ remove_earlier_state() {
   fi
 }
 
-# Starts each daemon of the layout that does not run, and waits for the system daemon to answer. A daemon that runs
-# is left alone, also when it does not answer: guests and their logs depend on it. Check again during the wait,
-# because a daemon that was already stopping can end after the first check.
+# Starts each daemon of the layout that does not run, and waits until every daemon runs and the system daemon
+# answers. A daemon that runs is left alone, also when it does not answer: guests and their logs depend on it. Check
+# again during the wait, because a daemon that was already stopping can end after the first check.
 start_daemons() {
   local name deadline
   # SECONDS counts the seconds since the script started; one attempt may itself take up to 5.
@@ -215,14 +215,16 @@ start_daemons() {
       step="starting ${name}"
       log "starting ${name}"
       rm --force "${PID_DIR}/${name}.pid"
+      # Deviation from shell-style.md (Commands): the command's name comes from a variable. It holds one of the
+      # daemon names in the readonly lists at the top of this file and nothing from outside the script.
       "${name}" --daemon
     done
-    step="waiting for ${SYSTEM_URI} to answer"
-    if daemon_answers; then return 0; fi
+    step="waiting for ${daemons[*]} to run and ${SYSTEM_URI} to answer"
+    if all_daemons_run && daemon_answers; then return 0; fi
     sleep 1
   done
-  finish failed "${SYSTEM_URI} did not answer within ${WAIT_SECONDS} seconds although the processes of" \
-    "${daemons[*]} exist; see ${LOG_DIR}, and restart the container if a daemon hangs"
+  finish failed "within ${WAIT_SECONDS} seconds of starting them, ${daemons[*]} did not all run with" \
+    "${SYSTEM_URI} answering; see ${LOG_DIR} for a daemon that ends or hangs, and restart the container"
 }
 
 # Sets kvm to "available" when /dev/kvm can be opened for reading and writing, and to "unavailable" otherwise.
@@ -269,8 +271,22 @@ apply_default_network() {
   fi
 }
 
+# Prints the first mount point that is the directory $1 or lies below it, and nothing when there is none. The mount
+# points of this container are the fifth field of each line of /proc/self/mountinfo.
+mount_at_or_below() {
+  local directory="$1"
+  local fields
+  step="reading the mount points of the container"
+  while read -ra fields; do
+    if [[ "${fields[4]}" == "${directory}" || "${fields[4]}" == "${directory}/"* ]]; then
+      printf '%s\n' "${fields[4]}"
+      return 0
+    fi
+  done </proc/self/mountinfo
+}
+
 main() {
-  local uid
+  local uid mount_point
   # Every file this script writes is readable by every user and writable by root alone.
   umask 022
   uid="$(id --user)"
@@ -280,12 +296,10 @@ main() {
   fi
   trap handle_exit EXIT
   read_settings
-  # Without the tool that tells a mount point, nothing may be removed or started.
-  command -v mountpoint >/dev/null \
-    || finish failed "the mountpoint command is missing, so ${LIBVIRT_RUN_DIR} cannot be checked; rebuild the container"
-  if mountpoint --quiet "${LIBVIRT_RUN_DIR}"; then
-    finish refused "${LIBVIRT_RUN_DIR} is a mount point, and a daemon started there would write into another" \
-      "system's libvirt directory; remove the mount from devcontainer.json"
+  mount_point="$(mount_at_or_below "${LIBVIRT_RUN_DIR}")"
+  if [[ -n "${mount_point}" ]]; then
+    finish refused "${mount_point} is a mount point, and a daemon started in ${LIBVIRT_RUN_DIR} would write into" \
+      "another system's libvirt directory; remove the mount from devcontainer.json"
   fi
   if recorded_as_started && all_daemons_run && daemon_answers; then
     # A run by hand while everything runs and is recorded so: nothing is removed, started, or recorded anew.

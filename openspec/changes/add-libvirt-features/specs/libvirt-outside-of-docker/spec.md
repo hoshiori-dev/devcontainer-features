@@ -194,8 +194,9 @@ developer chose to give the remote user the host's libvirt daemon, which reaches
 ### Requirement: Sockets left to the host's authorization
 
 The entrypoint SHALL change no group when neither path is a socket, when the socket's mode lets every user write to it,
-or when the socket's group is GID 0. The remote user SHALL never be added to the root group. In the last two cases the
-host decides by other means than the socket's group who may connect.
+when the socket's group is GID 0, or when the mode gives the socket's group no write permission, so that membership
+would not help. The remote user SHALL never be added to the root group. In the last three cases the host decides by
+other means than the socket's group who may connect.
 
 #### Scenario: No socket
 
@@ -206,6 +207,11 @@ host decides by other means than the socket's group who may connect.
 
 - **WHEN** the mounted socket's mode lets every user write to it
 - **THEN** the remote user's groups are unchanged
+
+#### Scenario: Socket its group may not write to
+
+- **WHEN** the mounted socket's mode gives its group no write permission, such as `0700`
+- **THEN** the remote user's groups are unchanged, no group is created, and the start record says why
 
 #### Scenario: Socket of the root group
 

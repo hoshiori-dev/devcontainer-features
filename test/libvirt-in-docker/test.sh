@@ -15,6 +15,7 @@ check "swtpm is not installed by default, unless the distribution's QEMU driver 
   swtpm_absent_unless_required
 check "the entrypoint and the start check exist and are executable" test -x "${LID_START}" -a -x "${LID_CHECK}"
 check "the container is privileged" container_is_privileged
+check "the container's first process is the init the feature requests" container_has_init
 check "the two volumes are mounted at /var/lib/libvirt and /etc/libvirt/qemu" \
   bash -c "grep -q ' /var/lib/libvirt ' /proc/self/mounts && grep -q ' /etc/libvirt/qemu ' /proc/self/mounts"
 check "LIBVIRT_DEFAULT_URI is qemu:///system" test "${LIBVIRT_DEFAULT_URI:-}" = qemu:///system

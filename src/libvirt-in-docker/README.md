@@ -50,6 +50,9 @@ Use this feature only for dev containers whose users you would trust with root o
 
 ## What happens at every start
 
+- The container runs with an init process as its first process (the feature sets `init`). libvirt needs a first process
+  that collects ended processes; a container command such as `sleep infinity` does not, and without one the daemon never
+  answers.
 - The feature's entrypoint, `/usr/local/share/libvirt-in-docker/start.sh`, starts `virtlogd` and the daemons the
   distribution ships: `libvirtd` on Debian and Ubuntu, the modular daemons (`virtqemud`, `virtnetworkd`, `virtstoraged`,
   `virtnodedevd`, `virtsecretd`, `virtnwfilterd`) on Fedora. It first removes the runtime state an earlier start of the

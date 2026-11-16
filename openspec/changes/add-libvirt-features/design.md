@@ -75,6 +75,15 @@ Found while implementing, on 2026-11-13, and carried into the delta specs:
 - Review rounds on the pull request led to these further bounds: the entrypoint of `libvirt-in-docker` never stops a
   daemon and starts only those that do not run; the removal of earlier state stays on one file system; and
   `libvirt-in-docker` installs after `common-utils`, which may create the remote user its install needs.
+- libvirtd needs a first process that collects ended processes. In a privileged `debian:13` container whose command is
+  `sleep infinity`, `libvirtd` did not answer within 40 seconds and five ended `qemu-system` processes stayed
+  uncollected under process 1; the same container run with Docker's `--init` answered within a second (2026-11-16). The
+  dev container CLI's default command collects, so the tests never met this; a Compose service or
+  `overrideCommand: false` keeps the image's own command. `libvirt-in-docker` therefore declares `init`.
+- A last review round added three bounds: the entrypoint of `libvirt-in-docker` refuses to start also when a single file
+  is mounted below `/run/libvirt`, and reports started daemons only when every one of them runs;
+  `libvirt-outside-of-docker` adds the remote user to no group when the socket's mode gives its group no write
+  permission.
 
 Repository facts: `just validate` requires `test/<id>/test.sh` and `test/<id>/compatibility.json` for every feature, and
 CI's plan fails for an affected feature without a compatibility list, so a feature cannot be left untested without

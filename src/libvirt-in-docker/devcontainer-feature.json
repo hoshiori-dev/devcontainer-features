@@ -17,6 +17,7 @@
     }
   },
   "privileged": true,
+  "init": true,
   "mounts": [
     {
       "source": "libvirt-in-docker-data-${devcontainerId}",
