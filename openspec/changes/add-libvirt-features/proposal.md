@@ -93,7 +93,7 @@ None.
   or a signing key, or contacts the network at container start.
 - `libvirt-outside-of-docker` declares no `mounts`, `privileged`, `capAdd`, or `securityOpt`, and never writes to,
   re-owns, or changes the mode of anything under a mounted `/run/libvirt`.
-- `libvirt-in-docker` never starts a daemon while `/run/libvirt` is a mount point.
+- `libvirt-in-docker` never starts a daemon while `/run/libvirt` is a mount point or holds one.
 - No file outside `src/libvirt-outside-of-docker/`, `src/libvirt-in-docker/`, `test/libvirt-outside-of-docker/`,
   `test/libvirt-in-docker/`, the root `README.md`, `README.zh.md`, and this change changes; in particular nothing under
   `.github/` or `scripts/`.

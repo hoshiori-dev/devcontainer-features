@@ -9,12 +9,22 @@ source dev-container-features-test-lib
 # shellcheck source=/dev/null
 source "$(dirname "$0")/helpers.sh"
 
+# Succeeds when no ended process stays uncollected: none is in state Z ("zombie") at one of five looks, a second
+# apart. A process that has just ended may be seen once before the init collects it.
+no_uncollected_process() {
+  for _ in $(seq 1 5); do
+    if ! grep -l '^State:.*Z' /proc/[0-9]*/status >/dev/null 2>&1; then return 0; fi
+    sleep 1
+  done
+  return 1
+}
+
 check "the container's first process is the init the feature requests" container_has_init
-check "the image's own command runs under it" bash -c "tr '\0' ' ' </proc/1/cmdline | grep -q 'sleep infinity'"
+check "the image's own command runs as a process" grep -q -x sleep /proc/[0-9]*/comm
 check "the start check exits zero" "${LID_CHECK}"
 check "the start record reports started daemons" test "$(record_field result)" = started
-check "no ended process is left uncollected" bash -c "! grep -l '^State:.*Z' /proc/[0-9]*/status"
 check "a software-emulated guest on the network default reaches the running state" start_emulated_guest network=default
 check "the guest is removed" remove_guest
+check "no ended process is left uncollected, the guest's QEMU included" no_uncollected_process
 
 reportResults

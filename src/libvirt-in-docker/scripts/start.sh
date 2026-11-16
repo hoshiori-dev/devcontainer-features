@@ -207,6 +207,7 @@ remove_earlier_state() {
 # again during the wait, because a daemon that was already stopping can end after the first check.
 start_daemons() {
   local name deadline
+  local missing=()
   # SECONDS counts the seconds since the script started; one attempt may itself take up to 5.
   deadline=$((SECONDS + WAIT_SECONDS))
   while ((SECONDS < deadline)); do
@@ -223,8 +224,15 @@ start_daemons() {
     if all_daemons_run && daemon_answers; then return 0; fi
     sleep 1
   done
-  finish failed "within ${WAIT_SECONDS} seconds of starting them, ${daemons[*]} did not all run with" \
-    "${SYSTEM_URI} answering; see ${LOG_DIR} for a daemon that ends or hangs, and restart the container"
+  for name in "${daemons[@]}"; do
+    if ! daemon_runs "${name}"; then missing+=("${name}"); fi
+  done
+  if ((${#missing[@]} > 0)); then
+    finish failed "after ${WAIT_SECONDS} seconds ${missing[*]} still does not keep running, although it was started" \
+      "again each second; see ${LOG_DIR} for why it ends"
+  fi
+  finish failed "${daemons[*]} run, but ${SYSTEM_URI} did not answer within ${WAIT_SECONDS} seconds; see ${LOG_DIR}," \
+    "and restart the container if a daemon hangs"
 }
 
 # Sets kvm to "available" when /dev/kvm can be opened for reading and writing, and to "unavailable" otherwise.
@@ -278,7 +286,7 @@ apply_default_network() {
 mount_at_or_below() {
   local directory="$1"
   local resolved fields path
-  resolved="$(realpath --canonicalize-missing "${directory}")"
+  resolved="$(realpath --canonicalize-missing "${directory}")" || return 1
   while read -ra fields; do
     for path in "${directory}" "${resolved}"; do
       if [[ "${fields[4]}" == "${path}" || "${fields[4]}" == "${path}/"* ]]; then

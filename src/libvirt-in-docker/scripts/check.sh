@@ -10,7 +10,8 @@ set -euo pipefail
 readonly RECORD_FILE="/run/libvirt-in-docker/status"
 readonly LOG_DIR="/var/log/libvirt"
 readonly SYSTEM_URI="qemu:///system"
-# Longer than the entrypoint can take: its waits for the daemons and for two network calls add up to 95 seconds.
+# Longer than the entrypoint's own limits add up to: WAIT_SECONDS and twice NETWORK_SECONDS of start.sh, about 100
+# seconds with the last attempts to connect.
 readonly WAIT_SECONDS=150
 readonly CONNECT_SECONDS=20
 

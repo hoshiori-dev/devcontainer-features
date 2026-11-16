@@ -66,3 +66,13 @@
 - [x] 5.2 Push through the publish gate and read the CI run, the arm64 jobs in particular (design.md, Open Questions);
       verify every required check passes, and record each Acceptance item and scenario with its result in the PR's
       Validation section.
+
+## 6. Review rounds
+
+- [x] 6.1 Declare `init` for `libvirt-in-docker`, state it in the delta spec and `NOTES.md`, and add the scenario
+      `test_container_command` (an image whose own command collects no ended processes); verify with
+      `just test-scenarios libvirt-in-docker --scenario test_container_command`.
+- [x] 6.2 Refuse a start of `libvirt-in-docker` also when a file is mounted below `/run/libvirt`; verify with the
+      "Mounted socket file" checks of `test_restart_by_hand`.
+- [x] 6.3 Leave the remote user's groups alone in `libvirt-outside-of-docker` when the socket's mode gives its group no
+      write permission; verify with the checks of that name in `test_group_alignment`.

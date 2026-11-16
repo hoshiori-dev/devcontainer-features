@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Scenario "test_restart_by_hand": libvirt-in-docker with default options on the Ubuntu image, as the remote user
-# vscode. The script runs the entrypoint's script again as root in several states of the container and asserts what the
-# spec says of each: while the daemon answers ("Run again by hand", "Environment does not change the start"), with a
-# daemon binary that fails ("Daemon fails to start", "Daemon not started"), with a file system mounted at
-# /run/libvirt ("Mounted run directory"), with one daemon stopped ("A daemon has stopped"), and over the state an
-# earlier start left ("State of an earlier start").
+# vscode. The script runs the entrypoint's script again as root in several states of the container and asserts what
+# the spec says of each: while the daemon answers ("Run again by hand", "Environment does not change the start"),
+# with a daemon binary that fails ("Daemon fails to start", "Daemon not started"), with a file system mounted at
+# /run/libvirt ("Mounted run directory"), with a file mounted below it ("Mounted socket file"), with one daemon
+# stopped ("A daemon has stopped"), and over the state an earlier start left ("State of an earlier start").
 set -euo pipefail
 
 # shellcheck source=/dev/null
