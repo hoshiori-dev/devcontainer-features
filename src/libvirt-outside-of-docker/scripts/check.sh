@@ -97,10 +97,12 @@ alignment_summary() {
 # started before the entrypoint added the user, does not.
 group_added_after_start() {
   local group="$1"
-  local mine database
+  local mine database name
   [[ -n "${group}" ]] || return 1
+  # A user ID without a name has no entry in the group database either.
+  name="$(id --user --name 2>/dev/null)" || return 1
   mine="$(id --groups --name)"
-  database="$(id --groups --name "$(id --user --name)")"
+  database="$(id --groups --name "${name}")"
   [[ " ${mine} " != *" ${group} "* && " ${database} " == *" ${group} "* ]]
 }
 
@@ -133,7 +135,7 @@ main() {
     fi
     uid="$(id --user)"
     # A user ID without a name in the container is reported by its number.
-    user="$(id --user --name 2>/dev/null || printf '%s\n' "${uid}")"
+    user="$(id --user --name 2>/dev/null)" || user="${uid}"
     fail "cannot connect to ${SYSTEM_URI} through ${socket} as ${user} (UID ${uid}); ${alignment};" \
       "check that the host's libvirt daemon runs and lets this user in"
   fi

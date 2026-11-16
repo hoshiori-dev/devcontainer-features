@@ -80,7 +80,7 @@ main() {
   if ! output="$(timeout "${CONNECT_SECONDS}" virsh --connect "${SYSTEM_URI}" version --daemon 2>&1)"; then
     printf '%s\n' "${output}" >&2
     # A user ID without a name in the container is reported by its number.
-    user="$(id --user --name 2>/dev/null || id --user)"
+    user="$(id --user --name 2>/dev/null)" || user="$(id --user)"
     fail "cannot connect to ${SYSTEM_URI} as ${user}, although the start record reports started daemons; a user" \
       "other than root must be a member of the libvirt group; logs: ${LOG_DIR}; record: ${RECORD_FILE}"
   fi

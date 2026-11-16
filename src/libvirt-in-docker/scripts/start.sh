@@ -272,16 +272,20 @@ apply_default_network() {
 }
 
 # Prints the first mount point that is the directory $1 or lies below it, and nothing when there is none. The mount
-# points of this container are the fifth field of each line of /proc/self/mountinfo.
+# points of this container are the fifth field of each line of /proc/self/mountinfo, with symbolic links resolved,
+# so the directory is compared both as it is written and as it resolves: in an image where /run is a link, a mount
+# at /run/libvirt is listed under the link's target.
 mount_at_or_below() {
   local directory="$1"
-  local fields
-  step="reading the mount points of the container"
+  local resolved fields path
+  resolved="$(realpath --canonicalize-missing "${directory}")"
   while read -ra fields; do
-    if [[ "${fields[4]}" == "${directory}" || "${fields[4]}" == "${directory}/"* ]]; then
-      printf '%s\n' "${fields[4]}"
-      return 0
-    fi
+    for path in "${directory}" "${resolved}"; do
+      if [[ "${fields[4]}" == "${path}" || "${fields[4]}" == "${path}/"* ]]; then
+        printf '%s\n' "${fields[4]}"
+        return 0
+      fi
+    done
   done </proc/self/mountinfo
 }
 
@@ -296,6 +300,7 @@ main() {
   fi
   trap handle_exit EXIT
   read_settings
+  step="reading the mount points of the container"
   mount_point="$(mount_at_or_below "${LIBVIRT_RUN_DIR}")"
   if [[ -n "${mount_point}" ]]; then
     finish refused "${mount_point} is a mount point, and a daemon started in ${LIBVIRT_RUN_DIR} would write into" \

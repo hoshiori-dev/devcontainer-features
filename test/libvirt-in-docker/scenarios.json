@@ -22,6 +22,15 @@
       "libvirt-in-docker": {}
     }
   },
+  "test_container_command": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "overrideCommand": false,
+    "features": {
+      "libvirt-in-docker": {}
+    }
+  },
   "fail_install": {
     "image": "debian:13",
     "features": {

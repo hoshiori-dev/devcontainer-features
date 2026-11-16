@@ -131,9 +131,9 @@ is visible in its metadata, and `NOTES.md` SHALL state it.
 ### Requirement: Daemons started at every start
 
 On every start of the container the feature's entrypoint SHALL, when it runs as root, start the log daemon and the
-daemons of Requirement: Daemon layout, wait a bounded time for the system socket to answer, and apply Requirement:
-Default network, before it hands over to the container's command. It SHALL hand over whatever the outcome. An entrypoint
-that does not run as root SHALL start nothing.
+daemons of Requirement: Daemon layout, wait a bounded time until all of them run and the system socket answers, and
+apply Requirement: Default network, before it hands over to the container's command. It SHALL hand over whatever the
+outcome. An entrypoint that does not run as root SHALL start nothing.
 
 #### Scenario: First start
 
@@ -142,7 +142,7 @@ that does not run as root SHALL start nothing.
 
 #### Scenario: Daemon fails to start
 
-- **WHEN** a daemon cannot be started or its socket does not answer within the limit
+- **WHEN** a daemon cannot be started, does not keep running, or the system socket does not answer within the limit
 - **THEN** the container's command still runs and the start record names the failure
 
 ### Requirement: State of an earlier start

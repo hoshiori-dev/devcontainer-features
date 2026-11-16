@@ -73,6 +73,12 @@ Two named volumes per dev container survive a rebuild:
 
 ## Limits
 
+- **`init` cannot be switched off from `devcontainer.json`**: a dev container tool turns it on when any feature asks for
+  it. An image whose own command must be the container's first process, such as systemd, does not work with this
+  feature.
+- **Do not mount another system's `/run` at `/run`.** The feature refuses to start when something is mounted at or below
+  `/run/libvirt`, but it cannot tell a mount of a whole `/run` from the container's own, and would clear the libvirt
+  state it finds there.
 - **Stopping the container ends every running guest at once**, as a power cut would: a feature has no hook that runs
   before the container stops. The feature starts no guest again at the next start. Shut guests down first
   (`virsh shutdown <name>`).
