@@ -1,0 +1,24 @@
+{
+  "id": "libvirt-outside-of-docker",
+  "version": "1.0.0",
+  "name": "libvirt (outside of Docker)",
+  "description": "Installs the libvirt client tools (virsh, virt-install) and prepares the dev container to manage the virtual machines of the host's libvirt daemon through a mount of the host's /run/libvirt that you add: qemu:///system is the default connection, and at every start the remote user is given access to the mounted socket.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/libvirt-outside-of-docker",
+  "options": {
+    "virtInstall": {
+      "type": "boolean",
+      "default": true,
+      "description": "Install virt-install, which also provides virt-clone and virt-xml."
+    },
+    "qemuImg": {
+      "type": "boolean",
+      "default": false,
+      "description": "Install qemu-img. An image it creates is useful to the host's daemon only at a path the host sees too."
+    }
+  },
+  "containerEnv": {
+    "LIBVIRT_DEFAULT_URI": "qemu:///system"
+  },
+  "entrypoint": "/usr/local/share/libvirt-outside-of-docker/align_group.sh",
+  "postStartCommand": "/usr/local/share/libvirt-outside-of-docker/check.sh"
+}

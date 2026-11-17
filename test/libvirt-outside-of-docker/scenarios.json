@@ -1,0 +1,24 @@
+{
+  "test_options": {
+    "image": "debian:13",
+    "features": {
+      "libvirt-outside-of-docker": {
+        "virtInstall": false,
+        "qemuImg": true
+      }
+    }
+  },
+  "test_group_alignment": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "libvirt-outside-of-docker": {}
+    }
+  },
+  "fail_install": {
+    "image": "debian:13",
+    "features": {
+      "libvirt-outside-of-docker": {}
+    }
+  }
+}
