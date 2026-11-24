@@ -59,7 +59,7 @@ credentials survive container rebuilds until they expire or are revoked.
 Pass `--auth=adc` before the subcommand when running `colab`:
 
 ```bash
-colab --auth=adc list
+colab --auth=adc sessions
 ```
 
 If you prefer not to install `gcloud`, you can alternatively supply an existing ADC file through
