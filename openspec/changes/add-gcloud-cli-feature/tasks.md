@@ -30,6 +30,6 @@
 
 ## 4. Verification and Review Readiness
 
-- [ ] 4.1 Run `just check`, `just test gcloud-cli`, `just test-scenarios gcloud-cli`, and
+- [x] 4.1 Run `just check`, `just test gcloud-cli`, `just test-scenarios gcloud-cli`, and
       `test/gcloud-cli/manual/state_persistence.sh`, complete independent code, security, and first-party source reviews
       until no valuable findings remain, verify PR CI checks pass, and record results in the PR Validation section.
