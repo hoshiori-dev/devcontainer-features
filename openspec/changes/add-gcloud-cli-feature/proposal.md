@@ -38,7 +38,7 @@ None.
 
 - Feature ids touched: `gcloud-cli`, new at version `1.0.0`.
 - Planned files at implementation: `src/gcloud-cli/` (`devcontainer-feature.json`, `install.sh`, `initialize.sh`,
-  `NOTES.md`, generated `README.md`), `test/gcloud-cli/` (`compatibility.json`, `test.sh`, `duplicate.sh`, `checks.sh`,
+  `NOTES.md`, generated `README.md`), `test/gcloud-cli/` (`compatibility.json`, `test.sh`, `duplicate.sh`,
   `scenarios.json` with scenario scripts, and `manual/state_persistence.sh`), root `README.md` (generated feature list),
   and `README.zh.md` (translated row). `test/canary.json` is not touched.
 - Metadata: `installsAfter` (`ghcr.io/devcontainers/features/common-utils`), `mounts` (`gcloud-cli-${devcontainerId}`

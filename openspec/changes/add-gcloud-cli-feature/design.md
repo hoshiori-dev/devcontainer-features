@@ -45,9 +45,8 @@ Upstream facts verified on 2026-11-24 against first-party Google Cloud sources
   - Sibling `.sha256`, `.sha256sum`, `.asc`, and `.sig` URLs all return `HTTP 404`; upstream publishes SHA-256 values
     only inside the HTML/Markdown quickstart table for the latest release, not as a machine-readable release checksum
     asset.
-  - Both `/opt/google-cloud-sdk/bin/gcloud` and `/opt/google-cloud-sdk/install.sh` use `#!/bin/sh`, so no `bash` is
-    needed. Verified live on `opensuse/leap:16.0` (bundled Python `3.14.9` runs directly) and `alpine:3.24`
-    (`apk add python3` provides `python3` where bundled glibc Python cannot run on musl).
+  - Verified live on `opensuse/leap:16.0`: bundled Python `3.14.9` runs directly without installing a separate Python
+    runtime.
 - **State and configuration behavior**:
   - Verified live on `debian:12`: `gcloud` resolves its global config directory to `$HOME/.config/gcloud` even when
     `XDG_CONFIG_HOME` differs, and respects `CLOUDSDK_CONFIG`.
@@ -62,8 +61,9 @@ Upstream facts verified on 2026-11-24 against first-party Google Cloud sources
 
 **Goals (each with how it is checked):**
 
-- **POSIX `sh` across shipped scripts (`install.sh`, `initialize.sh`)**: both use `#!/bin/sh` with `set -eu` so Alpine
-  and minimal images need no `bash`. Checked by `shellcheck` in `just check` and by `alpine:3.24` compatibility tests.
+- **Bash dialect across shipped and test scripts (`install.sh`, `initialize.sh`, tests)**: shipped scripts use
+  `#!/usr/bin/env bash` with `set -euo pipefail`, and test scripts source `dev-container-features-test-lib`,
+  prioritizing readability and auditability per `shell-style.md`. Checked by `shellcheck` in `just check`.
 - **HTTPS on every hop**: all `curl` calls pass `--proto '=https' --proto-redir '=https'` and hit only URLs in the URL
   inventory; repository configs use HTTPS `baseurl`/APT sources. Checked by code inspection and a `curl` stub in
   `fail_contract`.
@@ -80,12 +80,14 @@ Upstream facts verified on 2026-11-24 against first-party Google Cloud sources
   `gcloud-cli-${devcontainerId}`; healthy volumes initialize without `find` or `sudo`, and ownership repair stays
   strictly inside `/var/lib/gcloud-cli` (`find -P -xdev`). Checked by `test_state` and
   `test/gcloud-cli/manual/state_persistence.sh`.
-- **Zero build residue**: package caches (`apt`, `dnf`, `zypper`, `apk`) and temporary directories (`GNUPGHOME`, staging
-  dirs) are cleaned on every exit via `trap`. Checked in `test.sh` and `fail_contract`.
+- **Zero build residue**: package caches (`apt`, `dnf`, `zypper`) and temporary directories (`GNUPGHOME`, staging dirs)
+  are cleaned on every exit via `trap`. Checked in `test.sh` and `fail_contract`.
 
 **Non-Goals:**
 
 - Architectures outside `amd64`/`x86_64` and `arm64`/`aarch64` (such as 32-bit `x86` or non-Linux OSes).
+- Images without `bash` (such as stock Alpine Linux / musl images); the feature uses Bash for readability and never
+  installs `bash` into a user's image.
 - Build-time `gcloud auth`, service-account impersonation setup, or host `~/.config/gcloud` bind mounts.
 - Host keyring / Secret Service provisioning or D-Bus session management.
 - Installing VS Code extensions automatically (`GoogleCloudTools.cloudcode` is documented optionally in `NOTES.md`).
@@ -140,19 +142,17 @@ Upstream facts verified on 2026-11-24 against first-party Google Cloud sources
 ### Archive fallback with warning (Plan B)
 
 - **Trigger**: Linux `x86_64` or `aarch64` when `ID`/`ID_LIKE` matches neither Debian/Ubuntu with `apt-get` nor
-  Fedora/RHEL with `dnf` (e.g. `alpine:3.24`, `opensuse/leap:16.0`, `archlinux`, or custom distributions). Emits
+  Fedora/RHEL with `dnf` (e.g. `opensuse/leap:16.0`, `archlinux`, or custom bash-capable glibc distributions). Emits
   `gcloud-cli: warning: distribution "<os_id>" is outside supported APT and DNF repositories; falling back to official Linux archive`
   to stderr/stdout without failing.
-- **Prerequisites**: installs missing `curl`, `ca-certificates` (`ca-certificates-mozilla` on SUSE), `tar`, `gzip` (and
-  `python3` when musl is detected) via `apk --no-cache`, `zypper --non-interactive`, or `pacman -Syu --needed` if
-  present; if an unknown fallback image lacks a supported package manager and misses prerequisites, fails clearly naming
-  them.
+- **Prerequisites**: installs missing `curl`, `ca-certificates` (`ca-certificates-mozilla` on SUSE), `tar`, and `gzip`
+  via `zypper --non-interactive` or `pacman -Syu --needed` if present; if an unknown fallback image lacks a supported
+  package manager and misses prerequisites, fails clearly naming them.
 - **Install & components**: extracts into staging under `/usr/local/share/.gcloud-cli-install.XXXXXX`, runs
-  `gcloud version` in temporary `HOME` (testing `CLOUDSDK_PYTHON=python3` on musl if needed), installs requested
-  `components` via `CLOUDSDK_CORE_DISABLE_PROMPTS=1 HOME=<tmp> /staging/bin/gcloud components install --quiet <ids...>`,
-  atomically swaps `/usr/local/share/google-cloud-sdk`, and links
-  `/usr/local/share/google-cloud-sdk/bin/{gcloud,bq,gsutil,...}` (plus `kubectl` or component binaries present in
-  `bin/`) into `/usr/local/bin/` with `ln -sf`.
+  `gcloud version` in temporary `HOME`, installs requested `components` via
+  `CLOUDSDK_CORE_DISABLE_PROMPTS=1 HOME=<tmp> /staging/bin/gcloud components install --quiet <ids...>`, atomically swaps
+  `/usr/local/share/google-cloud-sdk`, and links `/usr/local/share/google-cloud-sdk/bin/{gcloud,bq,gsutil,...}` (plus
+  `kubectl` or component binaries present in `bin/`) into `/usr/local/bin/` with `ln -sf`.
 - **Second install skip/replace**: if `/usr/local/share/google-cloud-sdk` already exists and `gcloud version` matches an
   explicit `version` AND all requested `components` binaries/components are already installed, skip re-downloading the
   archive; otherwise install the new archive and components cleanly.
@@ -211,18 +211,19 @@ Follows the `antigravity` / `claude-code` state pattern:
   directories outside the volume.
 - **No `postStartCommand` / `postAttachCommand`**: ordinary restarts and editor attachments incur zero overhead.
 
-### POSIX `sh` dialect
+### Bash dialect
 
-Both `src/gcloud-cli/install.sh` and `src/gcloud-cli/initialize.sh` (and `test/gcloud-cli/checks.sh`) use `#!/bin/sh`
-(`set -eu`) rather than `bash`, because `alpine:3.24` ships no `bash` and `shell-style.md` prohibits installing `bash`
-solely for scripts. Function-scoped variables use `<func>_<name>` prefixes per `shell-style.md`.
+`src/gcloud-cli/install.sh`, `src/gcloud-cli/initialize.sh`, and all test scripts use `#!/usr/bin/env bash` with
+`set -euo pipefail` (and standard `dev-container-features-test-lib` in tests) for readability and auditability. Images
+without `bash` (such as stock Alpine) are intentionally excluded rather than installing `bash` into user images or
+dropping to POSIX `sh` (`shell-style.md`).
 
 ### Tests
 
-- `test/gcloud-cli/compatibility.json`: `scenarioArchitectures: ["amd64", "arm64"]`; 7 images (table below).
-- `test/gcloud-cli/test.sh` (POSIX `sh` using `checks.sh` so it runs on Alpine too): verifies `gcloud version`,
-  `bq version`, `gsutil version` as remote user on default PATH, binaries outside `/var/lib/gcloud-cli`, untouched shell
-  profiles, repo configs on APT/DNF, clean package caches, and no temp residue.
+- `test/gcloud-cli/compatibility.json`: `scenarioArchitectures: ["amd64", "arm64"]`; 6 images (table below).
+- `test/gcloud-cli/test.sh` (bash sourcing `dev-container-features-test-lib`): verifies `gcloud version`, `bq version`,
+  `gsutil version` as remote user on default PATH, binaries outside `/var/lib/gcloud-cli`, untouched shell profiles,
+  repo configs on APT/DNF, clean package caches, and no temp residue.
 - `test/gcloud-cli/duplicate.sh`: installs `version="590.0.0"` and `components="kubectl"`, then installs defaults
   (`version="latest"`, `components=""`), verifying the latest version is active, no duplicate repo files exist, and
   state mappings remain intact.
@@ -234,8 +235,8 @@ solely for scripts. Function-scoped variables use `<func>_<name>` prefixes per `
   - `test_pinned_version` (`mcr.microsoft.com/devcontainers/base:ubuntu24.04`, `remoteUser: "vscode"`,
     `version: "590.0.0"`, `components: "kubectl"`): verifies exact version pinning on Plan A for both `google-cloud-cli`
     and `kubectl`.
-  - `test_fallback_components` (`alpine:3.24`, `version: "590.0.0"`, `components: "kubectl,alpha"`): verifies warning
-    emission, archive fallback, version pinning, musl Python, and `gcloud components install`.
+  - `test_fallback_components` (`opensuse/leap:16.0`, `version: "590.0.0"`, `components: "kubectl,alpha"`): verifies
+    warning emission, archive fallback, version pinning, and `gcloud components install`.
   - `test_state` (`mcr.microsoft.com/devcontainers/base:ubuntu24.04`, `remoteUser: "vscode"`, `--network=none`):
     exercises `initialize`, healthy-volume no-scan/no-sudo check, missing-mount failure, real `gcloud config set`
     writes, atomic replacement of synthetic `credentials.db`/`access_tokens.db`/`application_default_credentials.json`,
@@ -276,7 +277,6 @@ Planned `test/gcloud-cli/compatibility.json` (`scenarioArchitectures: ["amd64", 
 | `almalinux:9`                                      | amd64, arm64  | Plan A | RHEL 9 family matched via `ID_LIKE`; DNF with `el10` repo    |
 | `almalinux:10`                                     | amd64, arm64  | Plan A | RHEL 10 family; verifies `rpm-package-key-v10.gpg`           |
 | `fedora:44`                                        | amd64, arm64  | Plan A | Fedora DNF 5 + strict crypto policy                          |
-| `alpine:3.24`                                      | amd64, arm64  | Plan B | Warning + archive fallback on musl; proves POSIX `sh` path   |
 | `opensuse/leap:16.0`                               | amd64, arm64  | Plan B | Warning + archive fallback on glibc (`zypper` prerequisites) |
 
 ## URL inventory

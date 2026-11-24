@@ -193,18 +193,13 @@ downloads and `gcloud components install` downloads SHALL rely on HTTPS/TLS alon
 ### Requirement: Archive staging and runtime dependencies
 
 On the archive fallback route, the feature SHALL verify the staged `gcloud` executes in an isolated temporary `HOME`,
-atomically replace `/usr/local/share/google-cloud-sdk`, link binaries into `/usr/local/bin`, and install a supported
-`python3` when the bundled glibc Python cannot run (such as on musl systems).
+atomically replace `/usr/local/share/google-cloud-sdk`, and link binaries into `/usr/local/bin`, relying on the
+archive's bundled Python on glibc Linux systems.
 
 #### Scenario: Failed archive install preserves existing CLI
 
 - **WHEN** an archive download, extraction, or staged execution check fails on a second installation
 - **THEN** any working CLI previously installed at `/usr/local/share/google-cloud-sdk` remains intact
-
-#### Scenario: Musl runtime Python
-
-- **WHEN** installed on a musl-based distribution such as Alpine Linux
-- **THEN** `python3` is installed if missing and `gcloud`, `bq`, and `gsutil` execute successfully as the remote user
 
 ### Requirement: Component selection and mapping
 
@@ -237,10 +232,10 @@ On the archive fallback route, the feature SHALL pass requested component IDs di
 
 ### Requirement: Supported platforms and architecture gate
 
-Tested images and architectures SHALL be recorded in `test/gcloud-cli/compatibility.json`. Non-Linux systems and
-architectures outside `amd64`/`x86_64` and `arm64`/`aarch64` SHALL fail before downloading or modifying the image.
-Fallback distributions lacking required tools without a supported package manager (`apk`, `zypper`, `pacman`) SHALL fail
-clearly naming what is missing.
+Tested images and architectures SHALL be recorded in `test/gcloud-cli/compatibility.json`. Non-Linux systems,
+architectures outside `amd64`/`x86_64` and `arm64`/`aarch64`, and images without `bash` SHALL be unsupported. Fallback
+distributions lacking required tools without a supported package manager (`zypper`, `pacman`) SHALL fail clearly naming
+what is missing.
 
 #### Scenario: Tested target
 
@@ -436,14 +431,14 @@ edits are created, and pre-mutation/atomic failures preserve prior state.
 
 ### Requirement: Leave no build residue
 
-The feature SHALL clean package-manager caches (`apt-get clean` and `/var/lib/apt/lists/*`, `dnf clean all`,
-`zypper clean --all`, or `apk --no-cache`) after installing prerequisites or packages, and SHALL remove temporary GnuPG
-homes and staging directories on every exit, whether installation succeeds or fails.
+The feature SHALL clean package-manager caches (`apt-get clean` and `/var/lib/apt/lists/*`, `dnf clean all`, or
+`zypper clean --all`) after installing prerequisites or packages, and SHALL remove temporary GnuPG homes and staging
+directories on every exit, whether installation succeeds or fails.
 
 #### Scenario: Package caches clean
 
 - **WHEN** installation finishes on any image in `test/gcloud-cli/compatibility.json`
-- **THEN** APT package lists, DNF caches, Zypper caches, and APK caches hold no downloaded metadata or package archives
+- **THEN** APT package lists, DNF caches, and Zypper caches hold no downloaded metadata or package archives
 
 #### Scenario: No temporary residue
 
