@@ -23,7 +23,7 @@ run_install() {
 }
 
 failed_with() {
-  if [[ "${install_status}" -eq 0 || "${install_output}" != *"gcloud-cli: error: $1"* ]]; then
+  if [[ "${install_status}" -eq 0 || "${install_output}" != *"gcloud-cli: error: "*"$1"* ]]; then
     printf 'install.sh exited with %s:\n%s\n' "${install_status}" "${install_output}" >&2
     return 1
   fi
