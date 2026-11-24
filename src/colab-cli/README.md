@@ -49,6 +49,50 @@ The
 [feature specification](https://github.com/hoshiori-dev/devcontainer-features/blob/main/openspec/specs/colab-cli/spec.md)
 defines version selection, installation sources, and repeated-install behavior.
 
+## Headless authentication and persistence
+
+By default, `colab` uses `--auth=oauth2` and stores its OAuth token in the operating system's native keyring. Headless
+dev containers usually have no unlocked Secret Service daemon, so `colab` prints a keyring warning and asks you to sign
+in again on the next command.
+
+To persist CLI authentication across container rebuilds, pair this feature with the
+[gcloud-cli feature](https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/gcloud-cli) and authenticate
+with Application Default Credentials (`--auth=adc`):
+
+```json
+{
+  "features": {
+    "ghcr.io/hoshiori-dev/devcontainer-features/colab-cli:1": {},
+    "ghcr.io/hoshiori-dev/devcontainer-features/gcloud-cli:1": {}
+  }
+}
+```
+
+After the container starts, sign in once with your Google account (no GCP project or billing account is required):
+
+```bash
+gcloud auth application-default login \
+  --no-launch-browser \
+  --disable-quota-project \
+  --scopes=openid,https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/colaboratory
+```
+
+Open the printed URL in a browser, complete sign-in, and paste the authorization code back into the terminal. The
+`gcloud-cli` feature stores `~/.config/gcloud/application_default_credentials.json` on its project-scoped volume, so
+credentials survive container rebuilds until they expire or are revoked.
+
+Pass `--auth=adc` before the subcommand when running `colab`:
+
+```bash
+colab --auth=adc sessions
+```
+
+If you prefer not to install `gcloud`, you can alternatively supply an existing ADC file through
+`GOOGLE_APPLICATION_CREDENTIALS`, or reinstall the CLI with a file-backed keyring plugin such as
+`uv tool install --reinstall google-colab-cli --with keyrings.alt` (note that `keyrings.alt` may store credentials in
+plaintext under `~/.local/share/python_keyring` and is not persisted by this feature). CLI session metadata under
+`~/.config/colab-cli` is separate from authentication credentials and is not persisted by `gcloud-cli`.
+
 ## Editor integration
 
 The feature requests Google's official `google.colab` VS Code extension. Its
