@@ -1,0 +1,53 @@
+{
+  "test_components_apt": {
+    "image": "debian:12",
+    "features": {
+      "gcloud-cli": {
+        "components": "kubectl,gke-gcloud-auth-plugin,alpha"
+      }
+    }
+  },
+  "test_components_dnf": {
+    "image": "fedora:44",
+    "features": {
+      "gcloud-cli": {
+        "components": "kubectl,gke-gcloud-auth-plugin,beta"
+      }
+    }
+  },
+  "test_pinned_version": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "gcloud-cli": {
+        "version": "590.0.0",
+        "components": "kubectl"
+      }
+    }
+  },
+  "test_fallback_components": {
+    "image": "opensuse/leap:16.0",
+    "features": {
+      "gcloud-cli": {
+        "version": "593.0.0",
+        "components": "kubectl,alpha"
+      }
+    }
+  },
+  "test_state": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "runArgs": [
+      "--network=none"
+    ],
+    "features": {
+      "gcloud-cli": {}
+    }
+  },
+  "fail_contract": {
+    "image": "debian:12",
+    "features": {
+      "gcloud-cli": {}
+    }
+  }
+}

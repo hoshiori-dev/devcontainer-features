@@ -1,0 +1,38 @@
+{
+  "id": "gcloud-cli",
+  "version": "1.0.0",
+  "name": "Google Cloud CLI",
+  "description": "Installs the Google Cloud CLI (gcloud, bq, gsutil, and optional components) from Google's signed APT/DNF repositories with archive fallback, and preserves private ~/.config/gcloud state in a project volume.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/gcloud-cli",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "proposals": [
+        "latest",
+        "593.0.0"
+      ],
+      "description": "Google Cloud CLI release to install ('latest' or an exact MAJOR.MINOR.PATCH version)"
+    },
+    "components": {
+      "type": "string",
+      "default": "",
+      "proposals": [
+        "",
+        "kubectl,gke-gcloud-auth-plugin"
+      ],
+      "description": "Comma-separated Google Cloud CLI component IDs to install alongside the base CLI"
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ],
+  "mounts": [
+    {
+      "source": "gcloud-cli-${devcontainerId}",
+      "target": "/var/lib/gcloud-cli",
+      "type": "volume"
+    }
+  ],
+  "onCreateCommand": "/usr/local/share/gcloud-cli-feature/initialize"
+}
