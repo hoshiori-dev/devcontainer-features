@@ -131,8 +131,8 @@ timeout 120 freecad render_view.py --pass view.png
 
 The two commands are small launchers. They set five variables, each only when you have not set it yourself:
 `FONTCONFIG_FILE` and `FONTCONFIG_PATH` (the image's fonts under `/etc/fonts`), `SSL_CERT_FILE` and `GIT_SSL_CAINFO`
-(the certificate bundle shipped in the release, for the bundled Python and Git), and `QT_QPA_PLATFORM`. Behind a proxy
-that inspects TLS, point the two certificate variables at your own bundle.
+(the certificate bundle shipped in the release, used by the bundled Python and by Git), and `QT_QPA_PLATFORM`. Behind a
+proxy that inspects TLS, point the two certificate variables at your own bundle.
 
 FreeCAD keeps its per-user state under the user's home (`~/.config/FreeCAD`, `~/.local/share/FreeCAD`,
 `~/.cache/FreeCAD`). It is lost when the container is rebuilt unless you mount a volume there.
