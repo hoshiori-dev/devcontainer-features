@@ -31,11 +31,12 @@ alone).
    package is complete — the proposal, the delta specs, `design.md` when warranted, and any Purpose correction the
    change carries (`spec-workflow.md`, Scope of specifications), created through OpenSpec's propose flow and passing
    `just spec-check`; no `tasks.md` (the flow stops before it; delete one it wrote anyway) — and the body's `Phase:`
-   line reads `specification` while Changes and Validation keep their reserved line. Then stop. The maintainer discusses
-   on the PR and directs changes in conversation; push each through the publish gate. The package approval is the label
-   `spec:approved` on the pull request (`spec-workflow.md`, Approval gates), read by recomputing it, never from the bare
-   label: `just pr-labels <pr>` prints the state the rules give the pull request now, and anything but `spec:approved`
-   is not approved. When it prints `spec:approved`, read the PR's comments
+   line reads `specification` while Changes and Validation keep their reserved line, and its security checklist item is
+   ticked as the publish gate directs (`pr-checklist` fails on a draft too while it is unticked). Then stop. The
+   maintainer discusses on the PR and directs changes in conversation; push each through the publish gate. The package
+   approval is the label `spec:approved` on the pull request (`spec-workflow.md`, Approval gates), read by recomputing
+   it, never from the bare label: `just pr-labels <pr>` prints the state the rules give the pull request now, and
+   anything but `spec:approved` is not approved. When it prints `spec:approved`, read the PR's comments
    (`gh api repos/hoshiori-dev/devcontainer-features/issues/<pr>/comments`, where `<pr>` is the pull request number, not
    the issue's: a PR's conversation lives under the issues API with its own number) and its review threads with their
    resolution state (the GraphQL `reviewThreads` connection, field `isResolved`); list every unresolved thread, every
@@ -111,6 +112,11 @@ survive deletion, and public content is indexed within minutes. Every remote or 
    review again. A secret that reaches GitHub is compromised even after deletion — tell a maintainer so it is rotated.
 5. Confirm applicable approval, execute non-interactively, and read the result back. Published content must be
    byte-identical to the reviewed content; any edit after the verdict requires a fresh review.
+6. A pull request body carries the template's security checklist item ("No secrets, credentials, or personal data …")
+   ticked, from the first draft on: `pr-checklist` is a required check and fails while the item is missing, reworded, or
+   unticked. The tick states this gate's verdict, so write it into the `body.md` under review, never after the verdict,
+   and it reaches GitHub only on `SAFE TO PUBLISH: YES`. Every later edit of the body keeps it ticked and passes the
+   gate again. The other checklist items are ticked as they become true and no check reads them.
 
 ## Finish
 
