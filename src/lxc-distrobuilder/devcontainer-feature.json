@@ -1,0 +1,27 @@
+{
+  "id": "lxc-distrobuilder",
+  "version": "1.0.0",
+  "name": "distrobuilder",
+  "description": "Builds distrobuilder, the image building tool for Incus and LXC, from upstream's signature-verified release source and installs it with the tools it runs, in a container that holds the SYS_ADMIN capability the tool needs to build container images.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/lxc-distrobuilder",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "3.3.1"],
+      "default": "latest",
+      "description": "distrobuilder release to build: 'latest', the release upstream marks as latest, or a release such as 3.4.0 (a leading 'v' is accepted; 3.3.1 or later)."
+    },
+    "vmSupport": {
+      "type": "boolean",
+      "default": false,
+      "description": "Install the tools 'distrobuilder build-incus --vm' runs (Btrfs, ext4, and FAT file systems, GPT partitioning, qemu-img, udev). Building a virtual machine image also needs a privileged container; see the notes."
+    },
+    "windowsSupport": {
+      "type": "boolean",
+      "default": false,
+      "description": "Install the tools 'distrobuilder repack-windows' runs (hivex, wimlib, genisoimage). Repacking also needs a privileged container; see the notes."
+    }
+  },
+  "capAdd": ["SYS_ADMIN"],
+  "securityOpt": ["apparmor=unconfined"]
+}

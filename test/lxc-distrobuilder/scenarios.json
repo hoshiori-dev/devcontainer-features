@@ -1,0 +1,18 @@
+{
+  "test_tool_options": {
+    "image": "debian:13",
+    "features": {
+      "lxc-distrobuilder": {
+        "version": "v3.4.0",
+        "vmSupport": true,
+        "windowsSupport": true
+      }
+    }
+  },
+  "fail_install": {
+    "image": "debian:12",
+    "features": {
+      "lxc-distrobuilder": {}
+    }
+  }
+}

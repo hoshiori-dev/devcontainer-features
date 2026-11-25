@@ -1,0 +1,53 @@
+{
+  "test_channel_lts": {
+    "image": "debian:13",
+    "features": {
+      "incus": {
+        "channel": "lts-6.0"
+      }
+    }
+  },
+  "test_vm": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "incus": {
+        "vm": true
+      }
+    }
+  },
+  "test_initialize_none": {
+    "image": "ubuntu:22.04",
+    "features": {
+      "incus": {
+        "initialize": "none"
+      }
+    }
+  },
+  "test_restart_by_hand": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "incus": {}
+    }
+  },
+  "test_no_network": {
+    "image": "debian:12",
+    "runArgs": ["--network=none"],
+    "features": {
+      "incus": {}
+    }
+  },
+  "test_second_install": {
+    "image": "debian:12",
+    "features": {
+      "incus": {}
+    }
+  },
+  "fail_install": {
+    "image": "debian:13",
+    "features": {
+      "incus": {}
+    }
+  }
+}

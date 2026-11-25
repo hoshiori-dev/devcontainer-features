@@ -17,5 +17,13 @@
       },
       "ghcr.io/hoshiori-dev/devcontainer-features/colab-cli:1": { "version": "0.7.2" }
     }
+  },
+  "test_incus_and_lxc_distrobuilder": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu24.04",
+    "remoteUser": "vscode",
+    "features": {
+      "ghcr.io/hoshiori-dev/devcontainer-features/incus:1": {},
+      "ghcr.io/hoshiori-dev/devcontainer-features/lxc-distrobuilder:1": { "vmSupport": true }
+    }
   }
 }

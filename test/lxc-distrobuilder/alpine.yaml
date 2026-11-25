@@ -1,0 +1,15 @@
+# The smallest image definition the tests build: an Alpine Linux root file system, downloaded over HTTPS from
+# Alpine's own mirror, with no package step inside the image.
+image:
+  distribution: alpinelinux
+  release: "3.22"
+  description: Alpine Linux {{ image.release }} for the lxc-distrobuilder feature tests
+
+source:
+  downloader: alpinelinux-http
+  url: https://dl-cdn.alpinelinux.org/alpine/
+
+packages:
+  manager: apk
+  update: false
+  cleanup: false
