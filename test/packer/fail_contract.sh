@@ -348,5 +348,8 @@ latest_kept_without_download() {
 }
 check "the same release selected again through latest is kept without downloading a list, key, or archive" \
   latest_kept_without_download
+serve_checkpoint '{"product":"packer","current_version":"v1.7.0","alerts":[]}'
+check "a Checkpoint answer naming the installed release with a leading v keeps it the same way" \
+  latest_kept_without_download
 
 reportResults

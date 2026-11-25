@@ -107,11 +107,15 @@ download() {
 
 # Runs the packer at $1 with the remaining arguments in a cleared environment that holds only PATH, a HOME inside the
 # work directory, and CHECKPOINT_DISABLE: every packer run writes a file under HOME, an outdated packer otherwise asks
-# the Checkpoint service, and no PACKER_* variable of the build can change what it prints.
+# the Checkpoint service, and no PACKER_* variable of the build can change what it prints. It runs in that empty HOME,
+# in a subshell: releases up to 1.10 execute any packer-plugin-* file of the current directory on every run.
 run_packer() {
   run_packer_binary="$1"
   shift
-  env --ignore-environment PATH="${PATH}" HOME="${work}/home" CHECKPOINT_DISABLE=1 "${run_packer_binary}" "$@"
+  (
+    cd "${work}/home"
+    env --ignore-environment PATH="${PATH}" HOME="${work}/home" CHECKPOINT_DISABLE=1 "${run_packer_binary}" "$@"
+  )
 }
 
 # Succeeds when the first line of `packer version` output $1 is "Packer v${version}".
@@ -284,9 +288,7 @@ resolve_latest() {
   esac
   resolve_latest_value="${resolve_latest_rest%%\"*}"
   log "read the current version from ${CHECKPOINT_URL}: ${resolve_latest_value}"
-  # No leading "v" is accepted here: the service reports bare versions.
-  if [ "${resolve_latest_value#v}" != "${resolve_latest_value}" ] \
-    || ! version="$(normalize_version "${resolve_latest_value}")" \
+  if ! version="$(normalize_version "${resolve_latest_value}")" \
     || ! version_at_least "${version}" "${MIN_VERSION}"; then
     fail "the current version is \"${resolve_latest_value}\", not a release version MAJOR.MINOR.PATCH at or above" \
       "${MIN_VERSION}; set version to a release"
