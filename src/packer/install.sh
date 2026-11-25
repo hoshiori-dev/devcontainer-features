@@ -113,7 +113,8 @@ run_packer() {
   run_packer_binary="$1"
   shift
   (
-    cd "${work}/home"
+    # Explicit, because errexit is off inside the callers' "if" conditions.
+    cd "${work}/home" || exit 1
     env --ignore-environment PATH="${PATH}" HOME="${work}/home" CHECKPOINT_DISABLE=1 "${run_packer_binary}" "$@"
   )
 }
