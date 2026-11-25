@@ -1,0 +1,24 @@
+{
+  "fail_contract": {
+    "image": "debian:12",
+    "features": {
+      "freecad": {}
+    }
+  },
+  "test_series": {
+    "image": "fedora:44",
+    "features": {
+      "freecad": {
+        "version": "1.1"
+      }
+    }
+  },
+  "test_floor": {
+    "image": "almalinux:9",
+    "features": {
+      "freecad": {
+        "version": "1.1.0"
+      }
+    }
+  }
+}

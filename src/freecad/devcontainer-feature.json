@@ -1,0 +1,18 @@
+{
+  "id": "freecad",
+  "version": "1.0.0",
+  "name": "FreeCAD",
+  "description": "Installs the official FreeCAD release build from its GitHub release, verified against its checksum file and unpacked for containers without FUSE, with freecadcmd for scripting and the libraries the GUI needs.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/freecad",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "latest",
+      "description": "FreeCAD release: latest, a series such as 1.1 for its newest stable release, or an exact MAJOR.MINOR.PATCH release; 1.1.0 or later.",
+      "proposals": [
+        "latest",
+        "1.1"
+      ]
+    }
+  }
+}
