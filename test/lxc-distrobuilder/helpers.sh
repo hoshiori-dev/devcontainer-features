@@ -99,7 +99,10 @@ no_build_leftovers_in_homes() {
   [[ ! -e "${HOME}/.gnupg" && ! -e "${HOME}/go" ]] && ! as_root test -e /root/.gnupg && ! as_root test -e /root/go
 }
 
-# The image holds no Go toolchain the install left: no go on PATH and none in /usr/local/go.
+# The install left no Go toolchain, source, or build cache: no go on PATH, none in /usr/local/go, and no temporary
+# directory of the install, which held all three, in /tmp.
 no_toolchain_left() {
-  not_on_root_path go && [[ ! -e /usr/local/go ]]
+  not_on_root_path go || return
+  [[ ! -e /usr/local/go ]] || return
+  ! as_root sh -c 'ls -d /tmp/tmp.*/go /tmp/tmp.*/gocache /tmp/tmp.*/source 2>/dev/null | grep .'
 }

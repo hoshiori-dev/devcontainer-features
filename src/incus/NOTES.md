@@ -65,7 +65,7 @@ lifecycle command, where the file and the command are visible in your repository
   "features": {
     "ghcr.io/hoshiori-dev/devcontainer-features/incus:1": { "initialize": "none" }
   },
-  "postCreateCommand": "incus admin init --preseed < .devcontainer/incus.yaml"
+  "postCreateCommand": "/usr/local/share/incus-feature/check.sh && incus admin init --preseed < .devcontainer/incus.yaml"
 }
 ```
 
@@ -94,9 +94,9 @@ profiles:
         type: nic
 ```
 
-The entrypoint has waited for the daemon before any lifecycle command runs. `postCreateCommand` runs again when the
-container is created again, against the daemon the volume already holds; Incus applies an unchanged preseed again
-without error.
+A dev container tool may run lifecycle commands while the entrypoint is still starting the daemon, so the command first
+runs the feature's start check, which waits for the daemon. `postCreateCommand` runs again when the container is created
+again, against the daemon the volume already holds; Incus applies an unchanged preseed again without error.
 
 ## What persists
 

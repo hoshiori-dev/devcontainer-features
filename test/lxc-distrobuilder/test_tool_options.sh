@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Scenario "test_tool_options": lxc-distrobuilder installed on debian:13 with version v3.4.0, vmSupport true, and
-# windowsSupport true. The release with its leading "v" removed is installed ("Explicit version", "Leading v
+# Scenario "test_tool_options": lxc-distrobuilder installed with version v3.4.0, vmSupport true, and windowsSupport
+# true on an image built from debian:13 that holds a Go toolchain of its own: a stand-in `go` in /usr/local/go, first
+# on PATH, that fails whenever it runs. The install succeeded, so it did not use that toolchain, and left it as it
+# was ("Image with its own Go"). The release with its leading "v" removed is installed ("Explicit version", "Leading v
 # accepted"), the tools of both options are present ("vmSupport enabled", "windowsSupport enabled"), and a virtual
 # machine image still cannot be built, because the container is not privileged ("Virtual machine image without
 # privilege").
@@ -24,6 +26,9 @@ vm_image_fails_for_loop_device() {
   as_root rm -rf "${out}"
 }
 
+check "the image's own go is as the image's build left it" \
+  bash -c 'cd / && sha256sum --check --quiet /usr/local/go/digest'
+check "the image's own go is still the one on PATH" test "$(command -v go)" = /usr/local/go/bin/go
 check "distrobuilder --version as root prints 3.4.0, which is also the recorded release" reports_version 3.4.0
 check "the tools of vmSupport are on root's PATH" on_root_path mkfs.btrfs mkfs.vfat mkfs.ext4 sgdisk qemu-img udevadm
 check "the tools of windowsSupport are on PATH" on_root_path hivexregedit wimlib-imagex genisoimage

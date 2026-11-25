@@ -20,8 +20,9 @@ readonly KEY_URL="https://pkgs.zabbly.com/key.asc"
 # The primary fingerprint of the Zabbly signing key (openspec/specs/incus/spec.md, "Zabbly signing key"). The fetched
 # file must hold this key and no other.
 readonly SIGNING_FINGERPRINT="4EFC590696CB15B87C73A3AD82CC8797C838DCFD"
-# The first line of an armored OpenPGP public key block.
+# The first and the last line of an armored OpenPGP public key block.
 readonly KEY_BLOCK_BEGIN="-----BEGIN PGP PUBLIC KEY BLOCK-----"
+readonly KEY_BLOCK_END="-----END PGP PUBLIC KEY BLOCK-----"
 readonly REPOSITORY_URL="https://pkgs.zabbly.com/incus"
 readonly KEYRINGS_DIR="/etc/apt/keyrings"
 readonly KEY_FILE="/etc/apt/keyrings/zabbly.asc"
@@ -86,7 +87,6 @@ validate_options() {
 
 # Sets os_id, codename, and arch; fails on an unsupported distribution or architecture before anything changes.
 detect_platform() {
-  local machine
   [[ -r /etc/os-release ]] \
     || fail "cannot read /etc/os-release to detect the distribution; use a Debian or Ubuntu image"
   # shellcheck source=/dev/null
@@ -102,11 +102,12 @@ detect_platform() {
   [[ "${codename}" =~ ^[a-z]+$ ]] \
     || fail "/etc/os-release names no release codename (VERSION_CODENAME is \"${codename}\"), which names the" \
       "repository's suite; use a released Debian or Ubuntu image"
-  machine="$(uname --machine)"
-  case "${machine}" in
-    x86_64 | amd64) arch="amd64" ;;
-    aarch64 | arm64) arch="arm64" ;;
-    *) fail "unsupported architecture \"${machine}\"; the Zabbly repository serves amd64 and arm64 only" ;;
+  command -v dpkg >/dev/null 2>&1 \
+    || fail "distribution \"${os_id}\" is supported, but the image has no dpkg; use an image that has it"
+  arch="$(dpkg --print-architecture)"
+  case "${arch}" in
+    amd64 | arm64) ;;
+    *) fail "unsupported architecture \"${arch}\"; the Zabbly repository serves amd64 and arm64 only" ;;
   esac
 }
 
@@ -130,22 +131,40 @@ install_prerequisites() {
     || fail "apt-get could not install ${packages[*]}; check the messages above"
 }
 
-# Fetches the Zabbly signing key and installs it as KEY_FILE only when the fetched file holds exactly one armored
-# public key block with exactly one primary key, whose fingerprint is SIGNING_FINGERPRINT. The key is listed, never
-# imported, in a GnuPG home inside the download directory.
+# Succeeds when the file $1 is exactly one armored OpenPGP public key block and nothing else: the first line is the
+# block's begin line, the last its end line, and every line between holds only base64 characters or is empty (the
+# data, its checksum line, and the blank line after the header). gpg, apt, and other tools each read armored files
+# their own way: one skips text another takes for a second block. A file of this one shape leaves them nothing to
+# read differently, so the key gpg lists below is the only key any of them finds.
+is_single_key_block() {
+  local line last=""
+  local number=0
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    number=$((number + 1))
+    if ((number == 1)); then
+      [[ "${line}" == "${KEY_BLOCK_BEGIN}" ]] || return 1
+    elif [[ "${last}" == "${KEY_BLOCK_END}" ]]; then
+      return 1
+    elif [[ "${line}" != "${KEY_BLOCK_END}" && ! "${line}" =~ ^[A-Za-z0-9+/=]*$ ]]; then
+      return 1
+    fi
+    last="${line}"
+  done <"$1"
+  [[ "${last}" == "${KEY_BLOCK_END}" ]]
+}
+
+# Fetches the Zabbly signing key and installs it as KEY_FILE only when the fetched file is exactly one armored
+# public key block that holds exactly one primary key, whose fingerprint is SIGNING_FINGERPRINT. The key is listed,
+# never imported, in a GnuPG home inside the download directory.
 install_key() {
-  local blocks key_blocks listing primary_keys fingerprint
+  local listing primary_keys fingerprint
   log "downloading the repository's signing key from ${KEY_URL}"
   fetch --output "${work_dir}/key.asc" "${KEY_URL}" \
     || fail "cannot download ${KEY_URL}; check network access to pkgs.zabbly.com"
-  # Exactly one armored block, a public key block: tools disagree on which further blocks of a file they read, and
-  # only what gpg lists below is checked.
-  blocks="$(grep --count '^-----BEGIN ' "${work_dir}/key.asc" || true)"
-  key_blocks="$(grep --count --line-regexp --fixed-strings -- "${KEY_BLOCK_BEGIN}" "${work_dir}/key.asc" || true)"
-  if [[ "${blocks}" != 1 || "${key_blocks}" != 1 ]]; then
-    fail "the key was not accepted: ${KEY_URL} holds ${blocks} armored block(s), ${key_blocks} of them a public key" \
-      "block, and the feature accepts exactly one public key block"
-  fi
+  is_single_key_block "${work_dir}/key.asc" \
+    || fail "the key was not accepted: ${KEY_URL} is not exactly one armored public key block (a begin line, base64" \
+      "lines, and an end line, with nothing before, between, or after); if Zabbly changed the form of its key file," \
+      "the feature needs a new version"
   mkdir --mode 0700 "${work_dir}/gnupg"
   listing="$(gpg --batch --homedir "${work_dir}/gnupg" --show-keys --with-colons "${work_dir}/key.asc")" \
     || fail "the key was not accepted: ${KEY_URL} does not hold an OpenPGP key that gpg can read"
@@ -203,7 +222,12 @@ install_incus() {
   local version package
   local names=(incus-client incus-base)
   local packages=()
-  if [[ "${VM}" == true ]]; then names+=(incus); fi
+  # The package incus joins the list also when an earlier install left it: it depends on incus-base of its own
+  # version, so it follows a change of channel with the others and is never removed.
+  if [[ "${VM}" == true ]] || dpkg-query --show --showformat '${db:Status-Status}' incus 2>/dev/null \
+    | grep --quiet --line-regexp installed; then
+    names+=(incus)
+  fi
   version="$(channel_version incus-base)"
   [[ -n "${version}" ]] \
     || fail "the repository ${REPOSITORY_URL}/${CHANNEL} offers no incus-base for ${codename} on ${arch}; use an" \

@@ -229,7 +229,7 @@ already_installed() {
 verify_source() {
   local archive="distrobuilder-${version}.tar.gz"
   local url="${RELEASES_URL}/download/v${version}/${archive}"
-  local signers signer
+  local signers signer members member
   download "${url}" "${work_dir}/${archive}" \
     "cannot download ${url}; check that release ${version} exists and that github.com is reachable"
   download "${url}.asc" "${work_dir}/${archive}.asc" \
@@ -261,6 +261,15 @@ verify_source() {
       || fail "verification failed: ${url} is signed by ${signer}, not by the release key ${SIGNING_FINGERPRINT}"
   done <<<"${signers}"
   log "verified the signature of ${archive} by ${SIGNING_FINGERPRINT}"
+  # The signature says who made the archive, not which release it is: every member must lie in the directory named
+  # after the selected release, so that an archive of another release, validly signed, is not built in its place.
+  members="$(tar --list --gzip --file "${work_dir}/${archive}")" \
+    || fail "cannot list ${archive}; set version to another release"
+  while IFS= read -r member; do
+    [[ "${member}" == "distrobuilder-${version}" || "${member}" == "distrobuilder-${version}/"* ]] \
+      || fail "verification failed: ${archive} holds \"${member}\" outside distrobuilder-${version}/, so it is not" \
+        "the source of release ${version}"
+  done <<<"${members}"
   mkdir "${work_dir}/source"
   tar --extract --gzip --file "${work_dir}/${archive}" --directory "${work_dir}/source" --strip-components 1 \
     --no-same-owner \
@@ -307,12 +316,11 @@ build() {
   log "building distrobuilder ${version} from its vendored modules, without network access"
   mkdir "${work_dir}/home" "${work_dir}/gocache" "${work_dir}/gopath"
   (
-    cd "${work_dir}/source"
-    env --ignore-environment \
+    cd "${work_dir}/source" && env --ignore-environment \
       PATH="${work_dir}/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
       HOME="${work_dir}/home" GOROOT="${work_dir}/go" GOCACHE="${work_dir}/gocache" GOPATH="${work_dir}/gopath" \
       GOMODCACHE="${work_dir}/gopath/pkg/mod" GOFLAGS=-mod=vendor GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local \
-      GOTELEMETRY=off CGO_ENABLED=1 \
+      GOTELEMETRY=off GOWORK=off GOENV=off CGO_ENABLED=1 \
       go build -tags "${BUILD_TAGS}" -o "${work_dir}/distrobuilder" ./distrobuilder
   ) || fail "the build of distrobuilder ${version} failed; check the messages above, and set version to another" \
     "release if it persists"

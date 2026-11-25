@@ -27,6 +27,7 @@ check "the start record is not writable by the remote user unless that user is r
 check "the daemon runs" daemon_runs
 check "the remote user lists instances without sudo" incus list
 check "the remote user is root or a member of incus-admin" root_or_admin_member
+check "a user outside the incus-admin group is refused by the daemon's socket" outsider_is_refused
 check "the first initialization created a storage pool" has_storage_pool
 check "the first initialization created a managed bridge" has_managed_network
 check "an instance starts and gets an address on the managed bridge" instance_starts_with_address

@@ -1,6 +1,8 @@
 {
   "test_tool_options": {
-    "image": "debian:13",
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
     "features": {
       "lxc-distrobuilder": {
         "version": "v3.4.0",

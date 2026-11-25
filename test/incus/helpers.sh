@@ -185,3 +185,17 @@ root_or_admin_member() {
   if ((uid == 0)); then return 0; fi
   id -nG | tr ' ' '\n' | grep -q -x incus-admin
 }
+
+# A user who is neither root nor a member of incus-admin is refused by the daemon's socket. The user nobody runs the
+# client with its configuration in a directory of its own.
+outsider_is_refused() {
+  local conf output
+  local status=0
+  conf="$(mktemp -d)"
+  chmod 0777 "${conf}"
+  output="$(as_root env INCUS_CONF="${conf}" setpriv --reuid nobody --regid nogroup --clear-groups incus list 2>&1)" \
+    || status=$?
+  printf '%s\n' "${output}" | tail -n 3
+  as_root rm -rf "${conf:?}"
+  ((status != 0)) && grep -q -i 'permission' <<<"${output}"
+}

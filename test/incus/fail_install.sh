@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Scenario "fail_install": the CLI installed incus on debian:13 with default options. The script runs the installer
 # again with an invalid value of each option, with /etc/os-release naming an unsupported distribution, with a
-# `uname` that names another architecture, and with a remote user that does not exist: each run must fail with its
+# `dpkg` that names another architecture, and with a remote user that does not exist: each run must fail with its
 # reason before anything changes ("Unsupported distribution", "Unsupported architecture", "Unknown channel"). With a
 # `curl` stand-in that serves the key file, it then checks the key rules ("Another key", "Key unavailable"), and
 # with a codename the repository does not serve, the failing build ("Release the repository does not serve").
@@ -79,12 +79,20 @@ check "Unsupported distribution: the install fails" test "${status}" -ne 0
 check "Unsupported distribution: the failure names the detected distribution" \
   grep -q 'unsupported distribution "alpine"' <<<"${output}"
 
-# Another architecture: `uname --machine` answered by a stand-in first on PATH.
-mkdir "${work_dir}/uname"
-printf '#!/bin/sh\necho riscv64\n' >"${work_dir}/uname/uname"
-chmod +x "${work_dir}/uname/uname"
+# Another architecture: `dpkg --print-architecture` answered by a stand-in first on PATH, which hands every other
+# call to the real dpkg.
+mkdir "${work_dir}/dpkg"
+cat >"${work_dir}/dpkg/dpkg" <<'STAND_IN'
+#!/bin/sh
+if [ "${1-}" = --print-architecture ]; then
+  echo riscv64
+else
+  exec /usr/bin/dpkg "$@"
+fi
+STAND_IN
+chmod +x "${work_dir}/dpkg/dpkg"
 status=0
-output="$(run_installer_with_stand_ins "${work_dir}/uname")" || status=$?
+output="$(run_installer_with_stand_ins "${work_dir}/dpkg")" || status=$?
 printf '%s\n' "${output}"
 check "Unsupported architecture: the install fails" test "${status}" -ne 0
 check "Unsupported architecture: the failure names the detected architecture" \
@@ -117,34 +125,86 @@ cp "${KEY_FIXTURE}" "${output}"
 STAND_IN
 chmod +x "${work_dir}/curl/curl"
 
-# Another key alone: a Debian archive key, armored as a public key block.
+# Prints the binary OpenPGP data of the files given as one armored public key block, of the form the installer
+# accepts: the begin line, an empty line, base64 lines with their checksum line, and the end line. gpg armors the
+# data as a file of another kind, with a comment line; the block's name is changed and the comment dropped.
+armor_key_block() {
+  cat "$@" \
+    | gpg --batch --homedir "${work_dir}/gnupg" --enarmor \
+    | sed -e 's/PGP ARMORED FILE/PGP PUBLIC KEY BLOCK/' -e '/^Comment:/d'
+}
+
+# Runs the installer with the key file $1 as the answer to its download, sets ${output} and ${status}, and shows the
+# end of the output.
+install_with_key() {
+  status=0
+  output="$(run_installer_with_stand_ins "${work_dir}/curl" KEY_FIXTURE="$1")" || status=$?
+  printf '%s\n' "${output}" | tail -n 4
+}
+
+# The last run failed with a message that matches the pattern $1, and changed no package and no configuration.
+key_rejected_with() {
+  ((status != 0)) || return
+  grep -q -E "$1" <<<"${output}" || return
+  [[ "$(packages)" == "${before}" && "$(configuration)" == "${configuration_before}" ]]
+}
+
+# The last run succeeded after it found the pinned fingerprint.
+key_accepted() {
+  ((status == 0)) && grep -q "the key has the pinned fingerprint ${PINNED}" <<<"${output}"
+}
+
+readonly PINNED="4EFC590696CB15B87C73A3AD82CC8797C838DCFD"
 other_key="$(other_key_file)"
-gpg --batch --homedir "${work_dir}/gnupg" --enarmor <"${other_key}" \
-  | sed 's/PGP ARMORED FILE/PGP PUBLIC KEY BLOCK/' >"${work_dir}/other.asc"
-status=0
-output="$(run_installer_with_stand_ins "${work_dir}/curl" KEY_FIXTURE="${work_dir}/other.asc")" || status=$?
-printf '%s\n' "${output}"
-check "Another key: a key with another fingerprint fails the install" test "${status}" -ne 0
-check "Another key: the failure says the key was not accepted and names the pinned fingerprint" \
-  grep -q 'the key was not accepted: .*4EFC590696CB15B87C73A3AD82CC8797C838DCFD' <<<"${output}"
+gpg --batch --homedir "${work_dir}/gnupg" --output "${work_dir}/pinned.gpg" --dearmor "${INCUS_KEY}"
 
-# Another key beside the pinned one, in a second armored block.
-cat "${INCUS_KEY}" "${work_dir}/other.asc" >"${work_dir}/both.asc"
-status=0
-output="$(run_installer_with_stand_ins "${work_dir}/curl" KEY_FIXTURE="${work_dir}/both.asc")" || status=$?
-printf '%s\n' "${output}"
-check "Another key: a key beside the pinned one fails the install" test "${status}" -ne 0
-check "Another key: the failure says the key was not accepted" grep -q 'the key was not accepted' <<<"${output}"
+# A key with another fingerprint, alone, in a well-formed block.
+armor_key_block "${other_key}" >"${work_dir}/other.asc"
+install_with_key "${work_dir}/other.asc"
+check "Another key: a key with another fingerprint is not accepted, and the failure names the pinned one" \
+  key_rejected_with "the key was not accepted: .* holds 1 primary key\\(s\\), .* exactly one, ${PINNED}"
 
-# A second block that is not a public key block, which gpg does not list.
-gpg --batch --homedir "${work_dir}/gnupg" --enarmor <"${other_key}" >"${work_dir}/file-block.asc"
-cat "${INCUS_KEY}" "${work_dir}/file-block.asc" >"${work_dir}/hidden.asc"
-status=0
-output="$(run_installer_with_stand_ins "${work_dir}/curl" KEY_FIXTURE="${work_dir}/hidden.asc")" || status=$?
-printf '%s\n' "${output}"
-check "Another key: a second armored block of another kind fails the install" test "${status}" -ne 0
-check "Another key: the failure counts the armored blocks" \
-  grep -q 'the key was not accepted: .* holds 2 armored block(s), 1 of them a public key block' <<<"${output}"
+# Another key beside the pinned one, inside one well-formed block.
+armor_key_block "${work_dir}/pinned.gpg" "${other_key}" >"${work_dir}/two-keys.asc"
+install_with_key "${work_dir}/two-keys.asc"
+check "Another key: a second key in the same block is not accepted" \
+  key_rejected_with 'the key was not accepted: .* holds 2 primary key\(s\)'
+
+# Another key beside the pinned one, in a second block.
+cat "${INCUS_KEY}" "${work_dir}/other.asc" >"${work_dir}/two-blocks.asc"
+install_with_key "${work_dir}/two-blocks.asc"
+check "Another key: a second armored block is not accepted" \
+  key_rejected_with 'the key was not accepted: .* is not exactly one armored public key block'
+
+# Another key in a block whose begin line gpg does not take for armor, so that gpg lists the pinned key alone,
+# while a tool that starts a block at any line beginning with "-----BEGIN" would read both.
+{
+  echo '-----BEGIN'
+  echo
+  base64 "${other_key}"
+  echo '-----END'
+  cat "${INCUS_KEY}"
+} >"${work_dir}/pseudo-block.asc"
+install_with_key "${work_dir}/pseudo-block.asc"
+check "Another key: a block that only some tools read is not accepted" \
+  key_rejected_with 'the key was not accepted: .* is not exactly one armored public key block'
+
+# The pinned key with a line of text before its block, and with carriage returns at its line ends.
+{
+  echo 'Zabbly signing key'
+  cat "${INCUS_KEY}"
+} >"${work_dir}/text-before.asc"
+install_with_key "${work_dir}/text-before.asc"
+check "the pinned key with text before its block is not accepted" \
+  key_rejected_with 'the key was not accepted: .* is not exactly one armored public key block'
+sed 's/$/\r/' "${INCUS_KEY}" >"${work_dir}/carriage-returns.asc"
+install_with_key "${work_dir}/carriage-returns.asc"
+check "the pinned key with carriage returns is not accepted" \
+  key_rejected_with 'the key was not accepted: .* is not exactly one armored public key block'
+
+# The pinned key as the installer accepts it: the run gets past the key and installs nothing new.
+install_with_key "${INCUS_KEY}"
+check "Pinned key: the installed key file, served again, is accepted" key_accepted
 
 status=0
 output="$(run_installer_with_stand_ins "${work_dir}/curl" KEY_FIXTURE="${work_dir}/missing.asc")" || status=$?

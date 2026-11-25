@@ -62,25 +62,64 @@ check "Run again by hand: the start record is unchanged" test "$(cat "${INCUS_RE
 check "Run again by hand: the instance keeps running" instance_state_is RUNNING
 
 check "The daemon has stopped: the daemon ends" stop_daemon
-check "The daemon has stopped: the script exits zero" as_root "${INCUS_START}"
+# INITIALIZE=none in the environment would record "not requested" if the script read it; the image says minimal.
+check "The daemon has stopped: the script exits zero, with another initialize in its environment" \
+  as_root env INITIALIZE=none "${INCUS_START}"
 check "The daemon has stopped: another daemon process runs" another_daemon_process "${pid_before}"
 check "The daemon has stopped: the daemon answers the remote user" incus list
-check "The daemon has stopped: the record reports a started daemon that was initialized before" \
+check "Environment does not change the start: the record reports a started daemon and the image's initialize" \
   test "$(record_field result):$(record_field initialization)" \
   = "started:skipped: the daemon holds a storage pool or a managed network"
 check "The daemon has stopped: the instance is still listed" incus info "${INCUS_INSTANCE}"
 check "the instance is removed" remove_instance
 
-# A daemon script that fails at once stands in for the package's.
+# A failed first initialization in the record: the start check still exits zero and prints the failure.
+check_reports_failed_initialization() {
+  local output
+  local status=0
+  as_root cp "${INCUS_RECORD}" "${INCUS_RECORD}.saved"
+  sed 's/^initialization=.*/initialization=failed: incus admin init --minimal: stand-in failure/' \
+    "${INCUS_RECORD}.saved" | as_root tee "${INCUS_RECORD}" >/dev/null
+  output="$("${INCUS_CHECK}" 2>&1)" || status=$?
+  as_root mv "${INCUS_RECORD}.saved" "${INCUS_RECORD}"
+  printf '%s\n' "${output}"
+  ((status == 0)) || return
+  grep -q 'the first initialization failed: incus admin init --minimal: stand-in failure' <<<"${output}"
+}
+check "Failed initialization: the start check exits zero and prints the failure" check_reports_failed_initialization
+
+# Puts the script given on standard input in the place of the package's daemon script.
+replace_daemon_script() {
+  as_root tee "${DAEMON_SCRIPT}" >/dev/null
+  as_root chmod +x "${DAEMON_SCRIPT}"
+}
+
+# The record reports a failed start whose reason matches the pattern $1.
+failed_with_reason() {
+  [[ "$(record_field result)" == failed ]] && grep -q -E "^reason=$1" "${INCUS_RECORD}"
+}
+
 check "the daemon ends once more" stop_daemon
 as_root mv "${DAEMON_SCRIPT}" "${DAEMON_SCRIPT}.saved"
-printf '#!/bin/sh\necho "stand-in: the daemon cannot start" >&2\nexit 1\n' | as_root tee "${DAEMON_SCRIPT}" >/dev/null
-as_root chmod +x "${DAEMON_SCRIPT}"
-check "Daemon fails to start: the script still exits zero" as_root "${INCUS_START}"
-check "Daemon fails to start: the record reports a failed start" test "$(record_field result)" = failed
-check "Daemon fails to start: the record names the failure" \
-  bash -c "grep -q '^reason=incusd was started and does not keep running' ${INCUS_RECORD}"
+
+# No daemon script at all.
+check "Daemon fails to start, no daemon script: the script still exits zero" as_root "${INCUS_START}"
+check "Daemon fails to start, no daemon script: the record names the missing script" \
+  failed_with_reason "${DAEMON_SCRIPT}, which the Zabbly package installs, is missing"
+
+# A daemon script that fails at once.
+printf '#!/bin/sh\necho "stand-in: the daemon cannot start" >&2\nexit 1\n' | replace_daemon_script
+check "Daemon fails to start, the daemon ends: the script still exits zero" as_root "${INCUS_START}"
+check "Daemon fails to start, the daemon ends: the record names the failure" \
+  failed_with_reason 'incusd was started and does not keep running'
 check "Not started: the start check exits non-zero with the reason and the log" check_fails_with_reason
+
+# A daemon script that keeps running and never answers: the script gives up after its limit of 60 seconds.
+printf '#!/bin/sh\nwhile :; do sleep 1; done\n' | replace_daemon_script
+check "Daemon fails to start, no answer: the script still exits zero" as_root "${INCUS_START}"
+check "Daemon fails to start, no answer: the record names the limit" \
+  failed_with_reason 'incusd runs but did not answer within 60 seconds'
+as_root kill "$(daemon_pid)"
 as_root mv "${DAEMON_SCRIPT}.saved" "${DAEMON_SCRIPT}"
 
 check "with the package's script back, the script starts the daemon" as_root "${INCUS_START}"

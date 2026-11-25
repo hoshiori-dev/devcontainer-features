@@ -17,11 +17,12 @@ readonly SYSTEM_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/b
 readonly RELEASES="github.com/lxc/distrobuilder/releases"
 readonly KEY="github.com/stgraber.gpg"
 readonly FINGERPRINT="602F567663E593BCBD14F338C638974D64792D67"
-# An earlier release than the installed one, whose real archive and signature the cases alter, and two versions that
-# have no release.
+# An earlier release than the installed one, whose real archive and signature the cases alter, and three versions
+# that have no release.
 readonly EARLIER="3.3.1"
 readonly FAKE="99.1.0"
 readonly ABSENT="99.0.0"
+readonly RENAMED="99.2.0"
 
 case "$(uname -m)" in
   x86_64) arch=amd64 ;;
@@ -208,6 +209,17 @@ run VERSION="${EARLIER}"
 check "Invalid signature: an archive altered after signing fails verification" \
   rejected_with 'verification failed: the signature of .* does not verify'
 mv "${earlier_dir}/distrobuilder-${EARLIER}.tar.gz" "${FIXTURE_DIR}/altered.tar.gz.used"
+
+# Upstream's archive and signature of the earlier release, served under the name of another release: the signature
+# is good and by the release key, and the archive is still not the release that was asked for.
+other_dir="${SERVE}/${RELEASES}/download/v${RENAMED}"
+mkdir -p "${other_dir}"
+cp "${FIXTURE_DIR}/earlier.tar.gz" "${other_dir}/distrobuilder-${RENAMED}.tar.gz"
+/usr/bin/curl --fail --silent --location --output "${other_dir}/distrobuilder-${RENAMED}.tar.gz.asc" \
+  "https://${RELEASES}/download/v${EARLIER}/distrobuilder-${EARLIER}.tar.gz.asc"
+run VERSION="${RENAMED}"
+check "a validly signed archive of another release is not built in place of the selected one" \
+  rejected_with "verification failed: .* outside distrobuilder-${RENAMED}/, so it is not the source of release"
 
 # The Go archive that the earlier release's go.mod names, replaced by a stand-in that does not match upstream's
 # published checksum, and then a checksum that cannot be fetched.

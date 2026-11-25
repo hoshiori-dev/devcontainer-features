@@ -19,6 +19,8 @@ readonly RECORD_TMP_FILE="/run/incus-feature/status.tmp"
 readonly PID_FILE="/run/incus-feature/incusd.pid"
 # Where root's incus client, run by this script, keeps its configuration, so that nothing is written to /root.
 readonly CLIENT_DIR="/run/incus-feature/client"
+# What the incus client printed to standard error in the last query of the daemon's state.
+readonly QUERY_ERROR_FILE="/run/incus-feature/query.err"
 # The script the Zabbly systemd unit runs: it sets the paths of the bundle under /opt/incus and runs the daemon.
 readonly DAEMON_SCRIPT="/opt/incus/lib/systemd/incusd"
 readonly DAEMON_NAME="incusd"
@@ -62,10 +64,11 @@ start_time() {
 }
 
 # Writes the start record, readable by every user and writable by root alone, replacing an earlier one at once.
+# Each command returns on failure by itself: the callers handle a failed write, which switches `set -e` off in here.
 write_record() {
   local start
-  start="$(start_time)"
-  mkdir --parents "${RUN_DIR}"
+  start="$(start_time)" || return
+  mkdir --parents "${RUN_DIR}" || return
   {
     printf 'start=%s\n' "${start}"
     printf 'result=%s\n' "${result}"
@@ -73,7 +76,7 @@ write_record() {
     printf 'initialization=%s\n' "${initialization}"
     printf 'remoteUser=%s\n' "${remote_user}"
     printf 'log=%s\n' "${LOG_FILE}"
-  } >"${RECORD_TMP_FILE}"
+  } >"${RECORD_TMP_FILE}" || return
   mv --force "${RECORD_TMP_FILE}" "${RECORD_FILE}"
 }
 
@@ -161,6 +164,16 @@ daemon_runs() {
   [[ -n "${fields[0]:-}" && "${fields[0]}" != Z ]]
 }
 
+# Removes the process ID file an earlier start of the container left: a restarted container keeps /run, and the
+# number in the file may by now belong to another process. The start record tells the two starts apart.
+remove_earlier_pid_file() {
+  local start current
+  step="removing the process ID file of an earlier start"
+  start="$(recorded start)"
+  current="$(start_time)"
+  if [[ "${start}" != "${current}" ]]; then rm --force "${PID_FILE}"; fi
+}
+
 # Starts the daemon when it does not run, and waits until it answers. A daemon that runs is left alone, also when it
 # does not answer yet.
 start_daemon() {
@@ -196,20 +209,24 @@ start_daemon() {
 # no storage pool and no managed network gets Incus's own minimal initialization; a daemon that holds either is left
 # alone. A failure is recorded and stops nothing.
 apply_initialization() {
-  local pools networks output
+  local pools networks errors output
   if [[ "${initialize}" != minimal ]]; then
     initialization="not requested (initialize is ${initialize})"
     return 0
   fi
   step="reading the daemon's storage pools and networks"
-  if ! pools="$(timeout "${QUERY_SECONDS}" incus storage list --format csv 2>&1)"; then
-    initialization="failed: cannot list the storage pools: ${pools//$'\n'/ }"
+  # Only what the client prints to standard output is the list: a notice on standard error must not read as a pool.
+  if ! pools="$(timeout "${QUERY_SECONDS}" incus storage list --format csv 2>"${QUERY_ERROR_FILE}")"; then
+    errors="$(<"${QUERY_ERROR_FILE}")"
+    initialization="failed: cannot list the storage pools: ${errors//$'\n'/ }"
     log "error: ${initialization}"
     return 0
   fi
   # The columns are the name and whether Incus manages the network; a managed one reads "name,YES".
-  if ! networks="$(timeout "${QUERY_SECONDS}" incus network list --format csv --columns nm 2>&1)"; then
-    initialization="failed: cannot list the networks: ${networks//$'\n'/ }"
+  if ! networks="$(timeout "${QUERY_SECONDS}" incus network list --format csv --columns nm \
+    2>"${QUERY_ERROR_FILE}")"; then
+    errors="$(<"${QUERY_ERROR_FILE}")"
+    initialization="failed: cannot list the networks: ${errors//$'\n'/ }"
     log "error: ${initialization}"
     return 0
   fi
@@ -246,7 +263,10 @@ main() {
     log "${DAEMON_NAME} answers: nothing is changed"
     exit 0
   fi
-  if ! daemon_answers; then start_daemon; fi
+  if ! daemon_answers; then
+    remove_earlier_pid_file
+    start_daemon
+  fi
   apply_initialization
   finish started "${DAEMON_NAME} answers"
 }
