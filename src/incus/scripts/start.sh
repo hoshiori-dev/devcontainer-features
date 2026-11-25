@@ -15,7 +15,7 @@ readonly SETTINGS_FILE="/usr/local/share/incus-feature/settings"
 readonly RUN_DIR="/run/incus-feature"
 readonly RECORD_FILE="/run/incus-feature/status"
 readonly RECORD_TMP_FILE="/run/incus-feature/status.tmp"
-# The process ID of the daemon this script started.
+# The process ID of the daemon this script started, and the start time of the container start it belongs to.
 readonly PID_FILE="/run/incus-feature/incusd.pid"
 # Where root's incus client, run by this script, keeps its configuration, so that nothing is written to /root.
 readonly CLIENT_DIR="/run/incus-feature/client"
@@ -147,13 +147,17 @@ daemon_answers() {
   timeout 5 incus query /1.0 >/dev/null 2>&1
 }
 
-# Succeeds when the daemon this script started runs: the process ID file names a process of the daemon's name that
-# has not ended. A process that ended and that PID 1 has not collected (state Z) still has an entry in /proc; it does
-# not count.
+# Succeeds when the daemon this script started in the current start of the container runs: the process ID file holds
+# the start time of this start and names a process of the daemon's name that has not ended. A restarted container
+# keeps /run, and the number an earlier start wrote may by now belong to another process, so a file of an earlier
+# start counts as none. A process that ended and that PID 1 has not collected (state Z) still has an entry in /proc;
+# it does not count.
 daemon_runs() {
-  local pid comm stat fields
+  local pid start current comm stat fields
   [[ -r "${PID_FILE}" ]] || return 1
-  pid="$(<"${PID_FILE}")"
+  read -r pid start <"${PID_FILE}" || return 1
+  current="$(start_time)"
+  [[ "${start}" == "${current}" ]] || return 1
   [[ "${pid}" =~ ^[0-9]+$ && -r "/proc/${pid}/comm" ]] || return 1
   # The process may end between the looks at /proc.
   comm="$(cat "/proc/${pid}/comm" 2>/dev/null || true)"
@@ -164,20 +168,10 @@ daemon_runs() {
   [[ -n "${fields[0]:-}" && "${fields[0]}" != Z ]]
 }
 
-# Removes the process ID file an earlier start of the container left: a restarted container keeps /run, and the
-# number in the file may by now belong to another process. The start record tells the two starts apart.
-remove_earlier_pid_file() {
-  local start current
-  step="removing the process ID file of an earlier start"
-  start="$(recorded start)"
-  current="$(start_time)"
-  if [[ "${start}" != "${current}" ]]; then rm --force "${PID_FILE}"; fi
-}
-
 # Starts the daemon when it does not run, and waits until it answers. A daemon that runs is left alone, also when it
 # does not answer yet.
 start_daemon() {
-  local deadline
+  local deadline pid current
   # SECONDS counts the seconds since the script started; one attempt to connect may itself take up to 5.
   deadline=$((SECONDS + WAIT_SECONDS))
   if ! daemon_runs; then
@@ -190,7 +184,9 @@ start_daemon() {
     # Deviation from shell-style.md (Commands): the command's name comes from a variable. It holds the readonly
     # path at the top of this file and nothing from outside the script.
     "${DAEMON_SCRIPT}" --group "${ADMIN_GROUP}" --logfile "${LOG_FILE}" </dev/null >"${OUTPUT_FILE}" 2>&1 &
-    printf '%s\n' "$!" >"${PID_FILE}"
+    pid=$!
+    current="$(start_time)"
+    printf '%s %s\n' "${pid}" "${current}" >"${PID_FILE}"
   fi
   step="waiting for ${DAEMON_NAME} to answer"
   while ((SECONDS < deadline)); do
@@ -263,10 +259,7 @@ main() {
     log "${DAEMON_NAME} answers: nothing is changed"
     exit 0
   fi
-  if ! daemon_answers; then
-    remove_earlier_pid_file
-    start_daemon
-  fi
+  if ! daemon_answers; then start_daemon; fi
   apply_initialization
   finish started "${DAEMON_NAME} answers"
 }

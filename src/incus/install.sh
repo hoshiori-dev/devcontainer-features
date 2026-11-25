@@ -131,45 +131,76 @@ install_prerequisites() {
     || fail "apt-get could not install ${packages[*]}; check the messages above"
 }
 
-# Succeeds when the file $1 is exactly one armored OpenPGP public key block and nothing else: the first line is the
-# block's begin line, the last its end line, and every line between holds only base64 characters or is empty (the
-# data, its checksum line, and the blank line after the header). gpg, apt, and other tools each read armored files
-# their own way: one skips text another takes for a second block. A file of this one shape leaves them nothing to
-# read differently, so the key gpg lists below is the only key any of them finds.
+# Succeeds when the file $1 is exactly one armored OpenPGP public key block of the plainest form and nothing else:
+# the begin line; an empty line; lines of base64 characters, of which only the last may end in padding; at most one
+# checksum line ("=" and four base64 characters); and the end line. gpg, apt, and other tools each read armored files
+# their own way: one skips text another takes for a second block, and one stops at a checksum line where another
+# reads on. A file of this one shape gives them a single run of base64 data to read, and nothing else.
 is_single_key_block() {
-  local line last=""
+  local line
   local number=0
+  # What the next line may be: data, the checksum or the end line, the end line only, or nothing more.
+  local expect="data"
+  local data_lines=0
   while IFS= read -r line || [[ -n "${line}" ]]; do
     number=$((number + 1))
     if ((number == 1)); then
       [[ "${line}" == "${KEY_BLOCK_BEGIN}" ]] || return 1
-    elif [[ "${last}" == "${KEY_BLOCK_END}" ]]; then
-      return 1
-    elif [[ "${line}" != "${KEY_BLOCK_END}" && ! "${line}" =~ ^[A-Za-z0-9+/=]*$ ]]; then
+    elif ((number == 2)); then
+      [[ -z "${line}" ]] || return 1
+    elif [[ "${expect}" == data && "${line}" =~ ^[A-Za-z0-9+/]+$ ]]; then
+      data_lines=$((data_lines + 1))
+    elif [[ "${expect}" == data && "${line}" =~ ^[A-Za-z0-9+/]+={1,2}$ ]]; then
+      data_lines=$((data_lines + 1))
+      expect="checksum or end"
+    elif [[ "${expect}" != end && "${expect}" != nothing && "${line}" =~ ^=[A-Za-z0-9+/]{4}$ ]]; then
+      expect="end"
+    elif [[ "${expect}" != nothing && "${line}" == "${KEY_BLOCK_END}" ]]; then
+      expect="nothing"
+    else
       return 1
     fi
-    last="${line}"
   done <"$1"
-  [[ "${last}" == "${KEY_BLOCK_END}" ]]
+  [[ "${expect}" == nothing ]] && ((data_lines > 0))
 }
 
 # Fetches the Zabbly signing key and installs it as KEY_FILE only when the fetched file is exactly one armored
 # public key block that holds exactly one primary key, whose fingerprint is SIGNING_FINGERPRINT. The key is listed,
 # never imported, in a GnuPG home inside the download directory.
 install_key() {
-  local listing primary_keys fingerprint
+  local size text_size listing other_records primary_keys fingerprint
   log "downloading the repository's signing key from ${KEY_URL}"
   fetch --output "${work_dir}/key.asc" "${KEY_URL}" \
     || fail "cannot download ${KEY_URL}; check network access to pkgs.zabbly.com"
+  # A NUL byte is dropped by the shell that reads the lines below, and read by other tools: none is allowed.
+  size="$(wc --bytes <"${work_dir}/key.asc")"
+  text_size="$(tr --delete '\0' <"${work_dir}/key.asc" | wc --bytes)"
+  [[ "${size}" == "${text_size}" ]] \
+    || fail "the key was not accepted: ${KEY_URL} holds NUL bytes, and an armored key file is plain text"
   is_single_key_block "${work_dir}/key.asc" \
-    || fail "the key was not accepted: ${KEY_URL} is not exactly one armored public key block (a begin line, base64" \
-      "lines, and an end line, with nothing before, between, or after); if Zabbly changed the form of its key file," \
-      "the feature needs a new version"
+    || fail "the key was not accepted: ${KEY_URL} is not exactly one armored public key block (a begin line, an" \
+      "empty line, base64 lines, at most one checksum line, and an end line, with nothing else); if Zabbly changed" \
+      "the form of its key file, the feature needs a new version"
   mkdir --mode 0700 "${work_dir}/gnupg"
+  # The data as a reader without any OpenPGP knowledge decodes it must be the data gpg reads: gpg lists and checks
+  # only what it reads itself.
+  grep --invert-match --extended-regexp '^(-----|=....$|$)' "${work_dir}/key.asc" \
+    | base64 --decode >"${work_dir}/key.plain" \
+    || fail "the key was not accepted: the base64 data of ${KEY_URL} cannot be decoded"
+  gpg --batch --homedir "${work_dir}/gnupg" --output "${work_dir}/key.gpg" --dearmor "${work_dir}/key.asc" \
+    || fail "the key was not accepted: ${KEY_URL} does not hold OpenPGP data that gpg can read"
+  cmp --silent "${work_dir}/key.plain" "${work_dir}/key.gpg" \
+    || fail "the key was not accepted: gpg reads other data from ${KEY_URL} than the base64 lines hold"
   listing="$(gpg --batch --homedir "${work_dir}/gnupg" --show-keys --with-colons "${work_dir}/key.asc")" \
     || fail "the key was not accepted: ${KEY_URL} does not hold an OpenPGP key that gpg can read"
-  # In gpg's colon listing a primary key is a "pub" record, followed by an "fpr" record with its fingerprint in
-  # field 10; subkeys are "sub" records with "fpr" records of their own.
+  # In gpg's colon listing a primary public key is a "pub" record, followed by an "fpr" record with its fingerprint
+  # in field 10; its user IDs are "uid" and "uat" records, its subkeys "sub" records with "fpr" records of their
+  # own, and a revoker it names an "rvk" record. Any other record is something else than a public key, such as a
+  # secret key ("sec"), which gpg lists apart and another tool may still take for a key.
+  other_records="$(awk -F: '$1 !~ /^(tru|pub|fpr|uid|uat|sub|rvk)$/ { print $1 }' <<<"${listing}" | sort --unique)"
+  [[ -z "${other_records}" ]] \
+    || fail "the key was not accepted: ${KEY_URL} holds something else than public keys with their user IDs and" \
+      "subkeys (gpg lists records of the kind ${other_records//$'\n'/, })"
   primary_keys="$(awk -F: '$1 == "pub" { count++ } END { print count + 0 }' <<<"${listing}")"
   fingerprint="$(awk -F: '$1 == "pub" { primary = 1 } $1 == "fpr" && primary { print $10; exit }' <<<"${listing}")"
   if [[ "${primary_keys}" != 1 || "${fingerprint}" != "${SIGNING_FINGERPRINT}" ]]; then

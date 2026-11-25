@@ -40,7 +40,7 @@ WINDOWSSUPPORT="${WINDOWSSUPPORT-false}"
 
 # The release to install, without a leading "v"; empty until "latest" is resolved.
 version=""
-# The machine's architecture as Go names it: amd64 or arm64.
+# The image's architecture as dpkg and Go both name it: amd64 or arm64.
 arch=""
 work_dir=""
 staged=""
@@ -123,7 +123,7 @@ validate_options() {
 # Sets arch; fails on an unsupported distribution or architecture before anything changes. Runs before VERSION
 # becomes readonly: /etc/os-release assigns it too.
 detect_platform() {
-  local os_id machine
+  local os_id
   [[ -r /etc/os-release ]] \
     || fail "cannot read /etc/os-release to detect the distribution; use a Debian or Ubuntu image"
   # shellcheck source=/dev/null
@@ -134,11 +134,13 @@ detect_platform() {
   esac
   command -v apt-get >/dev/null 2>&1 \
     || fail "distribution \"${os_id}\" is supported, but the image has no apt-get; use an image that has it"
-  machine="$(uname --machine)"
-  case "${machine}" in
-    x86_64 | amd64) arch="amd64" ;;
-    aarch64 | arm64) arch="arm64" ;;
-    *) fail "unsupported architecture \"${machine}\"; the feature builds distrobuilder for amd64 and arm64 only" ;;
+  command -v dpkg >/dev/null 2>&1 \
+    || fail "distribution \"${os_id}\" is supported, but the image has no dpkg; use an image that has it"
+  # The architecture of the image's packages, which the C compiler targets; Go names amd64 and arm64 the same way.
+  arch="$(dpkg --print-architecture)"
+  case "${arch}" in
+    amd64 | arm64) ;;
+    *) fail "unsupported architecture \"${arch}\"; the feature builds distrobuilder for amd64 and arm64 only" ;;
   esac
 }
 
@@ -311,7 +313,8 @@ fetch_toolchain() {
 }
 
 # Builds distrobuilder from the vendored modules of the verified source, in an environment that holds nothing of the
-# build's own: the toolchain downloads no module and no other toolchain, and its caches live in the work directory.
+# build's own: the toolchain downloads no module and no other toolchain, runs no version control tool of the image
+# (-buildvcs=false), and keeps its caches in the work directory.
 build() {
   log "building distrobuilder ${version} from its vendored modules, without network access"
   mkdir "${work_dir}/home" "${work_dir}/gocache" "${work_dir}/gopath"
@@ -321,7 +324,7 @@ build() {
       HOME="${work_dir}/home" GOROOT="${work_dir}/go" GOCACHE="${work_dir}/gocache" GOPATH="${work_dir}/gopath" \
       GOMODCACHE="${work_dir}/gopath/pkg/mod" GOFLAGS=-mod=vendor GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local \
       GOTELEMETRY=off GOWORK=off GOENV=off CGO_ENABLED=1 \
-      go build -tags "${BUILD_TAGS}" -o "${work_dir}/distrobuilder" ./distrobuilder
+      go build -buildvcs=false -tags "${BUILD_TAGS}" -o "${work_dir}/distrobuilder" ./distrobuilder
   ) || fail "the build of distrobuilder ${version} failed; check the messages above, and set version to another" \
     "release if it persists"
   [[ -f "${work_dir}/distrobuilder" ]] || fail "the build of distrobuilder ${version} produced no executable"

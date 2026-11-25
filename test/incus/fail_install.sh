@@ -189,6 +189,23 @@ install_with_key "${work_dir}/pseudo-block.asc"
 check "Another key: a block that only some tools read is not accepted" \
   key_rejected_with 'the key was not accepted: .* is not exactly one armored public key block'
 
+# Another key after the pinned key's checksum line, inside the one block: gpg stops reading at the checksum line,
+# while a tool that skips such lines would read on and find both keys.
+{
+  sed '$d' "${INCUS_KEY}"
+  base64 "${other_key}"
+  echo '-----END PGP PUBLIC KEY BLOCK-----'
+} >"${work_dir}/after-checksum.asc"
+install_with_key "${work_dir}/after-checksum.asc"
+check "Another key: data after the checksum line of the block is not accepted" \
+  key_rejected_with 'the key was not accepted: .* is not exactly one armored public key block'
+
+# The pinned key with an armor header line, which the plain form the installer accepts does not have.
+sed '1a Comment: stand-in' "${INCUS_KEY}" >"${work_dir}/header.asc"
+install_with_key "${work_dir}/header.asc"
+check "the pinned key with an armor header line is not accepted" \
+  key_rejected_with 'the key was not accepted: .* is not exactly one armored public key block'
+
 # The pinned key with a line of text before its block, and with carriage returns at its line ends.
 {
   echo 'Zabbly signing key'
@@ -233,5 +250,19 @@ check "Release the repository does not serve: the failure names the suite" \
 check "the installed packages are unchanged by the failed run" test "${before}" = "$(packages)"
 check "the installed feature still works: the start check exits zero" "${INCUS_CHECK}"
 
-rm -rf "${work_dir}"
+# A secret key beside the pinned key, in one well-formed block: gpg lists it apart from the public keys, and only
+# where a gpg-agent can start, which is installed for this case alone. The key is made here.
+as_root apt-get update >/dev/null
+as_root env DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends gpg-agent >/dev/null
+before="$(packages)"
+gpg --batch --quiet --homedir "${work_dir}/gnupg" --pinentry-mode loopback --passphrase '' \
+  --quick-generate-key 'Stand-in key' ed25519 sign never
+gpg --batch --quiet --homedir "${work_dir}/gnupg" --pinentry-mode loopback --passphrase '' \
+  --output "${work_dir}/secret.gpg" --export-secret-keys
+armor_key_block "${work_dir}/pinned.gpg" "${work_dir}/secret.gpg" >"${work_dir}/secret-key.asc"
+install_with_key "${work_dir}/secret-key.asc"
+check "Another key: a secret key beside the pinned key is not accepted" \
+  key_rejected_with 'the key was not accepted'
+check "the installed feature still works: the start check exits zero" "${INCUS_CHECK}"
+
 reportResults

@@ -16,7 +16,7 @@ readonly DAEMON_SCRIPT="/opt/incus/lib/systemd/incusd"
 
 # Prints the process ID of the daemon the entrypoint started.
 daemon_pid() {
-  cat "${INCUS_PID_FILE}"
+  cut -d ' ' -f 1 "${INCUS_PID_FILE}"
 }
 
 # Ends the daemon and waits until its process is gone. The instances' own processes outlive it.

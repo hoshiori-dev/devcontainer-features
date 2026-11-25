@@ -35,11 +35,19 @@ FIXTURE_DIR="$(mktemp -d)"
 readonly FIXTURE_DIR
 readonly SERVE="${FIXTURE_DIR}/serve"
 readonly LATEST_LOCATION="${SERVE}/${RELEASES}/latest.location"
-mkdir -p "${FIXTURE_DIR}/bin" "${FIXTURE_DIR}/uname" "${SERVE}/${RELEASES}/download" "${SERVE}/dl.google.com/go"
+mkdir -p "${FIXTURE_DIR}/bin" "${FIXTURE_DIR}/dpkg" "${SERVE}/${RELEASES}/download" "${SERVE}/dl.google.com/go"
 mkdir -m 700 "${FIXTURE_DIR}/gnupg"
 cp "${test_dir}/fixture_curl.sh" "${FIXTURE_DIR}/bin/curl"
-printf '#!/bin/sh\necho riscv64\n' >"${FIXTURE_DIR}/uname/uname"
-chmod +x "${FIXTURE_DIR}/bin/curl" "${FIXTURE_DIR}/uname/uname"
+# A `dpkg` that names another architecture and hands every other call to the real dpkg.
+cat >"${FIXTURE_DIR}/dpkg/dpkg" <<'STAND_IN'
+#!/bin/sh
+if [ "${1-}" = --print-architecture ]; then
+  echo riscv64
+else
+  exec /usr/bin/dpkg "$@"
+fi
+STAND_IN
+chmod +x "${FIXTURE_DIR}/bin/curl" "${FIXTURE_DIR}/dpkg/dpkg"
 chmod a+rx "${FIXTURE_DIR}"
 touch "${FIXTURE_DIR}/requests" "${FIXTURE_DIR}/violations"
 chmod a+rw "${FIXTURE_DIR}/requests" "${FIXTURE_DIR}/violations"
@@ -120,7 +128,7 @@ check "Unsupported distribution: nothing was requested" no_request
 
 : >"${FIXTURE_DIR}/requests"
 status=0
-output="$(as_root env -i PATH="${FIXTURE_DIR}/uname:${FIXTURE_DIR}/bin:${SYSTEM_PATH}" HOME=/root \
+output="$(as_root env -i PATH="${FIXTURE_DIR}/dpkg:${FIXTURE_DIR}/bin:${SYSTEM_PATH}" HOME=/root \
   FIXTURE_DIR="${FIXTURE_DIR}" bash "${test_dir}/_feature/install.sh" 2>&1)" || status=$?
 printf '%s\n' "${output}"
 check "Unsupported architecture: the install fails naming the detected architecture" \

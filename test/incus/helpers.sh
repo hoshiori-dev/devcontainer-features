@@ -39,10 +39,10 @@ record_field() {
   sed -n "s/^$1=//p" "${INCUS_RECORD}"
 }
 
-# The daemon runs: the process ID file names a process called incusd.
+# The daemon runs: the process ID file, whose first field is the process ID, names a process called incusd.
 daemon_runs() {
   local pid
-  pid="$(cat "${INCUS_PID_FILE}")" || return
+  pid="$(cut -d ' ' -f 1 "${INCUS_PID_FILE}")" || return
   [[ "$(cat "/proc/${pid}/comm")" == incusd ]]
 }
 
