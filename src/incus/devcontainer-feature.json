@@ -1,0 +1,38 @@
+{
+  "id": "incus",
+  "version": "1.0.0",
+  "name": "Incus",
+  "description": "Installs Incus from the Zabbly package repository and starts its daemon at every container start in a privileged dev container, so the remote user launches and manages system containers, and optionally virtual machines, inside the container; instances and images persist in a named volume.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/incus",
+  "options": {
+    "channel": {
+      "type": "string",
+      "enum": ["stable", "lts-7.0", "lts-6.0"],
+      "default": "stable",
+      "description": "Zabbly channel to install the newest Incus from: 'stable' (upstream's current feature release) or a long-term support series. An older host kernel may need 'lts-6.0'; see the notes."
+    },
+    "vm": {
+      "type": "boolean",
+      "default": false,
+      "description": "Install the 'incus' package, which adds virtual machine support with a bundled QEMU, in place of 'incus-base' (containers only). Virtual machines need /dev/kvm from the host."
+    },
+    "initialize": {
+      "type": "string",
+      "enum": ["minimal", "none"],
+      "default": "minimal",
+      "description": "What the entrypoint does with a daemon that has no storage pool and no managed network: 'minimal' runs 'incus admin init --minimal', 'none' leaves the initialization to you (for example a preseed; see the notes)."
+    }
+  },
+  "privileged": true,
+  "init": true,
+  "mounts": [
+    {
+      "source": "incus-data-${devcontainerId}",
+      "target": "/var/lib/incus",
+      "type": "volume"
+    }
+  ],
+  "entrypoint": "/usr/local/share/incus-feature/start.sh",
+  "postStartCommand": "/usr/local/share/incus-feature/check.sh",
+  "installsAfter": ["ghcr.io/devcontainers/features/common-utils"]
+}

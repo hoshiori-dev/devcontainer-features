@@ -1,0 +1,20 @@
+{
+  "test_tool_options": {
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "features": {
+      "lxc-distrobuilder": {
+        "version": "v3.4.0",
+        "vmSupport": true,
+        "windowsSupport": true
+      }
+    }
+  },
+  "fail_install": {
+    "image": "debian:12",
+    "features": {
+      "lxc-distrobuilder": {}
+    }
+  }
+}
