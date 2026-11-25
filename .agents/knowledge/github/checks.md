@@ -49,8 +49,9 @@ one of its scenarios runs once per architecture through the shared scenario matr
 - Each push to a PR cancels that PR's running CI; a cancelled run for an older commit is expected.
 - A PR that holds an unarchived change, draft or ready, waits for its archive (Waiting for the archive): its PR workflow
   run succeeds and `spec-archived` is absent. That absence is the merge block (`spec-workflow.md`), not a defect.
-- A failed PR workflow run is a defect: a wrong title, an incomplete description, or `archive-verdict` failing because
-  the checker itself broke.
+- A failed PR workflow run is a defect: a wrong title, an incomplete description (a template heading missing, or the
+  security checklist item missing, reworded, or unticked — tick it in the body the publish gate reviews, the
+  `github-project-workflow` skill), or `archive-verdict` failing because the checker itself broke.
 - Diagnose failures with `.agents/skills/github-project-workflow/scripts/run_log_digest.ts --run-id <id>` or
   `gh run view <id> --job <job-id> --log-failed`; never read a full log.
 - Reproduce a test job locally with the command in the map; `--preserve` keeps the test containers, `--keep` keeps the
