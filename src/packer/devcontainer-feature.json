@@ -1,0 +1,15 @@
+{
+  "id": "packer",
+  "version": "1.0.0",
+  "name": "Packer",
+  "description": "Installs HashiCorp Packer's packer command, which builds machine images from templates, from its signature-verified release archive.",
+  "documentationURL": "https://github.com/hoshiori-dev/devcontainer-features/tree/main/src/packer",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "1.15.4"],
+      "default": "latest",
+      "description": "Packer version to install: 'latest', the release upstream reports as current, or a release such as 1.15.4 (a leading 'v' is accepted; 1.7.0 or later)."
+    }
+  }
+}
