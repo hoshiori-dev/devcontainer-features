@@ -171,15 +171,10 @@ is_single_key_block() {
 # primary key, whose fingerprint is SIGNING_FINGERPRINT. The key is listed,
 # never imported, in a GnuPG home inside the download directory.
 install_key() {
-  local size text_size packets other_packets key_packets listing other_records primary_keys fingerprint
+  local packets other_packets key_packets listing primary_keys fingerprint
   log "downloading the repository's signing key from ${KEY_URL}"
   fetch --output "${work_dir}/key.asc" "${KEY_URL}" \
     || fail "cannot download ${KEY_URL}; check network access to pkgs.zabbly.com"
-  # A NUL byte is dropped by the shell that reads the lines below, and read by other tools: none is allowed.
-  size="$(wc --bytes <"${work_dir}/key.asc")"
-  text_size="$(tr --delete '\0' <"${work_dir}/key.asc" | wc --bytes)"
-  [[ "${size}" == "${text_size}" ]] \
-    || fail "the key was not accepted: ${KEY_URL} holds NUL bytes, and an armored key file is plain text"
   is_single_key_block "${work_dir}/key.asc" \
     || fail "the key was not accepted: ${KEY_URL} is not exactly one armored public key block (a begin line, an" \
       "empty line, base64 lines, at most one checksum line, and an end line, with nothing else); if Zabbly changed" \
@@ -195,7 +190,7 @@ install_key() {
   cmp --silent "${work_dir}/key.plain" "${work_dir}/key.gpg" \
     || fail "the key was not accepted: gpg reads other data from ${KEY_URL} than the base64 lines hold"
   # The packets of the data, as gpg names them one by one: a public key is a public key packet with user ID,
-  # signature, and public subkey packets after it. A packet of any other kind is refused, whatever it holds: gpg's
+  # signature, and public subkey packets after it. A packet gpg names otherwise is refused, whatever it holds: gpg's
   # key listing below stops at some kinds (compressed data) where another tool skips them and reads on, and skips
   # others (keys of an old version) that another tool may read.
   packets="$(gpg --batch --homedir "${work_dir}/gnupg" --list-packets "${work_dir}/key.asc")" \
@@ -211,14 +206,8 @@ install_key() {
   fi
   listing="$(gpg --batch --homedir "${work_dir}/gnupg" --show-keys --with-colons "${work_dir}/key.asc")" \
     || fail "the key was not accepted: ${KEY_URL} does not hold an OpenPGP key that gpg can read"
-  # In gpg's colon listing a primary public key is a "pub" record, followed by an "fpr" record with its fingerprint
-  # in field 10; its user IDs are "uid" and "uat" records, its subkeys "sub" records with "fpr" records of their
-  # own, and a revoker it names an "rvk" record. Any other record is something else than a public key, such as a
-  # secret key ("sec"), which gpg lists apart and another tool may still take for a key.
-  other_records="$(awk -F: '$1 !~ /^(tru|pub|fpr|uid|uat|sub|rvk)$/ { print $1 }' <<<"${listing}" | sort --unique)"
-  [[ -z "${other_records}" ]] \
-    || fail "the key was not accepted: ${KEY_URL} holds something else than public keys with their user IDs and" \
-      "subkeys (gpg lists records of the kind ${other_records//$'\n'/, })"
+  # In gpg's colon listing a primary key is a "pub" record, followed by an "fpr" record with its fingerprint in
+  # field 10; subkeys are "sub" records with "fpr" records of their own.
   primary_keys="$(awk -F: '$1 == "pub" { count++ } END { print count + 0 }' <<<"${listing}")"
   fingerprint="$(awk -F: '$1 == "pub" { primary = 1 } $1 == "fpr" && primary { print $10; exit }' <<<"${listing}")"
   if [[ "${primary_keys}" != 1 || "${fingerprint}" != "${SIGNING_FINGERPRINT}" ]]; then

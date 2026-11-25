@@ -48,6 +48,6 @@
       verify with `just test-global`.
 - [x] 4.2 Run `just docs`, and translate the two new rows of the root `README.md` into `README.zh.md`; verify with
       `just docs-check`.
-- [ ] 4.3 Run `just check`, `just test` and `just test-scenarios` for both features, push, and read the PR's CI run on
+- [x] 4.3 Run `just check`, `just test` and `just test-scenarios` for both features, push, and read the PR's CI run on
       amd64 and arm64; settle the design's open questions from it, and record every result in the PR's Validation
       section.
