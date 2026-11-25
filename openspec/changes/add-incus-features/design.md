@@ -159,8 +159,14 @@ says nothing about whose tool it is; decided by the maintainer.
 - `version` defaults to `latest`, as in the other features that build or download a release.
 - `vmSupport` and `windowsSupport` default to `false`: both pull in tools most image builds never run, and both need a
   privileged container the feature does not declare.
-- Rejected: a `preseed` option holding YAML or a path. A multi-line value in a feature option is hard to read in
-  `devcontainer.json`, and a path would make the entrypoint read a file of the workspace as root.
+- Rejected: a `preseed` option holding YAML or a path, and a third `initialize` value that reads a preseed file. A
+  multi-line value in a feature option is hard to read in `devcontainer.json`; a path would make the entrypoint read a
+  file of the workspace as root; and a file at a fixed path in the image is something a feature option cannot supply. A
+  preseed is Incus's complete initialization (server configuration, networks, storage pools, profiles, projects), and it
+  stays available without an option: `initialize` `none` and a `postCreateCommand` that runs
+  `incus admin init --preseed` on a file of the workspace, where both are visible. The entrypoint has waited for the
+  daemon before any lifecycle command runs, and applying one preseed twice succeeded and changed nothing (checked on
+  2026-11-25 with a `dir` pool, a bridge, and the `default` profile). `NOTES.md` gives the configuration.
 - Rejected: a `storage` option for Btrfs, ZFS, or LVM pools. Each needs kernel support and tools the feature cannot
   check at build time; `initialize` `none` leaves the way open.
 - Rejected: a `ui` option. The Zabbly UI package depends on the `incus` package and needs a listening HTTPS address.

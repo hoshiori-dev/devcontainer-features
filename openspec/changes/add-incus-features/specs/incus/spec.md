@@ -300,6 +300,24 @@ When the daemon holds a storage pool or a managed network, the entrypoint SHALL 
 - **WHEN** `initialize` is `none` and the developer runs `incus admin init` with a preseed after the start
 - **THEN** the daemon holds what the preseed describes, and later starts change none of it
 
+### Requirement: Documented initialization by preseed
+
+`NOTES.md` SHALL give the configuration for a developer's own initialization: `initialize` `none`, a preseed file in the
+workspace, and a `postCreateCommand` in `devcontainer.json` that runs `incus admin init --preseed` on it. It SHALL say
+that the command runs again when the container is created again, against the daemon the volume already holds, and that
+Incus applies an unchanged preseed again without error.
+
+#### Scenario: Notes give the preseed configuration
+
+- **WHEN** a developer reads the feature's `NOTES.md`
+- **THEN** it shows the option value, the lifecycle command, and an example preseed that declares a storage pool, a
+  network, and the `default` profile's devices
+
+#### Scenario: Preseed applied twice
+
+- **WHEN** `initialize` is `none` and the same preseed is applied to the daemon a second time
+- **THEN** the command exits 0 and the storage pools and networks are as after the first time
+
 ### Requirement: Access for the remote user
 
 The feature SHALL add the remote user to the `incus-admin` group at build time, so that the user controls the daemon
