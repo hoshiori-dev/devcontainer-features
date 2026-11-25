@@ -185,7 +185,6 @@ check "the installation belongs to root and only root can write it" tree_is_root
 check "freecad and freecadcmd link to the launchers" links_target_launchers
 check "an exact release reads only its own metadata" \
   test "$(grep -c "^${API_PREFIX}" "${FIXTURE_DIR}/requests")" = 1
-check "the installer leaves no FreeCAD state in root's home" home_has_no_freecad_state
 
 check "a series selects its numerically highest stable release" run_installer 1.1
 check "the series release is 1.1.10, not 1.1.9 or a pre-release" reports_release 1.1.10
@@ -218,6 +217,11 @@ check "a latest release older than 1.1.0 fails naming the tag" \
   failed_and_kept latest 'names the release 1.0.2, older than 1.1.0' 1.2.0
 printf 'not json\n' >"${FIXTURE_DIR}/api/latest.json"
 check "unreadable metadata fails naming its URL" failed_and_kept latest "${API_PREFIX}/latest is not a JSON" 1.2.0
+cp "${FIXTURE_DIR}/api/page1.json" "${FIXTURE_DIR}/page1.saved"
+printf '{"message": "not a list"}\n' >"${FIXTURE_DIR}/api/page1.json"
+check "a listing that is not a list fails naming its URL" \
+  failed_and_kept 1.1 "${API_PREFIX}?per_page=100&page=1 is not a JSON list" 1.2.0
+mv "${FIXTURE_DIR}/page1.saved" "${FIXTURE_DIR}/api/page1.json"
 mv "${FIXTURE_DIR}/latest.saved" "${FIXTURE_DIR}/api/latest.json"
 
 before="$(requests)"

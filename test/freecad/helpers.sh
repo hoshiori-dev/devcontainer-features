@@ -21,14 +21,21 @@ readonly SCRATCH
 newest_release() {
   local series="${1-}"
   local location
+  local page
+  local listing
+  local tags=""
   if [[ -z "${series}" ]]; then
     location="$(curl -fsS -o /dev/null -w '%{redirect_url}' "${LATEST_URL}")"
     printf '%s\n' "${location##*/}"
     return
   fi
-  curl -fsS "${RELEASES_API}?per_page=100" "${RELEASES_API}?per_page=100&page=2" \
-    | jq -r '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
-    | grep -E "^${series//./\\.}\.[0-9]+$" | sort -V -r | head -n 1
+  # Weekly builds fill the listing, so read every page: the series' releases move down it over time.
+  for page in $(seq 1 10); do
+    listing="$(curl -fsS "${RELEASES_API}?per_page=100&page=${page}")"
+    tags+="$(jq -r '.[] | select(.draft == false and .prerelease == false) | .tag_name' <<<"${listing}")"$'\n'
+    if [[ "$(jq 'length' <<<"${listing}")" -lt 100 ]]; then break; fi
+  done
+  grep -E "^${series//./\\.}\.[0-9]+$" <<<"${tags}" | sort -V -r | head -n 1
 }
 
 # Succeeds when freecadcmd, run through the command prefix in the remaining arguments (such as `sudo -n`), reports

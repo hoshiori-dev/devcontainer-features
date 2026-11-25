@@ -102,7 +102,8 @@ Three things matter when a script or an agent depends on the result:
   `timeout`.
 
 `freecadcmd` prints its banner and progress on the same streams as the script's output; write results a caller needs to
-a file instead of parsing them from the output.
+a file instead of parsing them from the output. `freecad -c` also runs a script without the GUI, but it then opens an
+interactive Python console and waits for input, so use `freecadcmd` for unattended runs.
 
 ## Using the GUI
 

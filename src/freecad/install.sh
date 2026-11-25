@@ -63,7 +63,9 @@ cleanup() {
       mv -- "${backup}" "${TARGET}"
       link_commands
     else
-      for name in "${COMMANDS[@]}"; do rm --force "${COMMAND_DIR}/${name}"; done
+      for name in "${COMMANDS[@]}"; do
+        rm --force "${COMMAND_DIR}/${name}"
+      done
     fi
   elif [[ -n "${backup}" && ! -e "${TARGET}" ]]; then
     mv -- "${backup}" "${TARGET}"
@@ -221,6 +223,7 @@ resolve_in_series() {
   local page
   local url
   local entries
+  local tags
   local tag
   local best=-1
   for ((page = 1; page <= LISTING_PAGES; page++)); do
@@ -229,13 +232,16 @@ resolve_in_series() {
     fetch_metadata "${url}" "${work}/listing.json" \
       || fail "cannot read the release listing ${url}; check connectivity, and retry later if GitHub's rate limit" \
         "for unauthenticated requests was reached"
-    entries="$(jq 'length' "${work}/listing.json")" \
-      || fail "the release listing ${url} is not a JSON list; retry later"
+    entries="$(jq 'arrays | length' "${work}/listing.json")" \
+      || fail "the release listing ${url} is not JSON; retry later"
+    [[ -n "${entries}" ]] || fail "the release listing ${url} is not a JSON list; retry later"
+    tags="$(jq --raw-output '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
+      "${work}/listing.json")" \
+      || fail "the release listing ${url} holds entries that are not releases; retry later"
     while IFS= read -r tag; do
       [[ "${tag}" =~ ^${1//./\\.}\.(0|[1-9][0-9]*)$ ]] || continue
       if ((BASH_REMATCH[1] > best)); then best="${BASH_REMATCH[1]}"; fi
-    done < <(jq --raw-output '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
-      "${work}/listing.json")
+    done <<<"${tags}"
     if ((entries < LISTING_PAGE_SIZE)); then
       if ((best >= 0)); then version="$1.${best}"; fi
       return
@@ -309,7 +315,6 @@ select_asset() {
 # start, so the check runs with a home inside the staging directory and leaves root's home alone.
 reports_version() {
   local output
-  mkdir --parents "${work}/home"
   output="$(env --unset=XDG_CONFIG_HOME --unset=XDG_DATA_HOME --unset=XDG_CACHE_HOME HOME="${work}/home" \
     "$1" --version)" || return
   grep --quiet --extended-regexp "^FreeCAD ${version//./\\.}( |\$)" <<<"${output}"
@@ -381,7 +386,9 @@ install_release() {
   "${work}/new/usr/bin/python" -I -W ignore -m compileall -qq -j 0 -s "${work}/new" -p "${TARGET}" "${work}/new/usr" \
     || log "some bundled Python sources do not compile and stay as upstream ships them"
   mkdir "${work}/new/bin"
-  for name in "${COMMANDS[@]}"; do write_launcher "${name}"; done
+  for name in "${COMMANDS[@]}"; do
+    write_launcher "${name}"
+  done
   printf '%s\n' "${version}" >"${work}/new/${MARKER}"
   # The unpacked files keep the ownership and modes of upstream's build, some of them group-writable.
   chown --recursive --no-dereference root:root "${work}/new"
@@ -422,6 +429,7 @@ main() {
   mkdir --parents "${STAGING%/*}"
   work="$(mktemp --directory "${STAGING}")"
   trap cleanup EXIT
+  mkdir "${work}/home"
   resolve_release
   if installed_healthy; then
     log "FreeCAD ${version} is already installed at ${TARGET}; skipping the download"

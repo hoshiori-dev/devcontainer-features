@@ -49,9 +49,11 @@ check "freecadcmd reports the newest stable release" reports_release "${latest}"
 check "the marker records the installed release" marker_records "${latest}"
 check "freecad and freecadcmd link to the launchers" links_target_launchers
 check "the feature adds no other command" adds_two_commands
-check "the bundled Python, pip, and Gmsh stay off PATH" bash -c '! command -v gmsh && ! command -v ccx && ! command -v pip'
+check "the bundled Gmsh, CalculiX, and pip stay off PATH" \
+  bash -c '! command -v gmsh && ! command -v ccx && ! command -v pip'
 check "the installation belongs to root and only root can write it" tree_is_root_only
-check "the downloaded AppImage is not kept" bash -c '! compgen -G "/opt/.freecad-feature.*" && ! compgen -G "/opt/freecad/*.AppImage"'
+check "the downloaded AppImage is not kept" \
+  bash -c '! compgen -G "/opt/.freecad-feature.*" && ! compgen -G "/opt/freecad/*.AppImage"'
 check "a first start keeps FreeCAD's defaults" fresh_user_defaults
 check "a script models a solid and exports STEP and STL" models_and_exports
 check "a script's sys.exit status reaches the caller" exit_status_reaches_caller
