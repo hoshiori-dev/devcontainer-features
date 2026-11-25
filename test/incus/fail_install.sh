@@ -168,7 +168,7 @@ check "Another key: a key with another fingerprint is not accepted, and the fail
 armor_key_block "${work_dir}/pinned.gpg" "${other_key}" >"${work_dir}/two-keys.asc"
 install_with_key "${work_dir}/two-keys.asc"
 check "Another key: a second key in the same block is not accepted" \
-  key_rejected_with 'the key was not accepted: .* holds 2 primary key\(s\)'
+  key_rejected_with 'the key was not accepted: .* holds 2 public key packet\(s\)'
 
 # Another key beside the pinned one, in a second block.
 cat "${INCUS_KEY}" "${work_dir}/other.asc" >"${work_dir}/two-blocks.asc"
@@ -199,6 +199,18 @@ check "Another key: a block that only some tools read is not accepted" \
 install_with_key "${work_dir}/after-checksum.asc"
 check "Another key: data after the checksum line of the block is not accepted" \
   key_rejected_with 'the key was not accepted: .* is not exactly one armored public key block'
+
+# Another key after a compressed data packet, behind the pinned key in one well-formed block: gpg's key listing
+# ends at the compressed packet, while a tool that skips the packet by its length would read the second key. gpg
+# itself makes the packet, from a line of text.
+echo 'stand-in' | gpg --batch --homedir "${work_dir}/gnupg" --compress-algo zip --store \
+  --output "${work_dir}/compressed.gpg"
+armor_key_block "${work_dir}/pinned.gpg" "${work_dir}/compressed.gpg" "${other_key}" >"${work_dir}/compressed.asc"
+install_with_key "${work_dir}/compressed.asc"
+# gpg either names the compressed packet or, depending on its version, fails to list the packets at all; the
+# installer refuses the file at that step in both cases.
+check "Another key: a key behind a compressed data packet is not accepted" \
+  key_rejected_with 'the key was not accepted: (gpg cannot list the OpenPGP packets|.* packets of the kind "compressed)'
 
 # The pinned key with an armor header line, which the plain form the installer accepts does not have.
 sed '1a Comment: stand-in' "${INCUS_KEY}" >"${work_dir}/header.asc"
@@ -262,7 +274,9 @@ gpg --batch --quiet --homedir "${work_dir}/gnupg" --pinentry-mode loopback --pas
 armor_key_block "${work_dir}/pinned.gpg" "${work_dir}/secret.gpg" >"${work_dir}/secret-key.asc"
 install_with_key "${work_dir}/secret-key.asc"
 check "Another key: a secret key beside the pinned key is not accepted" \
-  key_rejected_with 'the key was not accepted'
+  key_rejected_with 'the key was not accepted: .* packets of the kind "secret key packet'
 check "the installed feature still works: the start check exits zero" "${INCUS_CHECK}"
 
+gpgconf --homedir "${work_dir}/gnupg" --kill gpg-agent || true
+rm -rf "${work_dir:?}"
 reportResults

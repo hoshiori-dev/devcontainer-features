@@ -23,6 +23,8 @@ readonly SIGNING_FINGERPRINT="4EFC590696CB15B87C73A3AD82CC8797C838DCFD"
 # The first and the last line of an armored OpenPGP public key block.
 readonly KEY_BLOCK_BEGIN="-----BEGIN PGP PUBLIC KEY BLOCK-----"
 readonly KEY_BLOCK_END="-----END PGP PUBLIC KEY BLOCK-----"
+# The kinds of OpenPGP packet a public key is made of, as `gpg --list-packets` names them.
+readonly KEY_PACKETS="public key packet|user ID packet|signature packet|public sub key packet"
 readonly REPOSITORY_URL="https://pkgs.zabbly.com/incus"
 readonly KEYRINGS_DIR="/etc/apt/keyrings"
 readonly KEY_FILE="/etc/apt/keyrings/zabbly.asc"
@@ -165,10 +167,11 @@ is_single_key_block() {
 }
 
 # Fetches the Zabbly signing key and installs it as KEY_FILE only when the fetched file is exactly one armored
-# public key block that holds exactly one primary key, whose fingerprint is SIGNING_FINGERPRINT. The key is listed,
+# public key block that holds the packets of exactly one public key and nothing else, and gpg lists exactly one
+# primary key, whose fingerprint is SIGNING_FINGERPRINT. The key is listed,
 # never imported, in a GnuPG home inside the download directory.
 install_key() {
-  local size text_size listing other_records primary_keys fingerprint
+  local size text_size packets other_packets key_packets listing other_records primary_keys fingerprint
   log "downloading the repository's signing key from ${KEY_URL}"
   fetch --output "${work_dir}/key.asc" "${KEY_URL}" \
     || fail "cannot download ${KEY_URL}; check network access to pkgs.zabbly.com"
@@ -191,6 +194,21 @@ install_key() {
     || fail "the key was not accepted: ${KEY_URL} does not hold OpenPGP data that gpg can read"
   cmp --silent "${work_dir}/key.plain" "${work_dir}/key.gpg" \
     || fail "the key was not accepted: gpg reads other data from ${KEY_URL} than the base64 lines hold"
+  # The packets of the data, as gpg names them one by one: a public key is a public key packet with user ID,
+  # signature, and public subkey packets after it. A packet of any other kind is refused, whatever it holds: gpg's
+  # key listing below stops at some kinds (compressed data) where another tool skips them and reads on, and skips
+  # others (keys of an old version) that another tool may read.
+  packets="$(gpg --batch --homedir "${work_dir}/gnupg" --list-packets "${work_dir}/key.asc")" \
+    || fail "the key was not accepted: gpg cannot list the OpenPGP packets of ${KEY_URL}"
+  packets="$(sed --quiet --regexp-extended 's/^:([A-Za-z ]+ packet):.*/\1/p' <<<"${packets}")"
+  other_packets="$(grep --invert-match --line-regexp --extended-regexp "${KEY_PACKETS}" <<<"${packets}" \
+    | sort --unique || true)"
+  key_packets="$(grep --count --line-regexp 'public key packet' <<<"${packets}" || true)"
+  if [[ -n "${other_packets}" || "${key_packets}" != 1 ]]; then
+    fail "the key was not accepted: ${KEY_URL} holds ${key_packets} public key packet(s) and packets of the kind" \
+      "\"${other_packets//$'\n'/, }\", and the feature accepts exactly one public key packet with its user ID," \
+      "signature, and public subkey packets"
+  fi
   listing="$(gpg --batch --homedir "${work_dir}/gnupg" --show-keys --with-colons "${work_dir}/key.asc")" \
     || fail "the key was not accepted: ${KEY_URL} does not hold an OpenPGP key that gpg can read"
   # In gpg's colon listing a primary public key is a "pub" record, followed by an "fpr" record with its fingerprint

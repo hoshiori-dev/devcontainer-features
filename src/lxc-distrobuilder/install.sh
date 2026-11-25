@@ -245,7 +245,9 @@ verify_source() {
   gpg --batch --homedir "${work_dir}/gnupg" --output "${work_dir}/keys.gpg" --dearmor "${work_dir}/keys.asc" \
     2>"${work_dir}/gpg-key.log" \
     || fail "cannot read the keys from ${KEY_URL}: $(<"${work_dir}/gpg-key.log")"
-  if ! gpg --batch --homedir "${work_dir}/gnupg" --no-default-keyring --keyring "${work_dir}/keys.gpg" \
+  # --no-sig-cache: a keyring file can carry trust packets that mark a signature on a key as already checked, and
+  # gpg would then take a subkey for the pinned key's without checking its binding. Every signature is checked.
+  if ! gpg --batch --homedir "${work_dir}/gnupg" --no-default-keyring --keyring "${work_dir}/keys.gpg" --no-sig-cache \
     --status-file "${work_dir}/gpg-status" --verify "${work_dir}/${archive}.asc" "${work_dir}/${archive}" \
     2>"${work_dir}/gpg-verify.log"; then
     fail "verification failed: the signature of ${url} does not verify: $(<"${work_dir}/gpg-verify.log")"
